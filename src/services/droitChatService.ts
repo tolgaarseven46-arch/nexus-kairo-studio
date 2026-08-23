@@ -1,11 +1,14 @@
 import {
   DroitPersonalityTraits,
   TestMessage,
+  DroitDynamicState,
+  ReasoningTrace,
 } from '../types/nexus';
 import {
   computeBehaviorProfile,
   BehaviorLayerProfile,
 } from './droitBehaviorEngine';
+import { saveKdmInteraction, loadKdmState } from './kdmPersistenceService';
 
 export interface SendKairoChatOptions {
   userMessage: string;
@@ -21,13 +24,11 @@ export interface SendKairoChatOptions {
 export interface KairoChatResponse {
   reply: string;
   profile: BehaviorLayerProfile;
+  dynamicState?: DroitDynamicState;
+  reasoningTrace?: ReasoningTrace;
 }
 
 export const droitChatService = {
-  /**
-   * Processes the user message through the Personality Behavior Layer
-   * and sends the synthesized character prompt to the AI backend.
-   */
   async sendMessage({
     userMessage,
     personality,
@@ -38,44 +39,45 @@ export const droitChatService = {
       raceName: 'Sentetik Droit',
     },
   }: SendKairoChatOptions): Promise<KairoChatResponse> {
-    // 1. Synthesize the runtime behavior profile from current slider values
     const behaviorProfile = computeBehaviorProfile(personality, userMessage);
+    const persistedState = await loadKdmState().catch(() => null);
 
-    // 2. Prepare payload for the server-side Gemini route
     const payload = {
       userMessage,
       character: characterInfo,
       personality,
       behaviorProfile,
-      history: history.map((m) => ({
-        sender: m.sender,
-        text: m.text,
-      })),
+      dynamicState: persistedState,
+      history: history.map((m) => ({ sender: m.sender, text: m.text })),
     };
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        const message = errorData.error || `Sunucu hatası: ${res.status}`;
-        console.error('Kairo AI API request failed:', message);
-        throw new Error(message);
+        throw new Error(errorData.error || `Sunucu hatası: ${res.status}`);
       }
 
       const data = await res.json();
       const reply = data.reply || '';
+      const dynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined;
+      const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
 
-      return {
-        reply,
-        profile: behaviorProfile,
-      };
+      if (dynamicState && reasoningTrace) {
+        void saveKdmInteraction({
+          dynamicState,
+          reasoningTrace,
+          lastUserMessage: userMessage,
+          reply,
+        }).catch((error) => console.warn('KDM persistence failed:', error));
+      }
+
+      return { reply, profile: behaviorProfile, dynamicState, reasoningTrace };
     } catch (err: any) {
       console.error('Kairo Chat Service error:', err);
       throw err;
