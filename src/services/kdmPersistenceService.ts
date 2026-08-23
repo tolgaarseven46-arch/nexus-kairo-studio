@@ -13,31 +13,43 @@ export interface KdmMemoryItem { userMessage: string; reply: string; createdAt?:
 export interface KairoUserMemory { userName?: string; preferences: string[]; facts: string[]; goals: string[]; notes: string[]; updatedAt: string; }
 
 const emptyUserMemory = (): KairoUserMemory => ({ preferences: [], facts: [], goals: [], notes: [], updatedAt: new Date().toISOString() });
-const uniqueRecent = (items: string[]) => [...new Set(items.filter(Boolean))].slice(-20);
+const uniqueRecent = (items: string[]) => [...new Set(items.map((item) => item.trim()).filter(Boolean))].slice(-20);
 
 function extractMemoryCandidates(userMessage: string): Partial<KairoUserMemory> {
   const text = userMessage.trim();
   const result: Partial<KairoUserMemory> = {};
   const name = text.match(/(?:benim adım|adım|ismim)\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9_-]{2,40})/i);
   if (name) result.userName = name[1];
-  if (/(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor)/i.test(text)) result.preferences = [text];
-  if (/(?:istiyorum|hedefim|planım)/i.test(text)) result.goals = [text];
+
+  if (/(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor|ilgileniyorum|ilgimi çekiyor)/i.test(text)) {
+    result.preferences = [text];
+  }
+  if (/(?:istiyorum|hedefim|amacım|planım|üzerinde çalışıyorum|geliştiriyorum)/i.test(text)) {
+    result.goals = [text];
+  }
+  if (/(?:yaşım|yaşındayım|mesleğim|işim|şehirde yaşıyorum|yaşıyorum|çalışıyorum)/i.test(text)) {
+    result.facts = [text];
+  }
   return result;
 }
 
 async function updateStructuredUserMemory(userMessage: string): Promise<void> {
   const candidate = extractMemoryCandidates(userMessage);
-  if (!candidate.userName && !candidate.preferences?.length && !candidate.goals?.length) return;
+  if (!candidate.userName && !candidate.preferences?.length && !candidate.facts?.length && !candidate.goals?.length) return;
+
   const ref = doc(db, USER_MEMORY_COLLECTION, KAIRO_ID, 'entries', USER_MEMORY_DOC);
   let current = emptyUserMemory();
   try {
     const snapshot = await getDocs(query(collection(db, USER_MEMORY_COLLECTION, KAIRO_ID, 'entries'), orderBy('updatedAt', 'desc'), limit(1)));
     if (!snapshot.empty) current = { ...current, ...(snapshot.docs[0].data() as Partial<KairoUserMemory>) };
-  } catch (error) { console.warn('[Kairo User Memory] read failed:', error); }
+  } catch (error) {
+    console.warn('[Kairo User Memory] read failed:', error);
+  }
+
   await setDoc(ref, {
     userName: candidate.userName || current.userName,
     preferences: uniqueRecent([...current.preferences, ...(candidate.preferences || [])]),
-    facts: uniqueRecent(current.facts),
+    facts: uniqueRecent([...current.facts, ...(candidate.facts || [])]),
     goals: uniqueRecent([...current.goals, ...(candidate.goals || [])]),
     notes: uniqueRecent(current.notes),
     updatedAt: new Date().toISOString(),
@@ -88,6 +100,8 @@ export async function loadRecentKdmMemory(maxItems = 6): Promise<KdmMemoryItem[]
         notes: Array.isArray(profile.notes) ? profile.notes : [],
       }) });
     }
-  } catch (error) { console.warn('[Kairo User Memory] profile load skipped:', error); }
+  } catch (error) {
+    console.warn('[Kairo User Memory] profile load skipped:', error);
+  }
   return memories;
 }
