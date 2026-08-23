@@ -8,29 +8,9 @@ const TRACE_COLLECTION = 'kdmTraces';
 const USER_MEMORY_COLLECTION = 'kairoMemory';
 const USER_MEMORY_DOC = 'profile';
 
-export interface KdmPersistencePayload {
-  dynamicState: DroitDynamicState;
-  reasoningTrace: ReasoningTrace;
-  lastUserMessage: string;
-  reply: string;
-}
-
-export interface KdmMemoryItem {
-  userMessage: string;
-  reply: string;
-  createdAt?: string;
-  reasoningTrace?: ReasoningTrace;
-  dynamicState?: DroitDynamicState;
-}
-
-export interface KairoUserMemory {
-  userName?: string;
-  preferences: string[];
-  facts: string[];
-  goals: string[];
-  notes: string[];
-  updatedAt: string;
-}
+export interface KdmPersistencePayload { dynamicState: DroitDynamicState; reasoningTrace: ReasoningTrace; lastUserMessage: string; reply: string; }
+export interface KdmMemoryItem { userMessage: string; reply: string; createdAt?: string; reasoningTrace?: ReasoningTrace; dynamicState?: DroitDynamicState; }
+export interface KairoUserMemory { userName?: string; preferences: string[]; facts: string[]; goals: string[]; notes: string[]; updatedAt: string; }
 
 const emptyUserMemory = (): KairoUserMemory => ({ preferences: [], facts: [], goals: [], notes: [], updatedAt: new Date().toISOString() });
 const uniqueRecent = (items: string[]) => [...new Set(items.filter(Boolean))].slice(-20);
@@ -48,16 +28,12 @@ function extractMemoryCandidates(userMessage: string): Partial<KairoUserMemory> 
 async function updateStructuredUserMemory(userMessage: string): Promise<void> {
   const candidate = extractMemoryCandidates(userMessage);
   if (!candidate.userName && !candidate.preferences?.length && !candidate.goals?.length) return;
-
-  const ref = doc(db, USER_MEMORY_COLLECTION, KAIRO_ID, USER_MEMORY_DOC);
+  const ref = doc(db, USER_MEMORY_COLLECTION, KAIRO_ID, 'entries', USER_MEMORY_DOC);
   let current = emptyUserMemory();
   try {
     const snapshot = await getDocs(query(collection(db, USER_MEMORY_COLLECTION, KAIRO_ID, 'entries'), orderBy('updatedAt', 'desc'), limit(1)));
     if (!snapshot.empty) current = { ...current, ...(snapshot.docs[0].data() as Partial<KairoUserMemory>) };
-  } catch (error) {
-    console.warn('[Kairo User Memory] read failed:', error);
-  }
-
+  } catch (error) { console.warn('[Kairo User Memory] read failed:', error); }
   await setDoc(ref, {
     userName: candidate.userName || current.userName,
     preferences: uniqueRecent([...current.preferences, ...(candidate.preferences || [])]),
@@ -69,25 +45,14 @@ async function updateStructuredUserMemory(userMessage: string): Promise<void> {
 }
 
 export async function saveKdmInteraction(payload: KdmPersistencePayload): Promise<void> {
-  const stateRef = doc(db, STATE_COLLECTION, KAIRO_ID);
-  await setDoc(stateRef, {
-    characterId: KAIRO_ID,
-    dynamicState: payload.dynamicState,
-    reasoningTrace: payload.reasoningTrace,
-    lastUserMessage: payload.lastUserMessage,
-    lastReply: payload.reply,
-    updatedAt: new Date().toISOString(),
+  await setDoc(doc(db, STATE_COLLECTION, KAIRO_ID), {
+    characterId: KAIRO_ID, dynamicState: payload.dynamicState, reasoningTrace: payload.reasoningTrace,
+    lastUserMessage: payload.lastUserMessage, lastReply: payload.reply, updatedAt: new Date().toISOString(),
   }, { merge: true });
-
-  const tracesRef = collection(db, STATE_COLLECTION, KAIRO_ID, TRACE_COLLECTION);
-  await addDoc(tracesRef, {
-    ...payload.reasoningTrace,
-    userMessage: payload.lastUserMessage,
-    reply: payload.reply,
-    dynamicState: payload.dynamicState,
-    createdAt: new Date().toISOString(),
+  await addDoc(collection(db, STATE_COLLECTION, KAIRO_ID, TRACE_COLLECTION), {
+    ...payload.reasoningTrace, userMessage: payload.lastUserMessage, reply: payload.reply,
+    dynamicState: payload.dynamicState, createdAt: new Date().toISOString(),
   });
-
   await updateStructuredUserMemory(payload.lastUserMessage).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));
 }
 
@@ -99,39 +64,30 @@ export async function loadKdmState(): Promise<DroitDynamicState | null> {
 
 export async function loadRecentKdmMemory(maxItems = 6): Promise<KdmMemoryItem[]> {
   const safeLimit = Math.max(1, Math.min(maxItems, 20));
-  const tracesRef = collection(db, STATE_COLLECTION, KAIRO_ID, TRACE_COLLECTION);
-  const snapshot = await getDocs(query(tracesRef, orderBy('createdAt', 'desc'), limit(safeLimit)));
-
-  const memories = snapshot.docs
-    .map((item) => {
-      const data = item.data();
-      return {
-        userMessage: typeof data.userMessage === 'string' ? data.userMessage : '',
-        reply: typeof data.reply === 'string' ? data.reply : '',
-        createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined,
-        reasoningTrace: data as unknown as ReasoningTrace,
-        dynamicState: data.dynamicState as DroitDynamicState | undefined,
-      };
-    })
-    .filter((item) => item.userMessage || item.reply)
-    .reverse();
+  const snapshot = await getDocs(query(collection(db, STATE_COLLECTION, KAIRO_ID, TRACE_COLLECTION), orderBy('createdAt', 'desc'), limit(safeLimit)));
+  const memories = snapshot.docs.map((item) => {
+    const data = item.data();
+    return {
+      userMessage: typeof data.userMessage === 'string' ? data.userMessage : '',
+      reply: typeof data.reply === 'string' ? data.reply : '',
+      createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined,
+      reasoningTrace: data as unknown as ReasoningTrace,
+      dynamicState: data.dynamicState as DroitDynamicState | undefined,
+    };
+  }).filter((item) => item.userMessage || item.reply).reverse();
 
   try {
     const profileSnapshot = await getDocs(query(collection(db, USER_MEMORY_COLLECTION, KAIRO_ID, 'entries'), orderBy('updatedAt', 'desc'), limit(1)));
     if (!profileSnapshot.empty) {
       const profile = profileSnapshot.docs[0].data() as Partial<KairoUserMemory>;
-      const summary = JSON.stringify({
+      memories.unshift({ userMessage: 'Kairo kullanıcı profili', reply: JSON.stringify({
         userName: profile.userName || null,
         preferences: Array.isArray(profile.preferences) ? profile.preferences : [],
         facts: Array.isArray(profile.facts) ? profile.facts : [],
         goals: Array.isArray(profile.goals) ? profile.goals : [],
         notes: Array.isArray(profile.notes) ? profile.notes : [],
-      });
-      memories.unshift({ userMessage: 'Kairo kullanıcı profili', reply: summary });
+      }) });
     }
-  } catch (error) {
-    console.warn('[Kairo User Memory] profile load skipped:', error);
-  }
-
+  } catch (error) { console.warn('[Kairo User Memory] profile load skipped:', error); }
   return memories;
 }
