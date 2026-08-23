@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "Race": {
+      "title": "Race",
+      "description": "Fictional race template defining archetype, traits, and physical attributes",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Race classification name" },
+        "shortDescription": { "type": "string", "description": "Short summary of race characteristics" },
+        "status": { "type": "string", "enum": ["Active", "Draft", "Archived"], "description": "Operational status" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "characterCount": { "type": "number", "description": "Number of active characters belonging to this race" }
+      },
+      "required": ["name", "status", "createdAt", "updatedAt"]
+    },
+    "Character": {
+      "title": "Droit Character",
+      "description": "Droit character entity containing Physical, Brain, and Mission layers",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Droit name or callsign" },
+        "status": { "type": "string", "enum": ["Active", "Draft", "Standby", "Archived"], "description": "Operational state" },
+        "physical": { "type": "object", "description": "Physical appearance, face, optics, materials, colors, animations" },
+        "personality": { "type": "object", "description": "10 core personality traits (0-100) and custom traits" },
+        "behavior": { "type": "object", "description": "Situational responses to conflict, insult, joke, error, apology, threat, injustice" },
+        "memory": { "type": "object", "description": "Memory buffer limit, episodic memory switch, retention policy" },
+        "values": { "type": "array", "items": { "type": "string" }, "description": "Core moral and procedural values" },
+        "role": { "type": "object", "description": "Role title and rank" },
+        "category": { "type": "object", "description": "Droit functional category" },
+        "permissions": { "type": "array", "description": "Assigned permission toggles and custom rights" },
+        "tasks": { "type": "array", "description": "Assigned directives and tasks" },
+        "restrictions": { "type": "array", "description": "Restricted behaviors and strict boundaries" },
+        "expressions": { "type": "array", "description": "Facial expressions matrix" },
+        "currentExpression": { "type": "string", "description": "Active expression identifier" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "status", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "collections": {
+      "races": {
+        "entity": "Race",
+        "description": "Collection of race archetypes"
+      },
+      "characters": {
+        "entity": "Character",
+        "description": "Collection of digital being character profiles"
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "NEXUS",
+  "description": "Private control center for designing, creating, and managing fictional digital beings and characters.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
