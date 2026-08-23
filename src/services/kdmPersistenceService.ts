@@ -13,6 +13,14 @@ export interface KdmPersistencePayload {
   reply: string;
 }
 
+export interface KdmMemoryItem {
+  userMessage: string;
+  reply: string;
+  createdAt?: string;
+  reasoningTrace?: ReasoningTrace;
+  dynamicState?: DroitDynamicState;
+}
+
 export async function saveKdmInteraction(payload: KdmPersistencePayload): Promise<void> {
   const stateRef = doc(db, STATE_COLLECTION, KAIRO_ID);
   await setDoc(stateRef, {
@@ -38,4 +46,24 @@ export async function loadKdmState(): Promise<DroitDynamicState | null> {
   const stateSnap = await getDocs(query(collection(db, STATE_COLLECTION), orderBy('updatedAt', 'desc'), limit(1)));
   if (stateSnap.empty) return null;
   return (stateSnap.docs[0].data().dynamicState as DroitDynamicState) || null;
+}
+
+export async function loadRecentKdmMemory(maxItems = 6): Promise<KdmMemoryItem[]> {
+  const safeLimit = Math.max(1, Math.min(maxItems, 20));
+  const tracesRef = collection(db, STATE_COLLECTION, KAIRO_ID, TRACE_COLLECTION);
+  const snapshot = await getDocs(query(tracesRef, orderBy('createdAt', 'desc'), limit(safeLimit)));
+
+  return snapshot.docs
+    .map((item) => {
+      const data = item.data();
+      return {
+        userMessage: typeof data.userMessage === 'string' ? data.userMessage : '',
+        reply: typeof data.reply === 'string' ? data.reply : '',
+        createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined,
+        reasoningTrace: data as unknown as ReasoningTrace,
+        dynamicState: data.dynamicState as DroitDynamicState | undefined,
+      };
+    })
+    .filter((item) => item.userMessage || item.reply)
+    .reverse();
 }
