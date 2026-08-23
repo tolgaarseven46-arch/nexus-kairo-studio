@@ -21,15 +21,11 @@ function extractMemoryCandidates(userMessage: string): Partial<KairoUserMemory> 
   const name = text.match(/(?:benim adım|adım|ismim)\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9_-]{2,40})/i);
   if (name) result.userName = name[1];
 
-  if (/(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor|ilgileniyorum|ilgimi çekiyor)/i.test(text)) {
+  if (/(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor|ilgileniyorum|ilgimi çekiyor|artık .*? sevmiyorum|artık .*? ilgilenmiyorum|daha çok .*? ilgileniyorum)/i.test(text)) {
     result.preferences = [text];
   }
-  if (/(?:istiyorum|hedefim|amacım|planım|üzerinde çalışıyorum|geliştiriyorum)/i.test(text)) {
-    result.goals = [text];
-  }
-  if (/(?:yaşım|yaşındayım|mesleğim|işim|şehirde yaşıyorum|yaşıyorum|çalışıyorum)/i.test(text)) {
-    result.facts = [text];
-  }
+  if (/(?:istiyorum|hedefim|amacım|planım|üzerinde çalışıyorum|geliştiriyorum)/i.test(text)) result.goals = [text];
+  if (/(?:yaşım|yaşındayım|mesleğim|işim|şehirde yaşıyorum|yaşıyorum|çalışıyorum)/i.test(text)) result.facts = [text];
   return result;
 }
 
@@ -42,18 +38,17 @@ async function updateStructuredUserMemory(userMessage: string): Promise<void> {
   try {
     const snapshot = await getDocs(query(collection(db, USER_MEMORY_COLLECTION, KAIRO_ID, 'entries'), orderBy('updatedAt', 'desc'), limit(1)));
     if (!snapshot.empty) current = { ...current, ...(snapshot.docs[0].data() as Partial<KairoUserMemory>) };
-  } catch (error) {
-    console.warn('[Kairo User Memory] read failed:', error);
-  }
+  } catch (error) { console.warn('[Kairo User Memory] read failed:', error); }
 
-  await setDoc(ref, {
+  const next: KairoUserMemory = {
     userName: candidate.userName || current.userName,
-    preferences: uniqueRecent([...current.preferences, ...(candidate.preferences || [])]),
-    facts: uniqueRecent([...current.facts, ...(candidate.facts || [])]),
-    goals: uniqueRecent([...current.goals, ...(candidate.goals || [])]),
+    preferences: candidate.preferences?.length ? uniqueRecent(candidate.preferences) : uniqueRecent(current.preferences),
+    facts: candidate.facts?.length ? uniqueRecent([...current.facts, ...candidate.facts]) : uniqueRecent(current.facts),
+    goals: candidate.goals?.length ? uniqueRecent(candidate.goals) : uniqueRecent(current.goals),
     notes: uniqueRecent(current.notes),
     updatedAt: new Date().toISOString(),
-  }, { merge: true });
+  };
+  await setDoc(ref, next, { merge: true });
 }
 
 export async function saveKdmInteraction(payload: KdmPersistencePayload): Promise<void> {
@@ -79,29 +74,15 @@ export async function loadRecentKdmMemory(maxItems = 6): Promise<KdmMemoryItem[]
   const snapshot = await getDocs(query(collection(db, STATE_COLLECTION, KAIRO_ID, TRACE_COLLECTION), orderBy('createdAt', 'desc'), limit(safeLimit)));
   const memories = snapshot.docs.map((item) => {
     const data = item.data();
-    return {
-      userMessage: typeof data.userMessage === 'string' ? data.userMessage : '',
-      reply: typeof data.reply === 'string' ? data.reply : '',
-      createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined,
-      reasoningTrace: data as unknown as ReasoningTrace,
-      dynamicState: data.dynamicState as DroitDynamicState | undefined,
-    };
+    return { userMessage: typeof data.userMessage === 'string' ? data.userMessage : '', reply: typeof data.reply === 'string' ? data.reply : '', createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined, reasoningTrace: data as unknown as ReasoningTrace, dynamicState: data.dynamicState as DroitDynamicState | undefined };
   }).filter((item) => item.userMessage || item.reply).reverse();
 
   try {
     const profileSnapshot = await getDocs(query(collection(db, USER_MEMORY_COLLECTION, KAIRO_ID, 'entries'), orderBy('updatedAt', 'desc'), limit(1)));
     if (!profileSnapshot.empty) {
       const profile = profileSnapshot.docs[0].data() as Partial<KairoUserMemory>;
-      memories.unshift({ userMessage: 'Kairo kullanıcı profili', reply: JSON.stringify({
-        userName: profile.userName || null,
-        preferences: Array.isArray(profile.preferences) ? profile.preferences : [],
-        facts: Array.isArray(profile.facts) ? profile.facts : [],
-        goals: Array.isArray(profile.goals) ? profile.goals : [],
-        notes: Array.isArray(profile.notes) ? profile.notes : [],
-      }) });
+      memories.unshift({ userMessage: 'Kairo kullanıcı profili', reply: JSON.stringify({ userName: profile.userName || null, preferences: Array.isArray(profile.preferences) ? profile.preferences : [], facts: Array.isArray(profile.facts) ? profile.facts : [], goals: Array.isArray(profile.goals) ? profile.goals : [], notes: Array.isArray(profile.notes) ? profile.notes : [] }) });
     }
-  } catch (error) {
-    console.warn('[Kairo User Memory] profile load skipped:', error);
-  }
+  } catch (error) { console.warn('[Kairo User Memory] profile load skipped:', error); }
   return memories;
 }
