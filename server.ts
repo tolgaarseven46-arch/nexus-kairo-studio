@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { analyzeKdmInteraction } from './src/services/kdmConsistencyEngine';
+import { loadKdmState, saveKdmInteraction } from './src/services/kdmPersistenceService';
 import type { DroitDynamicState, DroitPersonalityTraits } from './src/types/nexus';
 
 dotenv.config();
@@ -70,10 +71,19 @@ app.post('/api/chat', async (req, res) => {
     const assertiveness = Math.round((behaviorProfile?.assertiveness ?? 0.5) * 100);
     const analyticalDepth = Math.round((behaviorProfile?.analyticalDepth ?? 0.5) * 100);
 
+    let persistedState: DroitDynamicState | null = null;
+    try {
+      persistedState = await loadKdmState();
+    } catch (persistenceError) {
+      console.warn('[KDM Persistence] State load skipped:', persistenceError);
+    }
+
+    const effectiveDynamicState = persistedState || (dynamicState as DroitDynamicState);
+
     const kdm = analyzeKdmInteraction(
       userMessage,
       personality as DroitPersonalityTraits,
-      dynamicState as DroitDynamicState
+      effectiveDynamicState
     );
 
     const systemInstruction = `
@@ -166,10 +176,21 @@ ${directives.map((d: string) => `- ${d}`).join('\n')}
       }
     }
 
-    const replyText = response?.text || '';
+    const replyText = (response?.text || '').trim();
+
+    try {
+      await saveKdmInteraction({
+        dynamicState: kdm.nextDynamicState,
+        reasoningTrace: kdm.trace,
+        lastUserMessage: userMessage,
+        reply: replyText,
+      });
+    } catch (persistenceError) {
+      console.warn('[KDM Persistence] Interaction save skipped:', persistenceError);
+    }
 
     return res.json({
-      reply: replyText.trim(),
+      reply: replyText,
       profileUsed: {
         tone,
         dominantSummary,
