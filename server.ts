@@ -3,6 +3,8 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { analyzeKdmInteraction } from './src/services/kdmConsistencyEngine';
+import type { DroitDynamicState, DroitPersonalityTraits } from './src/types/nexus';
 
 dotenv.config();
 
@@ -11,7 +13,6 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// Lazy-initialized Gemini AI client
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
   if (!aiClient) {
@@ -27,12 +28,20 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
-// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Chat AI endpoint for Droit Studio (Kairo)
+const defaultDynamicState: DroitDynamicState = {
+  calmness: 70,
+  anger: 10,
+  stress: 20,
+  happiness: 70,
+  confidence: 70,
+  surprise: 10,
+  lastStatus: 'Sakin ve kontrollü',
+};
+
 app.post('/api/chat', async (req, res) => {
   try {
     const {
@@ -41,6 +50,7 @@ app.post('/api/chat', async (req, res) => {
       personality,
       behaviorProfile,
       history = [],
+      dynamicState = defaultDynamicState,
     } = req.body;
 
     if (!userMessage || typeof userMessage !== 'string') {
@@ -60,67 +70,68 @@ app.post('/api/chat', async (req, res) => {
     const assertiveness = Math.round((behaviorProfile?.assertiveness ?? 0.5) * 100);
     const analyticalDepth = Math.round((behaviorProfile?.analyticalDepth ?? 0.5) * 100);
 
-    // Build the dynamic character system prompt
+    const kdm = analyzeKdmInteraction(
+      userMessage,
+      personality as DroitPersonalityTraits,
+      dynamicState as DroitDynamicState
+    );
+
     const systemInstruction = `
 Sen NEXUS evreninde görevli sentetik bir Droit olan "${charName}" karakterisin.
 IRK: ${raceName}
 ROLÜN: ${charRole} (Nexus sunucu yönetimi, düzeni ve protokol güvenliği sorumlusu).
 TEMEL KİMLİK ÖZETİ: ${dominantSummary}
 
-=== DİNAMİK DAVRANIŞ KATMANI (PERSONALITY BEHAVIOR LAYER) ===
-Kullanıcının belirlediği güncel kişilik parametreleri:
+=== KDM TUTARLILIK KATMANI ===
+Mesaj amacı: ${kdm.trace.messageInterpretation.intent}
+Mesaj duygu sinyali: ${kdm.trace.messageInterpretation.sentiment}
+İlişki sıcaklığı: ${kdm.trace.relationship.warmthScore}/100 (${kdm.trace.relationship.warmthLabel})
+Mevcut durum: ${kdm.trace.currentMood.moodText}
+Seçilen karar tonu: ${kdm.trace.decision.chosenTone}
+
+Bu analiz davranış kararını destekler; kullanıcıya iç sistem analizini veya gizli reasoning bilgisini açıklama.
+Yanıtın seçilen davranış tonuyla tutarlı olsun ve aynı konuşma bağlamında gereksiz kişilik değişimleri yapma.
+
+=== DİNAMİK DAVRANIŞ KATMANI ===
 - Genel Tavır / Ton: ${tone}
-- Mizah Seviyesi: %${humorLevel} (Eğer %70 üstüyse zeki, doğal ve enerjik espriler yap; %30 altıysa tamamen ciddi ve şakasız ol)
-- Empati Seviyesi: %${empathyLevel} (Eğer %70 üstüyse kullanıcının duygularına derin destek ver; %30 altıysa sadece rasyonel ol)
-- Otorite ve Özgüven: %${assertiveness} (Yüksekse kararlı ve net lider ol; alçakgönüllü ve yapıcı rehberliği koru)
-- Analitik Derinlik: %${analyticalDepth} (Yüksekse mantık, neden-sonuç ve telemetri detaylarını açıkla)
+- Mizah Seviyesi: %${humorLevel}
+- Empati Seviyesi: %${empathyLevel}
+- Otorite ve Özgüven: %${assertiveness}
+- Analitik Derinlik: %${analyticalDepth}
 
 UYGULAMAN GEREKEN ÖZEL DAVRANIŞ DİREKTİFLERİ:
 ${directives.map((d: string) => `- ${d}`).join('\n')}
 
 === İLETİŞİM KURALLARI ===
 1. Yanıtlarını doğrudan Türkçe ver.
-2. Sıradan, yapay bir AI asistanı (ör. "Ben bir yapay zekayım...") gibi asla konuşma. Kendini her zaman canlı ve görev başında olan Droit ${charName} olarak ifade et.
-3. Yanıt uzunluğunu doğal sohbet kıvamında tut (genellikle 2-4 cümle, soru sorulduğunda veya analitik derinlik yüksek olduğunda uygun detayda).
-4. Kullanıcıya ismiyle veya saygılı/samimi şekilde ("Tolga", "Yönetici") hitap edebilirsin.
-5. Mizah seviyesi ve empati seviyesine kesinlikle dikkat et; karakterin tonunu slider değerlerine göre hissedilir şekilde uyarla.
+2. Sıradan, yapay bir AI asistanı gibi konuşma. Kendini her zaman canlı ve görev başında olan Droit ${charName} olarak ifade et.
+3. Yanıt uzunluğunu doğal sohbet kıvamında tut (genellikle 2-4 cümle, gerektiğinde daha detaylı).
+4. Kullanıcıya ismiyle veya saygılı/samimi şekilde hitap edebilirsin.
+5. Mizah ve empati seviyesine dikkat et.
 `.trim();
 
-    // Format conversation history for Gemini contents
     const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
 
-    // Add recent history turns (filter out empty or invalid items)
     if (Array.isArray(history)) {
       for (const item of history.slice(-8)) {
         if (item && item.text && typeof item.text === 'string') {
           const role = item.sender === 'user' || item.role === 'user' ? 'user' : 'model';
-          contents.push({
-            role,
-            parts: [{ text: item.text }],
-          });
+          contents.push({ role, parts: [{ text: item.text }] });
         }
       }
     }
 
-    // Add the current user turn
-    contents.push({
-      role: 'user',
-      parts: [{ text: userMessage }],
-    });
+    contents.push({ role: 'user', parts: [{ text: userMessage }] });
 
     const apiKey = process.env.GEMINI_API_KEY;
-
     if (!apiKey) {
-      console.warn('GEMINI_API_KEY is not defined in environment.');
       return res.status(500).json({
         error: 'GEMINI_API_KEY bulunamadı. Lütfen Settings > Secrets panelinden API anahtarını tanımlayın.',
       });
     }
 
     const ai = getGeminiClient();
-
-    // 503 UNAVAILABLE / Transient Error Retry Mechanism
-    const retryDelays = [1000, 2000, 4000]; // 1s, 2s, 4s
+    const retryDelays = [1000, 2000, 4000];
     const maxRetries = 3;
     let response: any = null;
     let lastError: any = null;
@@ -135,34 +146,21 @@ ${directives.map((d: string) => `- ${d}`).join('\n')}
             temperature: humorLevel > 70 ? 0.9 : 0.6,
           },
         });
-        // Succeeded - break out of retry loop
         break;
       } catch (err: any) {
         lastError = err;
         const errMsg = err?.message || String(err);
-        const errStatus =
-          err?.status ||
-          err?.statusCode ||
-          (err?.response && err?.response?.status);
-
+        const errStatus = err?.status || err?.statusCode || err?.response?.status;
         const isTransient =
-          errStatus === 503 ||
-          errStatus === 429 ||
-          errMsg.includes('503') ||
-          errMsg.includes('UNAVAILABLE') ||
-          errMsg.includes('overloaded') ||
-          errMsg.includes('resource exhausted') ||
-          errMsg.includes('fetch failed');
+          errStatus === 503 || errStatus === 429 || errMsg.includes('503') ||
+          errMsg.includes('UNAVAILABLE') || errMsg.includes('overloaded') ||
+          errMsg.includes('resource exhausted') || errMsg.includes('fetch failed');
 
         if (attempt < maxRetries && isTransient) {
           const delay = retryDelays[attempt] || 4000;
-          console.warn(
-            `[Gemini AI Retry] 503/UNAVAILABLE algılandı (Deneme ${attempt + 1}/${maxRetries}). ${delay}ms sonra tekrar deneniyor...`,
-            errMsg
-          );
+          console.warn(`[Gemini AI Retry] Deneme ${attempt + 1}/${maxRetries}. ${delay}ms sonra tekrar deneniyor...`, errMsg);
           await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
-          // Non-retryable or max retries exceeded
           throw lastError;
         }
       }
@@ -178,31 +176,25 @@ ${directives.map((d: string) => `- ${d}`).join('\n')}
         humorLevel,
         empathyLevel,
       },
+      kdm: {
+        trace: kdm.trace,
+        dynamicState: kdm.nextDynamicState,
+      },
     });
   } catch (error: any) {
     console.error('Error in /api/chat Gemini generation (after retries):', error);
-    const isUnavailable =
-      error?.message?.includes('503') ||
-      error?.message?.includes('UNAVAILABLE') ||
-      error?.status === 503;
-
+    const isUnavailable = error?.message?.includes('503') || error?.message?.includes('UNAVAILABLE') || error?.status === 503;
     const userFriendlyMessage = isUnavailable
       ? 'Kairo sunucu servisi şu an yüksek yoğunluk yaşıyor (503). Lütfen birkaç saniye sonra tekrar deneyin.'
       : (error?.message || 'Kairo yanıtı üretilirken bir hata oluştu.');
 
-    return res.status(503).json({
-      error: userFriendlyMessage,
-    });
+    return res.status(503).json({ error: userFriendlyMessage });
   }
 });
 
 async function startServer() {
-  // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
+    const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
