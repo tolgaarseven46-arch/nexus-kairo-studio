@@ -5,55 +5,22 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { analyzeKdmInteraction } from './src/services/kdmConsistencyEngine';
 import { loadKdmState, loadRecentKdmMemory, saveKdmInteraction } from './src/services/kdmPersistenceService';
+import { validateMemoryAgainstMessage } from './src/services/kairoMemoryConsistency';
 import type { DroitDynamicState, DroitPersonalityTraits } from './src/types/nexus';
 
 dotenv.config();
-
 const app = express();
 const PORT = 3000;
-
 app.use(express.json());
-
 let aiClient: GoogleGenAI | null = null;
-function getGeminiClient(): GoogleGenAI {
-  if (!aiClient) {
-    aiClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
-    });
-  }
-  return aiClient;
-}
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-const defaultDynamicState: DroitDynamicState = {
-  calmness: 70,
-  anger: 10,
-  stress: 20,
-  happiness: 70,
-  confidence: 70,
-  surprise: 10,
-  lastStatus: 'Sakin ve kontrollü',
-};
+function getGeminiClient(): GoogleGenAI { if (!aiClient) aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { headers: { 'User-Agent': 'aistudio-build' } } }); return aiClient; }
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+const defaultDynamicState: DroitDynamicState = { calmness: 70, anger: 10, stress: 20, happiness: 70, confidence: 70, surprise: 10, lastStatus: 'Sakin ve kontrollü' };
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const {
-      userMessage,
-      character,
-      personality,
-      behaviorProfile,
-      history = [],
-      dynamicState = defaultDynamicState,
-    } = req.body;
-
-    if (!userMessage || typeof userMessage !== 'string') {
-      return res.status(400).json({ error: 'userMessage is required' });
-    }
-
+    const { userMessage, character, personality, behaviorProfile, history = [], dynamicState = defaultDynamicState } = req.body;
+    if (!userMessage || typeof userMessage !== 'string') return res.status(400).json({ error: 'userMessage is required' });
     const charName = character?.name || 'KAIRO';
     const charRole = character?.role?.title || character?.roleTitle || 'Sunucu Yöneticisi';
     const raceName = character?.physical?.raceName || 'Sentetik Droit';
@@ -67,134 +34,33 @@ app.post('/api/chat', async (req, res) => {
 
     let persistedState: DroitDynamicState | null = null;
     let persistentMemory: Array<{ userMessage: string; reply: string }> = [];
-    try {
-      persistedState = await loadKdmState();
-      persistentMemory = await loadRecentKdmMemory(6);
-    } catch (persistenceError) {
-      console.warn('[KDM Persistence] Memory load skipped:', persistenceError);
-    }
-
+    try { persistedState = await loadKdmState(); persistentMemory = await loadRecentKdmMemory(6); } catch (persistenceError) { console.warn('[KDM Persistence] Memory load skipped:', persistenceError); }
     const effectiveDynamicState = persistedState || (dynamicState as DroitDynamicState);
     const kdm = analyzeKdmInteraction(userMessage, personality as DroitPersonalityTraits, effectiveDynamicState);
 
-    const memoryContext = persistentMemory.length
-      ? persistentMemory.map((item, index) => `#${index + 1}\nKullanıcı: ${item.userMessage}\nKairo: ${item.reply}`).join('\n')
-      : 'Henüz kalıcı konuşma anısı yok.';
+    const validatedMemory = persistentMemory.filter((item) => validateMemoryAgainstMessage(`${item.userMessage} ${item.reply}`, userMessage).accepted);
+    const memoryContext = validatedMemory.length
+      ? validatedMemory.map((item, index) => `#${index + 1}\nKullanıcı: ${item.userMessage}\nKairo: ${item.reply}`).join('\n')
+      : 'Bu mesajla ilişkili doğrulanmış kalıcı anı yok.';
 
-    const systemInstruction = `
-Sen NEXUS evreninde görevli sentetik bir Droit olan "${charName}" karakterisin.
-IRK: ${raceName}
-ROLÜN: ${charRole} (Nexus sunucu yönetimi, düzeni ve protokol güvenliği sorumlusu).
-TEMEL KİMLİK ÖZETİ: ${dominantSummary}
-
-=== KDM TUTARLILIK KATMANI ===
-Mesaj amacı: ${kdm.trace.messageInterpretation.intent}
-Mesaj duygu sinyali: ${kdm.trace.messageInterpretation.sentiment}
-İlişki sıcaklığı: ${kdm.trace.relationship.warmthScore}/100 (${kdm.trace.relationship.warmthLabel})
-Mevcut durum: ${kdm.trace.currentMood.moodText}
-Seçilen karar tonu: ${kdm.trace.decision.chosenTone}
-Bu analiz davranış kararını destekler; kullanıcıya iç sistem analizini veya gizli reasoning bilgisini açıklama.
-Yanıtın seçilen davranış tonuyla tutarlı olsun ve aynı konuşma bağlamında gereksiz kişilik değişimleri yapma.
-
-=== KALICI KONUŞMA HAFIZASI ===
-Aşağıdaki kayıtlar önceki oturumlardan Firebase'den yüklenmiştir.
-Bunları yalnızca mevcut soruyla ilgiliyse kullan; uydurma bilgi ekleme.
-Kullanıcı açıkça geçmişte söylediği bir şeyi sorarsa bu kayıtları referans al.
-${memoryContext}
-
-=== DİNAMİK DAVRANIŞ KATMANI ===
-- Genel Tavır / Ton: ${tone}
-- Mizah Seviyesi: %${humorLevel}
-- Empati Seviyesi: %${empathyLevel}
-- Otorite ve Özgüven: %${assertiveness}
-- Analitik Derinlik: %${analyticalDepth}
-
-UYGULAMAN GEREKEN ÖZEL DAVRANIŞ DİREKTİFLERİ:
-${directives.map((d: string) => `- ${d}`).join('\n')}
-
-=== İLETİŞİM KURALLARI ===
-1. Yanıtlarını doğrudan Türkçe ver.
-2. Sıradan, yapay bir AI asistanı gibi konuşma. Kendini her zaman canlı ve görev başında olan Droit ${charName} olarak ifade et.
-3. Yanıt uzunluğunu doğal sohbet kıvamında tut (genellikle 2-4 cümle, gerektiğinde daha detaylı).
-4. Kullanıcıya ismiyle veya saygılı/samimi şekilde hitap edebilirsin.
-5. Mizah ve empati seviyesine dikkat et.
-`.trim();
+    const systemInstruction = `Sen NEXUS evreninde görevli sentetik bir Droit olan "${charName}" karakterisin.\nIRK: ${raceName}\nROLÜN: ${charRole}.\nTEMEL KİMLİK ÖZETİ: ${dominantSummary}\n\n=== KDM TUTARLILIK KATMANI ===\nMesaj amacı: ${kdm.trace.messageInterpretation.intent}\nMesaj duygu sinyali: ${kdm.trace.messageInterpretation.sentiment}\nİlişki sıcaklığı: ${kdm.trace.relationship.warmthScore}/100 (${kdm.trace.relationship.warmthLabel})\nMevcut durum: ${kdm.trace.currentMood.moodText}\nSeçilen karar tonu: ${kdm.trace.decision.chosenTone}\nKDM ve hafıza doğrulama sonuçlarını kullanıcıya veya gizli reasoning olarak açıklama.\n\n=== DOĞRULANMIŞ KALICI HAFIZA ===\nAşağıdaki kayıtlar yalnızca mevcut mesajla bağ kurduğu doğrulanan hafıza parçalarıdır. İlgisizse kullanma. Uydurma bilgi ekleme.\n${memoryContext}\n\n=== DİNAMİK DAVRANIŞ KATMANI ===\n- Genel Tavır / Ton: ${tone}\n- Mizah Seviyesi: %${humorLevel}\n- Empati Seviyesi: %${empathyLevel}\n- Otorite ve Özgüven: %${assertiveness}\n- Analitik Derinlik: %${analyticalDepth}\n\nUYGULAMAN GEREKEN ÖZEL DAVRANIŞ DİREKTİFLERİ:\n${directives.map((d: string) => `- ${d}`).join('\n')}\n\n=== İLETİŞİM KURALLARI ===\n1. Yanıtlarını doğrudan Türkçe ver.\n2. Kendini canlı ve görev başında olan Droit ${charName} olarak ifade et.\n3. Yanıt uzunluğunu doğal sohbet kıvamında tut (genellikle 2-4 cümle, gerektiğinde daha detaylı).\n4. Kullanıcıya ismiyle veya saygılı/samimi şekilde hitap edebilirsin.\n5. Mizah ve empati seviyesine dikkat et.`;
 
     const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
-    if (Array.isArray(history)) {
-      for (const item of history.slice(-8)) {
-        if (item && item.text && typeof item.text === 'string') {
-          const role = item.sender === 'user' || item.role === 'user' ? 'user' : 'model';
-          contents.push({ role, parts: [{ text: item.text }] });
-        }
-      }
-    }
+    if (Array.isArray(history)) for (const item of history.slice(-8)) if (item?.text && typeof item.text === 'string') contents.push({ role: item.sender === 'user' || item.role === 'user' ? 'user' : 'model', parts: [{ text: item.text }] });
     contents.push({ role: 'user', parts: [{ text: userMessage }] });
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY bulunamadı. Lütfen Settings > Secrets panelinden API anahtarını tanımlayın.' });
-    }
+    if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY bulunamadı. Lütfen Settings > Secrets panelinden API anahtarını tanımlayın.' });
 
     const ai = getGeminiClient();
-    const retryDelays = [1000, 2000, 4000];
-    const maxRetries = 3;
-    let response: any = null;
-    let lastError: any = null;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        response = await ai.models.generateContent({
-          model: 'gemini-3.7-flash',
-          contents,
-          config: { systemInstruction, temperature: humorLevel > 70 ? 0.9 : 0.6 },
-        });
-        break;
-      } catch (err: any) {
-        lastError = err;
-        const errMsg = err?.message || String(err);
-        const errStatus = err?.status || err?.statusCode || err?.response?.status;
-        const isTransient = errStatus === 503 || errStatus === 429 || errMsg.includes('503') || errMsg.includes('UNAVAILABLE') || errMsg.includes('overloaded') || errMsg.includes('resource exhausted') || errMsg.includes('fetch failed');
-        if (attempt < maxRetries && isTransient) {
-          const delay = retryDelays[attempt] || 4000;
-          console.warn(`[Gemini AI Retry] Deneme ${attempt + 1}/${maxRetries}. ${delay}ms sonra tekrar deneniyor...`, errMsg);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-        } else {
-          throw lastError;
-        }
-      }
+    const retryDelays = [1000, 2000, 4000]; let response: any = null;
+    for (let attempt = 0; attempt <= 3; attempt++) {
+      try { response = await ai.models.generateContent({ model: 'gemini-3.7-flash', contents, config: { systemInstruction, temperature: humorLevel > 70 ? 0.9 : 0.6 } }); break; }
+      catch (err: any) { const msg = err?.message || String(err); const status = err?.status || err?.statusCode || err?.response?.status; const transient = status === 503 || status === 429 || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('overloaded') || msg.includes('resource exhausted') || msg.includes('fetch failed'); if (attempt < 3 && transient) await new Promise((r) => setTimeout(r, retryDelays[attempt] || 4000)); else throw err; }
     }
-
     const replyText = (response?.text || '').trim();
-    try {
-      await saveKdmInteraction({ dynamicState: kdm.nextDynamicState, reasoningTrace: kdm.trace, lastUserMessage: userMessage, reply: replyText });
-    } catch (persistenceError) {
-      console.warn('[KDM Persistence] Interaction save skipped:', persistenceError);
-    }
-
-    return res.json({
-      reply: replyText,
-      profileUsed: { tone, dominantSummary, humorLevel, empathyLevel },
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState },
-    });
-  } catch (error: any) {
-    console.error('Error in /api/chat Gemini generation (after retries):', error);
-    const isUnavailable = error?.message?.includes('503') || error?.message?.includes('UNAVAILABLE') || error?.status === 503;
-    const userFriendlyMessage = isUnavailable ? 'Kairo sunucu servisi şu an yüksek yoğunluk yaşıyor (503). Lütfen birkaç saniye sonra tekrar deneyin.' : (error?.message || 'Kairo yanıtı üretilirken bir hata oluştu.');
-    return res.status(503).json({ error: userFriendlyMessage });
-  }
+    try { await saveKdmInteraction({ dynamicState: kdm.nextDynamicState, reasoningTrace: kdm.trace, lastUserMessage: userMessage, reply: replyText }); } catch (persistenceError) { console.warn('[KDM Persistence] Interaction save skipped:', persistenceError); }
+    return res.json({ reply: replyText, profileUsed: { tone, dominantSummary, humorLevel, empathyLevel }, kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState } });
+  } catch (error: any) { console.error('[Chat API Error]', error); return res.status(500).json({ error: error?.message || 'Chat service failed' }); }
 });
 
-async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
-  }
-  app.listen(PORT, '0.0.0.0', () => console.log(`Server running on http://0.0.0.0:${PORT}`));
-}
-
+async function startServer() { const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' }); app.use(vite.middlewares); app.listen(PORT, () => console.log(`NEXUS Kairo Studio running on http://localhost:${PORT}`)); }
 startServer();
