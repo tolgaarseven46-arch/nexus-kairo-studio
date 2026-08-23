@@ -9,6 +9,7 @@ import {
   BehaviorLayerProfile,
 } from './droitBehaviorEngine';
 import { saveKdmInteraction, loadKdmState } from './kdmPersistenceService';
+import { loadKairoLongTermMemory, KairoMemoryEntry } from './kairoLongTermMemoryService';
 
 export interface SendKairoChatOptions {
   userMessage: string;
@@ -40,7 +41,10 @@ export const droitChatService = {
     },
   }: SendKairoChatOptions): Promise<KairoChatResponse> {
     const behaviorProfile = computeBehaviorProfile(personality, userMessage);
-    const persistedState = await loadKdmState().catch(() => null);
+    const [persistedState, longTermMemory] = await Promise.all([
+      loadKdmState().catch(() => null),
+      loadKairoLongTermMemory(8),
+    ]);
 
     const payload = {
       userMessage,
@@ -48,6 +52,7 @@ export const droitChatService = {
       personality,
       behaviorProfile,
       dynamicState: persistedState,
+      longTermMemory: longTermMemory as KairoMemoryEntry[],
       history: history.map((m) => ({ sender: m.sender, text: m.text })),
     };
 
