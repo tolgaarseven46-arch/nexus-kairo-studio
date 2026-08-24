@@ -6,6 +6,8 @@ import { analyzeKdmInteraction } from './src/services/kdmConsistencyEngine';
 import { loadKdmState, loadRecentKdmMemory, saveKdmInteraction } from './src/services/kdmPersistenceService';
 import { validateMemoryAgainstMessage } from './src/services/kairoMemoryConsistency';
 import { validateKairoResponse } from './src/services/kairoResponseConsistency';
+import { decideResponseRepair, selectBestConsistency } from './src/services/kdmResponseRepairPolicy';
+import { recordKdmMetric } from './src/services/kdmMetricsService';
 import type { DroitDynamicState, DroitPersonalityTraits } from './src/types/nexus';
 
 dotenv.config(); const app = express(); const PORT = 3000; app.use(express.json()); let aiClient: GoogleGenAI | null = null;
@@ -34,16 +36,24 @@ app.post('/api/chat', async (req, res) => {
     for (let attempt = 0; attempt <= 3; attempt++) { try { response = await ai.models.generateContent({ model: 'gemini-3.7-flash', contents, config: { systemInstruction, temperature: humorLevel > 70 ? 0.9 : 0.6 } }); break; } catch (err: any) { const msg = err?.message || String(err), status = err?.status || err?.statusCode || err?.response?.status, transient = status === 503 || status === 429 || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('overloaded') || msg.includes('resource exhausted') || msg.includes('fetch failed'); if (attempt < 3 && transient) await new Promise((r) => setTimeout(r, retryDelays[attempt] || 4000)); else throw err; } }
     let replyText = (response?.text || '').trim();
     let consistency = validateKairoResponse(replyText, kdm.trace);
-    if (!consistency.accepted) {
+    let repairAttempts = 0;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const decision = decideResponseRepair(consistency, attempt);
+      if (!decision.shouldRepair) break;
       const repairInstruction = `${systemInstruction}\n\n=== YANIT TUTARLILIK ONARIMI ===\nÖnceki yanıt KDM ile uyumsuz bulundu. Şu sorunları düzelt: ${consistency.issues.join('; ')}. Sadece düzeltilmiş doğal Türkçe yanıtı üret; analiz veya açıklama yazma.`;
       try {
         const repaired = await ai.models.generateContent({ model: 'gemini-3.7-flash', contents, config: { systemInstruction: repairInstruction, temperature: 0.5 } });
         const repairedText = (repaired?.text || '').trim();
-        if (repairedText) { replyText = repairedText; consistency = validateKairoResponse(replyText, kdm.trace); }
-      } catch (repairError) { console.warn('[KDM Response Repair] skipped:', repairError); }
+        if (!repairedText) break;
+        const candidateConsistency = validateKairoResponse(repairedText, kdm.trace);
+        const selected = selectBestConsistency(consistency, candidateConsistency);
+        repairAttempts++;
+        if (selected === candidateConsistency) { replyText = repairedText; consistency = candidateConsistency; }
+      } catch (repairError) { console.warn('[KDM Response Repair] skipped:', repairError); break; }
     }
     try { await saveKdmInteraction({ userId, dynamicState: kdm.nextDynamicState, reasoningTrace: kdm.trace, lastUserMessage: userMessage, reply: replyText }); } catch (persistenceError) { console.warn('[KDM Persistence] Interaction save skipped:', persistenceError); }
-    return res.json({ reply: replyText, profileUsed: { tone, dominantSummary, humorLevel, empathyLevel, analyticalDepth }, kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState }, consistency: { score: consistency.score, accepted: consistency.accepted, issues: consistency.issues } });
+    try { await recordKdmMetric({ userId, score: consistency.score, accepted: consistency.accepted, repaired: repairAttempts > 0, repairAttempts, issues: consistency.issues }); } catch (metricError) { console.warn('[KDM Metrics] Record skipped:', metricError); }
+    return res.json({ reply: replyText, profileUsed: { tone, dominantSummary, humorLevel, empathyLevel, analyticalDepth }, kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState }, consistency: { score: consistency.score, accepted: consistency.accepted, issues: consistency.issues }, metrics: { repaired: repairAttempts > 0, repairAttempts } });
   } catch (error: any) { console.error('[Chat API Error]', error); return res.status(500).json({ error: error?.message || 'Chat service failed' }); }
 });
 async function startServer() { const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' }); app.use(vite.middlewares); app.listen(PORT, () => console.log(`NEXUS Kairo Studio running on http://localhost:${PORT}`)); }
