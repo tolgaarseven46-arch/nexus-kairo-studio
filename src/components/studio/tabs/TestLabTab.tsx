@@ -845,7 +845,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
   ];
 
   return (
-    <div className="h-full w-full bg-zinc-950 text-zinc-100 flex flex-col min-h-0 overflow-hidden font-sans select-none">
+    <div className="h-full w-full bg-zinc-950 text-zinc-100 flex flex-col min-h-0 overflow-hidden font-sans">
       
       {/* ─────────────────────────────────────────────────────────────
           1. ÜST HEADER: KAIRO TEST LAB (KOMPAKT & MINIMAL)
@@ -1165,7 +1165,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
               onChange={(e) => setInputVal(e.target.value)}
               placeholder="Kairo'ya mesaj gönder..."
               disabled={isAiLoading}
-              className="flex-1 h-8 px-2.5 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] font-sans text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-500 focus:outline-none transition-colors"
+              className="flex-1 h-8 px-2.5 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] font-sans text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-500 focus:outline-none transition-colors select-text"
             />
             <button
               type="submit"

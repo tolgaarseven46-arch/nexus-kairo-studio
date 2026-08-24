@@ -77,7 +77,7 @@ export const KairoChatTab: React.FC<KairoChatTabProps> = ({
   };
 
   return (
-    <div className="flex-1 h-full bg-[#0b0d13] flex flex-col min-w-0 overflow-hidden select-none">
+    <div className="flex-1 h-full bg-[#0b0d13] flex flex-col min-w-0 overflow-hidden">
       {/* ─────────────────────────────────────────────────────────────
           1. SOHBET ÜST BAŞLIK ÇUBUĞU (Kairo Durum & Profil Bilgisi)
          ───────────────────────────────────────────────────────────── */}
@@ -268,7 +268,7 @@ export const KairoChatTab: React.FC<KairoChatTabProps> = ({
             disabled={isLoading}
             onChange={(e) => setInputText(e.target.value)}
             placeholder={isLoading ? 'Kairo yanıt yazıyor...' : 'Kairo ile sohbet et...'}
-            className="flex-1 bg-transparent border-none text-zinc-100 placeholder-zinc-500 text-xs sm:text-sm px-2 py-1.5 focus:outline-none disabled:opacity-50"
+            className="flex-1 bg-transparent border-none text-zinc-100 placeholder-zinc-500 text-xs sm:text-sm px-2 py-1.5 focus:outline-none disabled:opacity-50 select-text"
           />
 
           <button
