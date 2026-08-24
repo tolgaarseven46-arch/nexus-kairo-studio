@@ -19,28 +19,45 @@ function extractMemoryCandidates(userMessage: string): Partial<KairoUserMemory> 
   const text = userMessage.trim(); const result: Partial<KairoUserMemory> = {};
   const name = text.match(/(?:benim adım|adım|ismim)\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9_-]{2,40})/i);
   if (name) result.userName = name[1];
-  if (/(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor|ilgileniyorum|ilgimi çekiyor|artık .*? sevmiyorum|artık .*? ilgilenmiyorum|daha çok .*? ilgileniyorum)/i.test(text)) result.preferences = [text];
+  if (/(?:artık .*? sevmiyorum|artık .*? ilgilenmiyorum)/i.test(text)) {
+    result.preferences = [text];
+  } else if (/(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor|ilgileniyorum|ilgimi çekiyor|daha çok .*? ilgileniyorum)/i.test(text)) {
+    result.preferences = [text];
+  }
   if (/(?:istiyorum|hedefim|amacım|planım|üzerinde çalışıyorum|geliştiriyorum)/i.test(text)) result.goals = [text];
   if (/(?:yaşım|yaşındayım|mesleğim|işim|şehirde yaşıyorum|yaşıyorum|çalışıyorum)/i.test(text)) result.facts = [text];
   return result;
 }
+
+async function readUserProfile(userId: string): Promise<KairoUserMemory> {
+  const userScope = scope(userId); let current = emptyUserMemory();
+  try {
+    const snapshot = await getDocs(query(collection(db, USER_MEMORY_COLLECTION, userScope, 'entries'), orderBy('updatedAt', 'desc'), limit(1)));
+    if (!snapshot.empty) current = { ...current, ...(snapshot.docs[0].data() as Partial<KairoUserMemory>) };
+  } catch (error) { console.warn('[Kairo User Memory] read failed:', error); }
+  return current;
+}
+
 async function updateStructuredUserMemory(userId: string, userMessage: string): Promise<void> {
   const candidate = extractMemoryCandidates(userMessage);
   if (!candidate.userName && !candidate.preferences?.length && !candidate.facts?.length && !candidate.goals?.length) return;
-  const userScope = scope(userId); const ref = doc(db, USER_MEMORY_COLLECTION, userScope, 'entries', USER_MEMORY_DOC); let current = emptyUserMemory();
-  try { const snapshot = await getDocs(query(collection(db, USER_MEMORY_COLLECTION, userScope, 'entries'), orderBy('updatedAt', 'desc'), limit(1))); if (!snapshot.empty) current = { ...current, ...(snapshot.docs[0].data() as Partial<KairoUserMemory>) }; } catch (error) { console.warn('[Kairo User Memory] read failed:', error); }
-  await setDoc(ref, { userName: candidate.userName || current.userName, preferences: candidate.preferences?.length ? uniqueRecent(candidate.preferences) : uniqueRecent(current.preferences), facts: candidate.facts?.length ? uniqueRecent([...current.facts, ...candidate.facts]) : uniqueRecent(current.facts), goals: candidate.goals?.length ? uniqueRecent(candidate.goals) : uniqueRecent(current.goals), notes: uniqueRecent(current.notes), updatedAt: new Date().toISOString() }, { merge: true });
+  const userScope = scope(userId); const ref = doc(db, USER_MEMORY_COLLECTION, userScope, 'entries', USER_MEMORY_DOC); const current = await readUserProfile(userScope);
+  const removingPreference = candidate.preferences?.some((item) => /artık .*?(sevmiyorum|ilgilenmiyorum)/i.test(item));
+  const preferences = removingPreference
+    ? uniqueRecent(current.preferences.filter((item) => !candidate.preferences!.some((replacement) => item.toLocaleLowerCase('tr-TR').includes(replacement.toLocaleLowerCase('tr-TR')))))
+    : uniqueRecent([...current.preferences, ...(candidate.preferences || [])]);
+  const facts = uniqueRecent([...current.facts, ...(candidate.facts || [])]);
+  const goals = uniqueRecent([...current.goals, ...(candidate.goals || [])]);
+  await setDoc(ref, { userName: candidate.userName || current.userName, preferences, facts, goals, notes: uniqueRecent(current.notes), updatedAt: new Date().toISOString() }, { merge: true });
 }
+
 export async function saveKdmInteraction(payload: KdmPersistencePayload): Promise<void> {
   const userScope = scope(payload.userId);
   await setDoc(doc(db, STATE_COLLECTION, userScope), { characterId: 'kairo', userId: userScope, dynamicState: payload.dynamicState, reasoningTrace: payload.reasoningTrace, lastUserMessage: payload.lastUserMessage, lastReply: payload.reply, updatedAt: new Date().toISOString() }, { merge: true });
   await addDoc(collection(db, STATE_COLLECTION, userScope, TRACE_COLLECTION), { ...payload.reasoningTrace, userMessage: payload.lastUserMessage, reply: payload.reply, dynamicState: payload.dynamicState, userId: userScope, createdAt: new Date().toISOString() });
   await updateStructuredUserMemory(userScope, payload.lastUserMessage).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));
 }
-export async function loadKdmState(userId?: string): Promise<DroitDynamicState | null> {
-  const userScope = scope(userId); const snap = await getDocs(query(collection(db, STATE_COLLECTION, userScope), limit(1)));
-  if (snap.empty) return null; return (snap.docs[0].data().dynamicState as DroitDynamicState) || null;
-}
+export async function loadKdmState(userId?: string): Promise<DroitDynamicState | null> { const userScope = scope(userId); const snap = await getDocs(query(collection(db, STATE_COLLECTION, userScope), limit(1))); if (snap.empty) return null; return (snap.docs[0].data().dynamicState as DroitDynamicState) || null; }
 export async function loadRecentKdmMemory(maxItems = 6, userId?: string): Promise<KdmMemoryItem[]> {
   const userScope = scope(userId); const safeLimit = Math.max(1, Math.min(maxItems, 20));
   const snapshot = await getDocs(query(collection(db, STATE_COLLECTION, userScope, TRACE_COLLECTION), orderBy('createdAt', 'desc'), limit(safeLimit)));
