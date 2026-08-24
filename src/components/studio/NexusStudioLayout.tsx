@@ -5,6 +5,7 @@ import { CharacterTab } from './tabs/CharacterTab';
 import { TestLabTab } from './tabs/TestLabTab';
 import { BrainTab } from './tabs/BrainTab';
 import { SettingsTab } from './tabs/SettingsTab';
+import { KdmMetricsPanel } from '../common/KdmMetricsPanel';
 import { DroitPersonalityTraits, DroitDynamicState, DroitExpressionMode, DroitExpressionId, DroitExpressionAsset, NexusTab, TestMessage, ReasoningTrace } from '../../types/nexus';
 import { droitPersonalityService, DEFAULT_PERSONALITY_TRAITS } from '../../services/droitPersonalityService';
 import { droitExpressionAssetService } from '../../services/droitExpressionAssetService';
@@ -108,7 +109,7 @@ export const NexusStudioLayout: React.FC = () => {
     <StudioTopBar activeTab={activeTab} onSelectTab={setActiveTab} onSave={handleSave} isSaved={isSaved} isSaving={isSaving} />
     <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {activeTab === 'KARAKTER' && <CharacterTab personality={personality} dynamicState={dynamicState} expression={expression} onExpressionChange={setExpression} expressionAssets={expressionAssets} onPersonalityChange={handlePersonalityChange} onSave={handleSave} isSaved={isSaved} isSaving={isSaving} />}
-      {activeTab === 'TEST' && <TestLabTab personality={personality} dynamicState={dynamicState} expression={expression} onDynamicStateChange={setDynamicState} onExpressionChange={setExpression} reasoningTrace={reasoningTrace} onReasoningTraceChange={setReasoningTrace} lastAnalysis={lastAnalysis} onLastAnalysisChange={setLastAnalysis} isNewUserMode={isNewUserMode} onToggleNewUserMode={() => setIsNewUserMode((prev) => !prev)} userWarmth={userWarmth} onUserWarmthChange={setUserWarmth} onNavigateToBrain={() => setActiveTab('BEYİN')} />}
+      {activeTab === 'TEST' && <div className="flex-1 min-h-0 flex flex-col gap-2"><div className="flex-1 min-h-0"><TestLabTab personality={personality} dynamicState={dynamicState} expression={expression} onDynamicStateChange={setDynamicState} onExpressionChange={setExpression} reasoningTrace={reasoningTrace} onReasoningTraceChange={setReasoningTrace} lastAnalysis={lastAnalysis} onLastAnalysisChange={setLastAnalysis} isNewUserMode={isNewUserMode} onToggleNewUserMode={() => setIsNewUserMode((prev) => !prev)} userWarmth={userWarmth} onUserWarmthChange={setUserWarmth} onNavigateToBrain={() => setActiveTab('BEYİN')} /></div><div className="shrink-0"><KdmMetricsPanel compact userId="anonymous" /></div></div>}
       {(activeTab === 'BEYIN' || activeTab === 'BEYİN') && <BrainTab reasoningTrace={reasoningTrace} onReasoningTraceChange={setReasoningTrace} personality={personality} dynamicState={dynamicState} onDynamicStateChange={setDynamicState} isNewUserMode={isNewUserMode} onToggleNewUserMode={() => setIsNewUserMode((prev) => !prev)} userWarmth={userWarmth} onUserWarmthChange={setUserWarmth} lastAnalysis={lastAnalysis} onNavigateToTest={() => setActiveTab('TEST')} onNavigateToCharacter={() => setActiveTab('KARAKTER')} onResetTrace={() => { setReasoningTrace(INITIAL_REASONING_TRACE); setUserWarmth(62); setIsNewUserMode(false); }} />}
       {activeTab === 'AYARLAR' && <SettingsTab />}
       {activeTab === 'KAIRO' && <KairoChatTab expression={expression} dynamicState={dynamicState} messages={messages} isLoading={isAiLoading} onSendMessage={handleSendMessage} />}
