@@ -1,6 +1,6 @@
 import { DroitPersonalityTraits, TestMessage, DroitDynamicState, ReasoningTrace } from '../types/nexus';
 import { computeBehaviorProfile, BehaviorLayerProfile } from './droitBehaviorEngine';
-import { saveKdmInteraction, loadKdmState } from './kdmPersistenceService';
+import { saveKdmInteraction, loadKdmState, loadRecentKdmMemory } from './kdmPersistenceService';
 import { loadKairoLongTermMemory, KairoMemoryEntry } from './kairoLongTermMemoryService';
 import { auth } from '../lib/firebase';
 
@@ -11,8 +11,22 @@ export const droitChatService = {
   async sendMessage({ userMessage, personality, history = [], characterInfo = { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' } }: SendKairoChatOptions): Promise<KairoChatResponse> {
     const behaviorProfile = computeBehaviorProfile(personality, userMessage);
     const userId = auth.currentUser?.uid || 'anonymous';
-    const [persistedState, longTermMemory] = await Promise.all([loadKdmState(userId).catch(() => null), loadKairoLongTermMemory(8)]);
-    const payload = { userId, userMessage, character: characterInfo, personality, behaviorProfile, dynamicState: persistedState, longTermMemory: longTermMemory as KairoMemoryEntry[], history: history.map((m) => ({ sender: m.sender, text: m.text })) };
+    const [persistedState, longTermMemory, structuredMemory] = await Promise.all([
+      loadKdmState(userId).catch(() => null),
+      loadKairoLongTermMemory(8).catch(() => []),
+      loadRecentKdmMemory(8, userId).catch(() => []),
+    ]);
+    const payload = {
+      userId,
+      userMessage,
+      character: characterInfo,
+      personality,
+      behaviorProfile,
+      dynamicState: persistedState,
+      longTermMemory: longTermMemory as KairoMemoryEntry[],
+      userMemory: structuredMemory,
+      history: history.map((m) => ({ sender: m.sender, text: m.text })),
+    };
     try {
       const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) { const errorData = await res.json().catch(() => ({})); throw new Error(errorData.error || `Sunucu hatası: ${res.status}`); }
