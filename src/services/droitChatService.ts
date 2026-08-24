@@ -2,10 +2,11 @@ import { DroitPersonalityTraits, TestMessage, DroitDynamicState, ReasoningTrace 
 import { computeBehaviorProfile, BehaviorLayerProfile } from './droitBehaviorEngine';
 import { saveKdmInteraction, loadKdmState, loadRecentKdmMemory } from './kdmPersistenceService';
 import { loadKairoLongTermMemory, KairoMemoryEntry } from './kairoLongTermMemoryService';
+import { validateKairoResponse, ResponseConsistencyResult } from './kairoResponseConsistency';
 import { auth } from '../lib/firebase';
 
 export interface SendKairoChatOptions { userMessage: string; personality: DroitPersonalityTraits; history?: TestMessage[]; characterInfo?: { name?: string; roleTitle?: string; raceName?: string; }; }
-export interface KairoChatResponse { reply: string; profile: BehaviorLayerProfile; dynamicState?: DroitDynamicState; reasoningTrace?: ReasoningTrace; }
+export interface KairoChatResponse { reply: string; profile: BehaviorLayerProfile; dynamicState?: DroitDynamicState; reasoningTrace?: ReasoningTrace; consistency?: ResponseConsistencyResult; }
 
 export const droitChatService = {
   async sendMessage({ userMessage, personality, history = [], characterInfo = { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' } }: SendKairoChatOptions): Promise<KairoChatResponse> {
@@ -30,9 +31,13 @@ export const droitChatService = {
     try {
       const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) { const errorData = await res.json().catch(() => ({})); throw new Error(errorData.error || `Sunucu hatası: ${res.status}`); }
-      const data = await res.json(); const reply = data.reply || ''; const dynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined; const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
+      const data = await res.json();
+      const reply = data.reply || '';
+      const dynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined;
+      const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
+      const consistency = reasoningTrace ? validateKairoResponse(reply, reasoningTrace) : undefined;
       if (dynamicState && reasoningTrace) void saveKdmInteraction({ userId, dynamicState, reasoningTrace, lastUserMessage: userMessage, reply }).catch((error) => console.warn('KDM persistence failed:', error));
-      return { reply, profile: behaviorProfile, dynamicState, reasoningTrace };
+      return { reply, profile: behaviorProfile, dynamicState, reasoningTrace, consistency };
     } catch (err: any) { console.error('Kairo Chat Service error:', err); throw err; }
   },
 };
