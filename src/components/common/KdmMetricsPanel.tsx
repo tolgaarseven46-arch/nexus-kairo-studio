@@ -24,7 +24,10 @@ export const KdmMetricsPanel: React.FC<KdmMetricsPanelProps> = ({ userId = 'anon
 
   const summary = useMemo(() => summarizeKdmMetrics(events), [events]);
   const recent = events.slice(-8);
-  const topIssues = Object.entries(summary.issueFrequency).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topIssues = Object.entries(summary.issueFrequency)
+    .map(([issue, count]) => [issue, Number(count)] as const)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
 
   return (
     <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/60 p-3.5 shadow-xs">
