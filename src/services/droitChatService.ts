@@ -1,9 +1,8 @@
 import { DroitPersonalityTraits, TestMessage, DroitDynamicState, ReasoningTrace } from '../types/nexus';
 import { computeBehaviorProfile, BehaviorLayerProfile } from './droitBehaviorEngine';
-import { saveKdmInteraction, loadKdmState, loadRecentKdmMemory } from './kdmPersistenceService';
+import { loadKdmState, loadRecentKdmMemory } from './kdmPersistenceService';
 import { loadKairoLongTermMemory, KairoMemoryEntry } from './kairoLongTermMemoryService';
 import { validateKairoResponse, ResponseConsistencyResult } from './kairoResponseConsistency';
-import { recordKdmMetric } from './kdmMetricsService';
 import { auth } from '../lib/firebase';
 
 export interface SendKairoChatOptions { userMessage: string; personality: DroitPersonalityTraits; history?: TestMessage[]; characterInfo?: { name?: string; roleTitle?: string; raceName?: string; }; }
@@ -37,10 +36,8 @@ export const droitChatService = {
       const dynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined;
       const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
       const consistency = reasoningTrace ? validateKairoResponse(reply, reasoningTrace) : undefined;
-      if (consistency) {
-        void recordKdmMetric({ userId, score: consistency.score, accepted: consistency.accepted, repaired: false, repairAttempts: 0, issues: consistency.issues }).catch((error) => console.warn('KDM metric recording failed:', error));
-      }
-      if (dynamicState && reasoningTrace) void saveKdmInteraction({ userId, dynamicState, reasoningTrace, lastUserMessage: userMessage, reply }).catch((error) => console.warn('KDM persistence failed:', error));
+      // KDM metrikleri ve etkileşim kaydı server.ts tarafından, onarım tamamlandıktan sonra tutulur.
+      // Burada tekrar yazmak duplicate event oluşturur ve gerçek repairAttempts bilgisini kaybeder.
       return { reply, profile: behaviorProfile, dynamicState, reasoningTrace, consistency };
     } catch (err: any) { console.error('Kairo Chat Service error:', err); throw err; }
   },
