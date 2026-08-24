@@ -50,9 +50,7 @@ export const NexusStudioLayout: React.FC = () => {
         setExpressionAssets(loadedExpressions);
         if (persistedMessages.length) setMessages(persistedMessages);
         setIsSaved(true);
-      } catch (err) {
-        console.warn('Could not load character data from Firestore:', err);
-      }
+      } catch (err) { console.warn('Could not load character data from Firestore:', err); }
     }
     fetchData();
     return () => { isMounted = false; };
@@ -61,14 +59,9 @@ export const NexusStudioLayout: React.FC = () => {
   const handlePersonalityChange = (partial: Partial<DroitPersonalityTraits>) => { setPersonality((prev) => ({ ...prev, ...partial })); setIsSaved(false); };
 
   const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      await droitPersonalityService.saveKairoPersonality(personality, kairoDocId);
-      setIsSaved(true);
-      setMessages([]);
-    } catch (error) {
-      console.error('Error saving personality to Firestore:', error);
-    } finally { setIsSaving(false); }
+    try { setIsSaving(true); await droitPersonalityService.saveKairoPersonality(personality, kairoDocId); setIsSaved(true); setMessages([]); }
+    catch (error) { console.error('Error saving personality to Firestore:', error); }
+    finally { setIsSaving(false); }
   };
 
   const persistMessageSafely = useCallback(async (message: TestMessage) => {
@@ -77,20 +70,32 @@ export const NexusStudioLayout: React.FC = () => {
 
   const handleSendMessage = useCallback(async (userText: string) => {
     if (!userText.trim() || isAiLoading) return;
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const userMsg: TestMessage = { id: `msg-${Date.now()}`, sender: 'user', text: userText.trim(), timestamp: timeStr };
     setMessages((prev) => [...prev, userMsg]);
     setIsAiLoading(true);
     void persistMessageSafely(userMsg);
     try {
       const response = await droitChatService.sendMessage({ userMessage: userText.trim(), personality, history: [...messages, userMsg], characterInfo: { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' } });
+      if (response.dynamicState) {
+        setDynamicState(response.dynamicState);
+        setLastAnalysis(response.dynamicState.lastEvent ?? null);
+      }
+      if (response.reasoningTrace) {
+        setReasoningTrace(response.reasoningTrace);
+        setUserWarmth(response.reasoningTrace.relationship.warmthScore);
+        setLastAnalysis({
+          intent: response.reasoningTrace.messageInterpretation.intent,
+          sentiment: response.reasoningTrace.messageInterpretation.sentiment,
+          tone: response.reasoningTrace.decision.chosenTone,
+          mood: response.reasoningTrace.currentMood.moodText,
+          warmthScore: response.reasoningTrace.relationship.warmthScore,
+        });
+      }
       const replyTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const droitMsg: TestMessage = { id: `msg-${Date.now() + 1}`, sender: 'droit', text: response.reply, timestamp: replyTime };
       setMessages((prev) => [...prev, droitMsg]);
       void persistMessageSafely(droitMsg);
-      if (response.dynamicState) setDynamicState(response.dynamicState);
-      if (response.reasoningTrace) setReasoningTrace(response.reasoningTrace);
     } catch (error: any) {
       console.error('Kairo AI generation error in chat:', error);
       const replyTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
