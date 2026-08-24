@@ -61,7 +61,25 @@ export async function loadKdmState(userId?: string): Promise<DroitDynamicState |
 export async function loadRecentKdmMemory(maxItems = 6, userId?: string): Promise<KdmMemoryItem[]> {
   const userScope = scope(userId); const safeLimit = Math.max(1, Math.min(maxItems, 20));
   const snapshot = await getDocs(query(collection(db, STATE_COLLECTION, userScope, TRACE_COLLECTION), orderBy('createdAt', 'desc'), limit(safeLimit)));
-  const memories = snapshot.docs.map((item) => { const data = item.data(); return { userMessage: typeof data.userMessage === 'string' ? data.userMessage : '', reply: typeof data.reply === 'string' ? data.reply : '', createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined, reasoningTrace: data as unknown as ReasoningTrace, dynamicState: data.dynamicState as DroitDynamicState | undefined }; }).filter((item) => item.userMessage || item.reply).reverse();
-  try { const profileSnapshot = await getDocs(query(collection(db, USER_MEMORY_COLLECTION, userScope, 'entries'), orderBy('updatedAt', 'desc'), limit(1))); if (!profileSnapshot.empty) { const profile = profileSnapshot.docs[0].data() as Partial<KairoUserMemory>; memories.unshift({ userMessage: 'Kairo kullanıcı profili', reply: JSON.stringify({ userName: profile.userName || null, preferences: Array.isArray(profile.preferences) ? profile.preferences : [], facts: Array.isArray(profile.facts) ? profile.facts : [], goals: Array.isArray(profile.goals) ? profile.goals : [], notes: Array.isArray(profile.notes) ? profile.notes : [] }) }); } } catch (error) { console.warn('[Kairo User Memory] profile load skipped:', error); }
+  const memories: KdmMemoryItem[] = snapshot.docs.map((item) => { const data = item.data(); return { userMessage: typeof data.userMessage === 'string' ? data.userMessage : '', reply: typeof data.reply === 'string' ? data.reply : '', createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined, reasoningTrace: data as unknown as ReasoningTrace, dynamicState: data.dynamicState as DroitDynamicState | undefined }; }).filter((item) => item.userMessage || item.reply).reverse();
+  try {
+    const profileSnapshot = await getDocs(query(collection(db, USER_MEMORY_COLLECTION, userScope, 'entries'), orderBy('updatedAt', 'desc'), limit(1)));
+    if (!profileSnapshot.empty) {
+      const profile = profileSnapshot.docs[0].data() as Partial<KairoUserMemory>;
+      memories.unshift({
+        userMessage: 'Kairo kullanıcı profili',
+        reply: JSON.stringify({
+          userName: profile.userName || null,
+          preferences: Array.isArray(profile.preferences) ? profile.preferences : [],
+          facts: Array.isArray(profile.facts) ? profile.facts : [],
+          goals: Array.isArray(profile.goals) ? profile.goals : [],
+          notes: Array.isArray(profile.notes) ? profile.notes : [],
+        }),
+        createdAt: new Date().toISOString(),
+      });
+    }
+  } catch (error) {
+    console.warn('[Kairo User Memory] profile load skipped:', error);
+  }
   return memories;
 }

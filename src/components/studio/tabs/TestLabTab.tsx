@@ -34,6 +34,7 @@ import {
 } from '../../../types/nexus';
 import { droitChatService } from '../../../services/droitChatService';
 import { computeBehaviorProfile } from '../../../services/droitBehaviorEngine';
+import { validateKairoResponse } from '../../../services/kairoResponseConsistency';
 import { DroitAvatar } from '../DroitAvatar';
 
 export interface ReasoningTrace {
@@ -361,13 +362,30 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
         outputStatus: 'Başarıyla üretildi ✓',
         rawResponse: 'KAIRO Test Kontrol Paneli aktif. Sistem protokolleri ve anlık davranış katmanı canlı olarak izleniyor.',
       },
-      ktm: {
-        passed: true,
-        score: 94,
-        statusText: 'Tutarlı',
-        consistencySummary: 'Karakter, duygu, bağlam ve güvenlik tutarlı',
-        regenerationInfo: 'Gerekmedi (İlk seferde onaylandı)',
-      },
+      ktm: (() => {
+        const fallbackTrace = propReasoningTrace ?? {
+          whoSent: { userName: 'Test Operatörü', isNewUser: false, recognitionText: 'Tanınan kullanıcı' },
+          relationship: { warmthScore: 62, warmthLabel: 'Samimi', note: '' },
+          currentMood: { moodText: 'Sakin ve dengeli', reasonText: '' },
+          messageInterpretation: { intent: 'Duygusal Destek', sentiment: 'Hassas', explanation: '' },
+          decision: { chosenTone: 'Sıcak, destekleyici', explanation: '' },
+          memoryUpdate: { warmthBefore: 62, warmthAfter: 65, warmthDelta: 3, moodChange: 'Sakin', reason: '' },
+        };
+        const initialConsistency = validateKairoResponse(
+          'KAIRO Test Kontrol Paneli aktif. Sistem protokolleri ve anlık davranış katmanı canlı olarak izleniyor.',
+          fallbackTrace
+        );
+        const passed = initialConsistency.accepted;
+        return {
+          passed,
+          score: initialConsistency.score,
+          statusText: passed ? (initialConsistency.score >= 85 ? 'Tutarlı' : 'Kabul Edilebilir') : 'Uyumsuzluk',
+          consistencySummary: initialConsistency.issues.length > 0
+            ? initialConsistency.issues.join('; ')
+            : 'Karakter, duygu, bağlam ve güvenlik tutarlı',
+          regenerationInfo: passed ? 'Gerekmedi (İlk seferde onaylandı)' : `${initialConsistency.issues.length} uyumsuzluk`,
+        };
+      })(),
       latencyMs: 320,
     };
   });
@@ -805,13 +823,27 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
           outputStatus: `Başarıyla üretildi ✓ (${latency}ms)`,
           rawResponse: response.reply,
         },
-        ktm: {
-          passed: true,
-          score: 94,
-          statusText: 'Tutarlı',
-          consistencySummary: 'Karakter, duygu, bağlam ve güvenlik tutarlı',
-          regenerationInfo: 'Gerekmedi (İlk seferde onaylandı)',
-        },
+        ktm: (() => {
+          const consistencyResult = response.consistency ?? validateKairoResponse(response.reply, newTrace);
+          const passed = consistencyResult.accepted;
+          const score = consistencyResult.score;
+          const statusText = passed
+            ? (score >= 85 ? 'Tutarlı' : 'Kabul Edilebilir')
+            : 'Uyumsuzluk';
+          const consistencySummary = consistencyResult.issues && consistencyResult.issues.length > 0
+            ? consistencyResult.issues.join('; ')
+            : 'Karakter, duygu, bağlam ve güvenlik tutarlı';
+          const regenerationInfo = response.consistency
+            ? (passed ? 'Gerekmedi (KTM tarafından onaylandı)' : `${consistencyResult.issues.length} tutarsızlık tespit edildi`)
+            : (passed ? 'Gerekmedi (Yerel KTM Doğrulandı)' : `${consistencyResult.issues.length} sorun bulundu`);
+          return {
+            passed,
+            score,
+            statusText,
+            consistencySummary,
+            regenerationInfo,
+          };
+        })(),
         latencyMs: latency,
       };
       setLastAnalysis(newAnalysis);

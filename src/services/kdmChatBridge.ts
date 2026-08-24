@@ -20,7 +20,7 @@ export async function sendKairoMessageThroughKdm(input: {
 
   return {
     ...response,
-    trace: response.trace,
+    trace: response.reasoningTrace,
     dynamicState: response.dynamicState,
   };
 }
