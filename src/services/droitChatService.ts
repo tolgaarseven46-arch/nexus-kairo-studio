@@ -1,15 +1,39 @@
 import { DroitPersonalityTraits, TestMessage, DroitDynamicState, ReasoningTrace } from '../types/nexus';
 import { computeBehaviorProfile, BehaviorLayerProfile } from './droitBehaviorEngine';
 import { loadKdmState, loadRecentKdmMemory } from './kdmPersistenceService';
-import { loadKairoLongTermMemory, KairoMemoryEntry } from './kairoLongTermMemoryService';
+import { loadKairoLongTermMemory, KairoMemoryEntry, saveKairoLongTermMemory } from './kairoLongTermMemoryService';
 import { validateKairoResponse, ResponseConsistencyResult } from './kairoResponseConsistency';
 import { auth } from '../lib/firebase';
 
 export interface SendKairoChatOptions { userMessage: string; personality: DroitPersonalityTraits; history?: TestMessage[]; characterInfo?: { name?: string; roleTitle?: string; raceName?: string; }; }
 export interface KairoChatResponse { reply: string; profile: BehaviorLayerProfile; dynamicState?: DroitDynamicState; reasoningTrace?: ReasoningTrace; consistency?: ResponseConsistencyResult; }
 
+const EXPLICIT_NAME_PATTERNS = [
+  /^benim adım\s+([^.!?,\n]+)[.!?]?$/i,
+  /^adım\s+([^.!?,\n]+)[.!?]?$/i,
+  /^ben\s+([^.!?,\n]+)\s*$/i,
+];
+
+async function captureExplicitUserMemory(userMessage: string): Promise<void> {
+  const normalized = userMessage.trim();
+  for (const pattern of EXPLICIT_NAME_PATTERNS) {
+    const match = normalized.match(pattern);
+    if (!match) continue;
+    const name = match[1].trim();
+    if (name.length < 2 || name.length > 80) return;
+    await saveKairoLongTermMemory({
+      category: 'user_identity',
+      content: `Kullanıcının adı: ${name}`,
+      importance: 1,
+      tags: ['name', 'user_identity'],
+    });
+    return;
+  }
+}
+
 export const droitChatService = {
   async sendMessage({ userMessage, personality, history = [], characterInfo = { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' } }: SendKairoChatOptions): Promise<KairoChatResponse> {
+    await captureExplicitUserMemory(userMessage).catch((error) => console.warn('Kairo memory capture skipped:', error));
     const behaviorProfile = computeBehaviorProfile(personality, userMessage);
     const userId = auth.currentUser?.uid || 'anonymous';
     const [persistedState, longTermMemory, structuredMemory] = await Promise.all([
@@ -36,8 +60,6 @@ export const droitChatService = {
       const dynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined;
       const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
       const consistency = reasoningTrace ? validateKairoResponse(reply, reasoningTrace) : undefined;
-      // KDM metrikleri ve etkileşim kaydı server.ts tarafından, onarım tamamlandıktan sonra tutulur.
-      // Burada tekrar yazmak duplicate event oluşturur ve gerçek repairAttempts bilgisini kaybeder.
       return { reply, profile: behaviorProfile, dynamicState, reasoningTrace, consistency };
     } catch (err: any) { console.error('Kairo Chat Service error:', err); throw err; }
   },
