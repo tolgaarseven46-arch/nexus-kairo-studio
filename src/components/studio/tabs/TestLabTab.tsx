@@ -360,7 +360,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
         temperature: 0.6,
         systemPromptSummary: `Rol: Sunucu Yöneticisi | Ton: ${profile.tone} | Profil: ${profile.dominantSummary}`,
         outputStatus: 'Başarıyla üretildi ✓',
-        rawResponse: 'KAIRO Test Kontrol Paneli aktif. Sistem protokolleri ve anlık davranış katmanı canlı olarak izleniyor.',
+        rawResponse: 'Seni çok iyi anlıyorum. Yorucu ve stresli günlerde sakin bir nefes almak önemlidir; buradayım ve her konuda sana destek olmaya hazırım.',
       },
       ktm: (() => {
         const fallbackTrace = propReasoningTrace ?? {
@@ -372,7 +372,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
           memoryUpdate: { warmthBefore: 62, warmthAfter: 65, warmthDelta: 3, moodChange: 'Sakin', reason: '' },
         };
         const initialConsistency = validateKairoResponse(
-          'KAIRO Test Kontrol Paneli aktif. Sistem protokolleri ve anlık davranış katmanı canlı olarak izleniyor.',
+          'Seni çok iyi anlıyorum. Yorucu ve stresli günlerde sakin bir nefes almak önemlidir; buradayım ve her konuda sana destek olmaya hazırım.',
           fallbackTrace
         );
         const passed = initialConsistency.accepted;
@@ -1227,15 +1227,31 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
             } ${highlightedCard === 'ktm' ? 'ring-1 ring-emerald-400/50' : ''}`}
           >
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.3)] shrink-0">
-                <Check className="w-2.5 h-2.5 stroke-[3]" />
+              <div
+                className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                  lastAnalysis.ktm.passed
+                    ? 'bg-emerald-500/20 border border-emerald-400/50 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.3)]'
+                    : 'bg-rose-500/20 border border-rose-400/50 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.3)]'
+                }`}
+              >
+                {lastAnalysis.ktm.passed ? (
+                  <Check className="w-2.5 h-2.5 stroke-[3]" />
+                ) : (
+                  <Shield className="w-2.5 h-2.5 stroke-[3]" />
+                )}
               </div>
-              <span className="text-[11px] font-mono font-bold tracking-wider text-emerald-400">
-                {lastAnalysis.ktm.statusText ? lastAnalysis.ktm.statusText.toUpperCase() : 'TUTARLI'}
+              <span
+                className={`text-[11px] font-mono font-bold tracking-wider ${
+                  lastAnalysis.ktm.passed ? 'text-emerald-400' : 'text-rose-400'
+                }`}
+              >
+                {lastAnalysis.ktm.statusText ? lastAnalysis.ktm.statusText.toUpperCase() : (lastAnalysis.ktm.passed ? 'TUTARLI' : 'UYUMSUZLUK')}
               </span>
               <span className="text-[9px] font-mono text-zinc-500">|</span>
               <span className="text-[10px] font-mono font-bold text-zinc-200">
-                <span className="text-emerald-400">{lastAnalysis.ktm.score}</span>
+                <span className={lastAnalysis.ktm.passed ? 'text-emerald-400' : 'text-rose-400'}>
+                  {lastAnalysis.ktm.score}
+                </span>
                 <span className="text-zinc-500 text-[9px]">/100</span>
               </span>
             </div>
