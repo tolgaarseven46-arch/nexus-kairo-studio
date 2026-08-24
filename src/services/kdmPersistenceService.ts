@@ -9,6 +9,35 @@ const USER_MEMORY_COLLECTION = 'kairoMemory';
 const USER_MEMORY_DOC = 'profile';
 const scope = (userId?: string) => (userId || DEFAULT_USER_ID).replace(/[^a-zA-Z0-9_-]/g, '_');
 
+const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
+  calmness: 70,
+  anger: 10,
+  stress: 20,
+  happiness: 70,
+  confidence: 70,
+  surprise: 10,
+  lastStatus: 'Sakin ve kontrollü',
+};
+
+function normalizeDynamicState(value: unknown): DroitDynamicState | null {
+  if (!value || typeof value !== 'object') return null;
+  const source = value as Partial<DroitDynamicState>;
+  const numberOrDefault = (candidate: unknown, fallback: number) =>
+    typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : fallback;
+  return {
+    calmness: numberOrDefault(source.calmness, DEFAULT_DYNAMIC_STATE.calmness),
+    anger: numberOrDefault(source.anger, DEFAULT_DYNAMIC_STATE.anger),
+    stress: numberOrDefault(source.stress, DEFAULT_DYNAMIC_STATE.stress),
+    happiness: numberOrDefault(source.happiness, DEFAULT_DYNAMIC_STATE.happiness),
+    confidence: numberOrDefault(source.confidence, DEFAULT_DYNAMIC_STATE.confidence),
+    surprise: numberOrDefault(source.surprise, DEFAULT_DYNAMIC_STATE.surprise),
+    lastStatus: typeof source.lastStatus === 'string' && source.lastStatus.trim()
+      ? source.lastStatus
+      : DEFAULT_DYNAMIC_STATE.lastStatus,
+    ...(source.lastEvent ? { lastEvent: source.lastEvent } : {}),
+  };
+}
+
 export interface KdmPersistencePayload { dynamicState: DroitDynamicState; reasoningTrace: ReasoningTrace; lastUserMessage: string; reply: string; userId?: string; }
 export interface KdmMemoryItem { userMessage: string; reply: string; createdAt?: string; reasoningTrace?: ReasoningTrace; dynamicState?: DroitDynamicState; }
 export interface KairoUserMemory { userName?: string; preferences: string[]; facts: string[]; goals: string[]; notes: string[]; updatedAt: string; }
@@ -53,15 +82,16 @@ async function updateStructuredUserMemory(userId: string, userMessage: string): 
 
 export async function saveKdmInteraction(payload: KdmPersistencePayload): Promise<void> {
   const userScope = scope(payload.userId);
-  await setDoc(doc(db, STATE_COLLECTION, userScope), { characterId: 'kairo', userId: userScope, dynamicState: payload.dynamicState, reasoningTrace: payload.reasoningTrace, lastUserMessage: payload.lastUserMessage, lastReply: payload.reply, updatedAt: new Date().toISOString() }, { merge: true });
-  await addDoc(collection(db, STATE_COLLECTION, userScope, TRACE_COLLECTION), { ...payload.reasoningTrace, userMessage: payload.lastUserMessage, reply: payload.reply, dynamicState: payload.dynamicState, userId: userScope, createdAt: new Date().toISOString() });
+  const safeDynamicState = normalizeDynamicState(payload.dynamicState) || DEFAULT_DYNAMIC_STATE;
+  await setDoc(doc(db, STATE_COLLECTION, userScope), { characterId: 'kairo', userId: userScope, dynamicState: safeDynamicState, reasoningTrace: payload.reasoningTrace, lastUserMessage: payload.lastUserMessage, lastReply: payload.reply, updatedAt: new Date().toISOString() }, { merge: true });
+  await addDoc(collection(db, STATE_COLLECTION, userScope, TRACE_COLLECTION), { ...payload.reasoningTrace, userMessage: payload.lastUserMessage, reply: payload.reply, dynamicState: safeDynamicState, userId: userScope, createdAt: new Date().toISOString() });
   await updateStructuredUserMemory(userScope, payload.lastUserMessage).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));
 }
-export async function loadKdmState(userId?: string): Promise<DroitDynamicState | null> { const userScope = scope(userId); const snap = await getDocs(query(collection(db, STATE_COLLECTION, userScope), limit(1))); if (snap.empty) return null; return (snap.docs[0].data().dynamicState as DroitDynamicState) || null; }
+export async function loadKdmState(userId?: string): Promise<DroitDynamicState | null> { const userScope = scope(userId); const snap = await getDocs(query(collection(db, STATE_COLLECTION, userScope), limit(1))); if (snap.empty) return null; return normalizeDynamicState(snap.docs[0].data().dynamicState); }
 export async function loadRecentKdmMemory(maxItems = 6, userId?: string): Promise<KdmMemoryItem[]> {
   const userScope = scope(userId); const safeLimit = Math.max(1, Math.min(maxItems, 20));
   const snapshot = await getDocs(query(collection(db, STATE_COLLECTION, userScope, TRACE_COLLECTION), orderBy('createdAt', 'desc'), limit(safeLimit)));
-  const memories: KdmMemoryItem[] = snapshot.docs.map((item) => { const data = item.data(); return { userMessage: typeof data.userMessage === 'string' ? data.userMessage : '', reply: typeof data.reply === 'string' ? data.reply : '', createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined, reasoningTrace: data as unknown as ReasoningTrace, dynamicState: data.dynamicState as DroitDynamicState | undefined }; }).filter((item) => item.userMessage || item.reply).reverse();
+  const memories: KdmMemoryItem[] = snapshot.docs.map((item) => { const data = item.data(); return { userMessage: typeof data.userMessage === 'string' ? data.userMessage : '', reply: typeof data.reply === 'string' ? data.reply : '', createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined, reasoningTrace: data as unknown as ReasoningTrace, dynamicState: normalizeDynamicState(data.dynamicState) || undefined }; }).filter((item) => item.userMessage || item.reply).reverse();
   try {
     const profileSnapshot = await getDocs(query(collection(db, USER_MEMORY_COLLECTION, userScope, 'entries'), orderBy('updatedAt', 'desc'), limit(1)));
     if (!profileSnapshot.empty) {
