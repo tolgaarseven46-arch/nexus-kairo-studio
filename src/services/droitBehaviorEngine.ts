@@ -42,25 +42,26 @@ export interface EngineInteractionResult {
  * Traits are evaluated synergistically (e.g. Humor + Seriousness + Empathy).
  */
 export function computeBehaviorProfile(
-  traits: DroitPersonalityTraits,
+  traits?: Partial<DroitPersonalityTraits> | null,
   userMessage: string = ''
 ): BehaviorLayerProfile {
+  const safeTraits = traits || {};
   // Extract normalized trait values (0 to 100, default 50)
-  const humor = Number(traits.humor ?? 50);
-  const empathy = Number(traits.empathy ?? 50);
-  const confidence = Number(traits.selfConfidence ?? traits.confidence ?? 50);
-  const authority = Number(traits.authority ?? 50);
-  const patience = Number(traits.patience ?? 50);
-  const anger = Number(traits.anger ?? 50);
-  const curiosity = Number(traits.curiosity ?? 50);
-  const analytical = Number(traits.analyticalThinking ?? traits.analytical ?? 50);
-  const creativity = Number(traits.creativity ?? 50);
-  const decisionMaking = Number(traits.decisionMaking ?? traits.decisiveness ?? 50);
-  const attention = Number(traits.attention ?? 50);
-  const seriousness = Number(traits.seriousness ?? 50);
-  const courage = Number(traits.courage ?? 50);
-  const loyalty = Number(traits.loyalty ?? 50);
-  const initiative = Number(traits.initiative ?? 50);
+  const humor = Number(safeTraits.humor ?? 50);
+  const empathy = Number(safeTraits.empathy ?? 50);
+  const confidence = Number(safeTraits.selfConfidence ?? (safeTraits as any).confidence ?? 50);
+  const authority = Number(safeTraits.authority ?? 50);
+  const patience = Number(safeTraits.patience ?? 50);
+  const anger = Number(safeTraits.anger ?? 50);
+  const curiosity = Number(safeTraits.curiosity ?? 50);
+  const analytical = Number(safeTraits.analyticalThinking ?? (safeTraits as any).analytical ?? 50);
+  const creativity = Number(safeTraits.creativity ?? 50);
+  const decisionMaking = Number(safeTraits.decisionMaking ?? (safeTraits as any).decisiveness ?? 50);
+  const attention = Number(safeTraits.attention ?? 50);
+  const seriousness = Number(safeTraits.seriousness ?? 50);
+  const courage = Number(safeTraits.courage ?? 50);
+  const loyalty = Number(safeTraits.loyalty ?? 50);
+  const initiative = Number(safeTraits.initiative ?? 50);
 
   const lowerMsg = userMessage.toLowerCase();
   const isDistressOrEmergency =

@@ -580,6 +580,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
       const response = await droitChatService.sendMessage({
         userMessage: textToSend,
         personality,
+        dynamicState,
         history: [...testMessages, userMsg],
         characterInfo: {
           name: 'KAIRO',

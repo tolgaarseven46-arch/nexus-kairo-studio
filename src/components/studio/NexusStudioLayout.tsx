@@ -77,7 +77,7 @@ export const NexusStudioLayout: React.FC = () => {
     setIsAiLoading(true);
     void persistMessageSafely(userMsg);
     try {
-      const response = await droitChatService.sendMessage({ userMessage: userText.trim(), personality, history: [...messages, userMsg], characterInfo: { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' } });
+      const response = await droitChatService.sendMessage({ userMessage: userText.trim(), personality, dynamicState, history: [...messages, userMsg], characterInfo: { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' } });
       if (response.dynamicState) {
         setDynamicState(response.dynamicState);
         setLastAnalysis(response.dynamicState.lastEvent ?? null);

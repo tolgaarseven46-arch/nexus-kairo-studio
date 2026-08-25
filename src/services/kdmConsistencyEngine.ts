@@ -46,15 +46,31 @@ function moodChangeFromDelta(delta: number): string {
   return 'stabil';
 }
 
+const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
+  calmness: 70,
+  anger: 10,
+  stress: 20,
+  happiness: 70,
+  confidence: 70,
+  surprise: 10,
+  lastStatus: 'Sakin ve kontrollü',
+};
+
 export function analyzeKdmInteraction(
   userMessage: string,
-  personality: DroitPersonalityTraits,
-  currentDynamicState: DroitDynamicState
+  personality?: DroitPersonalityTraits | null,
+  currentDynamicState?: DroitDynamicState | null
 ): KdmAnalysisResult {
-  const behaviorProfile = computeBehaviorProfile(personality, userMessage);
+  const state: DroitDynamicState = {
+    ...DEFAULT_DYNAMIC_STATE,
+    ...(currentDynamicState || {}),
+  };
+  const behaviorProfile = computeBehaviorProfile(personality || undefined, userMessage);
   const intent = classifyIntent(userMessage);
   const sentiment = classifySentiment(userMessage);
-  const warmthBefore = clamp((currentDynamicState.confidence + currentDynamicState.happiness) / 2);
+  const conf = typeof state.confidence === 'number' ? state.confidence : 70;
+  const happ = typeof state.happiness === 'number' ? state.happiness : 70;
+  const warmthBefore = clamp((conf + happ) / 2);
   const warmthDelta = warmthDeltaFor(userMessage, sentiment);
   const warmthAfter = clamp(warmthBefore + warmthDelta);
 
@@ -63,11 +79,11 @@ export function analyzeKdmInteraction(
   const confidenceDelta = intent === 'eylem_talebi' ? 1 : 0;
 
   const nextDynamicState: DroitDynamicState = {
-    ...currentDynamicState,
-    stress: clamp(currentDynamicState.stress + stressDelta),
-    happiness: clamp(currentDynamicState.happiness + happinessDelta),
-    confidence: clamp(currentDynamicState.confidence + confidenceDelta),
-    calmness: clamp(currentDynamicState.calmness + (sentiment === 'negatif' ? -2 : 1)),
+    ...state,
+    stress: clamp((state.stress ?? 20) + stressDelta),
+    happiness: clamp((state.happiness ?? 70) + happinessDelta),
+    confidence: clamp((state.confidence ?? 70) + confidenceDelta),
+    calmness: clamp((state.calmness ?? 70) + (sentiment === 'negatif' ? -2 : 1)),
     lastStatus: moodChangeFromDelta(warmthDelta),
     lastEvent: {
       eventTitle: `KDM: ${intent}`,

@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getAuth, Auth } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -10,15 +10,27 @@ let db: Firestore;
 let storage: FirebaseStorage;
 let auth: Auth;
 
+const firestoreSettings = {
+  experimentalForceLongPolling: true,
+};
+
 try {
   if (firebaseConfig.firestoreDatabaseId) {
-    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+    db = initializeFirestore(app, firestoreSettings, firebaseConfig.firestoreDatabaseId);
   } else {
-    db = getFirestore(app);
+    db = initializeFirestore(app, firestoreSettings);
   }
 } catch (e) {
-  console.warn('Fallback to default firestore initialization:', e);
-  db = getFirestore(app);
+  try {
+    if (firebaseConfig.firestoreDatabaseId) {
+      db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+    } else {
+      db = getFirestore(app);
+    }
+  } catch (fallbackError) {
+    console.warn('Fallback to default firestore initialization:', fallbackError);
+    db = getFirestore(app);
+  }
 }
 
 try {
