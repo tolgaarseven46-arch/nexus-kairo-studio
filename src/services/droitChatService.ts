@@ -5,8 +5,9 @@ import { loadKairoLongTermMemory, KairoMemoryEntry, saveKairoLongTermMemory } fr
 import { validateKairoResponse, ResponseConsistencyResult } from './kairoResponseConsistency';
 import { auth } from '../lib/firebase';
 
-export interface SendKairoChatOptions { userMessage: string; personality: DroitPersonalityTraits; history?: TestMessage[]; characterInfo?: { name?: string; roleTitle?: string; raceName?: string; }; }
-export interface KairoChatResponse { reply: string; profile: BehaviorLayerProfile; dynamicState?: DroitDynamicState; reasoningTrace?: ReasoningTrace; consistency?: ResponseConsistencyResult; }
+export type KairoProvider = 'gemini' | 'openrouter';
+export interface SendKairoChatOptions { userMessage: string; personality: DroitPersonalityTraits; history?: TestMessage[]; characterInfo?: { name?: string; roleTitle?: string; raceName?: string; }; provider?: KairoProvider; }
+export interface KairoChatResponse { reply: string; profile: BehaviorLayerProfile; dynamicState?: DroitDynamicState; reasoningTrace?: ReasoningTrace; consistency?: ResponseConsistencyResult; providerUsed?: KairoProvider; }
 
 const EXPLICIT_NAME_PATTERNS = [
   /^benim adım\s+([^.!?,\n]+)[.!?]?$/i,
@@ -32,7 +33,7 @@ async function captureExplicitUserMemory(userMessage: string): Promise<void> {
 }
 
 export const droitChatService = {
-  async sendMessage({ userMessage, personality, history = [], characterInfo = { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' } }: SendKairoChatOptions): Promise<KairoChatResponse> {
+  async sendMessage({ userMessage, personality, history = [], characterInfo = { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' }, provider = 'gemini' }: SendKairoChatOptions): Promise<KairoChatResponse> {
     await captureExplicitUserMemory(userMessage).catch((error) => console.warn('Kairo memory capture skipped:', error));
     const behaviorProfile = computeBehaviorProfile(personality, userMessage);
     const userId = auth.currentUser?.uid || 'anonymous';
@@ -51,6 +52,7 @@ export const droitChatService = {
       longTermMemory: longTermMemory as KairoMemoryEntry[],
       userMemory: structuredMemory,
       history: history.map((m) => ({ sender: m.sender, text: m.text })),
+      provider,
     };
     try {
       const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -60,7 +62,7 @@ export const droitChatService = {
       const dynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined;
       const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
       const consistency = reasoningTrace ? validateKairoResponse(reply, reasoningTrace) : undefined;
-      return { reply, profile: behaviorProfile, dynamicState, reasoningTrace, consistency };
+      return { reply, profile: behaviorProfile, dynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed };
     } catch (err: any) { console.error('Kairo Chat Service error:', err); throw err; }
   },
 };
