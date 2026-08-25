@@ -79,7 +79,7 @@ export const KdmAutoRelationshipTestPanel: React.FC<KdmAutoRelationshipTestPanel
     <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 px-3 py-2">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-300">Otomatik KDM İlişki Testi</div>
+          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-300">Otomatik KDM İlişki Testi · X/Y</div>
           <div className="text-[9px] font-mono text-zinc-500">AI çağrısı yapmaz. Aynı mesajı yeni kullanıcı ve yakın kullanıcı için milisaniyeler içinde karşılaştırır.</div>
         </div>
         <div className={`rounded-md border px-2 py-1 text-[9px] font-mono font-bold ${result.relationshipEffect ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-rose-500/30 bg-rose-500/10 text-rose-300'}`}>
