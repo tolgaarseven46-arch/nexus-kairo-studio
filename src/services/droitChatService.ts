@@ -2,7 +2,7 @@ import { DroitPersonalityTraits, TestMessage, DroitDynamicState, ReasoningTrace 
 import { computeBehaviorProfile, BehaviorLayerProfile } from './droitBehaviorEngine';
 import { applyRelationshipContext } from './relationshipBehaviorService';
 import { loadKdmState, loadRecentKdmMemory } from './kdmPersistenceService';
-import { loadKairoLongTermMemory, KairoMemoryEntry, saveKairoLongTermMemory } from './kairoLongTermMemoryService';
+import { saveKairoLongTermMemory } from './kairoLongTermMemoryService';
 import { validateKairoResponse, ResponseConsistencyResult } from './kairoResponseConsistency';
 import { auth } from '../lib/firebase';
 
@@ -15,12 +15,23 @@ async function captureExplicitUserMemory(userMessage: string): Promise<void> { c
 
 export const droitChatService = {
   async sendMessage({ userMessage, personality, history = [], characterInfo = { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' }, provider = 'gemini' }: SendKairoChatOptions): Promise<KairoChatResponse> {
-    await captureExplicitUserMemory(userMessage).catch((error) => console.warn('Kairo memory capture skipped:', error));
+    // Only write long-term memory when the message explicitly contains durable identity data.
+    void captureExplicitUserMemory(userMessage).catch((error) => console.warn('Kairo memory capture skipped:', error));
     const userId = auth.currentUser?.uid || 'anonymous';
-    const [persistedState, longTermMemory, structuredMemory] = await Promise.all([loadKdmState(userId).catch(() => null),loadKairoLongTermMemory(8).catch(() => []),loadRecentKdmMemory(8,userId).catch(() => [])]);
+    // Keep the hot path lean: relationship state + a short recent-memory window are enough for each turn.
+    const [persistedState, structuredMemory] = await Promise.all([loadKdmState(userId).catch(() => null),loadRecentKdmMemory(4,userId).catch(() => [])]);
     const baseBehaviorProfile = computeBehaviorProfile(personality, userMessage);
     const behaviorProfile = applyRelationshipContext(baseBehaviorProfile, persistedState);
-    const payload = { userId,userMessage,character:characterInfo,personality,behaviorProfile,dynamicState:persistedState,longTermMemory:longTermMemory as KairoMemoryEntry[],userMemory:structuredMemory,history:history.map((m)=>({sender:m.sender,text:m.text})),provider };
-    try { const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!res.ok){const errorData=await res.json().catch(()=>({}));throw new Error(errorData.error||`Sunucu hatası: ${res.status}`);}const data=await res.json();const reply=data.reply||'';const dynamicState=data.kdm?.dynamicState as DroitDynamicState|undefined;const reasoningTrace=data.kdm?.trace as ReasoningTrace|undefined;const consistency=reasoningTrace?validateKairoResponse(reply,reasoningTrace):undefined;return {reply,profile:behaviorProfile,dynamicState,reasoningTrace,consistency,providerUsed:data.providerUsed}; } catch(err:any){console.error('Kairo Chat Service error:',err);throw err;}
+    const payload = { userId,userMessage,character:characterInfo,personality,behaviorProfile,dynamicState:persistedState,userMemory:structuredMemory,history:history.slice(-6).map((m)=>({sender:m.sender,text:m.text})),provider };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+      const res=await fetch('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      if(!res.ok){const errorData=await res.json().catch(()=>({}));throw new Error(errorData.error||`Sunucu hatası: ${res.status}`);}
+      const data=await res.json();const reply=data.reply||'';const dynamicState=data.kdm?.dynamicState as DroitDynamicState|undefined;const reasoningTrace=data.kdm?.trace as ReasoningTrace|undefined;const consistency=reasoningTrace?validateKairoResponse(reply,reasoningTrace):undefined;return {reply,profile:behaviorProfile,dynamicState,reasoningTrace,consistency,providerUsed:data.providerUsed};
+    } catch(err:any){
+      if(err?.name==='AbortError') throw new Error('Kaira yanıtı zaman aşımına uğradı. Lütfen tekrar dene.');
+      console.error('Kairo Chat Service error:',err);throw err;
+    } finally { clearTimeout(timeout); }
   },
 };
