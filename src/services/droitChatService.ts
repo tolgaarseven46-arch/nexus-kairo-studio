@@ -7,18 +7,25 @@ import { validateKairoResponse, ResponseConsistencyResult } from './kairoRespons
 import { auth } from '../lib/firebase';
 
 export type KairoProvider = 'gemini' | 'openrouter';
-export interface SendKairoChatOptions { userMessage: string; personality: DroitPersonalityTraits; history?: TestMessage[]; characterInfo?: { name?: string; roleTitle?: string; raceName?: string; }; provider?: KairoProvider; }
+export interface SendKairoChatOptions { userMessage: string; personality: DroitPersonalityTraits; history?: TestMessage[]; characterInfo?: { name?: string; roleTitle?: string; raceName?: string; }; provider?: KairoProvider; userId?: string; }
 export interface KairoChatResponse { reply: string; profile: BehaviorLayerProfile; dynamicState?: DroitDynamicState; reasoningTrace?: ReasoningTrace; consistency?: ResponseConsistencyResult; providerUsed?: KairoProvider; }
 
 const EXPLICIT_NAME_PATTERNS = [/^benim adım\s+([^.!?,\n]+)[.!?]?$/i,/^adım\s+([^.!?,\n]+)[.!?]?$/i,/^ben\s+([^.!?,\n]+)\s*$/i];
 async function captureExplicitUserMemory(userMessage: string): Promise<void> { const normalized=userMessage.trim(); for(const pattern of EXPLICIT_NAME_PATTERNS){const match=normalized.match(pattern);if(!match)continue;const name=match[1].trim();if(name.length<2||name.length>80)return;await saveKairoLongTermMemory({category:'user_identity',content:`Kullanıcının adı: ${name}`,importance:1,tags:['name','user_identity']});return;}}
 
+function resolveConversationUserId(explicitUserId?: string): string {
+  if (explicitUserId?.trim()) return explicitUserId.trim();
+  if (typeof window !== 'undefined') {
+    const testUserId = window.localStorage.getItem('kairo_test_user_id');
+    if (testUserId?.trim()) return testUserId.trim();
+  }
+  return auth.currentUser?.uid || 'anonymous';
+}
+
 export const droitChatService = {
-  async sendMessage({ userMessage, personality, history = [], characterInfo = { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' }, provider = 'openrouter' }: SendKairoChatOptions): Promise<KairoChatResponse> {
-    // Only write long-term memory when the message explicitly contains durable identity data.
+  async sendMessage({ userMessage, personality, history = [], characterInfo = { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' }, provider = 'openrouter', userId: explicitUserId }: SendKairoChatOptions): Promise<KairoChatResponse> {
     void captureExplicitUserMemory(userMessage).catch((error) => console.warn('Kairo memory capture skipped:', error));
-    const userId = auth.currentUser?.uid || 'anonymous';
-    // Keep the hot path lean: relationship state + a short recent-memory window are enough for each turn.
+    const userId = resolveConversationUserId(explicitUserId);
     const [persistedState, structuredMemory] = await Promise.all([loadKdmState(userId).catch(() => null),loadRecentKdmMemory(4,userId).catch(() => [])]);
     const baseBehaviorProfile = computeBehaviorProfile(personality, userMessage);
     const behaviorProfile = applyRelationshipContext(baseBehaviorProfile, persistedState);
