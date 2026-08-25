@@ -1,11 +1,6 @@
 import { DroitDynamicState } from '../types/nexus';
 import { BehaviorLayerProfile } from './droitBehaviorEngine';
 
-/**
- * Relationship is a runtime modifier. It never changes permanent personality.
- * The longer/warmthier a relationship is, the more natural and tolerant Kaira
- * can be without losing her core traits.
- */
 export function applyRelationshipContext(
   profile: BehaviorLayerProfile,
   dynamicState?: DroitDynamicState | null,
@@ -16,22 +11,14 @@ export function applyRelationshipContext(
   const familiarity = Math.max(0, Math.min(1, relationship.familiarityDays / 30));
   const interactionFamiliarity = Math.max(0, Math.min(1, relationship.interactionCount / 40));
   const warmth = Math.max(0, Math.min(1, relationship.warmth / 100));
-
-  // Relationship strength grows from both time and repeated interaction.
   const closeness = Math.max(0, Math.min(1, familiarity * 0.55 + interactionFamiliarity * 0.2 + warmth * 0.25));
   const establishedRelationship = relationship.familiarityDays >= 14 || relationship.interactionCount >= 20;
   const friendlyRelationship = closeness >= 0.55;
 
-  // Familiarity reduces unnecessary defensiveness while preserving personality.
-  const patienceBoost = closeness * 0.22;
-  const temperReduction = closeness * 0.18;
-  const empathyBoost = closeness * 0.10;
-  const humorBoost = friendlyRelationship ? closeness * 0.08 : 0;
-
-  const patienceLevel = Math.min(1, profile.patienceLevel + patienceBoost);
-  const temperLevel = Math.max(0, profile.temperLevel - temperReduction);
-  const empathyLevel = Math.min(1, profile.empathyLevel + empathyBoost);
-  const humorLevel = Math.min(1, profile.humorLevel + humorBoost);
+  const patienceLevel = Math.min(1, profile.patienceLevel + closeness * 0.22);
+  const temperLevel = Math.max(0, profile.temperLevel - closeness * 0.18);
+  const empathyLevel = Math.min(1, profile.empathyLevel + closeness * 0.10);
+  const humorLevel = Math.min(1, profile.humorLevel + (friendlyRelationship ? closeness * 0.08 : 0));
 
   const relationshipDirectives = [
     establishedRelationship
@@ -40,6 +27,10 @@ export function applyRelationshipContext(
     friendlyRelationship
       ? 'İlişki sıcaklığı yüksek; küçük hatalara ve sert ifadelere ilk tanışmaya göre daha yüksek tolerans göster.'
       : 'İlişki henüz tam oturmadı; sınırları ve karşılıklı güveni koru.',
+    friendlyRelationship
+      ? 'Çatışmalı bir mesaj geldiğinde yakınlığın sağladığı toleransı göster; mizah kullanabilirsin ama rahatsızlığı tamamen yok sayma.'
+      : 'Çatışmalı bir mesaj geldiğinde mizah yerine önce ilişki sınırını koru; kısa ve doğal bir tepki ver.',
+    'Çatışmalı mesajlarda ilişki durumu mizah seviyesinden daha yüksek önceliğe sahiptir; yüksek mizah her sert mesajı espriye çevirmemelidir.',
   ];
 
   const tone = friendlyRelationship && profile.tone === 'formal' ? 'confident' : profile.tone;
