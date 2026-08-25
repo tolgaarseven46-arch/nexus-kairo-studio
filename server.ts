@@ -6,7 +6,6 @@ import { analyzeKdmInteraction } from './src/services/kdmConsistencyEngine';
 import { loadKdmState, loadRecentKdmMemory, saveKdmInteraction } from './src/services/kdmPersistenceService';
 import { validateMemoryAgainstMessage } from './src/services/kairoMemoryConsistency';
 import { validateKairoResponse } from './src/services/kairoResponseConsistency';
-import { decideResponseRepair, selectBestConsistency } from './src/services/kdmResponseRepairPolicy';
 import { recordKdmMetric } from './src/services/kdmMetricsService';
 import type { DroitDynamicState, DroitPersonalityTraits } from './src/types/nexus';
 
@@ -21,44 +20,71 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
-async function generateText(systemInstruction: string, messages: Array<{ role: 'user' | 'assistant'; content: string }>, temperature: number): Promise<string> {
-  if (process.env.OPENROUTER_API_KEY) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    try {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
-          'X-Title': 'NEXUS Kairo Studio',
-        },
-        body: JSON.stringify({
-          model: process.env.OPENROUTER_MODEL || 'openai/gpt-oss-20b:free',
-          messages: [{ role: 'system', content: systemInstruction }, ...messages],
-          temperature,
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.error?.message || `OpenRouter hatası: ${response.status}`);
-      const text = data?.choices?.[0]?.message?.content;
-      if (!text || typeof text !== 'string') throw new Error('OpenRouter geçerli bir yanıt döndürmedi.');
-      return text.trim();
-    } finally {
-      clearTimeout(timeout);
-    }
+async function callOpenRouter(messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>, temperature: number): Promise<string> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY bulunamadı.');
+  const model = process.env.OPENROUTER_MODEL || 'openrouter/free';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        ...(process.env.APP_URL ? { 'HTTP-Referer': process.env.APP_URL } : {}),
+        'X-Title': 'NEXUS Kairo Studio',
+      },
+      body: JSON.stringify({ model, messages, temperature }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`);
+    const text = data?.choices?.[0]?.message?.content;
+    if (!text || typeof text !== 'string') throw new Error('OpenRouter geçerli bir yanıt döndürmedi.');
+    return text.trim();
+  } catch (error: any) {
+    if (error?.name === 'AbortError') throw new Error('OpenRouter isteği zaman aşımına uğradı.');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function generateText(
+  systemInstruction: string,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  temperature: number,
+  provider: 'gemini' | 'openrouter' = 'gemini',
+): Promise<string> {
+  if (provider === 'openrouter') {
+    return callOpenRouter([{ role: 'system', content: systemInstruction }, ...messages], temperature);
   }
 
-  if (!process.env.GEMINI_API_KEY) throw new Error('OPENROUTER_API_KEY veya GEMINI_API_KEY bulunamadı.');
+  if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY bulunamadı.');
   const ai = getGeminiClient();
   const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
   const response = await ai.models.generateContent({ model: 'gemini-3.7-flash', contents, config: { systemInstruction, temperature } });
   return (response?.text || '').trim();
 }
 
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString(), provider: process.env.OPENROUTER_API_KEY ? 'openrouter' : 'gemini' }));
+app.get('/api/health', (_req, res) => res.json({
+  status: 'ok',
+  timestamp: new Date().toISOString(),
+  geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+  openrouterConfigured: Boolean(process.env.OPENROUTER_API_KEY),
+  openrouterModel: process.env.OPENROUTER_MODEL || 'openrouter/free',
+}));
+
+app.post('/api/openrouter/test', async (_req, res) => {
+  try {
+    const reply = await callOpenRouter([{ role: 'user', content: 'Bağlantı testi. Sadece "OPENROUTER_OK" yaz.' }], 0);
+    return res.json({ ok: true, provider: 'openrouter', model: process.env.OPENROUTER_MODEL || 'openrouter/free', reply });
+  } catch (error: any) {
+    console.error('[OpenRouter Test]', error);
+    return res.status(502).json({ ok: false, provider: 'openrouter', configured: Boolean(process.env.OPENROUTER_API_KEY), model: process.env.OPENROUTER_MODEL || 'openrouter/free', error: error?.message || 'OpenRouter test failed' });
+  }
+});
 
 const defaultDynamicState: DroitDynamicState = { calmness: 70, anger: 10, stress: 20, happiness: 70, confidence: 70, surprise: 10, lastStatus: 'Sakin ve kontrollü' };
 
@@ -75,8 +101,9 @@ function normalizeDynamicState(value: unknown): DroitDynamicState {
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { userId = 'anonymous', userMessage, character, personality, behaviorProfile, history = [], dynamicState = defaultDynamicState } = req.body;
+    const { userId = 'anonymous', userMessage, character, personality, behaviorProfile, history = [], dynamicState = defaultDynamicState, provider = 'gemini' } = req.body;
     if (!userMessage || typeof userMessage !== 'string') return res.status(400).json({ error: 'userMessage is required' });
+    const selectedProvider: 'gemini' | 'openrouter' = provider === 'openrouter' ? 'openrouter' : 'gemini';
     const charName = character?.name || 'KAIRO';
     const charRole = character?.role?.title || character?.roleTitle || 'Sunucu Yöneticisi';
     const raceName = character?.physical?.raceName || 'Sentetik Droit';
@@ -99,12 +126,12 @@ app.post('/api/chat', async (req, res) => {
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
     if (Array.isArray(history)) for (const item of history.slice(-8)) if (item?.text && typeof item.text === 'string') messages.push({ role: item.sender === 'user' || item.role === 'user' ? 'user' : 'assistant', content: item.text });
     messages.push({ role: 'user', content: userMessage });
-    const replyText = await generateText(systemInstruction, messages, humorLevel > 70 ? 0.9 : 0.6);
+    const replyText = await generateText(systemInstruction, messages, humorLevel > 70 ? 0.9 : 0.6, selectedProvider);
     const consistency = validateKairoResponse(replyText, kdm.trace);
     const repairAttempts = 0;
     try { await saveKdmInteraction({ userId, dynamicState: kdm.nextDynamicState, reasoningTrace: kdm.trace, lastUserMessage: userMessage, reply: replyText }); } catch (e) { console.warn('[KDM Persistence] Interaction save skipped:', e); }
     try { await recordKdmMetric({ userId, score: consistency.score, accepted: consistency.accepted, repaired: false, repairAttempts, issues: consistency.issues }); } catch (e) { console.warn('[KDM Metrics] Record skipped:', e); }
-    return res.json({ reply: replyText, providerUsed: process.env.OPENROUTER_API_KEY ? 'openrouter' : 'gemini', profileUsed: { tone, dominantSummary, humorLevel, empathyLevel, analyticalDepth }, kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState }, consistency: { score: consistency.score, accepted: consistency.accepted, issues: consistency.issues }, metrics: { repaired: false, repairAttempts } });
+    return res.json({ reply: replyText, providerUsed: selectedProvider, profileUsed: { tone, dominantSummary, humorLevel, empathyLevel, analyticalDepth }, kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState }, consistency: { score: consistency.score, accepted: consistency.accepted, issues: consistency.issues }, metrics: { repaired: false, repairAttempts } });
   } catch (error: any) { console.error('[Chat API Error]', error); return res.status(500).json({ error: error?.message || 'Chat service failed' }); }
 });
 
