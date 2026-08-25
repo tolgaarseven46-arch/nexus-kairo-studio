@@ -1,5 +1,6 @@
 import { DroitPersonalityTraits, TestMessage, DroitDynamicState, ReasoningTrace } from '../types/nexus';
 import { computeBehaviorProfile, BehaviorLayerProfile } from './droitBehaviorEngine';
+import { applyRelationshipContext } from './relationshipBehaviorService';
 import { loadKdmState, loadRecentKdmMemory } from './kdmPersistenceService';
 import { loadKairoLongTermMemory, KairoMemoryEntry, saveKairoLongTermMemory } from './kairoLongTermMemoryService';
 import { validateKairoResponse, ResponseConsistencyResult } from './kairoResponseConsistency';
@@ -17,8 +18,9 @@ export const droitChatService = {
     await captureExplicitUserMemory(userMessage).catch((error) => console.warn('Kairo memory capture skipped:', error));
     const userId = auth.currentUser?.uid || 'anonymous';
     const [persistedState, longTermMemory, structuredMemory] = await Promise.all([loadKdmState(userId).catch(() => null),loadKairoLongTermMemory(8).catch(() => []),loadRecentKdmMemory(8,userId).catch(() => [])]);
-    const behaviorProfile = computeBehaviorProfile(personality, userMessage, persistedState || undefined);
-    const payload = { userId,userMessage,character:characterInfo,personality,behaviorProfile,dynamicState:behaviorProfile.dynamicStateUpdates ? {...(persistedState || {}),...behaviorProfile.dynamicStateUpdates} : persistedState,longTermMemory:longTermMemory as KairoMemoryEntry[],userMemory:structuredMemory,history:history.map((m)=>({sender:m.sender,text:m.text})),provider };
+    const baseBehaviorProfile = computeBehaviorProfile(personality, userMessage);
+    const behaviorProfile = applyRelationshipContext(baseBehaviorProfile, persistedState);
+    const payload = { userId,userMessage,character:characterInfo,personality,behaviorProfile,dynamicState:persistedState,longTermMemory:longTermMemory as KairoMemoryEntry[],userMemory:structuredMemory,history:history.map((m)=>({sender:m.sender,text:m.text})),provider };
     try { const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!res.ok){const errorData=await res.json().catch(()=>({}));throw new Error(errorData.error||`Sunucu hatası: ${res.status}`);}const data=await res.json();const reply=data.reply||'';const dynamicState=data.kdm?.dynamicState as DroitDynamicState|undefined;const reasoningTrace=data.kdm?.trace as ReasoningTrace|undefined;const consistency=reasoningTrace?validateKairoResponse(reply,reasoningTrace):undefined;return {reply,profile:behaviorProfile,dynamicState,reasoningTrace,consistency,providerUsed:data.providerUsed}; } catch(err:any){console.error('Kairo Chat Service error:',err);throw err;}
   },
 };
