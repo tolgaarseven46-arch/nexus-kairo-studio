@@ -3,94 +3,21 @@ import { computeBehaviorProfile, BehaviorLayerProfile } from './droitBehaviorEng
 
 export interface KdmAnalysisResult { trace: ReasoningTrace; behaviorProfile: BehaviorLayerProfile; nextDynamicState: DroitDynamicState; }
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, Math.round(value)));
-
-function classifyIntent(message: string): string {
-  const text = message.toLowerCase();
-  if (/^(selam|merhaba|hey|naber|nasılsın)\b/.test(text)) return 'selamlama';
-  if (/(neden|nasıl|ne demek|açıkla|anlat|nedir|niye)/.test(text)) return 'bilgi_ve_aciklama';
-  if (/(hata|sorun|çöktü|çalışmıyor|bug|arıza|bozuk)/.test(text)) return 'sorun_cozme';
-  if (/(yap|oluştur|ekle|değiştir|geliştir|uygula)/.test(text)) return 'eylem_talebi';
-  if (/[?]/.test(text)) return 'soru';
-  return 'genel_sohbet';
-}
-function classifySentiment(message: string): string {
-  const text = message.toLowerCase();
-  if (/(teşekkür|sağ ol|harika|süper|mükemmel|seviyorum|güzel)/.test(text)) return 'pozitif';
-  if (/(sinir|kızgın|nefret|rezalet|bok|amk|lanet|berbat)/.test(text)) return 'negatif';
-  if (/(üzgün|kötü|moralim|kaygı|endişe|stres)/.test(text)) return 'duygusal_yük';
-  return 'nötr';
-}
-function warmthDeltaFor(message: string, sentiment: string): number {
-  const text = message.toLowerCase();
-  let delta = sentiment === 'pozitif' ? 3 : sentiment === 'negatif' ? -2 : 0;
-  if (/(teşekkür|sağ ol|eyvallah|kanka|kardeşim|dostum)/.test(text)) delta += 2;
-  if (/(siktir|defol|sus|aptal|salak)/.test(text)) delta -= 5;
-  return clamp(delta, -10, 10);
-}
-function moodChangeFromDelta(delta: number): string {
-  if (delta >= 4) return 'daha pozitif ve sıcak';
-  if (delta <= -4) return 'daha temkinli ve mesafeli';
-  return 'stabil';
-}
-
+function classifyIntent(message: string): string { const text = message.toLowerCase(); if (/^(selam|merhaba|hey|naber|nasılsın)\b/.test(text)) return 'selamlama'; if (/(neden|nasıl|ne demek|açıkla|anlat|nedir|niye)/.test(text)) return 'bilgi_ve_aciklama'; if (/(hata|sorun|çöktü|çalışmıyor|bug|arıza|bozuk)/.test(text)) return 'sorun_cozme'; if (/(yap|oluştur|ekle|değiştir|geliştir|uygula)/.test(text)) return 'eylem_talebi'; if (/[?]/.test(text)) return 'soru'; return 'genel_sohbet'; }
+function classifySentiment(message: string): string { const text = message.toLowerCase(); if (/(teşekkür|sağ ol|harika|süper|mükemmel|seviyorum|güzel)/.test(text)) return 'pozitif'; if (/(sinir|kızgın|nefret|rezalet|bok|amk|lanet|berbat)/.test(text)) return 'negatif'; if (/(üzgün|kötü|moralim|kaygı|endişe|stres)/.test(text)) return 'duygusal_yük'; return 'nötr'; }
+function warmthDeltaFor(message: string, sentiment: string): number { const text = message.toLowerCase(); let delta = sentiment === 'pozitif' ? 3 : sentiment === 'negatif' ? -2 : 0; if (/(teşekkür|sağ ol|eyvallah|kanka|kardeşim|dostum)/.test(text)) delta += 2; if (/(siktir|defol|sus|aptal|salak)/.test(text)) delta -= 5; return clamp(delta, -10, 10); }
+function moodChangeFromDelta(delta: number): string { if (delta >= 4) return 'daha pozitif ve sıcak'; if (delta <= -4) return 'daha temkinli ve mesafeli'; return 'stabil'; }
 const DEFAULT_DYNAMIC_STATE: DroitDynamicState = { calmness: 70, anger: 10, stress: 20, happiness: 70, confidence: 70, surprise: 10, lastStatus: 'Sakin ve kontrollü' };
 
 export function analyzeKdmInteraction(userMessage: string, personality?: DroitPersonalityTraits | null, currentDynamicState?: DroitDynamicState | null): KdmAnalysisResult {
-  const state: DroitDynamicState = { ...DEFAULT_DYNAMIC_STATE, ...(currentDynamicState || {}) };
-  const behaviorProfile = computeBehaviorProfile(personality || undefined, userMessage);
-  const intent = classifyIntent(userMessage);
-  const sentiment = classifySentiment(userMessage);
-
-  const relationship = state.relationship || {
-    firstSeenAt: new Date().toISOString(), lastInteractionAt: new Date().toISOString(), interactionCount: 0, familiarityDays: 0, warmth: 50,
-  };
-  const familiarityDays = Math.max(0, relationship.familiarityDays || 0);
-  const interactionCount = Math.max(0, relationship.interactionCount || 0);
-  const baseWarmth = clamp(relationship.warmth ?? 50);
-  const familiarityFactor = Math.min(familiarityDays / 30, 1);
-  // New users feel every reaction more strongly. A month+ of a warm relationship makes Kairo noticeably more tolerant.
+  const state: DroitDynamicState = { ...DEFAULT_DYNAMIC_STATE, ...(currentDynamicState || {}) }; const behaviorProfile = computeBehaviorProfile(personality || undefined, userMessage); const intent = classifyIntent(userMessage); const sentiment = classifySentiment(userMessage);
+  const relationship = state.relationship || { firstSeenAt: new Date().toISOString(), lastInteractionAt: new Date().toISOString(), interactionCount: 0, familiarityDays: 0, warmth: 50 };
+  const calculatedDays = Number.isFinite(new Date(relationship.firstSeenAt).getTime()) ? Math.max(0, Math.floor((Date.now() - new Date(relationship.firstSeenAt).getTime()) / 86400000)) : 0;
+  const familiarityDays = Math.max(0, relationship.familiarityDays || 0, calculatedDays); const interactionCount = Math.max(0, relationship.interactionCount || 0); const baseWarmth = clamp(relationship.warmth ?? 50); const familiarityFactor = Math.min(familiarityDays / 30, 1);
   const toleranceMultiplier = Math.max(0.35, 1 - (0.55 * familiarityFactor * (baseWarmth / 100)));
-  const rawWarmthDelta = warmthDeltaFor(userMessage, sentiment);
-  const warmthDelta = Math.round(rawWarmthDelta * toleranceMultiplier);
-  const warmthBefore = baseWarmth;
-  const warmthAfter = clamp(warmthBefore + warmthDelta);
-
-  const stressDelta = Math.round((sentiment === 'negatif' ? 3 : sentiment === 'duygusal_yük' ? 2 : -1) * toleranceMultiplier);
-  const happinessDelta = Math.round((sentiment === 'pozitif' ? 4 : sentiment === 'negatif' ? -2 : 1) * toleranceMultiplier);
-  const confidenceDelta = intent === 'eylem_talebi' ? Math.max(1, Math.round(toleranceMultiplier)) : 0;
-  const calmnessDelta = Math.round((sentiment === 'negatif' ? -2 : 1) * toleranceMultiplier);
-
-  const nextDynamicState: DroitDynamicState = {
-    ...state,
-    stress: clamp((state.stress ?? 20) + stressDelta),
-    happiness: clamp((state.happiness ?? 70) + happinessDelta),
-    confidence: clamp((state.confidence ?? 70) + confidenceDelta),
-    calmness: clamp((state.calmness ?? 70) + calmnessDelta),
-    relationship: { ...relationship, warmth: warmthAfter },
-    lastStatus: moodChangeFromDelta(warmthDelta),
-    lastEvent: {
-      eventTitle: `KDM: ${intent}`,
-      reactionText: `Mesaj ${sentiment}; ${familiarityDays === 0 ? 'yeni kullanıcı etkisi' : `${familiarityDays} günlük tanışıklık`} nedeniyle tepki katsayısı %${Math.round(toleranceMultiplier * 100)}.`,
-      deltas: [
-        { label: 'Stres', key: 'stress', value: stressDelta },
-        { label: 'Mutluluk', key: 'happiness', value: happinessDelta },
-        { label: 'Sakinlik', key: 'calmness', value: calmnessDelta },
-      ],
-    },
-  };
-
-  const trace: ReasoningTrace = {
-    whoSent: { userName: 'Kullanıcı', isNewUser: interactionCount === 0, recognitionText: interactionCount === 0 ? 'İlk etkileşim.' : `${interactionCount} etkileşimlik tanışıklık.` },
-    relationship: {
-      warmthScore: warmthAfter,
-      warmthLabel: warmthAfter >= 70 ? 'Sıcak' : warmthAfter >= 40 ? 'Dengeli' : 'Mesafeli',
-      note: `${familiarityDays} günlük tanışıklık; tepki katsayısı %${Math.round(toleranceMultiplier * 100)}.`,
-      familiarityDays, interactionCount, toleranceMultiplier,
-    },
-    currentMood: { moodText: nextDynamicState.lastStatus, reasonText: `Mesajın ${sentiment} sinyali ve ${intent} amacı değerlendirildi.` },
-    messageInterpretation: { intent, sentiment, explanation: 'KDM mesajı sınıflandırdı ve ilişki süresiyle davranış profilini birlikte değerlendirdi.' },
-    decision: { chosenTone: behaviorProfile.tone, explanation: `${behaviorProfile.decisionSpeed} karar stili ve mevcut kişilik parametreleri uygulandı.` },
-    memoryUpdate: { warmthBefore, warmthAfter, warmthDelta, moodChange: moodChangeFromDelta(warmthDelta), reason: `KDM ${intent}/${sentiment} etkileşimini ilişki süresi katsayısıyla dinamik duruma dönüştürdü.` },
-  };
+  const rawWarmthDelta = warmthDeltaFor(userMessage, sentiment); const warmthDelta = Math.round(rawWarmthDelta * toleranceMultiplier); const warmthBefore = baseWarmth; const warmthAfter = clamp(warmthBefore + warmthDelta);
+  const stressDelta = Math.round((sentiment === 'negatif' ? 3 : sentiment === 'duygusal_yük' ? 2 : -1) * toleranceMultiplier); const happinessDelta = Math.round((sentiment === 'pozitif' ? 4 : sentiment === 'negatif' ? -2 : 1) * toleranceMultiplier); const confidenceDelta = intent === 'eylem_talebi' ? Math.max(1, Math.round(toleranceMultiplier)) : 0; const calmnessDelta = Math.round((sentiment === 'negatif' ? -2 : 1) * toleranceMultiplier);
+  const nextDynamicState: DroitDynamicState = { ...state, stress: clamp((state.stress ?? 20) + stressDelta), happiness: clamp((state.happiness ?? 70) + happinessDelta), confidence: clamp((state.confidence ?? 70) + confidenceDelta), calmness: clamp((state.calmness ?? 70) + calmnessDelta), relationship: { ...relationship, familiarityDays, warmth: warmthAfter }, lastStatus: moodChangeFromDelta(warmthDelta), lastEvent: { eventTitle: `KDM: ${intent}`, reactionText: `Mesaj ${sentiment}; ${familiarityDays === 0 ? 'yeni kullanıcı etkisi' : `${familiarityDays} günlük tanışıklık`} nedeniyle tepki katsayısı %${Math.round(toleranceMultiplier * 100)}.`, deltas: [{ label: 'Stres', key: 'stress', value: stressDelta }, { label: 'Mutluluk', key: 'happiness', value: happinessDelta }, { label: 'Sakinlik', key: 'calmness', value: calmnessDelta }] } };
+  const trace: ReasoningTrace = { whoSent: { userName: 'Kullanıcı', isNewUser: interactionCount === 0, recognitionText: interactionCount === 0 ? 'İlk etkileşim.' : `${interactionCount} etkileşimlik tanışıklık.` }, relationship: { warmthScore: warmthAfter, warmthLabel: warmthAfter >= 70 ? 'Sıcak' : warmthAfter >= 40 ? 'Dengeli' : 'Mesafeli', note: `${familiarityDays} günlük tanışıklık; tepki katsayısı %${Math.round(toleranceMultiplier * 100)}.`, familiarityDays, interactionCount, toleranceMultiplier }, currentMood: { moodText: nextDynamicState.lastStatus, reasonText: `Mesajın ${sentiment} sinyali ve ${intent} amacı değerlendirildi.` }, messageInterpretation: { intent, sentiment, explanation: 'KDM mesajı sınıflandırdı ve ilişki süresiyle davranış profilini birlikte değerlendirdi.' }, decision: { chosenTone: behaviorProfile.tone, explanation: `${behaviorProfile.decisionSpeed} karar stili ve mevcut kişilik parametreleri uygulandı.` }, memoryUpdate: { warmthBefore, warmthAfter, warmthDelta, moodChange: moodChangeFromDelta(warmthDelta), reason: `KDM ${intent}/${sentiment} etkileşimini ilişki süresi katsayısıyla dinamik duruma dönüştürdü.` } };
   return { trace, behaviorProfile, nextDynamicState };
 }
