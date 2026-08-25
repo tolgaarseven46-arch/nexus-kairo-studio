@@ -14,7 +14,7 @@ const EXPLICIT_NAME_PATTERNS = [/^benim adım\s+([^.!?,\n]+)[.!?]?$/i,/^adım\s+
 async function captureExplicitUserMemory(userMessage: string): Promise<void> { const normalized=userMessage.trim(); for(const pattern of EXPLICIT_NAME_PATTERNS){const match=normalized.match(pattern);if(!match)continue;const name=match[1].trim();if(name.length<2||name.length>80)return;await saveKairoLongTermMemory({category:'user_identity',content:`Kullanıcının adı: ${name}`,importance:1,tags:['name','user_identity']});return;}}
 
 export const droitChatService = {
-  async sendMessage({ userMessage, personality, history = [], characterInfo = { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' }, provider = 'gemini' }: SendKairoChatOptions): Promise<KairoChatResponse> {
+  async sendMessage({ userMessage, personality, history = [], characterInfo = { name: 'KAIRO', roleTitle: 'Sunucu Yöneticisi', raceName: 'Sentetik Droit' }, provider = 'openrouter' }: SendKairoChatOptions): Promise<KairoChatResponse> {
     // Only write long-term memory when the message explicitly contains durable identity data.
     void captureExplicitUserMemory(userMessage).catch((error) => console.warn('Kairo memory capture skipped:', error));
     const userId = auth.currentUser?.uid || 'anonymous';
