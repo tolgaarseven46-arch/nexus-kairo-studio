@@ -31,13 +31,13 @@ export const droitChatService = {
     const behaviorProfile = applyRelationshipContext(baseBehaviorProfile, persistedState);
     const payload = { userId,userMessage,character:characterInfo,personality,behaviorProfile,dynamicState:persistedState,userMemory:structuredMemory,history:history.slice(-6).map((m)=>({sender:m.sender,text:m.text})),provider };
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const timeout = setTimeout(() => controller.abort(), 35000);
     try {
       const res=await fetch('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       if(!res.ok){const errorData=await res.json().catch(()=>({}));throw new Error(errorData.error||`Sunucu hatası: ${res.status}`);}
       const data=await res.json();const reply=data.reply||'';const dynamicState=data.kdm?.dynamicState as DroitDynamicState|undefined;const reasoningTrace=data.kdm?.trace as ReasoningTrace|undefined;const consistency=reasoningTrace?validateKairoResponse(reply,reasoningTrace):undefined;return {reply,profile:behaviorProfile,dynamicState,reasoningTrace,consistency,providerUsed:data.providerUsed};
     } catch(err:any){
-      if(err?.name==='AbortError') throw new Error('Kaira yanıtı zaman aşımına uğradı. Lütfen tekrar dene.');
+      if(err?.name==='AbortError') throw new Error('Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.');
       console.error('Kairo Chat Service error:',err);throw err;
     } finally { clearTimeout(timeout); }
   },
