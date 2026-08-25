@@ -15,13 +15,68 @@ const PORT = 3000;
 app.use(express.json());
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI { if (!aiClient) aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { headers: { 'User-Agent': 'aistudio-build' } } }); return aiClient; }
+
+function extractOpenRouterText(data: any): string {
+  const message = data?.choices?.[0]?.message;
+  const direct = message?.content;
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  if (Array.isArray(direct)) {
+    const joined = direct.map((part: any) => {
+      if (typeof part === 'string') return part;
+      if (typeof part?.text === 'string') return part.text;
+      if (typeof part?.content === 'string') return part.content;
+      return '';
+    }).filter(Boolean).join('\n').trim();
+    if (joined) return joined;
+  }
+  if (typeof message?.text === 'string' && message.text.trim()) return message.text.trim();
+  if (typeof data?.output_text === 'string' && data.output_text.trim()) return data.output_text.trim();
+  return '';
+}
+
 async function callOpenRouter(messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>, temperature: number): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY; if (!apiKey) throw new Error('OPENROUTER_API_KEY bulunamadı.'); const model = process.env.OPENROUTER_MODEL || 'openrouter/free'; const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 20000);
-  try { const response = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', signal: controller.signal, headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', ...(process.env.APP_URL ? { 'HTTP-Referer': process.env.APP_URL } : {}), 'X-Title': 'NEXUS Kairo Studio' }, body: JSON.stringify({ model, messages, temperature }) }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`); const text = data?.choices?.[0]?.message?.content; if (!text || typeof text !== 'string') throw new Error('OpenRouter geçerli bir yanıt döndürmedi.'); return text.trim(); } catch (error: any) { if (error?.name === 'AbortError') throw new Error('OpenRouter isteği zaman aşımına uğradı.'); throw error; } finally { clearTimeout(timeout); }
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY bulunamadı.');
+  const model = process.env.OPENROUTER_MODEL || 'openrouter/free';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey.trim()}`,
+        'Content-Type': 'application/json',
+        ...(process.env.APP_URL ? { 'HTTP-Referer': process.env.APP_URL } : {}),
+        'X-Title': 'NEXUS Kairo Studio',
+      },
+      body: JSON.stringify({ model, messages, temperature, max_tokens: 500 }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`);
+    const text = extractOpenRouterText(data);
+    if (!text) {
+      const finishReason = data?.choices?.[0]?.finish_reason || 'unknown';
+      throw new Error(`OpenRouter boş yanıt döndürdü (finish_reason: ${finishReason}).`);
+    }
+    return text;
+  } catch (error: any) {
+    if (error?.name === 'AbortError') throw new Error('OpenRouter isteği zaman aşımına uğradı.');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
+
 async function generateText(systemInstruction: string, messages: Array<{ role: 'user' | 'assistant'; content: string }>, temperature: number, provider: 'gemini' | 'openrouter' = 'openrouter'): Promise<string> {
-  if (provider === 'openrouter') return callOpenRouter([{ role: 'system', content: systemInstruction }, ...messages], temperature); if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY bulunamadı.'); const ai = getGeminiClient(); const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })); const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents, config: { systemInstruction } }); return (response?.text || '').trim();
+  if (provider === 'openrouter') return callOpenRouter([{ role: 'system', content: systemInstruction }, ...messages], temperature);
+  if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY bulunamadı.');
+  const ai = getGeminiClient();
+  const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+  const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents, config: { systemInstruction } });
+  return (response?.text || '').trim();
 }
+
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString(), geminiConfigured: Boolean(process.env.GEMINI_API_KEY), openrouterConfigured: Boolean(process.env.OPENROUTER_API_KEY), openrouterModel: process.env.OPENROUTER_MODEL || 'openrouter/free' }));
 app.post('/api/openrouter/test', async (_req, res) => { try { const reply = await callOpenRouter([{ role: 'user', content: 'Bağlantı testi. Sadece "OPENROUTER_OK" yaz.' }], 0); return res.json({ ok: true, provider: 'openrouter', model: process.env.OPENROUTER_MODEL || 'openrouter/free', reply }); } catch (error: any) { console.error('[OpenRouter Test]', error); return res.status(502).json({ ok: false, provider: 'openrouter', configured: Boolean(process.env.OPENROUTER_API_KEY), model: process.env.OPENROUTER_MODEL || 'openrouter/free', error: error?.message || 'OpenRouter test failed' }); } });
 const defaultDynamicState: DroitDynamicState = { calmness: 70, anger: 10, stress: 20, happiness: 70, confidence: 70, surprise: 10, lastStatus: 'Sakin ve kontrollü' };
