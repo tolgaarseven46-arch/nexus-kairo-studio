@@ -6,6 +6,7 @@ import { TestLabTab } from './tabs/TestLabTab';
 import { BrainTab } from './tabs/BrainTab';
 import { SettingsTab } from './tabs/SettingsTab';
 import { KdmMetricsPanel } from '../common/KdmMetricsPanel';
+import { KdmAutoRelationshipTestPanel } from '../common/KdmAutoRelationshipTestPanel';
 import { DroitPersonalityTraits, DroitDynamicState, DroitExpressionMode, DroitExpressionId, DroitExpressionAsset, NexusTab, TestMessage, ReasoningTrace } from '../../types/nexus';
 import { droitPersonalityService, DEFAULT_PERSONALITY_TRAITS } from '../../services/droitPersonalityService';
 import { droitExpressionAssetService } from '../../services/droitExpressionAssetService';
@@ -122,7 +123,7 @@ export const NexusStudioLayout: React.FC = () => {
     <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {activeTab === 'KARAKTER' && <CharacterTab personality={personality} dynamicState={dynamicState} expression={expression} onExpressionChange={setExpression} expressionAssets={expressionAssets} onPersonalityChange={handlePersonalityChange} onSave={handleSave} isSaved={isSaved} isSaving={isSaving} />}
       {activeTab === 'TEST' && <div className="flex-1 min-h-0 flex flex-col gap-2">
-        <div className="shrink-0 px-3 pt-2">
+        <div className="shrink-0 px-3 pt-2 space-y-2">
           <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/70 px-3 py-2">
             <div>
               <div className="text-[10px] font-mono font-bold text-zinc-200 uppercase tracking-wider">Kişiye Özel İlişki Testi</div>
@@ -134,6 +135,7 @@ export const NexusStudioLayout: React.FC = () => {
               ))}
             </div>
           </div>
+          <KdmAutoRelationshipTestPanel personality={personality} />
         </div>
         <div className="flex-1 min-h-0"><TestLabTab key={selectedTestUser} personality={personality} dynamicState={dynamicState} expression={expression} onDynamicStateChange={setDynamicState} onExpressionChange={setExpression} reasoningTrace={reasoningTrace} onReasoningTraceChange={setReasoningTrace} lastAnalysis={lastAnalysis} onLastAnalysisChange={setLastAnalysis} isNewUserMode={isNewUserMode} onToggleNewUserMode={() => setIsNewUserMode((prev) => !prev)} userWarmth={userWarmth} onUserWarmthChange={setUserWarmth} onNavigateToBrain={() => setActiveTab('BEYİN')} /></div>
         <div className="shrink-0"><KdmMetricsPanel compact userId={selectedTestUser} /></div>
