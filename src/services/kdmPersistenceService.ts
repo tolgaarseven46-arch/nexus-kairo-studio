@@ -17,105 +17,29 @@ function normalizeDynamicState(value: unknown): DroitDynamicState | null {
   const rawRelationship = source.relationship;
   const relationship = rawRelationship && typeof rawRelationship === 'object' ? rawRelationship as Partial<RelationshipState> : undefined;
   return {
-    calmness: numberOrDefault(source.calmness, DEFAULT_DYNAMIC_STATE.calmness),
-    anger: numberOrDefault(source.anger, DEFAULT_DYNAMIC_STATE.anger),
-    stress: numberOrDefault(source.stress, DEFAULT_DYNAMIC_STATE.stress),
-    happiness: numberOrDefault(source.happiness, DEFAULT_DYNAMIC_STATE.happiness),
-    confidence: numberOrDefault(source.confidence, DEFAULT_DYNAMIC_STATE.confidence),
-    surprise: numberOrDefault(source.surprise, DEFAULT_DYNAMIC_STATE.surprise),
-    lastStatus: typeof source.lastStatus === 'string' && source.lastStatus.trim() ? source.lastStatus : DEFAULT_DYNAMIC_STATE.lastStatus,
+    calmness: numberOrDefault(source.calmness, DEFAULT_DYNAMIC_STATE.calmness), anger: numberOrDefault(source.anger, DEFAULT_DYNAMIC_STATE.anger), stress: numberOrDefault(source.stress, DEFAULT_DYNAMIC_STATE.stress), happiness: numberOrDefault(source.happiness, DEFAULT_DYNAMIC_STATE.happiness), confidence: numberOrDefault(source.confidence, DEFAULT_DYNAMIC_STATE.confidence), surprise: numberOrDefault(source.surprise, DEFAULT_DYNAMIC_STATE.surprise), lastStatus: typeof source.lastStatus === 'string' && source.lastStatus.trim() ? source.lastStatus : DEFAULT_DYNAMIC_STATE.lastStatus,
     ...(source.lastEvent ? { lastEvent: source.lastEvent } : {}),
     ...(relationship && typeof relationship.firstSeenAt === 'string' ? { relationship: {
-      firstSeenAt: relationship.firstSeenAt,
-      lastInteractionAt: typeof relationship.lastInteractionAt === 'string' ? relationship.lastInteractionAt : relationship.firstSeenAt,
-      interactionCount: numberOrDefault(relationship.interactionCount, 0),
-      familiarityDays: numberOrDefault(relationship.familiarityDays, 0),
-      warmth: numberOrDefault(relationship.warmth, 50),
-      trust: numberOrDefault(relationship.trust, 50),
-      positiveEvents: numberOrDefault(relationship.positiveEvents, 0),
-      negativeEvents: numberOrDefault(relationship.negativeEvents, 0),
-      conflictScore: numberOrDefault(relationship.conflictScore, 0),
-      hurtScore: numberOrDefault(relationship.hurtScore, 0),
-      repairProgress: numberOrDefault(relationship.repairProgress, 0),
-      ...(typeof relationship.lastConflictAt === 'string' ? { lastConflictAt: relationship.lastConflictAt } : {}),
+      firstSeenAt: relationship.firstSeenAt, lastInteractionAt: typeof relationship.lastInteractionAt === 'string' ? relationship.lastInteractionAt : relationship.firstSeenAt, interactionCount: numberOrDefault(relationship.interactionCount, 0), familiarityDays: numberOrDefault(relationship.familiarityDays, 0), warmth: numberOrDefault(relationship.warmth, 50), trust: numberOrDefault(relationship.trust, 50), positiveEvents: numberOrDefault(relationship.positiveEvents, 0), negativeEvents: numberOrDefault(relationship.negativeEvents, 0), conflictScore: numberOrDefault(relationship.conflictScore, 0), hurtScore: numberOrDefault(relationship.hurtScore, 0), repairProgress: numberOrDefault(relationship.repairProgress, 0), repeatedNegativeCount: numberOrDefault(relationship.repeatedNegativeCount, 0),
+      ...(typeof relationship.lastConflictAt === 'string' ? { lastConflictAt: relationship.lastConflictAt } : {}), ...(typeof relationship.lastNegativePattern === 'string' ? { lastNegativePattern: relationship.lastNegativePattern } : {}), ...(typeof relationship.lastNegativePatternAt === 'string' ? { lastNegativePatternAt: relationship.lastNegativePatternAt } : {}),
     } } : {}),
   };
 }
-
 export interface KdmPersistencePayload { dynamicState: DroitDynamicState; reasoningTrace: ReasoningTrace; lastUserMessage: string; reply: string; userId?: string; }
 export interface KdmMemoryItem { userMessage: string; reply: string; createdAt?: string; reasoningTrace?: ReasoningTrace; dynamicState?: DroitDynamicState; }
 export interface KairoUserMemory { userName?: string; preferences: string[]; facts: string[]; goals: string[]; notes: string[]; updatedAt: string; }
 const emptyUserMemory = (): KairoUserMemory => ({ preferences: [], facts: [], goals: [], notes: [], updatedAt: new Date().toISOString() });
 const uniqueRecent = (items: string[]) => [...new Set(items.map((item) => item.trim()).filter(Boolean))].slice(-20);
-
-function extractMemoryCandidates(userMessage: string): Partial<KairoUserMemory> {
-  const text = userMessage.trim(); const result: Partial<KairoUserMemory> = {};
-  const name = text.match(/(?:benim adım|adım|ismim)\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9_-]{2,40})/i);
-  if (name) result.userName = name[1];
-  if (/(?:artık .*? sevmiyorum|artık .*? ilgilenmiyorum)/i.test(text) || /(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor|ilgileniyorum|ilgimi çekiyor|daha çok .*? ilgileniyorum)/i.test(text)) result.preferences = [text];
-  if (/(?:istiyorum|hedefim|amacım|planım|üzerinde çalışıyorum|geliştiriyorum)/i.test(text)) result.goals = [text];
-  if (/(?:yaşım|yaşındayım|mesleğim|işim|şehirde yaşıyorum|yaşıyorum|çalışıyorum)/i.test(text)) result.facts = [text];
-  return result;
-}
-async function readUserProfile(userId: string): Promise<KairoUserMemory> {
-  const userScope = scope(userId); let current = emptyUserMemory();
-  try { const entriesRef = collection(doc(db, USER_MEMORY_COLLECTION, userScope), 'entries'); const snapshot = await getDocs(query(entriesRef, orderBy('updatedAt', 'desc'), limit(1))); if (!snapshot.empty) current = { ...current, ...(snapshot.docs[0].data() as Partial<KairoUserMemory>) }; } catch (error) { console.warn('[Kairo User Memory] read failed:', error); }
-  return current;
-}
-async function updateStructuredUserMemory(userId: string, userMessage: string): Promise<void> {
-  const candidate = extractMemoryCandidates(userMessage);
-  if (!candidate.userName && !candidate.preferences?.length && !candidate.facts?.length && !candidate.goals?.length) return;
-  const userScope = scope(userId); const ref = doc(db, USER_MEMORY_COLLECTION, userScope, 'entries', USER_MEMORY_DOC); const current = await readUserProfile(userScope);
-  const removingPreference = candidate.preferences?.some((item) => /artık .*?(sevmiyorum|ilgilenmiyorum)/i.test(item));
-  const preferences = removingPreference ? uniqueRecent(current.preferences.filter((item) => !candidate.preferences!.some((replacement) => item.toLocaleLowerCase('tr-TR').includes(replacement.toLocaleLowerCase('tr-TR'))))) : uniqueRecent([...current.preferences, ...(candidate.preferences || [])]);
-  const facts = uniqueRecent([...current.facts, ...(candidate.facts || [])]); const goals = uniqueRecent([...current.goals, ...(candidate.goals || [])]);
-  await setDoc(ref, { userName: candidate.userName || current.userName, preferences, facts, goals, notes: uniqueRecent(current.notes), updatedAt: new Date().toISOString() }, { merge: true });
-}
+function extractMemoryCandidates(userMessage: string): Partial<KairoUserMemory> { const text = userMessage.trim(); const result: Partial<KairoUserMemory> = {}; const name = text.match(/(?:benim adım|adım|ismim)\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9_-]{2,40})/i); if (name) result.userName = name[1]; if (/(?:artık .*? sevmiyorum|artık .*? ilgilenmiyorum)/i.test(text) || /(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor|ilgileniyorum|ilgimi çekiyor|daha çok .*? ilgileniyorum)/i.test(text)) result.preferences = [text]; if (/(?:istiyorum|hedefim|amacım|planım|üzerinde çalışıyorum|geliştiriyorum)/i.test(text)) result.goals = [text]; if (/(?:yaşım|yaşındayım|mesleğim|işim|şehirde yaşıyorum|yaşıyorum|çalışıyorum)/i.test(text)) result.facts = [text]; return result; }
+async function readUserProfile(userId: string): Promise<KairoUserMemory> { const userScope = scope(userId); let current = emptyUserMemory(); try { const entriesRef = collection(doc(db, USER_MEMORY_COLLECTION, userScope), 'entries'); const snapshot = await getDocs(query(entriesRef, orderBy('updatedAt', 'desc'), limit(1))); if (!snapshot.empty) current = { ...current, ...(snapshot.docs[0].data() as Partial<KairoUserMemory>) }; } catch (error) { console.warn('[Kairo User Memory] read failed:', error); } return current; }
+async function updateStructuredUserMemory(userId: string, userMessage: string): Promise<void> { const candidate = extractMemoryCandidates(userMessage); if (!candidate.userName && !candidate.preferences?.length && !candidate.facts?.length && !candidate.goals?.length) return; const userScope = scope(userId); const ref = doc(db, USER_MEMORY_COLLECTION, userScope, 'entries', USER_MEMORY_DOC); const current = await readUserProfile(userScope); const removingPreference = candidate.preferences?.some((item) => /artık .*?(sevmiyorum|ilgilenmiyorum)/i.test(item)); const preferences = removingPreference ? uniqueRecent(current.preferences.filter((item) => !candidate.preferences!.some((replacement) => item.toLocaleLowerCase('tr-TR').includes(replacement.toLocaleLowerCase('tr-TR'))))) : uniqueRecent([...current.preferences, ...(candidate.preferences || [])]); const facts = uniqueRecent([...current.facts, ...(candidate.facts || [])]); const goals = uniqueRecent([...current.goals, ...(candidate.goals || [])]); await setDoc(ref, { userName: candidate.userName || current.userName, preferences, facts, goals, notes: uniqueRecent(current.notes), updatedAt: new Date().toISOString() }, { merge: true }); }
 async function safeWithTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> { return Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]); }
 
 export async function saveKdmInteraction(payload: KdmPersistencePayload): Promise<void> {
-  try {
-    const userScope = scope(payload.userId);
-    const now = new Date();
-    const previous = payload.dynamicState.relationship;
-    const firstSeenAt = previous?.firstSeenAt || now.toISOString();
-    const previousCount = previous?.interactionCount || 0;
-    const familiarityDays = Math.max(0, Math.floor((now.getTime() - new Date(firstSeenAt).getTime()) / 86400000));
-    const relationship: RelationshipState = {
-      firstSeenAt,
-      lastInteractionAt: now.toISOString(),
-      interactionCount: previousCount + 1,
-      familiarityDays,
-      warmth: previous?.warmth ?? payload.reasoningTrace.relationship.warmthScore,
-      trust: previous?.trust ?? payload.reasoningTrace.relationship.trustScore ?? 50,
-      positiveEvents: previous?.positiveEvents ?? 0,
-      negativeEvents: previous?.negativeEvents ?? 0,
-      conflictScore: previous?.conflictScore ?? payload.reasoningTrace.relationship.conflictScore ?? 0,
-      hurtScore: previous?.hurtScore ?? payload.reasoningTrace.relationship.hurtScore ?? 0,
-      repairProgress: previous?.repairProgress ?? payload.reasoningTrace.relationship.repairProgress ?? 0,
-      ...(previous?.lastConflictAt ? { lastConflictAt: previous.lastConflictAt } : {}),
-    };
-    const normalized = normalizeDynamicState(payload.dynamicState) || DEFAULT_DYNAMIC_STATE;
-    const safeDynamicState: DroitDynamicState = { ...normalized, relationship: { ...relationship, ...(normalized.relationship || {}) } };
-    const stateRef = doc(db, STATE_COLLECTION, userScope);
-    await setDoc(stateRef, { characterId: 'kairo', userId: userScope, dynamicState: safeDynamicState, reasoningTrace: payload.reasoningTrace, lastUserMessage: payload.lastUserMessage, lastReply: payload.reply, updatedAt: now.toISOString() }, { merge: true });
-    const traceRef = collection(stateRef, TRACE_COLLECTION);
-    await addDoc(traceRef, { ...payload.reasoningTrace, userMessage: payload.lastUserMessage, reply: payload.reply, dynamicState: safeDynamicState, userId: userScope, createdAt: now.toISOString() });
-    await updateStructuredUserMemory(userScope, payload.lastUserMessage).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));
+  try { const userScope = scope(payload.userId); const now = new Date(); const previous = payload.dynamicState.relationship; const firstSeenAt = previous?.firstSeenAt || now.toISOString(); const previousCount = previous?.interactionCount || 0; const familiarityDays = Math.max(0, Math.floor((now.getTime() - new Date(firstSeenAt).getTime()) / 86400000));
+    const relationship: RelationshipState = { firstSeenAt, lastInteractionAt: now.toISOString(), interactionCount: previousCount + 1, familiarityDays, warmth: previous?.warmth ?? payload.reasoningTrace.relationship.warmthScore, trust: previous?.trust ?? payload.reasoningTrace.relationship.trustScore ?? 50, positiveEvents: previous?.positiveEvents ?? 0, negativeEvents: previous?.negativeEvents ?? 0, conflictScore: previous?.conflictScore ?? payload.reasoningTrace.relationship.conflictScore ?? 0, hurtScore: previous?.hurtScore ?? payload.reasoningTrace.relationship.hurtScore ?? 0, repairProgress: previous?.repairProgress ?? payload.reasoningTrace.relationship.repairProgress ?? 0, repeatedNegativeCount: previous?.repeatedNegativeCount ?? payload.reasoningTrace.relationship.repeatedNegativeCount ?? 0, ...(previous?.lastConflictAt ? { lastConflictAt: previous.lastConflictAt } : {}), ...(previous?.lastNegativePattern ? { lastNegativePattern: previous.lastNegativePattern } : {}), ...(previous?.lastNegativePatternAt ? { lastNegativePatternAt: previous.lastNegativePatternAt } : {}) };
+    const normalized = normalizeDynamicState(payload.dynamicState) || DEFAULT_DYNAMIC_STATE; const safeDynamicState: DroitDynamicState = { ...normalized, relationship: { ...relationship, ...(normalized.relationship || {}) } }; const stateRef = doc(db, STATE_COLLECTION, userScope); await setDoc(stateRef, { characterId: 'kairo', userId: userScope, dynamicState: safeDynamicState, reasoningTrace: payload.reasoningTrace, lastUserMessage: payload.lastUserMessage, lastReply: payload.reply, updatedAt: now.toISOString() }, { merge: true }); const traceRef = collection(stateRef, TRACE_COLLECTION); await addDoc(traceRef, { ...payload.reasoningTrace, userMessage: payload.lastUserMessage, reply: payload.reply, dynamicState: safeDynamicState, userId: userScope, createdAt: now.toISOString() }); await updateStructuredUserMemory(userScope, payload.lastUserMessage).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));
   } catch (err) { console.warn('[KDM Persistence] saveKdmInteraction skipped:', err); }
 }
-
-export async function loadKdmState(userId?: string): Promise<DroitDynamicState | null> {
-  return safeWithTimeout((async () => { try { const userScope = scope(userId); const snapshot = await getDoc(doc(db, STATE_COLLECTION, userScope)); if (!snapshot.exists()) return null; return normalizeDynamicState(snapshot.data().dynamicState); } catch (err) { console.warn('[KDM Persistence] loadKdmState warning:', err); return null; } })(), 2500, null);
-}
-export async function loadRecentKdmMemory(maxItems = 6, userId?: string): Promise<KdmMemoryItem[]> {
-  return safeWithTimeout((async () => {
-    try {
-      const userScope = scope(userId); const safeLimit = Math.max(1, Math.min(maxItems, 20)); const stateRef = doc(db, STATE_COLLECTION, userScope);
-      const snapshot = await getDocs(query(collection(stateRef, TRACE_COLLECTION), orderBy('createdAt', 'desc'), limit(safeLimit)));
-      const memories: KdmMemoryItem[] = snapshot.docs.map((item) => { const data = item.data(); return { userMessage: typeof data.userMessage === 'string' ? data.userMessage : '', reply: typeof data.reply === 'string' ? data.reply : '', createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined, reasoningTrace: data as unknown as ReasoningTrace, dynamicState: normalizeDynamicState(data.dynamicState) || undefined }; }).filter((item) => item.userMessage || item.reply).reverse();
-      try { const profileSnapshot = await getDocs(query(collection(doc(db, USER_MEMORY_COLLECTION, userScope), 'entries'), orderBy('updatedAt', 'desc'), limit(1))); if (!profileSnapshot.empty) { const profile = profileSnapshot.docs[0].data() as Partial<KairoUserMemory>; memories.unshift({ userMessage: 'Kairo kullanıcı profili', reply: JSON.stringify({ userName: profile.userName || null, preferences: Array.isArray(profile.preferences) ? profile.preferences : [], facts: Array.isArray(profile.facts) ? profile.facts : [], goals: Array.isArray(profile.goals) ? profile.goals : [], notes: Array.isArray(profile.notes) ? profile.notes : [] }), createdAt: new Date().toISOString() }); } } catch (error) { console.warn('[Kairo User Memory] profile load skipped:', error); }
-      return memories;
-    } catch (err) { console.warn('[KDM Persistence] loadRecentKdmMemory warning:', err); return []; }
-  })(), 2500, []);
-}
+export async function loadKdmState(userId?: string): Promise<DroitDynamicState | null> { return safeWithTimeout((async () => { try { const userScope = scope(userId); const snapshot = await getDoc(doc(db, STATE_COLLECTION, userScope)); if (!snapshot.exists()) return null; return normalizeDynamicState(snapshot.data().dynamicState); } catch (err) { console.warn('[KDM Persistence] loadKdmState warning:', err); return null; } })(), 2500, null); }
+export async function loadRecentKdmMemory(maxItems = 6, userId?: string): Promise<KdmMemoryItem[]> { return safeWithTimeout((async () => { try { const userScope = scope(userId); const safeLimit = Math.max(1, Math.min(maxItems, 20)); const stateRef = doc(db, STATE_COLLECTION, userScope); const snapshot = await getDocs(query(collection(stateRef, TRACE_COLLECTION), orderBy('createdAt', 'desc'), limit(safeLimit))); const memories: KdmMemoryItem[] = snapshot.docs.map((item) => { const data = item.data(); return { userMessage: typeof data.userMessage === 'string' ? data.userMessage : '', reply: typeof data.reply === 'string' ? data.reply : '', createdAt: typeof data.createdAt === 'string' ? data.createdAt : undefined, reasoningTrace: data as unknown as ReasoningTrace, dynamicState: normalizeDynamicState(data.dynamicState) || undefined }; }).filter((item) => item.userMessage || item.reply).reverse(); try { const profileSnapshot = await getDocs(query(collection(doc(db, USER_MEMORY_COLLECTION, userScope), 'entries'), orderBy('updatedAt', 'desc'), limit(1))); if (!profileSnapshot.empty) { const profile = profileSnapshot.docs[0].data() as Partial<KairoUserMemory>; memories.unshift({ userMessage: 'Kairo kullanıcı profili', reply: JSON.stringify({ userName: profile.userName || null, preferences: Array.isArray(profile.preferences) ? profile.preferences : [], facts: Array.isArray(profile.facts) ? profile.facts : [], goals: Array.isArray(profile.goals) ? profile.goals : [], notes: Array.isArray(profile.notes) ? profile.notes : [] }), createdAt: new Date().toISOString() }); } } catch (error) { console.warn('[Kairo User Memory] profile load skipped:', error); } return memories; } catch (err) { console.warn('[KDM Persistence] loadRecentKdmMemory warning:', err); return []; } })(), 2500, []); }
