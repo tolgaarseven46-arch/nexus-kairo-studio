@@ -6,11 +6,15 @@ export interface RelationshipState {
   interactionCount: number;
   familiarityDays: number;
   warmth: number;
+  trust?: number;
+  positiveEvents?: number;
+  negativeEvents?: number;
+  conflictScore?: number;
 }
 
 export interface ReasoningTrace {
   whoSent: { userName: string; isNewUser: boolean; recognitionText: string; };
-  relationship: { warmthScore: number; warmthLabel: string; note: string; familiarityDays?: number; interactionCount?: number; toleranceMultiplier?: number; };
+  relationship: { warmthScore: number; warmthLabel: string; note: string; familiarityDays?: number; interactionCount?: number; toleranceMultiplier?: number; trustScore?: number; conflictScore?: number; };
   currentMood: { moodText: string; reasonText: string; };
   messageInterpretation: { intent: string; sentiment: string; explanation: string; };
   decision: { chosenTone: string; explanation: string; };
