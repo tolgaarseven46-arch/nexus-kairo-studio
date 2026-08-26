@@ -6,16 +6,16 @@
 - Proje: NEXUS / KAIRO Studio
 - Repo: `tolgaarseven46-arch/nexus-kairo-studio`
 - Ana amaç: NEXUS içinde kullanılacak Sentetik Droit karakterlerini oluşturmak, kişiliklerini tanımlamak, test etmek ve ileride sunucu yöneticisi/asistan olarak çalıştırmak.
-- Kairo: örnek/ana Droit karakteri; Nexus çekirdek asistanı.
+- Kairo/Kaira: örnek/ana Droit karakteri; Nexus çekirdek asistanı.
 - Droit'ler klasik “bot” olarak değil, kişiliği ve dinamik davranışı olan dijital varlıklar olarak ele alınır.
 
 ## 2. Geliştirme prensibi — KTM/KDM
 - **KTM:** Kairo Tutarlılık Motoru
 - **KDM:** Katmanlı Doğrulama Mimarisi
-- Bunlar aynı temel yaklaşımın adlandırmalarıdır.
 - Sistem mevcut mimariyi çöpe atıp yeniden yazılmayacak; mevcut yapı üzerine katmanlı ve doğrulanabilir şekilde genişletilecek.
 - Yeni özellik eklenirken önce mevcut tipler/servisler/akışlar kontrol edilir, sonra minimum gerekli dosya değiştirilir.
 - Bir iş tamamlanmadan aynı iş tekrar yapılmaz.
+- Yeni prensip: fikir üretim hızı test hızını geçmeyecek. Büyük yeni katman eklemeden önce mevcut sistem baseline testinden geçirilecek.
 
 ## 3. Droit karakter modeli
 Karakter üç ana eksende ele alınır:
@@ -26,99 +26,165 @@ Karakter üç ana eksende ele alınır:
 ### Kişilik hedefi
 - İnsan davranışına yakın, tutarlı fakat robotik olmayan davranış.
 - Slider değerleri doğrudan “cevap metni” değildir; davranış motoruna girdi sağlar.
-- Aynı kişiyle ilişki süresi ve ilişki kalitesi gibi bağlamsal faktörler ilerleyen aşamada dinamik davranışı etkilemelidir.
-- Örnek hedef: Kaira ilk gün tanıştığı kişiye daha temkinli; uzun süredir iyi ilişki kurduğu kişiye karşı daha rahat/toleranslı davranabilmelidir.
+- Aynı kişiyle ilişki süresi ve ilişki kalitesi dinamik davranışı etkiler.
+- Kaira her zaman matematiksel olarak “en uygun” cevabı vermek zorunda değildir; gelecekte karakter sınırları içindeki gerçek spontane/rastlantısal davranış ayrı bir katman olarak ele alınacaktır.
 
 ## 4. Mevcut teknik yapı
 - React + Vite + Tailwind CSS.
-- Firebase / Firestore / Storage kullanılıyor.
-- Gemini API entegrasyonu mevcut çalışma alanının parçası.
-- Ana UI bileşenleri arasında Studio layout ve sekmeler bulunuyor.
-- Bilinen sekmeler: KairoChatTab, CharacterTab, TestLabTab, BrainTab, SettingsTab.
-- Bilinen servis/tipler: `droitPersonalityService`, `droitExpressionAssetService`, `droitChatService`, `droitBehaviorEngine`, `characterService`; `DroitPersonalityTraits`, `DroitDynamicState`, `DroitExpressionMode`, `DroitExpressionId`, `DroitExpressionAsset`.
-- Davranış profili üretimi için `computeBehaviorProfile(personality, userMessage)` yaklaşımı kullanılıyor.
-- Chat katmanında kişilik, geçmiş ve karakter bilgisi prompt/çalışma girdilerine dahil ediliyor.
+- Firebase / Firestore kullanılıyor; görsel asset akışında Storage da mevcut.
+- Sunucu: Express + Vite middleware (`server.ts`).
+- AI sağlayıcıları: OpenRouter ana akışta; Gemini desteği de mevcut.
+- Build: Vite istemci + esbuild sunucu bundle.
+- Vitest test altyapısı mevcut.
+- GitHub Actions üzerinde TypeScript ve production build doğrulaması var; test komutu CI akışına henüz ekli değil.
 
-## 5. Studio / Karakter sayfası tasarım kararı
-Hedef: masaüstü uygulaması hissi veren, tek ekranda mümkün olduğunca çok bilgiyi gösteren, sade ve şık bir kontrol paneli.
+## 5. Kişilik ve davranış
+- `droitBehaviorEngine.ts`: kişilik slider'larından davranış profili üretir.
+- `kdmConsistencyEngine.ts`: niyet/duygu, dinamik durum, ilişki, tekrar, kırgınlık/çatışma ve kişilik etkilerini hesaplar.
+- İlişki state'i kullanıcı bazlıdır: warmth, trust, conflictScore, hurtScore, familiarityDays, interactionCount ve tekrar sinyalleri bulunur.
+- `relationshipBehaviorService.ts`: ilişki bağlamını davranış profiline uygular.
 
-Character sayfasındaki mevcut yön:
-- Sol: kimlik / sabit karakter bilgileri / temel karakter kuralları.
-- Orta: kişilik slider'ları.
-- Sağ: özet ve dinamik durum/teste ayrılabilecek alan.
-- Gereksiz kalabalık ve özellikle şimdilik “ifadeler” gibi ikincil kontroller ana karakter ekranına doldurulmayacak.
-- Kullanıcı her şeyi tek ekranda görebilmeyi tercih ediyor.
+## 6. Konuşma akışı — mevcut hedef mimari
+Kullanıcı mesajı kabaca şu zincirden geçer:
+1. mesaj alınır,
+2. dil normalizasyonu / hitap temizleme,
+3. KDM niyet-duygu-ilişki analizi,
+4. konuşma kimliği hesaplama,
+5. yerel Dil Motoru mesajı çözebiliyorsa AI çağrısı yapılmadan cevap,
+6. çözemiyorsa AI sağlayıcısına kontrollü prompt,
+7. cevap tutarlılık kontrolü,
+8. KDM/KNT/hafıza kayıtları.
 
-## 6. Kişilik slider'ları
-Mevcut CharacterTab'da görülen temel özellikler:
-- Mizah
-- Empati
-- Özgüven
-- Merak
-- Otorite
-- Analitik Mantık
-- Sabır
-- İletişim
+Temel tasarım ilkesi:
+- **KDM: ne diyecek?**
+- **Konuşma kimliği: nasıl diyecek?**
+- **AI: gerektiğinde doğal cümleye dökecek.**
 
-Duygusal özellikler:
-- Sinirlilik
-- Hassasiyet
-- Sosyal Zekâ
-- Karizma
+## 7. Yerel Dil Motoru — mevcut durum
+Dosyalar:
+- `kairoLanguageNormalizer.ts`
+- `kairoLocalLanguageEngine.ts`
+- `kairoLanguageMemory.ts`
 
-Not: Bu liste gelecekte değiştirilebilir; değişiklik mevcut tiplerle uyumlu yapılmalıdır.
+Mevcut özellikler:
+- Selamlama, hal-hatır, ne yapıyorsun, teşekkür, onay, veda, iyi geceler gibi sınırlı yerel niyetler.
+- `napyon / napıyon / napiyon` gibi günlük yazım varyasyonlarının canonical anlama bağlanması.
+- Yakın eşleşme/typo toleransı (`nber`, `nabr` vb.).
+- `kaira`, `kairo`, `kanka`, `kız`, `aga`, `lan` gibi baş/son hitapların niyet çözümünden ayrılması.
+- Yerel cevaplarda AI çağrısı yapılmaması.
+- Kelime/ifade ağırlıkları ve tekrar cezası.
+- Dil hafızasının kullanıcı bazlı Firestore persistence katmanı.
 
-## 7. Kaira kimliği — mevcut UI varsayılanları
-- Ad: KAIRA
-- Rol: Nexus Çekirdek Asistanı
-- Köken: Sentetik Droit • Nexus OS
-- Kısa tanım: Rasyonel, esprili ve duruma göre uyum sağlayan dijital karakter.
+Doğrulanmış örnek:
+- `selam kaira` → yerel Dil Motoru tarafından işlendi; AI süresi 0 ms görüldü.
 
-Temel kuralların mevcut varsayılanları:
-- Bilmediği bilgiyi uydurmaz; belirsizliği açıkça belirtir.
-- Kullanıcıya karşı saygılı kalır fakat gerektiğinde sınır koyar.
-- Mizahı bağlama göre kullanır; kritik durumlarda ciddiyeti korur.
-- Kişiliğini korurken konuşmanın bağlamına göre üslubunu değiştirebilir.
+Henüz tam doğrulanmamış:
+- Kalıcı dil hafızasının uzun süre sonra davranışı gerçekten değiştirmesi.
+- Çok sayıda typo ve doğal sosyal medya yazımında yanlış pozitif/yanlış negatif oranı.
+- Aynı niyette cevap çeşitliliğinin doğallığı.
 
-## 8. Görsel/ifade sistemi
-- Droit ifadeleri ayrı asset olarak yönetiliyor.
-- Firebase Storage + Firestore akışı daha önce kurulmuş durumda.
-- Görsel yükleme, download URL ve Firestore yazma akışları daha önce başarıyla çalıştırıldı.
-- Avatarların sosyal medya/profil kullanımında kırpılma problemi yaşandı; sonraki UI değişikliklerinde crop davranışı kontrol edilmeli.
-- İfade sistemi karakterin ana kişilik modelinden ayrı bir görsel katmandır.
+## 8. Konuşma kimliği
+- `kairoSpeechIdentity.ts` register, cümle uzunluğu, argo, mizah, emoji, sıcaklık ve doğrudanlık üretir.
+- Bu katman AI promptuna talimat olarak aktarılıyor.
+- Yerel Dil Motorunda ise etkisi henüz sınırlı cevap havuzu üzerinden gerçekleşiyor.
+- Konuşma kimliğinin gerçekten Kaira'ya özgü bir dil parmak izi oluşturup oluşturmadığı henüz baseline testleriyle kanıtlanmadı.
 
-## 9. Kullanıcı çalışma tercihi
-- Kullanıcı Türkçe ilerlemek istiyor.
-- Kullanıcı “ok/değiştir/devam” gibi küçük onaylarla sürekli bölünmek istemiyor.
-- Bir görev verildiğinde mümkün olan tüm hazırlık/değişiklik/test adımları art arda yapılmalı.
-- Kullanıcının yapması gereken tek bir adım kalana kadar iş tamamlanmalı; sonra kısa şekilde ne kaldığı söylenmeli.
-- Aynı ekran görüntüsünü tekrar tekrar istememek önemli.
-- Kota nedeniyle gereksiz ekran görüntüsü talep edilmemeli.
+## 9. Hafıza
+Mevcut farklı hafıza parçaları:
+- KDM ilişki/dinamik state persistence.
+- Son konuşma/KDM hafızası.
+- Uzun dönem kullanıcı hafızası (`kairoLongTermMemoryService`).
+- Dil hafızası (`kairoLanguageMemory`).
 
-## 10. Sohbet devamlılığı protokolü
+Risk:
+- Hafıza türleri işlevsel olarak ayrılmaya başlamış olsa da mimari sınırları ve hangi mesajda hangisinin kullanılacağı henüz resmi bir şemaya bağlanmadı.
+- Firestore/hafıza okuması testlerde belirgin gecikme yaratıyor; hız optimizasyonu daha sonra yeniden ele alınacak.
+
+## 10. KNT / Zihin Haritası
+- Ayrı `MindMapTab` mevcut.
+- KDM aktivasyonları ve gecikme EKG'si gösteriliyor.
+- İstemci, hafıza, KDM, AI, kayıt ve ağ süreleri ayrıştırılıyor.
+- KNT debug raporu kopyalama bulunuyor.
+- Sohbeti temizleme / izole test butonu eklendi.
+- Yerel cevaplarda AI göstergesi 0 olarak gösterilebiliyor.
+
+Ölçülen önemli sonuç:
+- KDM hesaplaması birkaç ms düzeyinde.
+- Büyük gecikme ağırlıklı olarak Firestore hafıza ve AI çağrısından geliyor.
+- Hız çalışması şimdilik donduruldu; işlevsel doğrulama öncelikli.
+
+## 11. Response consistency / doğrulama
+- `kairoResponseConsistency.ts` deterministic post-generation kontrolü yapıyor.
+- Mevcut kontroller daha çok boşluk, uzunluk ve belirli ton/duygu anahtar kelimelerine dayanıyor.
+- Unit test dosyasında 4 temel tutarlılık testi var.
+- Bu doğrulama henüz Kaira'nın doğal sosyal medya dili, persona gösterisi, gereksiz uzunluk, spontanlık ve dünya kuralları için yeterli değil.
+
+## 12. Studio / UI
+- Ana sekmeler arasında Karakter, Test, Beyin, Zihin Haritası, Ayarlar ve Kairo Chat akışları bulunuyor.
+- UI'nin görsel kalitesi şimdilik ikinci planda; altyapı öncelikli.
+- Zihin Haritası test/debug aracı olarak kullanılacak.
+
+## 13. Çalışma tercihi
+- Türkçe ilerlenir.
+- Gereksiz onay adımları ve ekran görüntüsü istekleri azaltılır.
+- Kullanıcının yapması gereken tek adım kalana kadar mümkün olan işler tamamlanır.
+- Kısa, net durum bildirimleri tercih edilir.
+
+## 14. 2026-08-26 mimari dondurma / gözden geçirme kararı
+Yeni özellik geliştirme geçici olarak durduruldu. Önce mevcut sistemin gerçek durumu ölçülecek.
+
+Her modül şu etiketlerden biriyle sınıflandırılacak:
+- **ÇALIŞIYOR / DOĞRULANDI**
+- **KISMEN ÇALIŞIYOR**
+- **TEST EDİLMEDİ**
+- **SORUNLU / BORÇ**
+
+İlk baseline test paketi oluşturulacak. Örnek kapsama:
+- düz selamlama,
+- typo/hitaplı selamlama,
+- hal-hatır,
+- günlük kısa ifade,
+- duygusal paylaşım,
+- hakaret/agresif dil,
+- özür/telafi,
+- tekrar eden olumsuz davranış,
+- aynı mesajın X/Y kullanıcı ilişkilerinde farkı,
+- AI'ye giden karmaşık mesaj,
+- uzun sohbet/hafıza tutarlılığı.
+
+## 15. Backlog — henüz kodlanmayacak önemli fikir
+### Spontane / kontrollü kusurluluk ve gerçek rastlantısallık
+Kaira'nın her cevabı son kullanıcı mesajının optimum matematiksel karşılığı olmak zorunda değildir.
+Gelecekte:
+- bazen soruya doğrudan cevap vermeden konu açabilmeli,
+- kişiyi görünce başka aktif bir düşünceyi öne çıkarabilmeli,
+- karakter sınırları içinde bazen anlamsız/kısa/ters/şakacı davranabilmeli,
+- rastlantısal davranış gerçekleştiğinde bunun sonucu gerçek olay olarak ilişki ve hafızaya işlenmeli.
+
+Önemli ayrım: rastgelelik yalnızca kelime kombinasyonu değil, **davranış seçimi** seviyesinde olacaktır. Bu özellik mevcut sistem baseline testleri tamamlanmadan kodlanmayacak.
+
+## 16. Şu anki öncelik sırası
+1. Repo ve akış audit'i.
+2. Baseline test matrisi oluşturma.
+3. Var olan motorları gerçek örneklerle doğrulama.
+4. Kırık/yamalı bağlantıları düzeltme.
+5. Testler güvenilir hale geldikten sonra KDM Cevap Planı ve gelişmiş konuşma kimliği.
+6. Daha sonra spontane davranış / kontrollü kusurluluk katmanı.
+7. Hız optimizasyonuna yeniden dönüş.
+
+## 17. Bilinen teknik borçlar / ilk audit bulguları
+- `PROJECT_STATE.md` önceki durumda güncel mimarinin gerisindeydi; bu güncellemeyle snapshot yenilendi.
+- CI `npm run lint` ve `npm run build` çalıştırıyor fakat `npm test` henüz CI'a bağlı değil.
+- KDM unit test kapsamı şu an çok küçük (4 test, ağırlıklı response consistency/repair tarafı).
+- `kdmConsistencyEngine.ts` niyet ve sentiment sınıflandırması basit regex tabanlı; yeni normalizer ile tek bir canonical sınıflandırma kaynağına henüz bağlanmış değil.
+- `droitChatService.ts` istemci tarafında ayrıca behavior profile hesaplıyor; sunucuda KDM tekrar davranış profili hesaplıyor. Veri akışı sadeleştirme adayı.
+- Response consistency kontrolü mevcut ama sosyal/doğal konuşma kalitesini ölçmek için yetersiz.
+
+## 18. Sohbet devamlılığı protokolü
 Yeni sohbet açıldığında:
 1. `PROJECT_STATE.md` okunur.
 2. GitHub'daki mevcut kod durumu doğrulanır.
 3. Kullanıcının son hedefi ve mevcut dosyalar arasında fark kontrol edilir.
 4. Daha önce tamamlanmış iş tekrar yapılmaz.
 5. Emin olunmayan geçmiş bilgi varsayılmaz; repo ve bu dosya esas alınır.
-6. İş sonunda bu dosya güncellenir.
-
-## 11. Çalışma durumu — 2026-08-25
-- Proje aktif geliştirme aşamasında.
-- CharacterTab mevcut ve tek ekranlı karakter/kişilik düzenleme yönünde ilerliyor.
-- Kişilik slider'ları ve karakter kimliği alanları mevcut kodda bulunuyor.
-- Proje hafızasının kalıcılaştırılması bu dosyayla başlatıldı.
-- **Sonraki görev:** Bu dosyayı her önemli mimari/UI kararından sonra güncel tutmak ve gerekirse ayrı bir `SESSION_HANDOFF.md` ile son oturumun kısa teknik özetini eklemek.
-
-## 12. Değişiklik günlüğü
-### 2026-08-25
-- Proje sürekliliği için `PROJECT_STATE.md` oluşturuldu.
-- Repo, mimari, karakter modeli, UI kararları ve çalışma protokolü tek dosyada toplandı.
-
-## 13. Değiştirilmemesi gereken ana kararlar
-- KTM/KDM yaklaşımı korunacak.
-- Droit'ler kişilik sahibi dijital varlıklar olarak tasarlanacak.
-- Kişilik = sadece slider değildir; dinamik durum ve bağlamla birleşir.
-- Character Studio masaüstü uygulaması hissinde, sade ve tek ekran odaklı kalacak.
-- Yeni özellikler mevcut mimariyi bozmak yerine katmanlı olarak eklenecek.
+6. İş sonunda önemli mimari kararlar bu dosyaya eklenir.
