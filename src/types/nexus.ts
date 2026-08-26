@@ -1,4 +1,4 @@
-export type NexusTab = 'KARAKTER' | 'TEST' | 'BEYIN' | 'BEYİN' | 'AYARLAR' | 'KAIRO';
+export type NexusTab = 'KARAKTER' | 'TEST' | 'BEYIN' | 'BEYİN' | 'ZIHIN' | 'AYARLAR' | 'KAIRO';
 
 export interface RelationshipState {
   firstSeenAt: string;
