@@ -31,6 +31,10 @@ function normalizeDynamicState(value: unknown): DroitDynamicState | null {
       interactionCount: numberOrDefault(relationship.interactionCount, 0),
       familiarityDays: numberOrDefault(relationship.familiarityDays, 0),
       warmth: numberOrDefault(relationship.warmth, 50),
+      trust: numberOrDefault(relationship.trust, 50),
+      positiveEvents: numberOrDefault(relationship.positiveEvents, 0),
+      negativeEvents: numberOrDefault(relationship.negativeEvents, 0),
+      conflictScore: numberOrDefault(relationship.conflictScore, 0),
     } } : {}),
   };
 }
@@ -74,8 +78,19 @@ export async function saveKdmInteraction(payload: KdmPersistencePayload): Promis
     const firstSeenAt = previous?.firstSeenAt || now.toISOString();
     const previousCount = previous?.interactionCount || 0;
     const familiarityDays = Math.max(0, Math.floor((now.getTime() - new Date(firstSeenAt).getTime()) / 86400000));
-    const relationship: RelationshipState = { firstSeenAt, lastInteractionAt: now.toISOString(), interactionCount: previousCount + 1, familiarityDays, warmth: payload.dynamicState.relationship?.warmth ?? payload.reasoningTrace.relationship.warmthAfter };
-    const safeDynamicState: DroitDynamicState = { ...(normalizeDynamicState(payload.dynamicState) || DEFAULT_DYNAMIC_STATE), relationship };
+    const relationship: RelationshipState = {
+      firstSeenAt,
+      lastInteractionAt: now.toISOString(),
+      interactionCount: previousCount + 1,
+      familiarityDays,
+      warmth: previous?.warmth ?? payload.reasoningTrace.relationship.warmthScore,
+      trust: previous?.trust ?? payload.reasoningTrace.relationship.trustScore ?? 50,
+      positiveEvents: previous?.positiveEvents ?? 0,
+      negativeEvents: previous?.negativeEvents ?? 0,
+      conflictScore: previous?.conflictScore ?? payload.reasoningTrace.relationship.conflictScore ?? 0,
+    };
+    const normalized = normalizeDynamicState(payload.dynamicState) || DEFAULT_DYNAMIC_STATE;
+    const safeDynamicState: DroitDynamicState = { ...normalized, relationship: { ...relationship, ...(normalized.relationship || {}) } };
     const stateRef = doc(db, STATE_COLLECTION, userScope);
     await setDoc(stateRef, { characterId: 'kairo', userId: userScope, dynamicState: safeDynamicState, reasoningTrace: payload.reasoningTrace, lastUserMessage: payload.lastUserMessage, lastReply: payload.reply, updatedAt: now.toISOString() }, { merge: true });
     const traceRef = collection(stateRef, TRACE_COLLECTION);
