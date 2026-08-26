@@ -35,6 +35,9 @@ function normalizeDynamicState(value: unknown): DroitDynamicState | null {
       positiveEvents: numberOrDefault(relationship.positiveEvents, 0),
       negativeEvents: numberOrDefault(relationship.negativeEvents, 0),
       conflictScore: numberOrDefault(relationship.conflictScore, 0),
+      hurtScore: numberOrDefault(relationship.hurtScore, 0),
+      repairProgress: numberOrDefault(relationship.repairProgress, 0),
+      ...(typeof relationship.lastConflictAt === 'string' ? { lastConflictAt: relationship.lastConflictAt } : {}),
     } } : {}),
   };
 }
@@ -88,6 +91,9 @@ export async function saveKdmInteraction(payload: KdmPersistencePayload): Promis
       positiveEvents: previous?.positiveEvents ?? 0,
       negativeEvents: previous?.negativeEvents ?? 0,
       conflictScore: previous?.conflictScore ?? payload.reasoningTrace.relationship.conflictScore ?? 0,
+      hurtScore: previous?.hurtScore ?? payload.reasoningTrace.relationship.hurtScore ?? 0,
+      repairProgress: previous?.repairProgress ?? payload.reasoningTrace.relationship.repairProgress ?? 0,
+      ...(previous?.lastConflictAt ? { lastConflictAt: previous.lastConflictAt } : {}),
     };
     const normalized = normalizeDynamicState(payload.dynamicState) || DEFAULT_DYNAMIC_STATE;
     const safeDynamicState: DroitDynamicState = { ...normalized, relationship: { ...relationship, ...(normalized.relationship || {}) } };
