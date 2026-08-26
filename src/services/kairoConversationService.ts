@@ -1,4 +1,4 @@
-import { addDoc, collection, getDocs, limit, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, getDocs, limit, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { TestMessage } from '../types/nexus';
 
@@ -36,6 +36,13 @@ export async function saveKairoConversationMessage(message: TestMessage): Promis
     timestamp: message.timestamp,
     createdAt: serverTimestamp(),
   });
+}
+
+export async function clearKairoConversation(): Promise<void> {
+  const scope = userScope();
+  const messagesRef = collection(db, COLLECTION, scope, 'messages');
+  const snapshot = await getDocs(messagesRef);
+  await Promise.all(snapshot.docs.map((item) => deleteDoc(item.ref)));
 }
 
 export async function persistKairoConversationMessages(messages: TestMessage[]): Promise<void> {
