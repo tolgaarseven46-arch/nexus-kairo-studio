@@ -13,11 +13,14 @@ export interface RelationshipState {
   hurtScore?: number;
   repairProgress?: number;
   lastConflictAt?: string;
+  repeatedNegativeCount?: number;
+  lastNegativePattern?: string;
+  lastNegativePatternAt?: string;
 }
 
 export interface ReasoningTrace {
   whoSent: { userName: string; isNewUser: boolean; recognitionText: string; };
-  relationship: { warmthScore: number; warmthLabel: string; note: string; familiarityDays?: number; interactionCount?: number; toleranceMultiplier?: number; trustScore?: number; conflictScore?: number; hurtScore?: number; repairProgress?: number; };
+  relationship: { warmthScore: number; warmthLabel: string; note: string; familiarityDays?: number; interactionCount?: number; toleranceMultiplier?: number; trustScore?: number; conflictScore?: number; hurtScore?: number; repairProgress?: number; repeatedNegativeCount?: number; };
   currentMood: { moodText: string; reasonText: string; };
   messageInterpretation: { intent: string; sentiment: string; explanation: string; };
   decision: { chosenTone: string; explanation: string; };
