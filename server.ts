@@ -13,8 +13,11 @@ import {
 import { validateMemoryAgainstMessage } from "./src/services/kairoMemoryConsistency";
 import { validateKairoResponse } from "./src/services/kairoResponseConsistency";
 import {
+  buildActiveParticipantInstruction,
   buildKairoGroundingInstruction,
   findKairoGroundingIssues,
+  formatKairoHistoryForModel,
+  sanitizeKairoChatHistory,
 } from "./src/services/kairoConversationGrounding";
 import { recordKdmMetric } from "./src/services/kdmMetricsService";
 import {
@@ -223,29 +226,6 @@ function buildSessionWorkingMemory(history: any[], userMessage: string) {
     )
     .join("\n");
 }
-function sanitizeChatHistory(history: any[]) {
-  if (!Array.isArray(history)) return [];
-  const clean: any[] = [];
-  for (const item of history) {
-    const text = String(item?.text || "");
-    if (item?.sender === "droit" && /^\[Hata\]:/i.test(text)) {
-      if (clean.at(-1)?.sender === "user") clean.pop();
-      continue;
-    }
-    const previous = clean.at(-1);
-    if (
-      item?.sender === "user" &&
-      previous?.sender === "user" &&
-      previous.participantId === item.participantId &&
-      String(previous.text || "").trim() === text.trim()
-    ) {
-      clean[clean.length - 1] = item;
-      continue;
-    }
-    clean.push(item);
-  }
-  return clean;
-}
 app.get("/api/health", (_q, r) =>
   r.json({ status: "ok", timestamp: new Date().toISOString() }),
 );
@@ -299,7 +279,7 @@ app.post("/api/chat", async (req, res) => {
     } = req.body;
     if (!userMessage)
       return res.status(400).json({ error: "userMessage is required" });
-    const cleanHistory = sanitizeChatHistory(history);
+    const cleanHistory = sanitizeKairoChatHistory(history);
     const memoryStart = now();
     const [persistedState, persistentMemory] = await Promise.all([
       loadKdmState(userId).catch(() => null),
@@ -410,14 +390,12 @@ app.post("/api/chat", async (req, res) => {
       cleanHistory,
       userMessage,
     );
-    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\nAKTİF KONUŞAN: ${userName} (${userId}). Son mesaj bu kişiden geldi. Yanıtını ona ver; ortak sohbet geçmişindeki diğer kişilerin sözlerini bu kişiye ait sanma. Her kişinin ilişki ve kalıcı hafıza katmanı ayrıdır.\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bunlar ne söyleyeceğini dikte etmez; yalnızca davranış sınırların ve mevcut ilişkin hakkında bağlamdır.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
-    const msgs = cleanHistory.slice(-8).map((x: any) => ({
-      role: x.sender === "user" ? "user" : "assistant",
-      content:
-        x.sender === "user"
-          ? `[${x.participantName || "Kullanıcı"}]: ${x.text}`
-          : x.text,
-    }));
+    const activeParticipantInstruction = buildActiveParticipantInstruction(
+      userName,
+      userId,
+    );
+    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bunlar ne söyleyeceğini dikte etmez; yalnızca davranış sınırların ve mevcut ilişkin hakkında bağlamdır.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
     let reply = await generateText(system, msgs, 0.78, provider);
