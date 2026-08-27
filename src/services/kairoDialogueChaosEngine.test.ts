@@ -135,4 +135,39 @@ describe("Kaira complex dialogue engine", () => {
       ),
     ).toEqual([]);
   });
+
+  it("rejects reviving Mert's denied resignation as a humorous guess", () => {
+    const history = [
+      {
+        sender: "user",
+        participantName: "Ali",
+        text: "Mert yarın müdürle konuşup istifa edecekmiş.",
+      },
+      {
+        sender: "user",
+        participantName: "Mert",
+        text: "yok lan o ben değildim, Ali maaş zammını konuşacaktı herhalde",
+      },
+    ];
+    const question = "neyse Mert yarın ne yapacaktı?";
+
+    expect(
+      findDialogueAttributionIssues(
+        "Mert büyük ihtimalle hiçbir şey yapmayıp içinden istifa edecek.",
+        history,
+        question,
+        "Ali",
+      ),
+    ).toContain(
+      "Mert tarafından reddedilen istifa iddiası yeni tahmin gibi yeniden üretildi",
+    );
+    expect(
+      findDialogueAttributionIssues(
+        "Mert istifa iddiasını reddetti; yarın ne yapacağına dair net bilgi yok.",
+        history,
+        question,
+        "Ali",
+      ),
+    ).toEqual([]);
+  });
 });
