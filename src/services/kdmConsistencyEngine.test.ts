@@ -5,7 +5,7 @@ import {
   decideResponseRepair,
   selectBestConsistency,
 } from "./kdmResponseRepairPolicy";
-import type { ReasoningTrace } from "../types/nexus";
+import type { DroitDynamicState, ReasoningTrace } from "../types/nexus";
 
 const trace = (tone = "sıcak ve empatik"): ReasoningTrace =>
   ({
@@ -13,6 +13,30 @@ const trace = (tone = "sıcak ve empatik"): ReasoningTrace =>
     currentMood: { moodText: "Sakin ve destekleyici" },
     decision: { chosenTone: tone },
   }) as ReasoningTrace;
+
+const relationshipState = (): DroitDynamicState => ({
+  calmness: 70,
+  anger: 10,
+  stress: 20,
+  happiness: 70,
+  confidence: 70,
+  surprise: 10,
+  lastStatus: "Sakin ve kontrollü",
+  relationship: {
+    firstSeenAt: "2026-08-27T00:00:00.000Z",
+    lastInteractionAt: "2026-08-27T00:00:00.000Z",
+    interactionCount: 0,
+    familiarityDays: 0,
+    warmth: 50,
+    trust: 50,
+    positiveEvents: 0,
+    negativeEvents: 0,
+    conflictScore: 0,
+    hurtScore: 0,
+    repairProgress: 0,
+    repeatedNegativeCount: 0,
+  },
+});
 
 describe("KDM response consistency gate", () => {
   it("accepts a response matching the emotional context and tone", () => {
@@ -70,5 +94,62 @@ describe("KDM response consistency gate", () => {
       "neyse boşver, bugün hava da baya sıcak ya",
     );
     expect(result.trace.messageInterpretation.intent).toBe("genel_sohbet");
+  });
+
+  it("does not damage the Kaira relationship for negativity aimed at Mert", () => {
+    const result = analyzeKdmInteraction(
+      "Mert bugün gerçekten çok saçmalıyor, ona sinir oldum.",
+      undefined,
+      relationshipState(),
+    );
+    const relationship = result.nextDynamicState.relationship!;
+
+    expect(result.trace.messageInterpretation.sentiment).toBe("negatif");
+    expect(relationship.warmth).toBe(50);
+    expect(relationship.trust).toBe(50);
+    expect(relationship.negativeEvents).toBe(0);
+    expect(relationship.conflictScore).toBe(0);
+    expect(relationship.hurtScore).toBe(0);
+    expect(relationship.repeatedNegativeCount).toBe(0);
+  });
+
+  it("records relationship damage when Kaira is the negative target", () => {
+    const result = analyzeKdmInteraction(
+      "Kaira bugün gerçekten çok saçmalıyorsun, senden hiç hoşlanmıyorum.",
+      undefined,
+      relationshipState(),
+    );
+    const relationship = result.nextDynamicState.relationship!;
+
+    expect(result.trace.messageInterpretation.sentiment).toBe("negatif");
+    expect(relationship.warmth).toBeLessThan(50);
+    expect(relationship.trust).toBeLessThan(50);
+    expect(relationship.negativeEvents).toBe(1);
+    expect(relationship.conflictScore).toBeGreaterThan(0);
+    expect(relationship.hurtScore).toBeGreaterThan(0);
+    expect(relationship.repeatedNegativeCount).toBe(1);
+  });
+
+  it("keeps Mert and Ali relationship states isolated", () => {
+    const states = {
+      mert: relationshipState(),
+      ali: relationshipState(),
+    };
+
+    states.mert = analyzeKdmInteraction(
+      "Kaira senden hiç hoşlanmıyorum, çok saçmalıyorsun.",
+      undefined,
+      states.mert,
+    ).nextDynamicState;
+    states.ali = analyzeKdmInteraction(
+      "Mert bugün gerçekten çok saçmalıyor, ona sinir oldum.",
+      undefined,
+      states.ali,
+    ).nextDynamicState;
+
+    expect(states.mert.relationship!.warmth).toBeLessThan(50);
+    expect(states.mert.relationship!.hurtScore).toBeGreaterThan(0);
+    expect(states.ali.relationship!.warmth).toBe(50);
+    expect(states.ali.relationship!.hurtScore).toBe(0);
   });
 });
