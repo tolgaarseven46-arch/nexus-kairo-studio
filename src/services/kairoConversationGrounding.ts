@@ -1,6 +1,58 @@
 export interface ConversationTurn {
   sender?: string;
   text?: string;
+  participantId?: string;
+  participantName?: string;
+  replyToParticipantId?: string;
+  replyToParticipantName?: string;
+}
+
+export function sanitizeKairoChatHistory<T extends ConversationTurn>(
+  history: T[],
+): T[] {
+  if (!Array.isArray(history)) return [];
+  const clean: T[] = [];
+  for (const item of history) {
+    const text = String(item?.text || "");
+    if (item?.sender === "droit" && /^\[Hata\]:/i.test(text)) {
+      if (clean.at(-1)?.sender === "user") clean.pop();
+      continue;
+    }
+    const previous = clean.at(-1);
+    if (
+      item?.sender === "user" &&
+      previous?.sender === "user" &&
+      previous.participantId === item.participantId &&
+      String(previous.text || "").trim() === text.trim()
+    ) {
+      clean[clean.length - 1] = item;
+      continue;
+    }
+    clean.push(item);
+  }
+  return clean;
+}
+
+export function formatKairoHistoryForModel(
+  history: ConversationTurn[],
+  limit = 8,
+) {
+  return sanitizeKairoChatHistory(history)
+    .slice(-limit)
+    .map((turn) => ({
+      role: turn.sender === "user" ? "user" : "assistant",
+      content:
+        turn.sender === "user"
+          ? `[${turn.participantName || "Kullanıcı"}]: ${turn.text || ""}`
+          : `[Kairo → ${turn.replyToParticipantName || "Kullanıcı"}]: ${turn.text || ""}`,
+    }));
+}
+
+export function buildActiveParticipantInstruction(
+  participantName: string,
+  participantId: string,
+) {
+  return `AKTİF KONUŞAN: ${participantName} (${participantId}). Son mesaj bu kişiden geldi. Yanıtını ona ver; ortak sohbet geçmişindeki diğer kişilerin sözlerini bu kişiye ait sanma. "Ben/bana/benim" ifadelerini aktif konuşana bağla. Her kişinin ilişki ve kalıcı hafıza katmanı ayrıdır.`;
 }
 
 const UNCERTAINTY_RE =
