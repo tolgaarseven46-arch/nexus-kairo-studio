@@ -204,7 +204,8 @@ export const NexusStudioLayout: React.FC = () => {
     async (userText: string) => {
       if (!userText.trim() || isAiLoading) return;
       const activeParticipant =
-        TEST_USERS.find((user) => user.id === selectedTestUser) ?? TEST_USERS[0];
+        TEST_USERS.find((user) => user.id === selectedTestUser) ??
+        TEST_USERS[0];
       const userMsg: TestMessage = {
         id: `msg-${Date.now()}`,
         sender: "user",
@@ -374,6 +375,9 @@ export const NexusStudioLayout: React.FC = () => {
             messages={messages}
             isLoading={isAiLoading}
             timings={lastTimings}
+            participants={TEST_USERS}
+            selectedParticipantId={selectedTestUser}
+            onSelectParticipant={setSelectedTestUser}
             onSendMessage={handleSendMessage}
             onClearChat={handleClearChat}
             onResetTestUser={handleResetTestUser}
