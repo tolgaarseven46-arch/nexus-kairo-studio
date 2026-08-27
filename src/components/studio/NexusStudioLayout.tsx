@@ -8,6 +8,7 @@ import { MindMapTab } from "./tabs/MindMapTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import { KdmMetricsPanel } from "../common/KdmMetricsPanel";
 import { KdmAutoRelationshipTestPanel } from "../common/KdmAutoRelationshipTestPanel";
+import { KairaSpeechMatrixPanel } from "../common/KairaSpeechMatrixPanel";
 import {
   DroitPersonalityTraits,
   DroitDynamicState,
@@ -327,6 +328,7 @@ export const NexusStudioLayout: React.FC = () => {
                 </div>
               </div>
               <KdmAutoRelationshipTestPanel personality={personality} />
+              <KairaSpeechMatrixPanel personality={personality} />
             </div>
             <div className="flex-1 min-h-0">
               <TestLabTab

@@ -199,3 +199,4 @@ Yeni sohbet açıldığında:
 - Sert küfür yakın ilişkide dahi otomatik değildir; karşılıklı bağlam ve ileride tanımlanacak konuşma tercihi/izin sinyali gerekir.
 - Yerel Dil Motoru cevap havuzları da aynı ilişki kapısına bağlandı.
 - `kairoSpeechIdentity.test.ts` ile ritmin ilişki seviyelerinde sabit kaldığı, argonun yakınlıkla açıldığı, yeni kullanıcıya yakın hitap verilmediği ve emoji eğiliminin düşük tutulduğu doğrulanıyor.
+- Test sekmesine `YAZI RİTMİ v1` karşılaştırma matrisi eklendi. Aynı mesajı sırayla `new`, `familiar`, `close` profillerinde çalıştırır; üç çağrıyı kullanıcı düğmeye bastığında yapar ve cevap uzunluğu, satır, noktalama, emoji ve yeni kullanıcıya samimiyet sızıntısını raporlar.
