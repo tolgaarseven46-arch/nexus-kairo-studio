@@ -66,7 +66,7 @@ async function callOpenRouter(messages: any[], temperature: number) {
   if (!key) throw new Error("OPENROUTER_API_KEY bulunamadı.");
   const freeModel = "openrouter/free";
   const primaryModel = process.env.OPENROUTER_MODEL?.trim() || freeModel;
-  const requestModel = async (model: string) => {
+  const requestModel = async (model: string, maxTokens?: number) => {
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -80,6 +80,7 @@ async function callOpenRouter(messages: any[], temperature: number) {
           model,
           messages,
           temperature,
+          ...(maxTokens ? { max_tokens: maxTokens } : {}),
         }),
       },
     );
@@ -87,6 +88,15 @@ async function callOpenRouter(messages: any[], temperature: number) {
     return { response, data };
   };
   let { response, data } = await requestModel(primaryModel);
+  const affordableTokens = Number(
+    String(data?.error?.message || "").match(/can only afford\s+(\d+)/i)?.[1],
+  );
+  if (!response.ok && affordableTokens >= 40) {
+    ({ response, data } = await requestModel(
+      primaryModel,
+      Math.max(32, affordableTokens - 8),
+    ));
+  }
   if (!response.ok)
     throw new Error(
       data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`,
