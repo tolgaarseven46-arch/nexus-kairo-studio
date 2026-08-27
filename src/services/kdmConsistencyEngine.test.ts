@@ -57,4 +57,18 @@ describe("KDM response consistency gate", () => {
     );
     expect(result.trace.messageInterpretation.intent).toBe("soru");
   });
+
+  it("classifies an uncertainty-preserving recall as a question", () => {
+    const result = analyzeKdmInteraction(
+      "bu arada Mert yarın ne yapmayı düşünüyordu?",
+    );
+    expect(result.trace.messageInterpretation.intent).toBe("soru");
+  });
+
+  it("does not treat the Turkish word bugün as the software term bug", () => {
+    const result = analyzeKdmInteraction(
+      "neyse boşver, bugün hava da baya sıcak ya",
+    );
+    expect(result.trace.messageInterpretation.intent).toBe("genel_sohbet");
+  });
 });
