@@ -22,6 +22,10 @@ export async function loadKairoConversation(maxItems = MAX_MESSAGES): Promise<Te
         sender: data.sender === 'user' ? 'user' : 'droit',
         text: typeof data.text === 'string' ? data.text : '',
         timestamp: typeof data.timestamp === 'string' ? data.timestamp : '',
+        participantId: typeof data.participantId === 'string' ? data.participantId : undefined,
+        participantName: typeof data.participantName === 'string' ? data.participantName : undefined,
+        replyToParticipantId: typeof data.replyToParticipantId === 'string' ? data.replyToParticipantId : undefined,
+        replyToParticipantName: typeof data.replyToParticipantName === 'string' ? data.replyToParticipantName : undefined,
       } as TestMessage;
     })
     .filter((item) => item.text.trim());
@@ -34,6 +38,10 @@ export async function saveKairoConversationMessage(message: TestMessage): Promis
     sender: message.sender,
     text: message.text,
     timestamp: message.timestamp,
+    participantId: message.participantId || null,
+    participantName: message.participantName || null,
+    replyToParticipantId: message.replyToParticipantId || null,
+    replyToParticipantName: message.replyToParticipantName || null,
     createdAt: serverTimestamp(),
   });
 }

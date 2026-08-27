@@ -8,7 +8,6 @@ import {
   computeBehaviorProfile,
   BehaviorLayerProfile,
 } from "./droitBehaviorEngine";
-import { saveKairoLongTermMemory } from "./kairoLongTermMemoryService";
 import {
   validateKairoResponse,
   ResponseConsistencyResult,
@@ -33,6 +32,7 @@ export interface SendKairoChatOptions {
   characterInfo?: { name?: string; roleTitle?: string; raceName?: string };
   provider?: KairoProvider;
   userId?: string;
+  userName?: string;
   suppressRecentMemory?: boolean;
 }
 export interface KairoChatResponse {
@@ -43,27 +43,6 @@ export interface KairoChatResponse {
   consistency?: ResponseConsistencyResult;
   providerUsed?: KairoProvider;
   timings?: KairoTimingMetrics;
-}
-const EXPLICIT_NAME_PATTERNS = [
-  /^benim adım\s+([^.!?,\n]+)[.!?]?$/i,
-  /^adım\s+([^.!?,\n]+)[.!?]?$/i,
-  /^ben\s+([^.!?,\n]+)\s*$/i,
-];
-async function captureExplicitUserMemory(userMessage: string) {
-  const normalized = userMessage.trim();
-  for (const pattern of EXPLICIT_NAME_PATTERNS) {
-    const match = normalized.match(pattern);
-    if (!match) continue;
-    const name = match[1].trim();
-    if (name.length < 2 || name.length > 80) return;
-    await saveKairoLongTermMemory({
-      category: "user_identity",
-      content: `Kullanıcının adı: ${name}`,
-      importance: 1,
-      tags: ["name", "user_identity"],
-    });
-    return;
-  }
 }
 function resolveConversationUserId(explicitUserId?: string) {
   if (explicitUserId?.trim()) return explicitUserId.trim();
@@ -86,16 +65,17 @@ export const droitChatService = {
     },
     provider = "openrouter",
     userId: explicitUserId,
+    userName = "Kullanıcı",
     suppressRecentMemory = false,
   }: SendKairoChatOptions): Promise<KairoChatResponse> {
     const totalStart = performance.now();
-    void captureExplicitUserMemory(userMessage).catch(() => {});
     const userId = resolveConversationUserId(explicitUserId);
     const prepStart = performance.now();
     const behaviorProfile = computeBehaviorProfile(personality, userMessage);
     const clientPrepMs = Math.round(performance.now() - prepStart);
     const payload = {
       userId,
+      userName,
       userMessage,
       character: characterInfo,
       personality,
@@ -103,7 +83,14 @@ export const droitChatService = {
       dynamicState,
       history: history
         .slice(-24)
-        .map((m) => ({ sender: m.sender, text: m.text })),
+        .map((m) => ({
+          sender: m.sender,
+          text: m.text,
+          participantId: m.participantId,
+          participantName: m.participantName,
+          replyToParticipantId: m.replyToParticipantId,
+          replyToParticipantName: m.replyToParticipantName,
+        })),
       provider,
       suppressRecentMemory,
     };
