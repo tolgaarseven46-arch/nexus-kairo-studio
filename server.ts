@@ -188,7 +188,7 @@ function buildSessionWorkingMemory(history: any[], userMessage: string) {
   return scored
     .map(
       (x) =>
-        `${x.item.sender === "user" ? "Kullanıcı" : "Kaira"}: ${String(x.item.text || "").slice(0, 320)}`,
+        `${x.item.sender === "user" ? x.item.participantName || "Kullanıcı" : "Kaira"}: ${String(x.item.text || "").slice(0, 320)}`,
     )
     .join("\n");
 }
@@ -233,6 +233,7 @@ app.post("/api/chat", async (req, res) => {
   try {
     const {
       userId = "anonymous",
+      userName = "Kullanıcı",
       userMessage,
       character = {},
       personality = {},
@@ -288,9 +289,10 @@ app.post("/api/chat", async (req, res) => {
       ),
       memoryContext =
         validatedMemory
-          .map((x: any) => `Kullanıcı: ${x.userMessage}\nKairo: ${x.reply}`)
+          .map((x: any) => `${userName}: ${x.userMessage}\nKairo: ${x.reply}`)
           .join("\n") || "İlgili doğrulanmış anı yok.",
       sessionWorkingMemory = buildSessionWorkingMemory(history, userMessage);
+    kdm.trace.whoSent.userName = userName;
     if (local.handled && local.reply) {
       const reply = local.reply,
         consistency = validateKairoResponse(reply, kdm.trace),
@@ -350,14 +352,17 @@ app.post("/api/chat", async (req, res) => {
       history,
       userMessage,
     );
-    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bunlar ne söyleyeceğini dikte etmez; yalnızca davranış sınırların ve mevcut ilişkin hakkında bağlamdır.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\nAKTİF KONUŞAN: ${userName} (${userId}). Son mesaj bu kişiden geldi. Yanıtını ona ver; ortak sohbet geçmişindeki diğer kişilerin sözlerini bu kişiye ait sanma. Her kişinin ilişki ve kalıcı hafıza katmanı ayrıdır.\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bunlar ne söyleyeceğini dikte etmez; yalnızca davranış sınırların ve mevcut ilişkin hakkında bağlamdır.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = history
       .slice(-8)
       .map((x: any) => ({
         role: x.sender === "user" ? "user" : "assistant",
-        content: x.text,
+        content:
+          x.sender === "user"
+            ? `[${x.participantName || "Kullanıcı"}]: ${x.text}`
+            : x.text,
       }));
-    msgs.push({ role: "user", content: userMessage });
+    msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
     let reply = await generateText(system, msgs, 0.78, provider);
     let groundingIssues = findKairoGroundingIssues(
