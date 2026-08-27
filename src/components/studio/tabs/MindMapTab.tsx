@@ -17,6 +17,7 @@ import {
   TestMessage,
 } from "../../../types/nexus";
 import type { KairoTimingMetrics } from "../../../services/droitChatService";
+import { KairaSpeechMatrixPanel } from "../../common/KairaSpeechMatrixPanel";
 type Props = {
   personality: DroitPersonalityTraits;
   dynamicState: DroitDynamicState;
@@ -225,6 +226,9 @@ export const MindMapTab: React.FC<Props> = ({
               ● CANLI KDM
             </span>
           </div>
+        </div>
+        <div className="mb-3">
+          <KairaSpeechMatrixPanel personality={personality} />
         </div>
         <div className="grid grid-cols-4 gap-3">
           <Node
