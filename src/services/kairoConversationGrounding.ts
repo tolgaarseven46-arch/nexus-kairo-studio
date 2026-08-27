@@ -48,6 +48,15 @@ export function formatKairoHistoryForModel(
     }));
 }
 
+export function sanitizeKairoReplyText(reply: string): string {
+  return String(reply || "")
+    .replace(
+      /^\s*(?:\[\s*Kairo(?:\s*→\s*[^\]]+)?\s*\]|Kairo(?:\s*→\s*[^:]+)?):\s*/iu,
+      "",
+    )
+    .trim();
+}
+
 export function buildActiveParticipantInstruction(
   participantName: string,
   participantId: string,
