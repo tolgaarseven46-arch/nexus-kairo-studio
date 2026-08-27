@@ -80,7 +80,6 @@ async function callOpenRouter(messages: any[], temperature: number) {
           model,
           messages,
           temperature,
-          max_tokens: model === freeModel ? 420 : 180,
         }),
       },
     );
@@ -88,21 +87,13 @@ async function callOpenRouter(messages: any[], temperature: number) {
     return { response, data };
   };
   let { response, data } = await requestModel(primaryModel);
-  const errorMessage = String(data?.error?.message || "");
-  if (
-    !response.ok &&
-    primaryModel !== freeModel &&
-    /available credits|insufficient credits|add credits/i.test(errorMessage)
-  ) {
-    ({ response, data } = await requestModel(freeModel));
-  }
   if (!response.ok)
     throw new Error(
       data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`,
     );
   let text = extractOpenRouterText(data);
   if (!text) {
-    ({ response, data } = await requestModel(freeModel));
+    ({ response, data } = await requestModel(primaryModel));
     if (!response.ok)
       throw new Error(
         data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`,
