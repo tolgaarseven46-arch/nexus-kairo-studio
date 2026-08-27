@@ -56,7 +56,10 @@ function extractOpenRouterText(data: any) {
 async function callOpenRouter(messages: any[], temperature: number) {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("OPENROUTER_API_KEY bulunamadı.");
-  const response = await fetch(
+  const freeModel = "openrouter/free";
+  const primaryModel = process.env.OPENROUTER_MODEL?.trim() || freeModel;
+  const requestModel = async (model: string) => {
+    const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
         method: "POST",
@@ -66,14 +69,25 @@ async function callOpenRouter(messages: any[], temperature: number) {
           "X-Title": "NEXUS Kairo Studio",
         },
         body: JSON.stringify({
-          model: process.env.OPENROUTER_MODEL || "openrouter/free",
+          model,
           messages,
           temperature,
           max_tokens: 180,
         }),
       },
-    ),
-    data = await response.json().catch(() => ({}));
+    );
+    const data = await response.json().catch(() => ({}));
+    return { response, data };
+  };
+  let { response, data } = await requestModel(primaryModel);
+  const errorMessage = String(data?.error?.message || "");
+  if (
+    !response.ok &&
+    primaryModel !== freeModel &&
+    /available credits|insufficient credits|add credits/i.test(errorMessage)
+  ) {
+    ({ response, data } = await requestModel(freeModel));
+  }
   if (!response.ok)
     throw new Error(
       data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`,
@@ -353,23 +367,17 @@ app.post("/api/chat", async (req, res) => {
       userMessage,
     );
     const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\nAKTİF KONUŞAN: ${userName} (${userId}). Son mesaj bu kişiden geldi. Yanıtını ona ver; ortak sohbet geçmişindeki diğer kişilerin sözlerini bu kişiye ait sanma. Her kişinin ilişki ve kalıcı hafıza katmanı ayrıdır.\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bunlar ne söyleyeceğini dikte etmez; yalnızca davranış sınırların ve mevcut ilişkin hakkında bağlamdır.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
-    const msgs = history
-      .slice(-8)
-      .map((x: any) => ({
-        role: x.sender === "user" ? "user" : "assistant",
-        content:
-          x.sender === "user"
-            ? `[${x.participantName || "Kullanıcı"}]: ${x.text}`
-            : x.text,
-      }));
+    const msgs = history.slice(-8).map((x: any) => ({
+      role: x.sender === "user" ? "user" : "assistant",
+      content:
+        x.sender === "user"
+          ? `[${x.participantName || "Kullanıcı"}]: ${x.text}`
+          : x.text,
+    }));
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
     let reply = await generateText(system, msgs, 0.78, provider);
-    let groundingIssues = findKairoGroundingIssues(
-      reply,
-      history,
-      userMessage,
-    );
+    let groundingIssues = findKairoGroundingIssues(reply, history, userMessage);
     let repairAttempts = 0;
     if (groundingIssues.length && now() - aiStart < 24000) {
       try {
