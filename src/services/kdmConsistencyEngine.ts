@@ -52,14 +52,18 @@ function classifyIntent(message: string): string {
   if (/(^|\s)(selam|merhaba|hey|naber|nasılsın|ne yapıyorsun)(\s|$)/.test(text))
     return "selamlama";
   if (
-    /(^|\s)(kim|kime|kimi|neydi|hangisi|hangisiydi)(\s|$)|ne\s+yapacaktı|hatırlıyor\s+musun|hatırladın\s+mı/.test(
+    /(^|\s)(kim|kime|kimi|neydi|hangisi|hangisiydi)(\s|$)|ne\s+yapacaktı|(?:^|\s)ne(?:yi)?\s+.{0,50}düşün|hatırlıyor\s+musun|hatırladın\s+mı/.test(
       text,
     )
   )
     return "soru";
   if (/(neden|nasıl|ne demek|açıkla|anlat|nedir|niye)/.test(text))
     return "bilgi_ve_aciklama";
-  if (/(hata|sorun|çöktü|çalışmıyor|bug|arıza|bozuk)/.test(text))
+  if (
+    /(?<![\p{L}])(hata|sorun|çöktü|çalışmıyor|bug|arıza|bozuk)(?![\p{L}])/u.test(
+      text,
+    )
+  )
     return "sorun_cozme";
   if (/(yap|oluştur|ekle|değiştir|geliştir|uygula)/.test(text))
     return "eylem_talebi";
