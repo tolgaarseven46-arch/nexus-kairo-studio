@@ -19,6 +19,10 @@ import {
   formatKairoHistoryForModel,
   sanitizeKairoChatHistory,
 } from "./src/services/kairoConversationGrounding";
+import {
+  analyzeDialogueTurn,
+  buildDialogueBoardInstruction,
+} from "./src/services/kairoDialogueChaosEngine";
 import { recordKdmMetric } from "./src/services/kdmMetricsService";
 import {
   computeKairoSpeechIdentity,
@@ -42,7 +46,15 @@ let aiClient: GoogleGenAI | null = null;
 const now = () => performance.now(),
   memoryCache = new Map<
     string,
-    { expires: number; items: Array<{ userMessage: string; reply: string }> }
+    {
+      expires: number;
+      items: Array<{
+        userMessage: string;
+        reply: string;
+        memoryScope?: string;
+        dialogueAnalysis?: { factConfidence?: number };
+      }>;
+    }
   >(),
   MEMORY_TTL_MS = 30000,
   sleep = <T>(ms: number, value: T) =>
@@ -280,6 +292,12 @@ app.post("/api/chat", async (req, res) => {
     if (!userMessage)
       return res.status(400).json({ error: "userMessage is required" });
     const cleanHistory = sanitizeKairoChatHistory(history);
+    const dialogueAnalysis = analyzeDialogueTurn(userMessage);
+    const dialogueInstruction = buildDialogueBoardInstruction(
+      cleanHistory,
+      userMessage,
+      userName,
+    );
     const memoryStart = now();
     const [persistedState, persistentMemory] = await Promise.all([
       loadKdmState(userId).catch(() => null),
@@ -324,7 +342,10 @@ app.post("/api/chat", async (req, res) => {
       ),
       memoryContext =
         validatedMemory
-          .map((x: any) => `${userName}: ${x.userMessage}\nKairo: ${x.reply}`)
+          .map(
+            (x: any) =>
+              `[${x.memoryScope || "epizodik"}; güven=${Number(x.dialogueAnalysis?.factConfidence ?? 0.7).toFixed(2)}] ${userName}: ${x.userMessage}\nKairo: ${x.reply}`,
+          )
           .join("\n") || "İlgili doğrulanmış anı yok.",
       sessionWorkingMemory = buildSessionWorkingMemory(
         cleanHistory,
@@ -342,6 +363,8 @@ app.post("/api/chat", async (req, res) => {
           reasoningTrace: kdm.trace,
           lastUserMessage: userMessage,
           reply,
+          memoryScope: dialogueAnalysis.memoryScope,
+          dialogueAnalysis,
         }),
         saveKntTrace({
           userId,
@@ -380,6 +403,7 @@ app.post("/api/chat", async (req, res) => {
         speechIdentity: speech,
         kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState },
         consistency,
+        dialogue: dialogueAnalysis,
         timings,
       });
       return;
@@ -394,7 +418,7 @@ app.post("/api/chat", async (req, res) => {
       userName,
       userId,
     );
-    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bunlar ne söyleyeceğini dikte etmez; yalnızca davranış sınırların ve mevcut ilişkin hakkında bağlamdır.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${dialogueInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bunlar ne söyleyeceğini dikte etmez; yalnızca davranış sınırların ve mevcut ilişkin hakkında bağlamdır.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
@@ -447,6 +471,8 @@ app.post("/api/chat", async (req, res) => {
         reasoningTrace: kdm.trace,
         lastUserMessage: userMessage,
         reply,
+        memoryScope: dialogueAnalysis.memoryScope,
+        dialogueAnalysis,
       }),
       recordKdmMetric({
         userId,
@@ -482,6 +508,7 @@ app.post("/api/chat", async (req, res) => {
       speechIdentity: speech,
       kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState },
       consistency,
+      dialogue: dialogueAnalysis,
       timings,
     });
   } catch (e: any) {
