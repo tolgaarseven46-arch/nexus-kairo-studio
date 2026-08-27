@@ -9,6 +9,7 @@ import {
   Shield,
   Activity,
   Bot,
+  Users,
 } from 'lucide-react';
 import {
   DroitExpressionMode,
@@ -23,6 +24,9 @@ interface KairoChatTabProps {
   messages: TestMessage[];
   isLoading?: boolean;
   onSendMessage: (text: string) => void;
+  participants: ReadonlyArray<{ id: string; label: string }>;
+  selectedParticipantId: string;
+  onSelectParticipant: (participantId: string) => void;
 }
 
 export const KairoChatTab: React.FC<KairoChatTabProps> = ({
@@ -31,10 +35,15 @@ export const KairoChatTab: React.FC<KairoChatTabProps> = ({
   messages,
   isLoading = false,
   onSendMessage,
+  participants,
+  selectedParticipantId,
+  onSelectParticipant,
 }) => {
   const [inputText, setInputText] = useState<string>('');
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const activeParticipant =
+    participants.find((participant) => participant.id === selectedParticipantId) ?? participants[0];
 
   // Otomatik aşağı kaydırma
   useEffect(() => {
@@ -126,6 +135,34 @@ export const KairoChatTab: React.FC<KairoChatTabProps> = ({
         </div>
       </header>
 
+      <div className="h-11 px-4 sm:px-6 border-b border-zinc-800/80 bg-zinc-950/70 flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500 mr-1">
+          <Users className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Konuşan kişi</span>
+        </div>
+        {participants.map((participant) => {
+          const selected = participant.id === selectedParticipantId;
+          return (
+            <button
+              key={participant.id}
+              type="button"
+              disabled={isLoading}
+              onClick={() => onSelectParticipant(participant.id)}
+              className={`px-3 py-1 rounded-full border text-[11px] font-mono font-semibold transition-all ${
+                selected
+                  ? 'border-cyan-400/60 bg-cyan-500/15 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.12)]'
+                  : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+              } disabled:opacity-50`}
+            >
+              {participant.label}
+            </button>
+          );
+        })}
+        <span className="ml-auto hidden sm:inline text-[10px] font-mono text-zinc-500">
+          Ayrı ilişki ve hafıza katmanı
+        </span>
+      </div>
+
       {/* ─────────────────────────────────────────────────────────────
           2. SOHBET MESAJ GEÇMİŞİ
          ───────────────────────────────────────────────────────────── */}
@@ -153,7 +190,7 @@ export const KairoChatTab: React.FC<KairoChatTabProps> = ({
             return (
               <div key={msg.id} className="flex flex-col items-end gap-1 max-w-xl ml-auto">
                 <div className="flex items-center gap-2 px-1 text-[11px] text-zinc-500">
-                  <span className="font-semibold text-zinc-300">Sen</span>
+                  <span className="font-semibold text-zinc-300">{msg.participantName || 'Sen'}</span>
                   <span className="font-mono text-[10px]">{msg.timestamp}</span>
                 </div>
                 <div className="bg-indigo-600 text-zinc-100 px-4 py-2.5 rounded-2xl rounded-tr-xs text-[13px] sm:text-sm leading-relaxed shadow-sm">
@@ -178,7 +215,9 @@ export const KairoChatTab: React.FC<KairoChatTabProps> = ({
               {/* Mesaj İçeriği */}
               <div className="flex flex-col items-start gap-1">
                 <div className="flex items-center gap-2 px-1 text-[11px] text-zinc-500">
-                  <span className="font-semibold text-zinc-200">Kairo</span>
+                  <span className="font-semibold text-zinc-200">
+                    Kairo{msg.replyToParticipantName ? ` → ${msg.replyToParticipantName}` : ''}
+                  </span>
                   <span className="font-mono text-[10px]">{msg.timestamp}</span>
                 </div>
 
@@ -229,7 +268,9 @@ export const KairoChatTab: React.FC<KairoChatTabProps> = ({
 
             <div className="flex flex-col items-start gap-1">
               <div className="flex items-center gap-2 px-1 text-[11px] text-zinc-500">
-                <span className="font-semibold text-zinc-200">Kairo</span>
+                <span className="font-semibold text-zinc-200">
+                  Kairo{activeParticipant?.label ? ` → ${activeParticipant.label}` : ''}
+                </span>
                 <span className="font-mono text-[10px] text-indigo-400">düşünüyor...</span>
               </div>
               <div className="bg-zinc-900 border border-zinc-800/80 text-zinc-400 px-4 py-2.5 rounded-2xl rounded-tl-xs text-[13px] sm:text-sm flex items-center gap-2 shadow-sm">
@@ -267,7 +308,11 @@ export const KairoChatTab: React.FC<KairoChatTabProps> = ({
             value={inputText}
             disabled={isLoading}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder={isLoading ? 'Kairo yanıt yazıyor...' : 'Kairo ile sohbet et...'}
+            placeholder={
+              isLoading
+                ? 'Kairo yanıt yazıyor...'
+                : `${activeParticipant?.label || 'Kullanıcı'} olarak yaz...`
+            }
             className="flex-1 bg-transparent border-none text-zinc-100 placeholder-zinc-500 text-xs sm:text-sm px-2 py-1.5 focus:outline-none disabled:opacity-50 select-text"
           />
 
