@@ -51,7 +51,15 @@ function getGeminiClient() {
 }
 function extractOpenRouterText(data: any) {
   const d = data?.choices?.[0]?.message?.content;
-  return typeof d === "string" ? d.trim() : "";
+  if (typeof d === "string") return d.trim();
+  if (Array.isArray(d))
+    return d
+      .map((part: any) =>
+        typeof part === "string" ? part : String(part?.text || ""),
+      )
+      .join("")
+      .trim();
+  return "";
 }
 async function callOpenRouter(messages: any[], temperature: number) {
   const key = process.env.OPENROUTER_API_KEY;
@@ -72,7 +80,7 @@ async function callOpenRouter(messages: any[], temperature: number) {
           model,
           messages,
           temperature,
-          max_tokens: 180,
+          max_tokens: model === freeModel ? 420 : 180,
         }),
       },
     );
@@ -92,7 +100,15 @@ async function callOpenRouter(messages: any[], temperature: number) {
     throw new Error(
       data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`,
     );
-  const text = extractOpenRouterText(data);
+  let text = extractOpenRouterText(data);
+  if (!text) {
+    ({ response, data } = await requestModel(freeModel));
+    if (!response.ok)
+      throw new Error(
+        data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`,
+      );
+    text = extractOpenRouterText(data);
+  }
   if (!text) throw new Error("OpenRouter boş yanıt döndürdü.");
   return text;
 }
