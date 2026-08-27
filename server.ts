@@ -223,6 +223,29 @@ function buildSessionWorkingMemory(history: any[], userMessage: string) {
     )
     .join("\n");
 }
+function sanitizeChatHistory(history: any[]) {
+  if (!Array.isArray(history)) return [];
+  const clean: any[] = [];
+  for (const item of history) {
+    const text = String(item?.text || "");
+    if (item?.sender === "droit" && /^\[Hata\]:/i.test(text)) {
+      if (clean.at(-1)?.sender === "user") clean.pop();
+      continue;
+    }
+    const previous = clean.at(-1);
+    if (
+      item?.sender === "user" &&
+      previous?.sender === "user" &&
+      previous.participantId === item.participantId &&
+      String(previous.text || "").trim() === text.trim()
+    ) {
+      clean[clean.length - 1] = item;
+      continue;
+    }
+    clean.push(item);
+  }
+  return clean;
+}
 app.get("/api/health", (_q, r) =>
   r.json({ status: "ok", timestamp: new Date().toISOString() }),
 );
@@ -276,6 +299,7 @@ app.post("/api/chat", async (req, res) => {
     } = req.body;
     if (!userMessage)
       return res.status(400).json({ error: "userMessage is required" });
+    const cleanHistory = sanitizeChatHistory(history);
     const memoryStart = now();
     const [persistedState, persistentMemory] = await Promise.all([
       loadKdmState(userId).catch(() => null),
@@ -322,7 +346,10 @@ app.post("/api/chat", async (req, res) => {
         validatedMemory
           .map((x: any) => `${userName}: ${x.userMessage}\nKairo: ${x.reply}`)
           .join("\n") || "İlgili doğrulanmış anı yok.",
-      sessionWorkingMemory = buildSessionWorkingMemory(history, userMessage);
+      sessionWorkingMemory = buildSessionWorkingMemory(
+        cleanHistory,
+        userMessage,
+      );
     kdm.trace.whoSent.userName = userName;
     if (local.handled && local.reply) {
       const reply = local.reply,
@@ -380,11 +407,11 @@ app.post("/api/chat", async (req, res) => {
     const relationship = kdm.trace.relationship;
     const socialStyle = `SOSYAL SOHBET KURALI:\nSen bir yardımcı/asistan gibi konuşmuyorsun; sosyal medyada gerçek bir arkadaş gibi mesajlaşıyorsun.\n- Varsayılan cevap 1-2 kısa cümle olsun. Konu gerçekten gerektirirse uzat.\n- Kullanıcı istemedikçe madde listesi, rehber, seçenek menüsü, özet veya tavsiye paketi verme.\n- Her cevabı soruyla bitirme. Soru sormak zorunda değilsin.\n- \"istersen\", \"yardımcı olabilirim\", \"anlatmak ister misin\", \"şöyle yapalım\" gibi asistan kalıplarını alışkanlık olarak kullanma.\n- Kullanıcı sadece bir duygu/durum paylaşıyorsa önce onunla sohbet et; hemen problemi çözmeye çalışma.\n- Gerektiğinde kısa, eksik, gündelik cümle kurabilirsin. Argo ve emoji yalnızca konuşma kimliğin uygunsa doğal miktarda kullanılabilir.\n- Kendi Droit oluşunu sürekli hatırlatma; CPU, log, sunucu, veri merkezi gibi yapay persona şakalarını durduk yere üretme.\n- KDM verileri iç kararındır. Bunları açıklama, puanları söyleme veya analiz raporu gibi konuşma.\n- Hafızayı yalnızca gerçekten ilgiliyse kullan; sırf bildiğini göstermek için eski konuyu açma.\n- Geçmiş konuşma/anı sorularında yalnızca aşağıdaki oturum veya doğrulanmış hafıza kayıtlarına dayan. Kayıt desteklemiyorsa ayrıntı UYDURMA; doğal biçimde hatırlamadığını veya emin olmadığını söyle.\n- En doğru/yararlı cevabı vermek zorunda değilsin. Doğal bir sosyal tepki yeterlidir.\n- Kullanıcının mesajındaki her ayrıntıya tek tek cevap vermek zorunda değilsin.`;
     const groundingInstruction = buildKairoGroundingInstruction(
-      history,
+      cleanHistory,
       userMessage,
     );
     const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\nAKTİF KONUŞAN: ${userName} (${userId}). Son mesaj bu kişiden geldi. Yanıtını ona ver; ortak sohbet geçmişindeki diğer kişilerin sözlerini bu kişiye ait sanma. Her kişinin ilişki ve kalıcı hafıza katmanı ayrıdır.\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bunlar ne söyleyeceğini dikte etmez; yalnızca davranış sınırların ve mevcut ilişkin hakkında bağlamdır.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
-    const msgs = history.slice(-8).map((x: any) => ({
+    const msgs = cleanHistory.slice(-8).map((x: any) => ({
       role: x.sender === "user" ? "user" : "assistant",
       content:
         x.sender === "user"
@@ -394,7 +421,11 @@ app.post("/api/chat", async (req, res) => {
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
     let reply = await generateText(system, msgs, 0.78, provider);
-    let groundingIssues = findKairoGroundingIssues(reply, history, userMessage);
+    let groundingIssues = findKairoGroundingIssues(
+      reply,
+      cleanHistory,
+      userMessage,
+    );
     let repairAttempts = 0;
     if (groundingIssues.length && now() - aiStart < 24000) {
       try {
@@ -411,7 +442,7 @@ app.post("/api/chat", async (req, res) => {
         if (!repairedReply.trim()) throw new Error("KDM onarım zaman aşımı");
         const repairedIssues = findKairoGroundingIssues(
           repairedReply,
-          history,
+          cleanHistory,
           userMessage,
         );
         if (repairedIssues.length < groundingIssues.length) {
