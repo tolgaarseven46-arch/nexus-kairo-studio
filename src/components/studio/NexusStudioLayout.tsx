@@ -220,7 +220,6 @@ export const NexusStudioLayout: React.FC = () => {
       setMessages((p) => [...p, userMsg]);
       setIsAiLoading(true);
       setLastTimings(null);
-      void persistMessageSafely(userMsg);
       try {
         const response = await droitChatService.sendMessage({
           userMessage: userText.trim(),
@@ -254,6 +253,7 @@ export const NexusStudioLayout: React.FC = () => {
           }),
         };
         setMessages((p) => [...p, dm]);
+        void persistMessageSafely(userMsg);
         void persistMessageSafely(dm);
       } catch (e: any) {
         setMessages((p) => [
