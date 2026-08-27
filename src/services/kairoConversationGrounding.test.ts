@@ -4,6 +4,7 @@ import {
   buildKairoGroundingInstruction,
   findKairoGroundingIssues,
   formatKairoHistoryForModel,
+  sanitizeKairoReplyText,
   sanitizeKairoChatHistory,
 } from "./kairoConversationGrounding";
 
@@ -164,5 +165,12 @@ describe("Kaira conversation grounding", () => {
     expect(instruction).toContain("AKTİF KONUŞAN: Mert (test_mert)");
     expect(instruction).toContain('"Ben/bana/benim"');
     expect(instruction).toContain("ilişki ve kalıcı hafıza katmanı ayrıdır");
+  });
+
+  it("removes internal reply-target labels from the visible answer", () => {
+    expect(
+      sanitizeKairoReplyText("[Kairo → Ali]: Kanka son durum net değil."),
+    ).toBe("Kanka son durum net değil.");
+    expect(sanitizeKairoReplyText("Kairo: Selam kanka.")).toBe("Selam kanka.");
   });
 });
