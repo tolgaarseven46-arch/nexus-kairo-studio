@@ -17,11 +17,13 @@ import {
   buildKairoGroundingInstruction,
   findKairoGroundingIssues,
   formatKairoHistoryForModel,
+  sanitizeKairoReplyText,
   sanitizeKairoChatHistory,
 } from "./src/services/kairoConversationGrounding";
 import {
   analyzeDialogueTurn,
   buildDialogueBoardInstruction,
+  findDialogueAttributionIssues,
 } from "./src/services/kairoDialogueChaosEngine";
 import { recordKdmMetric } from "./src/services/kdmMetricsService";
 import {
@@ -422,31 +424,43 @@ app.post("/api/chat", async (req, res) => {
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
-    let reply = await generateText(system, msgs, 0.78, provider);
-    let groundingIssues = findKairoGroundingIssues(
-      reply,
-      cleanHistory,
-      userMessage,
+    let reply = sanitizeKairoReplyText(
+      await generateText(system, msgs, 0.78, provider),
     );
+    let groundingIssues = [
+      ...findKairoGroundingIssues(reply, cleanHistory, userMessage),
+      ...findDialogueAttributionIssues(
+        reply,
+        cleanHistory,
+        userMessage,
+        userName,
+      ),
+    ];
     let repairAttempts = 0;
     if (groundingIssues.length && now() - aiStart < 24000) {
       try {
         repairAttempts = 1;
-        const repairedReply = await Promise.race([
-          generateText(
-            `${system}\nDÜZELTME KAPISI: Önceki taslak şu nedenle reddedildi: ${groundingIssues.join("; ")}. Aynı doğal konuşma tonunu koruyarak yalnızca bu hataları düzelt.`,
-            msgs,
-            0.35,
-            provider,
-          ),
-          sleep(8000, ""),
-        ]);
-        if (!repairedReply.trim()) throw new Error("KDM onarım zaman aşımı");
-        const repairedIssues = findKairoGroundingIssues(
-          repairedReply,
-          cleanHistory,
-          userMessage,
+        const repairedReply = sanitizeKairoReplyText(
+          await Promise.race([
+            generateText(
+              `${system}\nDÜZELTME KAPISI: Önceki taslak şu nedenle reddedildi: ${groundingIssues.join("; ")}. Aynı doğal konuşma tonunu koruyarak yalnızca bu hataları düzelt.`,
+              msgs,
+              0.35,
+              provider,
+            ),
+            sleep(8000, ""),
+          ]),
         );
+        if (!repairedReply.trim()) throw new Error("KDM onarım zaman aşımı");
+        const repairedIssues = [
+          ...findKairoGroundingIssues(repairedReply, cleanHistory, userMessage),
+          ...findDialogueAttributionIssues(
+            repairedReply,
+            cleanHistory,
+            userMessage,
+            userName,
+          ),
+        ];
         if (repairedIssues.length < groundingIssues.length) {
           reply = repairedReply;
           groundingIssues = repairedIssues;

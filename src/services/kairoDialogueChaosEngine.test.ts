@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   analyzeDialogueTurn,
+  buildDialogueClaimLedger,
   buildDialogueBoardInstruction,
+  findDialogueAttributionIssues,
 } from "./kairoDialogueChaosEngine";
 
 describe("Kaira complex dialogue engine", () => {
@@ -62,5 +64,75 @@ describe("Kaira complex dialogue engine", () => {
     expect(instruction).toContain(
       "Her ayrıntıya cevap vermek zorunda değilsin",
     );
+  });
+
+  it("keeps the claim source separate from the person doing the action", () => {
+    const history = [
+      {
+        sender: "user",
+        participantName: "Ali",
+        text: "Mert yarın müdürle konuşup istifa edecekmiş.",
+      },
+      {
+        sender: "user",
+        participantName: "Mert",
+        text: "yok lan o ben değildim, Ali maaş zammını konuşacaktı herhalde",
+      },
+    ];
+
+    const ledger = buildDialogueClaimLedger(
+      history,
+      "neyse Mert yarın ne yapacaktı?",
+      "Ali",
+    );
+    expect(ledger).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "Ali",
+          subject: "Mert",
+          status: "denied",
+        }),
+        expect.objectContaining({
+          source: "Mert",
+          subject: "Ali",
+          status: "uncertain",
+        }),
+      ]),
+    );
+  });
+
+  it("rejects assigning Ali's salary discussion to Mert", () => {
+    const history = [
+      {
+        sender: "user",
+        participantName: "Ali",
+        text: "Mert yarın müdürle konuşup istifa edecekmiş.",
+      },
+      {
+        sender: "user",
+        participantName: "Mert",
+        text: "yok lan o ben değildim, Ali maaş zammını konuşacaktı herhalde",
+      },
+    ];
+    const question = "neyse Mert yarın ne yapacaktı?";
+
+    expect(
+      findDialogueAttributionIssues(
+        "Mert yarın maaş zammını konuşacak gibi duruyor.",
+        history,
+        question,
+        "Ali",
+      ),
+    ).toContain(
+      "maaş konusu Mert yerine başka bir kişiye ait kaynaktan yanlış aktarıldı",
+    );
+    expect(
+      findDialogueAttributionIssues(
+        "Mert için net bir plan kalmadı; istifa iddiasını reddetti. Maaş konusu Ali'nindi ve o da kesin değildi.",
+        history,
+        question,
+        "Ali",
+      ),
+    ).toEqual([]);
   });
 });
