@@ -225,11 +225,11 @@ export function findDialogueAttributionIssues(
   const issues: string[] = [];
   const clauses = reply.split(/[.!?;\n]+/).filter(Boolean);
   for (const topic of ACTION_TOPICS) {
-    const associatesTarget = clauses.some(
+    const targetTopicClauses = clauses.filter(
       (clause) =>
         participantInText(clause, target) && topic.pattern.test(clause),
     );
-    if (!associatesTarget) continue;
+    if (!targetTopicClauses.length) continue;
     const targetHasTopic = ledger.some(
       (claim) =>
         claim.subject === target &&
@@ -244,6 +244,26 @@ export function findDialogueAttributionIssues(
         claim.status !== "absurd" &&
         topic.pattern.test(claim.text),
     );
+    const targetDeniedTopic = ledger.some(
+      (claim) =>
+        claim.subject === target &&
+        claim.status === "denied" &&
+        topic.pattern.test(claim.text),
+    );
+    const revivesDeniedTopic =
+      targetDeniedTopic &&
+      targetTopicClauses.some(
+        (clause) =>
+          !/\b(dedi|dedin|demiş|iddia|reddetti|yalanladı|yok|değil)\b/i.test(
+            clause,
+          ),
+      );
+    if (revivesDeniedTopic) {
+      issues.push(
+        `${target} tarafından reddedilen ${topic.id} iddiası yeni tahmin gibi yeniden üretildi`,
+      );
+      continue;
+    }
     if (!targetHasTopic && otherHasTopic) {
       issues.push(
         `${topic.id} konusu ${target} yerine başka bir kişiye ait kaynaktan yanlış aktarıldı`,
@@ -298,6 +318,7 @@ KURALLAR:
 - Sohbetin tek ve düzgün bir konu izlemesi gerekmez. Birden fazla konu dalı açık kalabilir.
 - Düzeltmeyi, şakayı, aktarılan sözü ve belirsiz ifadeyi kesin gerçek gibi birleştirme.
 - İddia defterinde kaynak yalnızca sözü söyleyendir; eylemi yapan kişi "özne"dir. Kaynak ile özneyi ASLA birbirine çevirme. "denied" kaydı geçerli plan değildir.
+- Geçmişi hatırlama sorusunda özneye ait etkin iddia kalmadıysa "net bilgi yok" de. Reddedilmiş veya desteksiz bir planı mizah, tahmin ya da "büyük ihtimalle" kalıbıyla yeniden UYDURMA.
 - "session" işaretli absürt/gürültülü mesajları kalıcı gerçek sayma; akış içinde şakaya katılabilirsin.
 - Her ayrıntıya cevap vermek zorunda değilsin. En doğal tek sosyal hareketi seç: tepki, soru, görüş, şaka, düzeltme veya kısa sessiz kabul.
 - Karışıklık önemsizse akışı bozma. Ancak yanlış anlamak kişi, plan veya önemli olay bilgisini değiştirecekse kısa bir netleştirme sor.`;
