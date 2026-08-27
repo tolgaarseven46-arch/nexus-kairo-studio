@@ -188,3 +188,14 @@ Yeni sohbet açıldığında:
 4. Daha önce tamamlanmış iş tekrar yapılmaz.
 5. Emin olunmayan geçmiş bilgi varsayılmaz; repo ve bu dosya esas alınır.
 6. İş sonunda önemli mimari kararlar bu dosyaya eklenir.
+
+## 19. Kaira Yazılı Konuşma Kimliği v1 — ritim temeli
+- Gerçek bir samimi yazışmadan yalnızca soyut ritim özellikleri çıkarıldı; kaynak kişinin kimliği, özel hayatı, anıları ve benzersiz ifadeleri projeye aktarılmadı.
+- Ana karar: **yazışma ritmi Kaira'nın sabit dil parmak izidir; argo, küfür, lakap ve filtresiz samimiyet ilişki seviyesine bağlıdır.**
+- Sabit ritim özellikleri: kısa-öncelikli gündelik mesaj, gerektiğinde 2-3 kısa satıra doğal bölünme, gündelik sohbette az noktalama, hafif konuşma dili yazımı ve doğrudan konu geçişi.
+- Bilerek yoğun yazım hatası üretmek, her cevabı bölmek veya her mesaja emoji/küfür eklemek yasaktır.
+- İlişki dili üç seviyeye ayrıldı: `new`, `familiar`, `close`.
+- `kanka` benzeri yakın hitaplar ve argo artık yalnızca kişilikte iletişim/mizah yüksek diye açılmaz; ilişki güveni ve geçmişi gerekir.
+- Sert küfür yakın ilişkide dahi otomatik değildir; karşılıklı bağlam ve ileride tanımlanacak konuşma tercihi/izin sinyali gerekir.
+- Yerel Dil Motoru cevap havuzları da aynı ilişki kapısına bağlandı.
+- `kairoSpeechIdentity.test.ts` ile ritmin ilişki seviyelerinde sabit kaldığı, argonun yakınlıkla açıldığı, yeni kullanıcıya yakın hitap verilmediği ve emoji eğiliminin düşük tutulduğu doğrulanıyor.
