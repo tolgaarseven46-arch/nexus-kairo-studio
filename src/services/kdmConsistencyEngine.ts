@@ -249,6 +249,8 @@ export function analyzeKdmInteraction(
     calculatedDays,
   );
   const interactionCount = Math.max(0, relationship.interactionCount || 0);
+  const nextInteractionCount = interactionCount + 1;
+  const interactionAt = new Date().toISOString();
   const baseWarmth = clamp(relationship.warmth ?? 50);
   const baseTrust = clamp(relationship.trust ?? 50);
   const positiveEvents = Math.max(0, relationship.positiveEvents || 0);
@@ -427,6 +429,8 @@ export function analyzeKdmInteraction(
     calmness: clamp((state.calmness ?? 70) + calmnessDelta),
     relationship: {
       ...relationship,
+      lastInteractionAt: interactionAt,
+      interactionCount: nextInteractionCount,
       familiarityDays,
       warmth: warmthAfter,
       trust: trustAfter,
@@ -477,7 +481,7 @@ export function analyzeKdmInteraction(
             : "Mesafeli",
       note: `${familiarityDays} gün; güven %${trustAfter}; çatışma %${conflictAfter}; kırgınlık %${hurtAfter}; kişilik etkisi x${personalityImpact.toFixed(2)}.${targetNote}`,
       familiarityDays,
-      interactionCount,
+      interactionCount: nextInteractionCount,
       toleranceMultiplier,
       trustScore: trustAfter,
       conflictScore: conflictAfter,

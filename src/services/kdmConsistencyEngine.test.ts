@@ -105,6 +105,32 @@ describe("KDM response consistency gate", () => {
     expect(result.trace.messageInterpretation.sentiment).toBe("nötr");
   });
 
+  it("advances one continuous relationship interaction per message", () => {
+    const first = analyzeKdmInteraction(
+      "naber kaira",
+      undefined,
+      relationshipState(),
+    );
+    const second = analyzeKdmInteraction(
+      "tanışalım mı",
+      undefined,
+      first.nextDynamicState,
+    );
+    const third = analyzeKdmInteraction(
+      "ben öğrenciyim",
+      undefined,
+      second.nextDynamicState,
+    );
+
+    expect(first.trace.whoSent.isNewUser).toBe(true);
+    expect(second.trace.whoSent.isNewUser).toBe(false);
+    expect(third.trace.whoSent.isNewUser).toBe(false);
+    expect(first.nextDynamicState.relationship?.interactionCount).toBe(1);
+    expect(second.nextDynamicState.relationship?.interactionCount).toBe(2);
+    expect(third.nextDynamicState.relationship?.interactionCount).toBe(3);
+    expect(third.trace.relationship.interactionCount).toBe(3);
+  });
+
   it.each([
     "hiç havamda değilim",
     "kafam bozuk",
