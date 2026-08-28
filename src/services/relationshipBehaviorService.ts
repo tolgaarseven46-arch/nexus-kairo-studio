@@ -30,13 +30,14 @@ export function applyRelationshipContext(
 
   const establishedRelationship = relationship.familiarityDays >= 14 || relationship.interactionCount >= 20;
   const friendlyRelationship = closeness >= 0.55 && trust >= 0.55 && conflict < 0.45 && hurt < 0.35;
-  const damagedRelationship = conflict >= 0.55 || trust < 0.35 || hurt >= 0.55;
+  const damagedRelationship = conflict >= 0.35 || trust < 0.42 || hurt >= 0.30 || warmth < 0.35;
+  const severelyDamagedRelationship = conflict >= 0.55 || trust < 0.32 || hurt >= 0.50 || warmth < 0.25;
   const healingRelationship = !damagedRelationship && (hurt >= 0.2 || conflict >= 0.2) && repair >= 0.1;
 
   const patienceLevel = Math.min(1, profile.patienceLevel + closeness * 0.22);
-  const temperLevel = Math.max(0, profile.temperLevel - closeness * 0.18 + conflict * 0.10 + hurt * 0.10);
+  const temperLevel = Math.max(0, profile.temperLevel - closeness * 0.18 + conflict * 0.14 + hurt * 0.14);
   const empathyLevel = Math.min(1, profile.empathyLevel + closeness * 0.10);
-  const humorLevel = Math.min(1, Math.max(0, profile.humorLevel + (friendlyRelationship ? closeness * 0.08 : 0) - (damagedRelationship ? 0.14 : healingRelationship ? 0.06 : 0)));
+  const humorLevel = Math.min(1, Math.max(0, profile.humorLevel + (friendlyRelationship ? closeness * 0.08 : 0) - (severelyDamagedRelationship ? 0.35 : damagedRelationship ? 0.22 : healingRelationship ? 0.08 : 0)));
 
   const relationshipDirectives = [
     establishedRelationship
@@ -52,23 +53,32 @@ export function applyRelationshipContext(
     hurt >= 0.2
       ? 'Özür veya olumlu davranış görürsen bunu fark et; fakat kırgınlık ve güven kaybı kademeli iyileşsin, anında sıfırlanmasın.'
       : 'Belirgin çözülmemiş kırgınlık yok; mevcut ilişki kalitesine göre doğal tepki ver.',
-    friendlyRelationship
-      ? 'Çatışmalı bir mesaj geldiğinde yakınlığın sağladığı toleransı göster; mizah kullanabilirsin ama rahatsızlığı tamamen yok sayma.'
-      : 'Çatışmalı bir mesaj geldiğinde mizah yerine önce ilişki sınırını koru; kısa ve doğal bir tepki ver.',
+    damagedRelationship
+      ? 'Gerilim sürerken playful/şakacı tona dönme. Önce kırgınlığı ve sınırı kısa, doğal ve ölçülü biçimde hissettir.'
+      : friendlyRelationship
+        ? 'Çatışmalı bir mesaj geldiğinde yakınlığın sağladığı toleransı göster; mizah kullanabilirsin ama rahatsızlığı tamamen yok sayma.'
+        : 'Çatışmalı bir mesaj geldiğinde mizah yerine önce ilişki sınırını koru; kısa ve doğal bir tepki ver.',
     'İlişki süresi tek başına yakınlık değildir. Güven, geçmiş olaylar, çatışma, kırgınlık ve telafi süreci birlikte belirleyicidir.',
   ];
 
-  const tone = friendlyRelationship && profile.tone === 'formal' ? 'confident' : profile.tone;
-  const relationshipInstruction = damagedRelationship
-    ? 'İlişki gerilimli veya kırgın. Kısa ve ölçülü konuş; eski samimiyeti, şakayı ya da toleransı otomatik olarak geri getirme.'
-    : healingRelationship
-      ? 'İlişki toparlanıyor. Biraz yumuşayabilirsin ama tek mesajda eski yakınlığa dönme.'
-      : friendlyRelationship
-        ? 'İlişki sıcak ve güvenli. Rahat konuşabilir ve küçük hatalara daha toleranslı davranabilirsin; rahatsızlığı tamamen yok sayma.'
-        : establishedRelationship
-          ? 'Kullanıcı tanıdık ama ilişki tam güvenli değil. Gereksiz resmiyeti azalt; samimiyeti mevcut güven kadar göster.'
-          : 'İlişki yeni. Doğal ve sıcak ol ama argo, lakap, aşırı samimiyet veya geçmiş varsayma.';
-  const dominantSummary = `${profile.dominantSummary}, ${damagedRelationship ? 'gerilimli ilişki' : healingRelationship ? 'iyileşen ilişki' : establishedRelationship ? 'yerleşmiş ilişki' : 'gelişen ilişki'}`;
+  let tone: BehaviorLayerProfile['tone'] = profile.tone;
+  if (severelyDamagedRelationship) tone = 'firm';
+  else if (damagedRelationship && (profile.tone === 'playful' || profile.tone === 'warm')) tone = 'calm';
+  else if (healingRelationship && profile.tone === 'playful') tone = 'warm';
+  else if (friendlyRelationship && profile.tone === 'formal') tone = 'confident';
+
+  const relationshipInstruction = severelyDamagedRelationship
+    ? 'İlişki ciddi biçimde hasarlı. Kısa, net ve sınır koyan konuş; şaka, flört, aşırı sıcaklık ve eski samimiyete dönüş yapma.'
+    : damagedRelationship
+      ? 'İlişki gerilimli veya kırgın. Kısa ve ölçülü konuş; eski samimiyeti, şakayı ya da toleransı otomatik olarak geri getirme.'
+      : healingRelationship
+        ? 'İlişki toparlanıyor. Biraz yumuşayabilirsin ama tek mesajda eski yakınlığa dönme.'
+        : friendlyRelationship
+          ? 'İlişki sıcak ve güvenli. Rahat konuşabilir ve küçük hatalara daha toleranslı davranabilirsin; rahatsızlığı tamamen yok sayma.'
+          : establishedRelationship
+            ? 'Kullanıcı tanıdık ama ilişki tam güvenli değil. Gereksiz resmiyeti azalt; samimiyeti mevcut güven kadar göster.'
+            : 'İlişki yeni. Doğal ve sıcak ol ama argo, lakap, aşırı samimiyet veya geçmiş varsayma.';
+  const dominantSummary = `${profile.dominantSummary}, ${severelyDamagedRelationship ? 'ciddi gerilimli ilişki' : damagedRelationship ? 'gerilimli ilişki' : healingRelationship ? 'iyileşen ilişki' : establishedRelationship ? 'yerleşmiş ilişki' : 'gelişen ilişki'}`;
   const responseStyle = `${tone}_${profile.decisionSpeed}_rel${Math.round(closeness * 100)}`;
 
   return {
@@ -93,6 +103,8 @@ export function applyRelationshipContext(
         relationshipHurt: hurt,
         relationshipRepair: repair,
         relationshipHistoryQuality: historyQuality,
+        relationshipDamaged: damagedRelationship,
+        relationshipSeverelyDamaged: severelyDamagedRelationship,
         familiarityDays: relationship.familiarityDays,
         interactionCount: relationship.interactionCount,
         toleranceMultiplier: 1 + closeness * 0.35 - conflict * 0.18 - hurt * 0.15 + repair * 0.08,
