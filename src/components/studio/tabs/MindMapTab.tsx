@@ -1,14 +1,24 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  BrainCircuit,
-  Send,
-  Loader2,
   Activity,
-  Gauge,
-  Copy,
+  BrainCircuit,
   Check,
-  Trash2,
+  ChevronDown,
+  CircleAlert,
+  Clock3,
+  Copy,
+  Database,
+  Gauge,
+  HeartHandshake,
+  Loader2,
+  MessageSquareText,
+  MoreHorizontal,
   RotateCcw,
+  Send,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+  X,
 } from "lucide-react";
 import {
   DroitDynamicState,
@@ -17,8 +27,12 @@ import {
   TestMessage,
 } from "../../../types/nexus";
 import type { KairoTimingMetrics } from "../../../services/droitChatService";
+import type { ResponseConsistencyResult } from "../../../services/kairoResponseConsistency";
+
 type RelationshipTestLevel = "new" | "familiar" | "close";
+type InspectorTab = "decision" | "relationship" | "memory" | "performance";
 type MindMapSendOptions = { relationshipLevel?: RelationshipTestLevel };
+
 type Props = {
   personality: DroitPersonalityTraits;
   dynamicState: DroitDynamicState;
@@ -27,6 +41,7 @@ type Props = {
   isLoading: boolean;
   timings: KairoTimingMetrics | null;
   providerUsed: string | null;
+  consistency: ResponseConsistencyResult | null;
   participants: ReadonlyArray<{ id: string; label: string }>;
   selectedParticipantId: string;
   onSelectParticipant: (id: string) => void;
@@ -34,53 +49,56 @@ type Props = {
   onResetTestUser: () => void | Promise<void>;
   onClearAllTestData: () => void | Promise<void>;
 };
-type TraceScores = {
-  input: number;
-  intent: number;
-  memory: number;
-  emotion: number;
-  relation: number;
-  personality: number;
-  decision: number;
-  ai: number;
-};
-type TraceLog = {
-  id: string;
-  time: string;
-  message: string;
-  scores: TraceScores;
-  intent: string;
-  sentiment: string;
-  timings?: KairoTimingMetrics;
-};
-const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
+
 const fmt = (ms: number) =>
   ms >= 1000 ? `${(ms / 1000).toFixed(2)} sn` : `${ms} ms`;
-const Node = ({
+
+const relationshipLabels: Record<RelationshipTestLevel, string> = {
+  new: "Yeni",
+  familiar: "Tanıdık",
+  close: "Çok yakın",
+};
+
+const sourceLabel = (
+  providerUsed: string | null,
+  timings: KairoTimingMetrics | null,
+) => {
+  if (providerUsed === "local_language" || timings?.aiMs === 0)
+    return "Yerel Dil Motoru";
+  if (providerUsed === "gemini") return "Gemini";
+  if (providerUsed === "openrouter") return "OpenRouter";
+  return "Henüz yanıt yok";
+};
+
+const DataRow = ({
   label,
   value,
-  items,
+  accent = false,
 }: {
   label: string;
-  value: number;
-  items: string[];
+  value: React.ReactNode;
+  accent?: boolean;
 }) => (
-  <div
-    className={`rounded-xl border bg-zinc-950/80 p-3 ${value >= 80 ? "border-red-500/60 text-red-300" : value >= 60 ? "border-orange-500/50 text-orange-300" : value >= 40 ? "border-yellow-500/40 text-yellow-200" : "border-cyan-500/30 text-cyan-300"}`}
-  >
-    <div className="flex justify-between text-[10px] font-mono font-bold">
-      <span>{label}</span>
-      <span className="text-base">{value}</span>
-    </div>
-    <div className="mt-2 space-y-1">
-      {items.map((x, i) => (
-        <div key={i} className="text-[9px] font-mono text-zinc-400">
-          • {x}
-        </div>
-      ))}
-    </div>
+  <div className="flex items-start justify-between gap-4 border-b border-zinc-800/70 py-2.5 last:border-0">
+    <span className="text-[10px] font-mono text-zinc-500">{label}</span>
+    <span
+      className={`max-w-[65%] text-right text-[11px] font-medium ${accent ? "text-violet-300" : "text-zinc-200"}`}
+    >
+      {value}
+    </span>
   </div>
 );
+
+const EmptyInspector = () => (
+  <div className="flex h-full min-h-52 flex-col items-center justify-center px-8 text-center">
+    <BrainCircuit className="mb-3 h-6 w-6 text-zinc-700" />
+    <p className="text-xs text-zinc-400">İlk mesajı gönder.</p>
+    <p className="mt-1 text-[10px] font-mono leading-5 text-zinc-600">
+      KDM kararı, ilişki değişimi, hafıza ve süreler burada görünecek.
+    </p>
+  </div>
+);
+
 export const MindMapTab: React.FC<Props> = ({
   personality,
   dynamicState,
@@ -89,6 +107,7 @@ export const MindMapTab: React.FC<Props> = ({
   isLoading,
   timings,
   providerUsed,
+  consistency,
   participants,
   selectedParticipantId,
   onSelectParticipant,
@@ -100,437 +119,509 @@ export const MindMapTab: React.FC<Props> = ({
   const [lastSubmittedMessage, setLastSubmittedMessage] = useState("");
   const [relationshipLevel, setRelationshipLevel] =
     useState<RelationshipTestLevel>("new");
+  const [inspectorTab, setInspectorTab] =
+    useState<InspectorTab>("decision");
   const [copied, setCopied] = useState(false);
+  const [showDangerMenu, setShowDangerMenu] = useState(false);
+  const [showRawTrace, setShowRawTrace] = useState(false);
+
   const activeParticipant =
-    participants.find(
-      (participant) => participant.id === selectedParticipantId,
-    ) ?? participants[0];
-  const [logs, setLogs] = useState<TraceLog[]>(() => {
-    try {
-      return JSON.parse(
-        localStorage.getItem("kaira_neural_trace_logs") || "[]",
-      );
-    } catch {
-      return [];
-    }
-  });
-  const lastLoggedReply = useRef("");
-  const r = dynamicState.relationship;
-  const scores = useMemo<TraceScores>(
-    () => ({
-      input: 35,
-      intent: clamp(
-        reasoningTrace.messageInterpretation.sentiment === "negatif"
-          ? 85
-          : reasoningTrace.messageInterpretation.intent === "genel_sohbet"
-            ? 35
-            : 60,
-      ),
-      memory: clamp(
-        25 +
-          (r?.repeatedNegativeCount || 0) * 15 +
-          (r?.interactionCount || 0) / 2,
-      ),
-      emotion: clamp(
-        dynamicState.anger * 0.45 +
-          dynamicState.stress * 0.25 +
-          (100 - dynamicState.calmness) * 0.3,
-      ),
-      relation: clamp(
-        (r?.hurtScore || 0) * 0.35 +
-          (r?.conflictScore || 0) * 0.35 +
-          (100 - (r?.trust || 50)) * 0.3,
-      ),
-      personality: clamp(
-        (personality.emotionalSensitivity +
-          personality.anger +
-          (100 - personality.patience)) /
-          3,
-      ),
-      decision: clamp(
-        45 + (r?.conflictScore || 0) * 0.35 + (r?.hurtScore || 0) * 0.2,
-      ),
-      ai: isLoading ? 100 : timings?.aiMs === 0 ? 0 : reasoningTrace ? 75 : 0,
-    }),
-    [personality, dynamicState, reasoningTrace, isLoading, r, timings],
+    participants.find((item) => item.id === selectedParticipantId) ??
+    participants[0];
+  const relationship = dynamicState.relationship;
+  const lastUser = useMemo(
+    () => [...messages].reverse().find((message) => message.sender === "user"),
+    [messages],
   );
-  useEffect(() => {
-    if (isLoading) return;
-    const reply = [...messages].reverse().find((m) => m.sender === "droit"),
-      idx = reply ? messages.findIndex((m) => m.id === reply.id) : -1;
-    if (!reply || idx < 0 || reply.id === lastLoggedReply.current) return;
-    const user = [...messages.slice(0, idx)]
-      .reverse()
-      .find((m) => m.sender === "user");
-    if (!user) return;
-    lastLoggedReply.current = reply.id;
-    const entry: TraceLog = {
-      id: reply.id,
-      time: reply.timestamp,
-      message: user.text,
-      scores: { ...scores, ai: timings?.aiMs === 0 ? 0 : 75 },
-      intent: reasoningTrace.messageInterpretation.intent,
-      sentiment: reasoningTrace.messageInterpretation.sentiment,
-      ...(timings ? { timings } : {}),
-    };
-    setLogs((p) => {
-      const n = [entry, ...p].slice(0, 100);
-      try {
-        localStorage.setItem("kaira_neural_trace_logs", JSON.stringify(n));
-      } catch {}
-      return n;
-    });
-  }, [isLoading, messages, reasoningTrace, scores, timings]);
+  const lastReply = useMemo(
+    () => [...messages].reverse().find((message) => message.sender === "droit"),
+    [messages],
+  );
+  const hasResult = Boolean(lastUser && lastReply && timings);
+  const responseSource = sourceLabel(providerUsed, timings);
+
   const submit = () => {
-    if (!text.trim() || isLoading) return;
     const submitted = text.trim();
+    if (!submitted || isLoading) return;
     setLastSubmittedMessage(submitted);
     onSendMessage(submitted, { relationshipLevel });
     setText("");
   };
-  const presets = [
-    "bugün moralim biraz bozuk ya",
-    "yine bütün işi son dakikaya bıraktım hahah",
-    "ne anlatıyorsun ya hiçbir şey anlamadım",
-    "naber",
-  ];
-  const timingItems = timings
-    ? ([
-        ["İstemci hazırlık", timings.clientPrepMs],
-        ["Hafıza / Firestore", timings.memoryMs],
-        ["KDM + konuşma kimliği", timings.kdmMs],
-        ["AI / model", timings.aiMs],
-        ["Kayıt + doğrulama", timings.postProcessMs],
-        ["Ağ / diğer", timings.networkAndOverheadMs],
-      ] as const)
-    : [];
+
   const copyReport = async () => {
-    const lastUser = [...messages].reverse().find((m) => m.sender === "user");
-    const lastKairo = [...messages].reverse().find((m) => m.sender === "droit");
-    const sourceLabel =
-      providerUsed === "local_language" ? "Yerel Dil Motoru" : "AI";
     const interactionCount =
-      reasoningTrace.relationship.interactionCount ?? r?.interactionCount ?? 0;
-    const isNewUser = reasoningTrace.whoSent.isNewUser;
-    const report = `KAIRA KNT DEBUG RAPORU\nMesaj: ${lastUser?.text || lastSubmittedMessage || "-"}\nKonuşan: ${lastUser?.participantName || activeParticipant?.label || "-"}\nYanıt: ${lastKairo?.text || "-"}\nYanıt kaynağı: ${sourceLabel}\nNiyet: ${reasoningTrace.messageInterpretation.intent}\nDuygu sinyali: ${reasoningTrace.messageInterpretation.sentiment}\nOturum mesaj sayısı: ${interactionCount}\nYeni kullanıcı: ${isNewUser ? "Evet" : "Hayır"}\nAktivasyonlar: ÖnBeyin=${scores.input}, Niyet=${scores.intent}, Hafıza=${scores.memory}, Duygu=${scores.emotion}, İlişki=${scores.relation}, Kişilik=${scores.personality}, Karar=${scores.decision}, AI=${scores.ai}\nİlişki: güven=${r?.trust ?? 50}, sıcaklık=${r?.warmth ?? 50}, kırgınlık=${r?.hurtScore || 0}, çatışma=${r?.conflictScore || 0}, tekrar=${r?.repeatedNegativeCount || 0}\nSüreler: ${timings ? `istemci=${timings.clientPrepMs}ms, hafıza=${timings.memoryMs}ms, KDM=${timings.kdmMs}ms, AI=${timings.aiMs}ms, kayıt=${timings.postProcessMs}ms, ağ=${timings.networkAndOverheadMs}ms, toplam=${timings.totalMs}ms` : "ölçüm yok"}`;
+      reasoningTrace.relationship.interactionCount ??
+      relationship?.interactionCount ??
+      0;
+    const report = `KAIRA KNT DEBUG RAPORU\nMesaj: ${lastUser?.text || lastSubmittedMessage || "-"}\nKonuşan: ${lastUser?.participantName || activeParticipant?.label || "-"}\nYanıt: ${lastReply?.text || "-"}\nYanıt kaynağı: ${responseSource}\nNiyet: ${reasoningTrace.messageInterpretation.intent}\nDuygu sinyali: ${reasoningTrace.messageInterpretation.sentiment}\nKarar tonu: ${reasoningTrace.decision.chosenTone}\nOturum mesaj sayısı: ${interactionCount}\nYeni kullanıcı: ${reasoningTrace.whoSent.isNewUser ? "Evet" : "Hayır"}\nİlişki: güven=${relationship?.trust ?? 50}, sıcaklık=${relationship?.warmth ?? reasoningTrace.relationship.warmthScore}, kırgınlık=${relationship?.hurtScore || 0}, çatışma=${relationship?.conflictScore || 0}, tekrar=${relationship?.repeatedNegativeCount || 0}\nDuygu durumu: sakinlik=${dynamicState.calmness}, stres=${dynamicState.stress}, öfke=${dynamicState.anger}, mutluluk=${dynamicState.happiness}\nKDM doğrulaması: ${consistency ? `${consistency.accepted ? "Kabul" : "Sorunlu"} (${consistency.score}/100)${consistency.issues.length ? ` - ${consistency.issues.join("; ")}` : ""}` : "ölçüm yok"}\nSüreler: ${timings ? `istemci=${timings.clientPrepMs}ms, hafıza=${timings.memoryMs}ms, KDM=${timings.kdmMs}ms, AI=${timings.aiMs}ms, kayıt=${timings.postProcessMs}ms, ağ=${timings.networkAndOverheadMs}ms, toplam=${timings.totalMs}ms` : "ölçüm yok"}`;
     try {
       await navigator.clipboard.writeText(report);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      window.setTimeout(() => setCopied(false), 1800);
     } catch {}
   };
+
+  const inspectorTabs: Array<{
+    id: InspectorTab;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }> = [
+    { id: "decision", label: "Karar", icon: ShieldCheck },
+    { id: "relationship", label: "İlişki", icon: HeartHandshake },
+    { id: "memory", label: "Hafıza", icon: Database },
+    { id: "performance", label: "Süre", icon: Gauge },
+  ];
+
   return (
-    <div className="flex-1 min-h-0 grid grid-cols-[1fr_360px] gap-3 p-3 bg-zinc-950 overflow-hidden">
-      <section className="min-h-0 overflow-auto rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
-        <div className="flex justify-between mb-3">
-          <div className="flex gap-2 items-center">
-            <BrainCircuit className="w-4 h-4 text-violet-400" />
-            <span className="text-xs font-mono font-bold">
-              KAIRA ZİHİN HARİTASI
-            </span>
-          </div>
+    <div className="flex min-h-0 flex-1 flex-col bg-zinc-950">
+      <header className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-4 py-2.5">
+        <div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={copyReport}
-              className="flex items-center gap-1 rounded border border-zinc-700 px-2 py-1 text-[9px] font-mono text-zinc-300 hover:border-violet-500 hover:text-violet-200"
-            >
-              {copied ? (
-                <Check className="w-3 h-3" />
-              ) : (
-                <Copy className="w-3 h-3" />
-              )}
-              {copied ? "KOPYALANDI" : "KNT RAPORUNU KOPYALA"}
-            </button>
-            <span className="text-[9px] font-mono text-emerald-400">
+            <MessageSquareText className="h-4 w-4 text-violet-400" />
+            <h1 className="text-xs font-bold tracking-wide text-zinc-100">
+              TEST & DEBUG
+            </h1>
+            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[8px] font-mono text-emerald-400">
               ● CANLI KDM
             </span>
           </div>
+          <p className="mt-0.5 text-[9px] font-mono text-zinc-600">
+            Mesajı gönder, yanıtı ve gerçek karar izini aynı yerde incele.
+          </p>
         </div>
-        <div className="grid grid-cols-4 gap-3">
-          <Node
-            label="1 · ÖN BEYİN"
-            value={scores.input}
-            items={["Mesaj alındı", "Ön çözümleme"]}
-          />
-          <Node
-            label="2 · NİYET"
-            value={scores.intent}
-            items={[
-              reasoningTrace.messageInterpretation.intent,
-              reasoningTrace.messageInterpretation.sentiment,
-            ]}
-          />
-          <Node
-            label="3 · HAFIZA"
-            value={scores.memory}
-            items={[
-              `Etkileşim ${r?.interactionCount || 0}`,
-              `Tekrar ${r?.repeatedNegativeCount || 0}`,
-            ]}
-          />
-          <Node
-            label="4 · DUYGU"
-            value={scores.emotion}
-            items={[
-              `Öfke ${dynamicState.anger}`,
-              `Stres ${dynamicState.stress}`,
-            ]}
-          />
-          <Node
-            label="5 · İLİŞKİ"
-            value={scores.relation}
-            items={[
-              `Güven ${r?.trust ?? 50}`,
-              `Kırgınlık ${r?.hurtScore || 0}`,
-            ]}
-          />
-          <Node
-            label="6 · KİŞİLİK"
-            value={scores.personality}
-            items={[
-              `Sabır ${personality.patience}`,
-              `Empati ${personality.empathy}`,
-            ]}
-          />
-          <Node
-            label="7 · KARAR"
-            value={scores.decision}
-            items={[reasoningTrace.decision.chosenTone, "KDM entegrasyonu"]}
-          />
-          <Node
-            label="8 · AI"
-            value={scores.ai}
-            items={[
-              isLoading
-                ? "AI işliyor…"
-                : timings?.aiMs === 0
-                  ? "Yerel dil motoru"
-                  : "AI hazır",
-              timings?.aiMs === 0 ? "AI çağrısı yok" : "Yanıt üretimi",
-            ]}
-          />
-        </div>
-        <div className="mt-4 rounded-xl border border-zinc-800 bg-black/30 p-3">
-          <div className="flex items-center gap-2 text-[10px] font-mono font-bold mb-2">
-            <Gauge className="w-3.5 h-3.5 text-cyan-400" />
-            GECİKME EKG'Sİ{" "}
-            {timings && (
-              <span className="ml-auto text-emerald-400">
-                TOPLAM {fmt(timings.totalMs)}
-              </span>
-            )}
-          </div>
-          {isLoading ? (
-            <div className="text-[10px] font-mono text-violet-300">
-              Ölçülüyor…
-            </div>
-          ) : timings ? (
-            <div className="grid grid-cols-3 gap-2">
-              {timingItems.map(([name, ms]) => (
-                <div key={name} className="rounded border border-zinc-800 p-2">
-                  <div className="text-[8px] font-mono text-zinc-500">
-                    {name}
-                  </div>
-                  <div
-                    className={`text-sm font-mono font-bold ${ms > 2000 ? "text-red-300" : ms > 700 ? "text-yellow-300" : "text-emerald-300"}`}
-                  >
-                    {fmt(ms)}
-                  </div>
-                </div>
-              ))}
-            </div>
+        <button
+          type="button"
+          onClick={copyReport}
+          disabled={!hasResult}
+          className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-[9px] font-mono font-bold text-zinc-300 hover:border-violet-500 hover:text-violet-200 disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          {copied ? (
+            <Check className="h-3.5 w-3.5" />
           ) : (
-            <div className="text-[9px] font-mono text-zinc-600">
-              Bir mesaj gönder; Kaira'nın nerede beklediğini burada ölçeceğiz.
-            </div>
+            <Copy className="h-3.5 w-3.5" />
           )}
-        </div>
-        <div className="mt-4 rounded-xl border border-zinc-800 bg-black/20 overflow-hidden">
-          <div className="flex justify-between px-3 py-2 border-b border-zinc-800">
-            <div className="flex gap-2 items-center text-[10px] font-mono font-bold">
-              <Activity className="w-3.5 h-3.5 text-emerald-400" />
-              NEURAL TRACE LOG
-            </div>
-            <button
-              onClick={() => {
-                setLogs([]);
-                localStorage.removeItem("kaira_neural_trace_logs");
-              }}
-              className="text-[9px] text-zinc-500"
-            >
-              Temizle
-            </button>
-          </div>
-          <div className="max-h-44 overflow-auto divide-y divide-zinc-900">
-            {logs.map((l) => (
-              <div key={l.id} className="p-2.5">
-                <div className="flex justify-between text-[9px] font-mono">
-                  <span>“{l.message}”</span>
-                  <span className="text-zinc-600">{l.time}</span>
+          {copied ? "KOPYALANDI" : "KNT RAPORUNU KOPYALA"}
+        </button>
+      </header>
+
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto p-3 lg:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)] lg:overflow-hidden">
+        <section className="flex min-h-[560px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/35 lg:min-h-0">
+          <div className="shrink-0 border-b border-zinc-800 bg-zinc-950/65 px-3 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <UserRound className="h-3.5 w-3.5 text-zinc-500" />
+                <span className="text-[9px] font-mono text-zinc-500">
+                  KONUŞAN
+                </span>
+                <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-0.5">
+                  {participants.map((participant) => {
+                    const active = participant.id === selectedParticipantId;
+                    return (
+                      <button
+                        key={participant.id}
+                        type="button"
+                        onClick={() => onSelectParticipant(participant.id)}
+                        disabled={isLoading}
+                        className={`rounded-md px-3 py-1.5 text-[10px] font-mono font-bold ${active ? "bg-violet-600 text-white" : "text-zinc-500 hover:text-zinc-200"}`}
+                      >
+                        {participant.label}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="mt-1 flex flex-wrap gap-2 text-[8px] font-mono text-zinc-500">
-                  <span>Niyet {l.scores.intent}</span>
-                  <span>Hafıza {l.scores.memory}</span>
-                  <span>Duygu {l.scores.emotion}</span>
-                  <span>Karar {l.scores.decision}</span>
-                  {l.timings && (
-                    <span className="text-emerald-400">
-                      Süre {fmt(l.timings.totalMs)}
-                    </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void onResetTestUser()}
+                  disabled={isLoading}
+                  className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-2.5 py-1.5 text-[9px] font-mono text-zinc-300 hover:border-amber-500 hover:text-amber-300 disabled:opacity-40"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  YENİ OTURUM
+                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowDangerMenu((value) => !value)}
+                    className="rounded-lg border border-zinc-800 p-1.5 text-zinc-500 hover:text-zinc-200"
+                    aria-label="Daha fazla işlem"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                  {showDangerMenu && (
+                    <div className="absolute right-0 top-9 z-20 w-56 rounded-lg border border-zinc-700 bg-zinc-900 p-1.5 shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const approved = window.confirm(
+                            "Mert ve Ali'nin tüm test sohbeti, ilişki ve hafıza kayıtları kalıcı olarak silinsin mi?",
+                          );
+                          if (!approved) return;
+                          setShowDangerMenu(false);
+                          void onClearAllTestData();
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[10px] font-mono text-red-300 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        TÜM TEST VERİLERİNİ SİL
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      <aside className="min-h-0 flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
-        <div className="px-3 py-2 border-b border-zinc-800 flex items-center justify-between">
-          <span className="text-[10px] font-mono font-bold">
-            KAIRO CHAT · CANLI TEST
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => {
-                void onResetTestUser();
-                setLogs([]);
-                localStorage.removeItem("kaira_neural_trace_logs");
-              }}
-              disabled={isLoading}
-              title="İlişki state ve tekrar sayaçlarını sıfırla"
-              className="flex items-center gap-1 rounded border border-amber-700/60 px-2 py-1 text-[9px] font-mono text-amber-300 hover:border-amber-400 disabled:opacity-40"
-            >
-              <RotateCcw className="w-3 h-3" />
-              YENİ OTURUM
-            </button>
-            <button
-              onClick={() => {
-                const approved = window.confirm(
-                  "Mert ve Ali'nin tüm test sohbeti, KDM, KNT, ilişki ve dil hafızası kayıtları kalıcı olarak silinsin mi?",
-                );
-                if (!approved) return;
-                void onClearAllTestData();
-                setLogs([]);
-                localStorage.removeItem("kaira_neural_trace_logs");
-              }}
-              disabled={isLoading}
-              title="Mert ve Ali test sohbeti, ilişki, hafıza ve KNT kayıtlarını temizle"
-              className="flex items-center gap-1 rounded border border-red-800/70 px-2 py-1 text-[9px] font-mono text-red-300 hover:border-red-500 disabled:opacity-40"
-            >
-              <Trash2 className="w-3 h-3" />
-              TÜMÜNÜ SİL
-            </button>
-          </div>
-        </div>
-        <div className="border-b border-zinc-800 bg-zinc-950/60 px-3 py-2">
-          <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] text-zinc-500">
-            <span>KONUŞAN KİŞİ</span>
-            <span>AYRI İLİŞKİ + HAFIZA</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {participants.map((participant) => {
-              const isActive = participant.id === selectedParticipantId;
-              return (
-                <button
-                  key={participant.id}
-                  type="button"
-                  onClick={() => onSelectParticipant(participant.id)}
-                  disabled={isLoading}
-                  className={`rounded-lg border px-3 py-2 text-[10px] font-mono font-bold transition-colors disabled:opacity-40 ${
-                    isActive
-                      ? "border-violet-400 bg-violet-500/20 text-violet-200"
-                      : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
-                  }`}
-                >
-                  {isActive ? "● " : ""}
-                  {participant.label}
-                </button>
-              );
-            })}
-          </div>
-          <div className="mt-2 border-t border-zinc-800 pt-2">
-            <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] text-zinc-500">
-              <span>OTURUM BAŞLANGICI</span>
-              <span>SONRAKİ MESAJLAR DEVAM EDER</span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {([
-                ["new", "Yeni"],
-                ["familiar", "Tanıdık"],
-                ["close", "Çok yakın"],
-              ] as const).map(([value, label]) => (
+
+            <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-zinc-800/70 pt-2.5">
+              <span className="text-[9px] font-mono text-zinc-500">
+                OTURUM BAŞLANGICI
+              </span>
+              {(
+                Object.entries(relationshipLabels) as Array<
+                  [RelationshipTestLevel, string]
+                >
+              ).map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setRelationshipLevel(value)}
                   disabled={isLoading}
-                  className={`rounded border px-2 py-1.5 text-[9px] font-mono font-bold ${relationshipLevel === value ? "border-fuchsia-400 bg-fuchsia-500/20 text-fuchsia-200" : "border-zinc-700 bg-zinc-900 text-zinc-500"}`}
+                  className={`rounded-md border px-2.5 py-1 text-[9px] font-mono ${relationshipLevel === value ? "border-fuchsia-400/60 bg-fuchsia-500/15 text-fuchsia-200" : "border-zinc-800 text-zinc-500 hover:text-zinc-300"}`}
                 >
                   {label}
                 </button>
               ))}
+              <span className="ml-auto hidden text-[8px] font-mono text-zinc-600 sm:block">
+                Yalnızca ilk mesajda başlangıç ilişkisini kurar
+              </span>
             </div>
           </div>
-        </div>
-        <div className="flex-1 overflow-auto p-3 space-y-2">
-          {messages.slice(-12).map((m) => (
-            <div
-              key={m.id}
-              className={`rounded-lg p-2 text-[11px] ${m.sender === "user" ? "ml-8 bg-indigo-500/15 border border-indigo-500/20" : "mr-8 bg-zinc-800 border border-zinc-700"}`}
-            >
-              <div className="text-[8px] text-zinc-500">
-                {m.sender === "user"
-                  ? m.participantName || "SEN"
-                  : `KAIRO${m.replyToParticipantName ? ` → ${m.replyToParticipantName}` : ""}`}{" "}
-                · {m.timestamp}
+
+          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+            {messages.length === 0 && !isLoading && (
+              <div className="flex h-full min-h-72 flex-col items-center justify-center text-center">
+                <MessageSquareText className="mb-3 h-7 w-7 text-zinc-800" />
+                <p className="text-xs text-zinc-400">Temiz oturum hazır.</p>
+                <p className="mt-1 text-[10px] font-mono text-zinc-600">
+                  {activeParticipant?.label} için ilk mesajı gönder.
+                </p>
               </div>
-              {m.text}
-            </div>
-          ))}
-          {messages.length === 0 && !isLoading && (
-            <div className="h-full flex items-center justify-center text-center text-[9px] font-mono text-zinc-600 px-6">
-              Temiz oturum hazır. İlk mesajdan sonra sohbet geçmişi ve duygu durumu devam eder.
-            </div>
-          )}
-          {isLoading && (
-            <div className="flex gap-2 text-[10px] text-violet-300">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              İşleniyor…
-            </div>
-          )}
-        </div>
-        <div className="p-3 border-t border-zinc-800 space-y-2">
-          <div className="grid grid-cols-4 gap-1.5">
-            {presets.map((preset, index) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => setText(preset)}
-                disabled={isLoading}
-                className="rounded border border-zinc-800 bg-zinc-950 px-1 py-1 text-[8px] font-mono text-zinc-400 hover:border-violet-500 hover:text-violet-200 disabled:opacity-40"
+            )}
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
               >
-                Örnek {index + 1}
-              </button>
+                <div
+                  className={`max-w-[78%] rounded-2xl px-3.5 py-2.5 ${message.sender === "user" ? "rounded-br-md border border-violet-500/25 bg-violet-500/15" : "rounded-bl-md border border-zinc-700 bg-zinc-800/80"}`}
+                >
+                  <div className="mb-1 text-[8px] font-mono text-zinc-500">
+                    {message.sender === "user"
+                      ? message.participantName || activeParticipant?.label
+                      : `KAIRA${message.replyToParticipantName ? ` → ${message.replyToParticipantName}` : ""}`} {" "}
+                    · {message.timestamp}
+                  </div>
+                  <p className="whitespace-pre-wrap text-[13px] leading-5 text-zinc-100">
+                    {message.text}
+                  </p>
+                </div>
+              </div>
             ))}
+            {isLoading && (
+              <div className="flex items-center gap-2 text-[10px] font-mono text-violet-300">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                KDM işliyor…
+              </div>
+            )}
           </div>
-          <div className="flex gap-2">
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder={`${activeParticipant?.label || "Kişi"} · ${relationshipLevel === "new" ? "Yeni" : relationshipLevel === "familiar" ? "Tanıdık" : "Çok yakın"} olarak yaz…`}
-              className="flex-1 min-w-0 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs"
-            />
+
+          <div className="shrink-0 border-t border-zinc-800 bg-zinc-950/65 p-3">
+            <div className="flex gap-2">
+              <textarea
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    submit();
+                  }
+                }}
+                rows={2}
+                placeholder={`${activeParticipant?.label || "Kişi"} olarak yaz…`}
+                className="min-h-12 flex-1 resize-none rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-violet-500"
+              />
+              <button
+                type="button"
+                onClick={submit}
+                disabled={!text.trim() || isLoading}
+                className="flex w-12 items-center justify-center rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+            <div className="mt-1.5 flex justify-between text-[8px] font-mono text-zinc-600">
+              <span>Enter gönderir · Shift+Enter yeni satır</span>
+              <span>{relationshipLabels[relationshipLevel]} ilişki testi</span>
+            </div>
+          </div>
+        </section>
+
+        <aside className="flex min-h-[520px] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/35 lg:min-h-0">
+          <div className="shrink-0 border-b border-zinc-800 px-3 pt-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <h2 className="text-[11px] font-bold text-zinc-100">
+                  SON KARAR İZİ
+                </h2>
+                <p className="mt-0.5 text-[8px] font-mono text-zinc-600">
+                  Yalnızca çalışan motordan gelen değerler
+                </p>
+              </div>
+              {hasResult && (
+                <span
+                  className={`rounded-full border px-2 py-1 text-[8px] font-mono ${responseSource === "Yerel Dil Motoru" ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-300" : "border-orange-500/30 bg-orange-500/10 text-orange-300"}`}
+                >
+                  {responseSource}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              {inspectorTabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setInspectorTab(tab.id)}
+                    className={`flex flex-col items-center gap-1 rounded-t-lg border-b-2 px-1 py-2 text-[8px] font-mono ${inspectorTab === tab.id ? "border-violet-500 bg-violet-500/10 text-violet-200" : "border-transparent text-zinc-600 hover:text-zinc-300"}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4">
+            {!hasResult ? (
+              <EmptyInspector />
+            ) : (
+              <>
+                {inspectorTab === "decision" && (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 px-3">
+                      <DataRow label="YANIT KAYNAĞI" value={responseSource} accent />
+                      <DataRow label="NİYET" value={reasoningTrace.messageInterpretation.intent} />
+                      <DataRow label="DUYGU SİNYALİ" value={reasoningTrace.messageInterpretation.sentiment} />
+                      <DataRow label="KARAR TONU" value={reasoningTrace.decision.chosenTone} />
+                      <DataRow label="ANLIK RUH HALİ" value={reasoningTrace.currentMood.moodText} />
+                    </div>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-[9px] font-mono font-bold text-zinc-300">
+                          KDM DOĞRULAMASI
+                        </span>
+                        {consistency ? (
+                          <span
+                            className={`flex items-center gap-1 text-[9px] font-mono ${consistency.accepted ? "text-emerald-400" : "text-amber-300"}`}
+                          >
+                            {consistency.accepted ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <CircleAlert className="h-3 w-3" />
+                            )}
+                            {consistency.accepted ? "KABUL" : "SORUN VAR"}
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-mono text-zinc-600">
+                            ÖLÇÜM YOK
+                          </span>
+                        )}
+                      </div>
+                      {consistency?.issues.length ? (
+                        <ul className="space-y-1.5 text-[10px] leading-4 text-amber-200/80">
+                          {consistency.issues.map((issue) => (
+                            <li key={issue}>• {issue}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-[10px] leading-4 text-zinc-500">
+                          Deterministik kontrol bildirilen bir sorun bulmadı.
+                        </p>
+                      )}
+                    </div>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+                      <p className="text-[9px] font-mono font-bold text-zinc-300">
+                        KARAR AÇIKLAMASI
+                      </p>
+                      <p className="mt-2 text-[10px] leading-5 text-zinc-500">
+                        {reasoningTrace.decision.explanation ||
+                          "Açıklama üretilmedi."}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {inspectorTab === "relationship" && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        [
+                          "Güven",
+                          relationship?.trust ??
+                            reasoningTrace.relationship.trustScore ??
+                            50,
+                        ],
+                        [
+                          "Sıcaklık",
+                          relationship?.warmth ??
+                            reasoningTrace.relationship.warmthScore,
+                        ],
+                        [
+                          "Kırgınlık",
+                          relationship?.hurtScore ??
+                            reasoningTrace.relationship.hurtScore ??
+                            0,
+                        ],
+                        [
+                          "Çatışma",
+                          relationship?.conflictScore ??
+                            reasoningTrace.relationship.conflictScore ??
+                            0,
+                        ],
+                      ].map(([label, value]) => (
+                        <div
+                          key={String(label)}
+                          className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3"
+                        >
+                          <div className="text-[8px] font-mono text-zinc-600">
+                            {label}
+                          </div>
+                          <div className="mt-1 text-xl font-mono font-bold text-zinc-100">
+                            {value}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 px-3">
+                      <DataRow label="KULLANICI" value={reasoningTrace.whoSent.userName} />
+                      <DataRow label="YENİ KULLANICI" value={reasoningTrace.whoSent.isNewUser ? "Evet" : "Hayır"} />
+                      <DataRow label="ETKİLEŞİM" value={relationship?.interactionCount ?? reasoningTrace.relationship.interactionCount ?? 0} />
+                      <DataRow label="TEKRAR EDEN NEGATİF" value={relationship?.repeatedNegativeCount ?? reasoningTrace.relationship.repeatedNegativeCount ?? 0} />
+                    </div>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+                      <div className="flex items-center justify-between text-[9px] font-mono">
+                        <span className="text-zinc-500">SICAKLIK DEĞİŞİMİ</span>
+                        <span
+                          className={
+                            reasoningTrace.memoryUpdate.warmthDelta >= 0
+                              ? "text-emerald-400"
+                              : "text-red-300"
+                          }
+                        >
+                          {reasoningTrace.memoryUpdate.warmthBefore} → {reasoningTrace.memoryUpdate.warmthAfter} ({reasoningTrace.memoryUpdate.warmthDelta >= 0 ? "+" : ""}{reasoningTrace.memoryUpdate.warmthDelta})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {inspectorTab === "memory" && (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 px-3">
+                      <DataRow label="OTURUM MESAJI" value={reasoningTrace.relationship.interactionCount ?? relationship?.interactionCount ?? 0} />
+                      <DataRow label="HAFIZA KARARI" value={reasoningTrace.memoryUpdate.reason || "Açıklama yok"} />
+                      <DataRow label="RUH HALİ DEĞİŞİMİ" value={reasoningTrace.memoryUpdate.moodChange || "Stabil"} />
+                    </div>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+                      <div className="flex items-center gap-2 text-[9px] font-mono font-bold text-zinc-300">
+                        <Activity className="h-3.5 w-3.5 text-cyan-400" />
+                        SON MESAJ BAĞLAMI
+                      </div>
+                      <p className="mt-2 rounded-lg bg-black/25 p-2.5 text-[10px] leading-5 text-zinc-400">
+                        {reasoningTrace.messageInterpretation.explanation ||
+                          "Bağlam açıklaması üretilmedi."}
+                      </p>
+                    </div>
+                    <p className="text-[9px] font-mono leading-5 text-zinc-600">
+                      Bu panel yalnızca sunucunun döndürdüğü hafıza özetini
+                      gösterir; tahmini “aktivasyon” puanı üretmez.
+                    </p>
+                  </div>
+                )}
+
+                {inspectorTab === "performance" && timings && (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
+                      <Clock3 className="mx-auto h-4 w-4 text-emerald-400" />
+                      <div className="mt-1 text-2xl font-mono font-bold text-emerald-300">
+                        {fmt(timings.totalMs)}
+                      </div>
+                      <div className="mt-1 text-[8px] font-mono text-zinc-600">
+                        TOPLAM YANIT SÜRESİ
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 px-3">
+                      <DataRow label="İSTEMCİ HAZIRLIK" value={fmt(timings.clientPrepMs)} />
+                      <DataRow label="HAFIZA / FIRESTORE" value={fmt(timings.memoryMs)} />
+                      <DataRow label="KDM + DİL KİMLİĞİ" value={fmt(timings.kdmMs)} />
+                      <DataRow label="AI / MODEL" value={timings.aiMs === 0 ? "Çağrılmadı" : fmt(timings.aiMs)} accent={timings.aiMs === 0} />
+                      <DataRow label="KAYIT + DOĞRULAMA" value={fmt(timings.postProcessMs)} />
+                      <DataRow label="AĞ / DİĞER" value={fmt(timings.networkAndOverheadMs)} />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="shrink-0 border-t border-zinc-800 bg-zinc-950/50">
             <button
-              onClick={submit}
-              disabled={isLoading}
-              className="rounded-lg bg-violet-600 px-3"
+              type="button"
+              onClick={() => setShowRawTrace((value) => !value)}
+              className="flex w-full items-center justify-between px-4 py-2.5 text-[9px] font-mono text-zinc-500 hover:text-zinc-300"
             >
-              <Send className="w-4 h-4" />
+              <span>HAM KNT İZİ</span>
+              {showRawTrace ? (
+                <X className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
             </button>
+            {showRawTrace && (
+              <pre className="max-h-48 overflow-auto border-t border-zinc-800 p-3 text-[8px] leading-4 text-zinc-500">
+                {JSON.stringify(
+                  {
+                    providerUsed,
+                    messageInterpretation:
+                      reasoningTrace.messageInterpretation,
+                    decision: reasoningTrace.decision,
+                    relationship: reasoningTrace.relationship,
+                    currentMood: reasoningTrace.currentMood,
+                    memoryUpdate: reasoningTrace.memoryUpdate,
+                    dynamicState,
+                    personality: {
+                      patience: personality.patience,
+                      empathy: personality.empathy,
+                      humor: personality.humor,
+                    },
+                    consistency,
+                    timings,
+                  },
+                  null,
+                  2,
+                )}
+              </pre>
+            )}
           </div>
-        </div>
-      </aside>
+        </aside>
+      </div>
     </div>
   );
 };

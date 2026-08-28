@@ -248,6 +248,26 @@ function buildSessionWorkingMemory(history: any[], userMessage: string) {
 app.get("/api/health", (_q, r) =>
   r.json({ status: "ok", timestamp: new Date().toISOString() }),
 );
+app.get("/api/runtime-info", (_q, r) => {
+  const activeProvider = "openrouter";
+  r.json({
+    status: "ok",
+    activeProvider,
+    model:
+      process.env.OPENROUTER_MODEL?.trim() ||
+      (activeProvider === "openrouter"
+        ? "openrouter/free"
+        : "gemini-3.6-flash"),
+    providers: {
+      openrouter: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
+      gemini: Boolean(process.env.GEMINI_API_KEY?.trim()),
+    },
+    persistence: "Firestore",
+    recentMemoryLimit: 6,
+    sessionHistoryLimit: 24,
+    generatedAt: new Date().toISOString(),
+  });
+});
 app.get("/api/knt/traces", async (q, r) => {
   try {
     const userId =

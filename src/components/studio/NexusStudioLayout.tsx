@@ -1,13 +1,8 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { StudioTopBar } from "./StudioTopBar";
-import { KairoChatTab } from "./tabs/KairoChatTab";
 import { CharacterTab } from "./tabs/CharacterTab";
-import { TestLabTab } from "./tabs/TestLabTab";
-import { BrainTab } from "./tabs/BrainTab";
 import { MindMapTab } from "./tabs/MindMapTab";
 import { SettingsTab } from "./tabs/SettingsTab";
-import { KdmMetricsPanel } from "../common/KdmMetricsPanel";
-import { KdmAutoRelationshipTestPanel } from "../common/KdmAutoRelationshipTestPanel";
 import {
   DroitPersonalityTraits,
   DroitDynamicState,
@@ -27,6 +22,7 @@ import {
   droitChatService,
   KairoTimingMetrics,
 } from "../../services/droitChatService";
+import type { ResponseConsistencyResult } from "../../services/kairoResponseConsistency";
 import {
   clearKairoConversation,
   loadKairoConversation,
@@ -146,9 +142,8 @@ export const NexusStudioLayout: React.FC = () => {
     [reasoningTrace, setReasoningTrace] = useState<ReasoningTrace>(
       INITIAL_REASONING_TRACE,
     ),
-    [lastAnalysis, setLastAnalysis] = useState<any>(null),
-    [isNewUserMode, setIsNewUserMode] = useState(false),
-    [userWarmth, setUserWarmth] = useState(62),
+    [lastAnalysis, setLastAnalysis] =
+      useState<ResponseConsistencyResult | null>(null),
     [lastTimings, setLastTimings] = useState<KairoTimingMetrics | null>(null),
     [lastProviderUsed, setLastProviderUsed] = useState<string | null>(null),
     [activeConversationScope, setActiveConversationScope] = useState<
@@ -228,7 +223,6 @@ export const NexusStudioLayout: React.FC = () => {
     setLastAnalysis(null);
     setLastTimings(null);
     setLastProviderUsed(null);
-    setUserWarmth(50);
     setIsolatedConversation(true);
     setActiveConversationScope(null);
     await clearKairoConversation().catch(() => {});
@@ -242,7 +236,6 @@ export const NexusStudioLayout: React.FC = () => {
     setLastAnalysis(null);
     setLastTimings(null);
     setLastProviderUsed(null);
-    setUserWarmth(50);
     setActiveConversationScope(null);
     setIsolatedConversation(true);
   }, [isAiLoading]);
@@ -300,9 +293,9 @@ export const NexusStudioLayout: React.FC = () => {
         if (response.dynamicState) setDynamicState(response.dynamicState);
         if (response.reasoningTrace) {
           setReasoningTrace(response.reasoningTrace);
-          setUserWarmth(response.reasoningTrace.relationship.warmthScore);
         }
         if (response.timings) setLastTimings(response.timings);
+        setLastAnalysis(response.consistency ?? null);
         setLastProviderUsed(response.providerUsed || null);
         setActiveConversationScope(conversationScope);
         setIsolatedConversation(false);
@@ -376,66 +369,6 @@ export const NexusStudioLayout: React.FC = () => {
           />
         )}{" "}
         {activeTab === "TEST" && (
-          <div className="flex-1 min-h-0 flex flex-col gap-2">
-            <div className="shrink-0 px-3 pt-2 space-y-2">
-              <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/70 px-3 py-2">
-                <span className="text-[10px] font-mono font-bold">
-                  KİŞİYE ÖZEL İLİŞKİ TESTİ
-                </span>
-                <div className="flex gap-1.5">
-                  {TEST_USERS.map((u) => (
-                    <button
-                      key={u.id}
-                      onClick={() => setSelectedTestUser(u.id)}
-                      className={`px-3 py-1.5 rounded-md border text-[10px] font-mono ${selectedTestUser === u.id ? "bg-indigo-500/20 border-indigo-400/50" : "border-zinc-800"}`}
-                    >
-                      {u.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <KdmAutoRelationshipTestPanel personality={personality} />
-            </div>
-            <div className="flex-1 min-h-0">
-              <TestLabTab
-                key={selectedTestUser}
-                personality={personality}
-                dynamicState={dynamicState}
-                expression={expression}
-                onDynamicStateChange={setDynamicState}
-                onExpressionChange={setExpression}
-                reasoningTrace={reasoningTrace}
-                onReasoningTraceChange={setReasoningTrace}
-                lastAnalysis={lastAnalysis}
-                onLastAnalysisChange={setLastAnalysis}
-                isNewUserMode={isNewUserMode}
-                onToggleNewUserMode={() => setIsNewUserMode((p) => !p)}
-                userWarmth={userWarmth}
-                onUserWarmthChange={setUserWarmth}
-                onNavigateToBrain={() => setActiveTab("BEYİN")}
-              />
-            </div>
-            <KdmMetricsPanel compact userId={selectedTestUser} />
-          </div>
-        )}{" "}
-        {(activeTab === "BEYIN" || activeTab === "BEYİN") && (
-          <BrainTab
-            reasoningTrace={reasoningTrace}
-            onReasoningTraceChange={setReasoningTrace}
-            personality={personality}
-            dynamicState={dynamicState}
-            onDynamicStateChange={setDynamicState}
-            isNewUserMode={isNewUserMode}
-            onToggleNewUserMode={() => setIsNewUserMode((p) => !p)}
-            userWarmth={userWarmth}
-            onUserWarmthChange={setUserWarmth}
-            lastAnalysis={lastAnalysis}
-            onNavigateToTest={() => setActiveTab("TEST")}
-            onNavigateToCharacter={() => setActiveTab("KARAKTER")}
-            onResetTrace={() => setReasoningTrace(INITIAL_REASONING_TRACE)}
-          />
-        )}{" "}
-        {activeTab === "ZIHIN" && (
           <MindMapTab
             personality={personality}
             dynamicState={dynamicState}
@@ -444,6 +377,7 @@ export const NexusStudioLayout: React.FC = () => {
             isLoading={isAiLoading}
             timings={lastTimings}
             providerUsed={lastProviderUsed}
+            consistency={lastAnalysis}
             participants={TEST_USERS}
             selectedParticipantId={selectedTestUser}
             onSelectParticipant={setSelectedTestUser}
@@ -452,19 +386,7 @@ export const NexusStudioLayout: React.FC = () => {
             onClearAllTestData={handleClearAllTestData}
           />
         )}{" "}
-        {activeTab === "AYARLAR" && <SettingsTab />}{" "}
-        {activeTab === "KAIRO" && (
-          <KairoChatTab
-            expression={expression}
-            dynamicState={dynamicState}
-            messages={messages}
-            isLoading={isAiLoading}
-            onSendMessage={handleSendMessage}
-            participants={TEST_USERS}
-            selectedParticipantId={selectedTestUser}
-            onSelectParticipant={setSelectedTestUser}
-          />
-        )}
+        {activeTab === "AYARLAR" && <SettingsTab />}
       </main>
     </div>
   );
