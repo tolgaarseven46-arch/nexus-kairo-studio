@@ -44,6 +44,8 @@ type Props = {
   consistency: ResponseConsistencyResult | null;
   participants: ReadonlyArray<{ id: string; label: string }>;
   selectedParticipantId: string;
+  activeSessionId?: string | null;
+  isRestoring?: boolean;
   onSelectParticipant: (id: string) => void;
   onSendMessage: (text: string, options?: MindMapSendOptions) => void;
   onResetTestUser: () => void | Promise<void>;
@@ -110,6 +112,8 @@ export const MindMapTab: React.FC<Props> = ({
   consistency,
   participants,
   selectedParticipantId,
+  activeSessionId,
+  isRestoring,
   onSelectParticipant,
   onSendMessage,
   onResetTestUser,
@@ -184,6 +188,16 @@ export const MindMapTab: React.FC<Props> = ({
             <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[8px] font-mono text-emerald-400">
               ● CANLI KDM
             </span>
+            {isRestoring && (
+              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[8px] font-mono text-amber-300">
+                Oturum Yükleniyor…
+              </span>
+            )}
+            {!isRestoring && messages.length > 0 && (
+              <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-[8px] font-mono text-violet-300">
+                {activeSessionId ? `Oturum: ${Math.floor(messages.length / 2)} Tur` : `${Math.floor(messages.length / 2)} Tur`}
+              </span>
+            )}
           </div>
           <p className="mt-0.5 text-[9px] font-mono text-zinc-600">
             Mesajı gönder, yanıtı ve gerçek karar izini aynı yerde incele.

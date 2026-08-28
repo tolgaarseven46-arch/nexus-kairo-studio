@@ -123,5 +123,8 @@ export interface RestoredTestSession {
   messages: TestMessage[];
   lastDynamicState?: DroitDynamicState;
   lastReasoningTrace?: ReasoningTrace;
+  lastConsistency?: any;
+  lastTimings?: any;
+  lastProviderUsed?: string;
 }
 

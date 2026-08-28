@@ -32,6 +32,10 @@ import {
   clearAllKairoTestData,
   resetKdmTestUser,
 } from "../../services/kdmTestResetService";
+import {
+  loadActiveTestSessionForUser,
+  clearTestSession,
+} from "../../services/kdmPersistenceService";
 const INITIAL_PERSONALITY: DroitPersonalityTraits = {
   ...DEFAULT_PERSONALITY_TRAITS,
 };
@@ -149,6 +153,17 @@ export const NexusStudioLayout: React.FC = () => {
     [activeConversationScope, setActiveConversationScope] = useState<
       string | null
     >(null),
+    [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
+      if (typeof window !== "undefined") {
+        return (
+          localStorage.getItem("kairo_active_session_id") ||
+          localStorage.getItem("kairo_active_session_test_user_x") ||
+          null
+        );
+      }
+      return null;
+    }),
+    [isRestoringSession, setIsRestoringSession] = useState(false),
     [selectedTestUser, setSelectedTestUser] = useState(() =>
       typeof window === "undefined"
         ? "test_user_x"
@@ -157,26 +172,79 @@ export const NexusStudioLayout: React.FC = () => {
     [isSaved, setIsSaved] = useState(true),
     [isSaving, setIsSaving] = useState(false),
     [isolatedConversation, setIsolatedConversation] = useState(false);
+
+  // Restore Active Test Session from Firestore whenever participant changes or on mount
   useEffect(() => {
-    if (typeof window !== "undefined")
-      localStorage.setItem("kairo_test_user_id", selectedTestUser);
-    setDynamicState(INITIAL_DYNAMIC_STATE);
-    setReasoningTrace(INITIAL_REASONING_TRACE);
-    setLastAnalysis(null);
-    setLastTimings(null);
-    setLastProviderUsed(null);
-    setMessages([]);
-    setActiveConversationScope(null);
-    setIsolatedConversation(false);
+    let isCurrent = true;
+    async function hydrateSession() {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("kairo_test_user_id", selectedTestUser);
+      }
+      setIsRestoringSession(true);
+
+      try {
+        const restored = await loadActiveTestSessionForUser(selectedTestUser);
+        if (!isCurrent) return;
+
+        if (restored && restored.turns && restored.turns.length > 0) {
+          setMessages(restored.messages);
+          if (restored.lastDynamicState) {
+            setDynamicState(restored.lastDynamicState);
+          }
+          if (restored.lastReasoningTrace) {
+            setReasoningTrace(restored.lastReasoningTrace);
+          }
+          if (restored.lastConsistency) {
+            setLastAnalysis(restored.lastConsistency);
+          }
+          if (restored.lastTimings) {
+            setLastTimings(restored.lastTimings);
+          }
+          if (restored.lastProviderUsed) {
+            setLastProviderUsed(restored.lastProviderUsed);
+          }
+          setActiveConversationScope(restored.summary.userId);
+          setActiveSessionId(restored.summary.sessionId);
+          setIsolatedConversation(false);
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem("kairo_active_session_id", restored.summary.sessionId);
+            localStorage.setItem(`kairo_active_session_${selectedTestUser}`, restored.summary.sessionId);
+          }
+          setIsRestoringSession(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("[NexusStudioLayout] Failed to restore test session:", err);
+      }
+
+      if (!isCurrent) return;
+      setDynamicState(INITIAL_DYNAMIC_STATE);
+      setReasoningTrace(INITIAL_REASONING_TRACE);
+      setLastAnalysis(null);
+      setLastTimings(null);
+      setLastProviderUsed(null);
+      setMessages([]);
+      setActiveConversationScope(null);
+      setActiveSessionId(null);
+      setIsolatedConversation(false);
+      setIsRestoringSession(false);
+    }
+
+    hydrateSession();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [selectedTestUser]);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const [p, e, m] = await Promise.all([
+        const [p, e] = await Promise.all([
           droitPersonalityService.loadKairoPersonality(),
           droitExpressionAssetService.loadExpressionAssets("kairo"),
-          loadKairoConversation(100).catch(() => []),
         ]);
         if (!mounted) return;
         if (p) {
@@ -184,7 +252,6 @@ export const NexusStudioLayout: React.FC = () => {
           if (p.docId) setKairoDocId(p.docId);
         }
         setExpressionAssets(e);
-        if (m.length) setMessages(m);
       } catch {}
     })();
     return () => {
@@ -216,6 +283,9 @@ export const NexusStudioLayout: React.FC = () => {
   }, []);
   const handleResetTestUser = useCallback(async () => {
     if (isAiLoading) return;
+    if (activeSessionId) {
+      await clearTestSession(activeSessionId).catch(() => {});
+    }
     await resetKdmTestUser(activeConversationScope || selectedTestUser);
     setMessages([]);
     setDynamicState(INITIAL_DYNAMIC_STATE);
@@ -225,10 +295,18 @@ export const NexusStudioLayout: React.FC = () => {
     setLastProviderUsed(null);
     setIsolatedConversation(true);
     setActiveConversationScope(null);
+    setActiveSessionId(null);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("kairo_active_session_id");
+      localStorage.removeItem(`kairo_active_session_${selectedTestUser}`);
+    }
     await clearKairoConversation().catch(() => {});
-  }, [activeConversationScope, isAiLoading, selectedTestUser]);
+  }, [activeConversationScope, activeSessionId, isAiLoading, selectedTestUser]);
   const handleClearAllTestData = useCallback(async () => {
     if (isAiLoading) return;
+    if (activeSessionId) {
+      await clearTestSession(activeSessionId).catch(() => {});
+    }
     await clearAllKairoTestData();
     setMessages([]);
     setDynamicState(INITIAL_DYNAMIC_STATE);
@@ -237,8 +315,15 @@ export const NexusStudioLayout: React.FC = () => {
     setLastTimings(null);
     setLastProviderUsed(null);
     setActiveConversationScope(null);
+    setActiveSessionId(null);
     setIsolatedConversation(true);
-  }, [isAiLoading]);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("kairo_active_session_id");
+      for (const user of TEST_USERS) {
+        localStorage.removeItem(`kairo_active_session_${user.id}`);
+      }
+    }
+  }, [activeSessionId, isAiLoading]);
   const handleSendMessage = useCallback(
     async (
       userText: string,
@@ -264,7 +349,8 @@ export const NexusStudioLayout: React.FC = () => {
         ? `knt_${activeParticipant.id}_${relationshipLevel}`
         : activeParticipant.id;
       const continuesCurrentConversation =
-        activeConversationScope === conversationScope;
+        activeConversationScope === conversationScope ||
+        Boolean(activeSessionId);
       setMessages((p) =>
         continuesCurrentConversation ? [...p, userMsg] : [userMsg],
       );
@@ -289,6 +375,7 @@ export const NexusStudioLayout: React.FC = () => {
             roleTitle: "Sunucu Yöneticisi",
             raceName: "Sentetik Droit",
           },
+          sessionId: activeSessionId || undefined,
         });
         if (response.dynamicState) setDynamicState(response.dynamicState);
         if (response.reasoningTrace) {
@@ -298,6 +385,16 @@ export const NexusStudioLayout: React.FC = () => {
         setLastAnalysis(response.consistency ?? null);
         setLastProviderUsed(response.providerUsed || null);
         setActiveConversationScope(conversationScope);
+        if (response.sessionId) {
+          setActiveSessionId(response.sessionId);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("kairo_active_session_id", response.sessionId);
+            localStorage.setItem(
+              `kairo_active_session_${activeParticipant.id}`,
+              response.sessionId,
+            );
+          }
+        }
         setIsolatedConversation(false);
         const dm: TestMessage = {
           id: `msg-${Date.now() + 1}`,
@@ -343,6 +440,7 @@ export const NexusStudioLayout: React.FC = () => {
       isolatedConversation,
       selectedTestUser,
       activeConversationScope,
+      activeSessionId,
     ],
   );
   return (
@@ -380,6 +478,8 @@ export const NexusStudioLayout: React.FC = () => {
             consistency={lastAnalysis}
             participants={TEST_USERS}
             selectedParticipantId={selectedTestUser}
+            activeSessionId={activeSessionId}
+            isRestoring={isRestoringSession}
             onSelectParticipant={setSelectedTestUser}
             onSendMessage={handleSendMessage}
             onResetTestUser={handleResetTestUser}

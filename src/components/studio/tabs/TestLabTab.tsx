@@ -231,25 +231,29 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
           setTestId(session.summary.sessionId);
           setPersistedTurnCount(session.summary.turnCount);
 
-          const restoredMessages: TestMessage[] = [];
-          session.turns.forEach((turn, idx) => {
-            const timeStr = turn.timestamp
-              ? new Date(turn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              : '12:00';
-            restoredMessages.push({
-              id: `usr-${turn.turnId || idx}`,
-              sender: 'user',
-              text: turn.userMessage,
-              timestamp: timeStr,
+          if (session.messages && session.messages.length > 0) {
+            setTestMessages(session.messages);
+          } else {
+            const restoredMessages: TestMessage[] = [];
+            session.turns.forEach((turn, idx) => {
+              const timeStr = turn.timestamp
+                ? new Date(turn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '12:00';
+              restoredMessages.push({
+                id: `usr-${turn.turnId || idx}`,
+                sender: 'user',
+                text: turn.userMessage,
+                timestamp: timeStr,
+              });
+              restoredMessages.push({
+                id: `kairo-${turn.turnId || idx}`,
+                sender: 'droit',
+                text: turn.assistantReply,
+                timestamp: timeStr,
+              });
             });
-            restoredMessages.push({
-              id: `kairo-${turn.turnId || idx}`,
-              sender: 'droit',
-              text: turn.assistantReply,
-              timestamp: timeStr,
-            });
-          });
-          setTestMessages(restoredMessages);
+            setTestMessages(restoredMessages);
+          }
 
           const lastTurn = session.turns[session.turns.length - 1];
           if (lastTurn.reasoningTrace) {

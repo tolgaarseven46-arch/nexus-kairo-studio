@@ -269,7 +269,7 @@ export async function loadTestSession(sessionId: string): Promise<RestoredTestSe
 
       const sessionData = sessionSnap.data();
       const turnsRef = collection(sessionRef, TURNS_COLLECTION);
-      const turnsSnap = await getDocs(query(turnsRef, orderBy('timestamp', 'asc'), limit(200)));
+      const turnsSnap = await getDocs(query(turnsRef, limit(200)));
 
       const turns: TestSessionTurnRecord[] = turnsSnap.docs.map((docSnap) => {
         const data = docSnap.data();
@@ -296,6 +296,9 @@ export async function loadTestSession(sessionId: string): Promise<RestoredTestSe
         };
       });
 
+      // Strict chronological sorting by turnNumber (with timestamp tiebreaker)
+      turns.sort((a, b) => (a.turnNumber || 0) - (b.turnNumber || 0) || new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
       const lastTurn = turns[turns.length - 1];
       const sessionSummary: TestSessionSummary = {
         sessionId,
@@ -305,8 +308,8 @@ export async function loadTestSession(sessionId: string): Promise<RestoredTestSe
         createdAt: sessionData.createdAt || sessionData.updatedAt || new Date().toISOString(),
         updatedAt: sessionData.updatedAt || new Date().toISOString(),
         turnCount: turns.length,
-        lastUserMessage: sessionData.lastUserMessage,
-        lastAssistantReply: sessionData.lastAssistantReply,
+        lastUserMessage: sessionData.lastUserMessage || lastTurn?.userMessage,
+        lastAssistantReply: sessionData.lastAssistantReply || lastTurn?.assistantReply,
         dynamicState: normalizeDynamicState(sessionData.dynamicState) || lastTurn?.dynamicStateAfter,
         relationship: sessionData.relationship || lastTurn?.relationshipState,
         active: sessionData.active ?? true,
@@ -319,12 +322,15 @@ export async function loadTestSession(sessionId: string): Promise<RestoredTestSe
         messages: turnsToTestMessages(turns),
         lastDynamicState: lastTurn?.dynamicStateAfter || sessionSummary.dynamicState,
         lastReasoningTrace: lastTurn?.reasoningTrace,
+        lastConsistency: lastTurn?.consistency,
+        lastTimings: lastTurn?.metadata?.timings,
+        lastProviderUsed: lastTurn?.metadata?.providerUsed,
       };
     } catch (err) {
       console.warn('[TestSessionPersistence] loadTestSession failed:', err);
       return null;
     }
-  })(), 3000, null);
+  })(), 8000, null);
 }
 
 export async function loadActiveTestSessionForUser(userId: string): Promise<RestoredTestSession | null> {
@@ -332,7 +338,9 @@ export async function loadActiveTestSessionForUser(userId: string): Promise<Rest
 
   // 1. First check localStorage for explicit active session ID
   if (typeof window !== 'undefined' && window.localStorage) {
-    const cachedId = window.localStorage.getItem(`kairo_active_session_${userScope}`);
+    const cachedId =
+      window.localStorage.getItem(`kairo_active_session_${userScope}`) ||
+      window.localStorage.getItem('kairo_active_session_id');
     if (cachedId) {
       const restored = await loadTestSession(cachedId);
       if (restored && restored.turns.length > 0) {
@@ -345,23 +353,53 @@ export async function loadActiveTestSessionForUser(userId: string): Promise<Rest
   return safeWithTimeout((async () => {
     try {
       const sessionsRef = collection(db, TEST_SESSIONS_COLLECTION);
+      // Query recent sessions ordered by updatedAt (uses single-field index, never fails on composite indexes)
       const q = query(
         sessionsRef,
-        where('userId', '==', userScope),
-        where('active', '==', true),
         orderBy('updatedAt', 'desc'),
-        limit(1),
+        limit(25),
       );
       const snap = await getDocs(q);
       if (!snap.empty) {
-        const foundId = snap.docs[0].id;
-        if (typeof window !== 'undefined' && window.localStorage) {
-          window.localStorage.setItem(`kairo_active_session_${userScope}`, foundId);
+        // Match candidates in priority order:
+        // Priority 1: Exact userId match or sessionId match
+        let matchedDoc = snap.docs.find((d) => {
+          const data = d.data();
+          if (data.active === false) return false;
+          return data.userId === userScope || d.id === `session_${userScope}`;
+        });
+
+        // Priority 2: Scoped match (e.g. knt_test_user_x_new contains test_user_x)
+        if (!matchedDoc) {
+          matchedDoc = snap.docs.find((d) => {
+            const data = d.data();
+            if (data.active === false) return false;
+            const docUser = String(data.userId || '');
+            const docId = d.id;
+            return (
+              docUser.includes(userScope) ||
+              userScope.includes(docUser) ||
+              docId.includes(userScope)
+            );
+          });
         }
-        return await loadTestSession(foundId);
+
+        // Priority 3: Any active session with turns
+        if (!matchedDoc) {
+          matchedDoc = snap.docs.find((d) => d.data().active !== false && (d.data().turnCount ?? 0) > 0);
+        }
+
+        if (matchedDoc) {
+          const foundId = matchedDoc.id;
+          if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.setItem(`kairo_active_session_${userScope}`, foundId);
+            window.localStorage.setItem('kairo_active_session_id', foundId);
+          }
+          return await loadTestSession(foundId);
+        }
       }
 
-      // Fallback: try session with standard name convention session_${userScope}
+      // Priority 4: Fallback standard session id
       const standardId = `session_${userScope}`;
       const standardSession = await loadTestSession(standardId);
       if (standardSession && standardSession.turns.length > 0) {
@@ -373,22 +411,20 @@ export async function loadActiveTestSessionForUser(userId: string): Promise<Rest
       console.warn('[TestSessionPersistence] loadActiveTestSessionForUser query failed:', err);
       return null;
     }
-  })(), 3500, null);
+  })(), 8000, null);
 }
 
 export async function clearTestSession(sessionId: string): Promise<void> {
   try {
     if (!sessionId?.trim()) return;
     const sessionRef = doc(db, TEST_SESSIONS_COLLECTION, sessionId.trim());
-    const turnsRef = collection(sessionRef, TURNS_COLLECTION);
-    const turnsSnap = await getDocs(turnsRef);
-    await Promise.all(turnsSnap.docs.map((d) => deleteDoc(d.ref)));
-    await deleteDoc(sessionRef);
+    // Soft-deactivate to avoid permanent data loss of prior test conversations
+    await setDoc(sessionRef, { active: false, updatedAt: new Date().toISOString() }, { merge: true });
 
     if (typeof window !== 'undefined' && window.localStorage) {
       for (let i = 0; i < window.localStorage.length; i++) {
         const key = window.localStorage.key(i);
-        if (key && window.localStorage.getItem(key) === sessionId) {
+        if (key && (window.localStorage.getItem(key) === sessionId || key.startsWith('kairo_active_session'))) {
           window.localStorage.removeItem(key);
         }
       }
