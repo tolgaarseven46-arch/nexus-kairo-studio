@@ -95,6 +95,7 @@ export const MindMapTab: React.FC<Props> = ({
   onResetTestUser,
 }) => {
   const [text, setText] = useState("");
+  const [lastSubmittedMessage, setLastSubmittedMessage] = useState("");
   const [relationshipLevel, setRelationshipLevel] =
     useState<RelationshipTestLevel>("new");
   const [copied, setCopied] = useState(false);
@@ -180,7 +181,9 @@ export const MindMapTab: React.FC<Props> = ({
   }, [isLoading, messages, reasoningTrace, scores, timings]);
   const submit = () => {
     if (!text.trim() || isLoading) return;
-    onSendMessage(text, { relationshipLevel });
+    const submitted = text.trim();
+    setLastSubmittedMessage(submitted);
+    onSendMessage(submitted, { relationshipLevel });
     setText("");
   };
   const presets = [
@@ -202,7 +205,7 @@ export const MindMapTab: React.FC<Props> = ({
   const copyReport = async () => {
     const lastUser = [...messages].reverse().find((m) => m.sender === "user");
     const lastKairo = [...messages].reverse().find((m) => m.sender === "droit");
-    const report = `KAIRA KNT DEBUG RAPORU\nMesaj: ${lastUser?.text || "-"}\nKonuşan: ${lastUser?.participantName || activeParticipant?.label || "-"}\nYanıt: ${lastKairo?.text || "-"}\nNiyet: ${reasoningTrace.messageInterpretation.intent}\nDuygu sinyali: ${reasoningTrace.messageInterpretation.sentiment}\nAktivasyonlar: ÖnBeyin=${scores.input}, Niyet=${scores.intent}, Hafıza=${scores.memory}, Duygu=${scores.emotion}, İlişki=${scores.relation}, Kişilik=${scores.personality}, Karar=${scores.decision}, AI=${scores.ai}\nİlişki: güven=${r?.trust ?? 50}, sıcaklık=${r?.warmth ?? 50}, kırgınlık=${r?.hurtScore || 0}, çatışma=${r?.conflictScore || 0}, tekrar=${r?.repeatedNegativeCount || 0}\nSüreler: ${timings ? `istemci=${timings.clientPrepMs}ms, hafıza=${timings.memoryMs}ms, KDM=${timings.kdmMs}ms, AI=${timings.aiMs}ms, kayıt=${timings.postProcessMs}ms, ağ=${timings.networkAndOverheadMs}ms, toplam=${timings.totalMs}ms` : "ölçüm yok"}`;
+    const report = `KAIRA KNT DEBUG RAPORU\nMesaj: ${lastUser?.text || lastSubmittedMessage || "-"}\nKonuşan: ${lastUser?.participantName || activeParticipant?.label || "-"}\nYanıt: ${lastKairo?.text || "-"}\nNiyet: ${reasoningTrace.messageInterpretation.intent}\nDuygu sinyali: ${reasoningTrace.messageInterpretation.sentiment}\nAktivasyonlar: ÖnBeyin=${scores.input}, Niyet=${scores.intent}, Hafıza=${scores.memory}, Duygu=${scores.emotion}, İlişki=${scores.relation}, Kişilik=${scores.personality}, Karar=${scores.decision}, AI=${scores.ai}\nİlişki: güven=${r?.trust ?? 50}, sıcaklık=${r?.warmth ?? 50}, kırgınlık=${r?.hurtScore || 0}, çatışma=${r?.conflictScore || 0}, tekrar=${r?.repeatedNegativeCount || 0}\nSüreler: ${timings ? `istemci=${timings.clientPrepMs}ms, hafıza=${timings.memoryMs}ms, KDM=${timings.kdmMs}ms, AI=${timings.aiMs}ms, kayıt=${timings.postProcessMs}ms, ağ=${timings.networkAndOverheadMs}ms, toplam=${timings.totalMs}ms` : "ölçüm yok"}`;
     try {
       await navigator.clipboard.writeText(report);
       setCopied(true);

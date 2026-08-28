@@ -37,6 +37,8 @@ const EMOTIONAL_OVERCARE_RE =
   /\b(canım|bebeğim|bebiş|yavrum|geçmiş olsun|üzülme|yanındayım|buradayım|sarıl\w*|anlatmak ister misin|bugünlük salma hakkın)\b/i;
 const UNSOLICITED_ADVICE_RE =
   /\b(bence|yapmalısın|denemelisin|iyi gelir|hakkın var)\b/i;
+const MINIMAL_EMOTIONAL_CURIOSITY_RE =
+  /^(?:(?:hmm|off)\s+)?(?:niye|neden|ne oldu|noldu|hayırdır)(?:\s+ya)?[?…]*$/i;
 
 function containsName(text: string, name: string): boolean {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -123,10 +125,10 @@ export function planDialogueResponse(
       allowFollowUpQuestion: true,
       allowSpeculation: false,
       maxSentences: 1,
-      maxWords: 6,
+      maxWords: 4,
       hasSupportedTargetClaim: false,
       reason:
-        "İlk duygusal açılışta yalnızca kısa doğal merak göster. Sebep anlatılmadan teselli, tavsiye, lakap, espri veya fiziksel yakınlık üretme; ilişki seviyesini bu turda zorla sergileme.",
+        "İlk duygusal açılışta yalnızca tek kısa merak tepkisi üret: hmm niye, ne oldu, niye ya veya hayırdır ritmi. İkinci açıklama, metafor ya da yeniden ifade ekleme. Sebep anlatılmadan teselli, tavsiye, lakap, espri veya fiziksel yakınlık üretme; ilişki seviyesini bu turda zorla sergileme.",
     };
   }
   if (analysis.acts.includes("correction")) {
@@ -212,8 +214,13 @@ export function findDialogueDecisionIssues(
   }
   if (plan.move === "invite_emotional_context") {
     const wordCount = (reply.match(/[\p{L}\p{N}]+/gu) || []).length;
-    if (wordCount > (plan.maxWords ?? 6)) {
-      issues.push("İlk duygusal açılış cevabı 6 kelimeyi aştı");
+    if (wordCount > (plan.maxWords ?? 4)) {
+      issues.push("İlk duygusal açılış cevabı 4 kelimeyi aştı");
+    }
+    if (!MINIMAL_EMOTIONAL_CURIOSITY_RE.test(reply.trim())) {
+      issues.push(
+        "İlk duygusal açılış tek kısa merak tepkisinin dışına çıktı",
+      );
     }
     if (EMOTIONAL_OVERCARE_RE.test(reply)) {
       issues.push(

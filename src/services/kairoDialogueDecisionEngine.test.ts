@@ -77,7 +77,7 @@ describe("Kaira dialogue decision engine", () => {
       allowFollowUpQuestion: true,
       allowSpeculation: false,
       maxSentences: 1,
-      maxWords: 6,
+      maxWords: 4,
     });
     expect(buildDialogueDecisionInstruction(plan)).toContain(
       "ilişki seviyesini bu turda zorla sergileme",
@@ -117,6 +117,21 @@ describe("Kaira dialogue decision engine", () => {
         "Ali",
       ),
     ).toBe("hmm niye");
+  });
+
+  it("rejects a short but artificial second phrase", () => {
+    const plan = planDialogueResponse(
+      [],
+      "bugün moralim biraz bozuk ya",
+      "Mert",
+    );
+
+    expect(
+      findDialogueDecisionIssues(
+        "Ne oldu, nereden koptu moral?",
+        plan,
+      ),
+    ).toContain("İlk duygusal açılış tek kısa merak tepkisinin dışına çıktı");
   });
 
   it("does not override an explicit request for advice", () => {
