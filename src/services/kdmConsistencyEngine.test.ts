@@ -96,6 +96,15 @@ describe("KDM response consistency gate", () => {
     expect(result.trace.messageInterpretation.intent).toBe("genel_sohbet");
   });
 
+  it("labels a self-deprecating laugh as banter", () => {
+    const result = analyzeKdmInteraction(
+      "yine bütün işi son dakikaya bıraktım hahah",
+    );
+
+    expect(result.trace.messageInterpretation.intent).toBe("şakalaşma");
+    expect(result.trace.messageInterpretation.sentiment).toBe("nötr");
+  });
+
   it.each([
     "hiç havamda değilim",
     "kafam bozuk",

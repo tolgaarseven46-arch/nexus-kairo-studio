@@ -65,6 +65,29 @@ describe("Kaira dialogue decision engine", () => {
     expect(plan.allowFollowUpQuestion).toBe(false);
   });
 
+  it("bounds self-deprecating banter to one short everyday reaction", () => {
+    const message = "yine bütün işi son dakikaya bıraktım hahah";
+    const plan = planDialogueResponse([], message, "Mert");
+    const failedReply =
+      "klasik erteleme speedrun’u açılmış 🏃‍♂️\npanik seviyen kaç şu an, ılımlı stres mi full kaos mu 😄";
+
+    expect(plan).toMatchObject({
+      move: "join_banter",
+      allowFollowUpQuestion: false,
+      maxSentences: 1,
+      maxWords: 7,
+    });
+    expect(findDialogueDecisionIssues(failedReply, plan).length).toBeGreaterThan(
+      0,
+    );
+    expect(buildGroundedDialogueFallback(plan, [], message, "Mert")).toBe(
+      "yine şaşırtmadın hahah",
+    );
+    expect(
+      findDialogueDecisionIssues("yine şaşırtmadın hahah", plan),
+    ).toEqual([]);
+  });
+
   it("uses a bounded curiosity move for a first emotional opening", () => {
     const plan = planDialogueResponse(
       [],

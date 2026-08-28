@@ -36,6 +36,17 @@ const UNSOLICITED_ADVICE_RE =
   /\b(bence|yapmalısın|denemelisin|iyi gelir|hakkın var)\b/i;
 const MINIMAL_EMOTIONAL_CURIOSITY_RE =
   /^(?:(?:hmm|off)\s+)?(?:niye|neden|ne oldu|noldu|hayırdır)(?:\s+ya)?[?…]*$/i;
+const CANNED_BANTER_RE =
+  /\b(speedrun|full kaos|plot twist|achievement|level atla\w*|npc|boss fight|main character|challenge accepted)\b/i;
+const PROCRASTINATION_BANTER_RE =
+  /\b(son dakikaya bırak\w*|ertele\w*|geciktir\w*|üşen\w*|yapmayıp bekle\w*)\b/i;
+
+function responseUnitCount(reply: string): number {
+  return reply
+    .trim()
+    .split(/\n+|(?<=[.!?…])\s+/u)
+    .filter((part) => part.trim()).length;
+}
 
 function containsName(text: string, name: string): boolean {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -150,9 +161,11 @@ export function planDialogueResponse(
       move: "join_banter",
       allowFollowUpQuestion: false,
       allowSpeculation: true,
-      maxSentences: 2,
+      maxSentences: 1,
+      maxWords: 7,
       hasSupportedTargetClaim: false,
-      reason: "Şakaya katılabilirsin; şakayı kalıcı gerçek veya plan yapma.",
+      reason:
+        "Kullanıcının kendi şakasına yalnızca tek kısa gündelik tepkiyle katıl. Yeni internet esprisi, oyun metaforu, seçenek sorusu veya emoji ekleme; şakayı kalıcı gerçek ya da plan yapma.",
     };
   }
   if (analysis.acts.includes("question")) {
@@ -196,6 +209,15 @@ export function findDialogueDecisionIssues(
   plan: DialogueDecisionPlan,
 ): string[] {
   const issues: string[] = [];
+  const wordCount = (reply.match(/[\p{L}\p{N}]+/gu) || []).length;
+  if (responseUnitCount(reply) > plan.maxSentences) {
+    issues.push(
+      `Diyalog kararı ${plan.maxSentences} kısa cümle sınırını aştı`,
+    );
+  }
+  if (plan.maxWords && wordCount > plan.maxWords) {
+    issues.push(`Diyalog kararı ${plan.maxWords} kelime sınırını aştı`);
+  }
   if (!plan.allowFollowUpQuestion && /[?？]/.test(reply)) {
     issues.push("Diyalog kararı takip sorusunu yasakladığı halde soru eklendi");
   }
@@ -205,10 +227,6 @@ export function findDialogueDecisionIssues(
     );
   }
   if (plan.move === "invite_emotional_context") {
-    const wordCount = (reply.match(/[\p{L}\p{N}]+/gu) || []).length;
-    if (wordCount > (plan.maxWords ?? 4)) {
-      issues.push("İlk duygusal açılış cevabı 4 kelimeyi aştı");
-    }
     if (!MINIMAL_EMOTIONAL_CURIOSITY_RE.test(reply.trim())) {
       issues.push(
         "İlk duygusal açılış tek kısa merak tepkisinin dışına çıktı",
@@ -224,6 +242,14 @@ export function findDialogueDecisionIssues(
     }
     if (/\bkim\b/i.test(reply)) {
       issues.push("Moral bozukluğunun sebebi bir kişiymiş gibi varsayıldı");
+    }
+  }
+  if (plan.move === "join_banter") {
+    if (/\p{Extended_Pictographic}/u.test(reply)) {
+      issues.push("Kısa şakaya gereksiz emoji eklendi");
+    }
+    if (CANNED_BANTER_RE.test(reply)) {
+      issues.push("Kısa şakaya hazır internet esprisi veya oyun metaforu eklendi");
     }
   }
   return issues;
@@ -242,6 +268,11 @@ export function buildGroundedDialogueFallback(
   userName: string,
 ): string | null {
   if (plan.move === "invite_emotional_context") return "hmm niye";
+  if (plan.move === "join_banter") {
+    return PROCRASTINATION_BANTER_RE.test(userMessage)
+      ? "yine şaşırtmadın hahah"
+      : "hahah iyiymiş";
+  }
   if (plan.move !== "grounded_recall" || !plan.target) return null;
   const claims = buildDialogueClaimLedger(history, userMessage, userName);
   const supported = supportedClaimsFor(claims, plan.target).at(-1);

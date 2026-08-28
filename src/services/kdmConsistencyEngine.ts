@@ -61,6 +61,7 @@ function classifyIntent(message: string): string {
     return "soru";
   if (/(neden|nasıl|ne demek|açıkla|anlat|nedir|niye)/.test(text))
     return "bilgi_ve_aciklama";
+  if (/(?:😂|🤣|😄|😅|:d|\bha(?:ha)+h*\b)/i.test(text)) return "şakalaşma";
   if (
     /(?<![\p{L}])(hata|sorun|çöktü|çalışmıyor|bug|arıza|bozuk)(?![\p{L}])/u.test(
       text,

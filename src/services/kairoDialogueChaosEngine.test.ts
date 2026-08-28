@@ -7,6 +7,14 @@ import {
 } from "./kairoDialogueChaosEngine";
 
 describe("Kaira complex dialogue engine", () => {
+  it("recognizes short Turkish text laughter as banter", () => {
+    const result = analyzeDialogueTurn(
+      "yine bütün işi son dakikaya bıraktım hahah",
+    );
+
+    expect(result.acts).toContain("banter");
+  });
+
   it("recognizes a correction without turning it into a durable fact", () => {
     const result = analyzeDialogueTurn("yok lan o ben değildim");
     expect(result.acts).toContain("correction");

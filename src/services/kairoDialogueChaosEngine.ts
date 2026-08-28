@@ -36,7 +36,7 @@ const UNCERTAINTY_RE =
 const QUESTION_RE =
   /[?？]|(?:^|\s)(kim|kime|kimi|ne|neyi|neden|niye|nasıl|nerede|nereye|hangi|kaç|mı|mi|mu|mü)(?:\s|$)/i;
 const BANTER_RE =
-  /(?:😂|🤣|😄|😅|:d|\b(?:şaka|dalga|taşak|ahaha+|hahaha+|asdasd+|dfghj+)\b)/i;
+  /(?:😂|🤣|😄|😅|:d|\b(?:şaka|dalga|taşak|ha(?:ha)+h*|a?haha+|asdasd+|dfghj+)\b)/i;
 const NOISE_RE = /^(?:\s|[.!?])+$/i;
 const KEYBOARD_MASH_RE = /^(?:asd|sdf|dfg|qwe|jkl|x+d|h+a+h+a+)[a-zğüşöçı]*$/i;
 const ABSURD_RE =
