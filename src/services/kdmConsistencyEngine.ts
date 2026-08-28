@@ -8,6 +8,7 @@ import {
   BehaviorLayerProfile,
 } from "./droitBehaviorEngine";
 import { normalizeKairoLanguageInput } from "./kairoLanguageNormalizer";
+import { hasLocalLowMoodExpression } from "./kairoEmotionalLanguage";
 
 export interface KdmAnalysisResult {
   trace: ReasoningTrace;
@@ -48,6 +49,7 @@ function classifyIntent(message: string): string {
   const text = analysisText(message);
   if (/(özür dilerim|özür|pardon|kusura bakma)/.test(text))
     return "özür_ve_telafi";
+  if (hasLocalLowMoodExpression(message)) return "duygusal_paylasim";
   if (EMOTIONAL_SHARE_RE.test(text)) return "duygusal_paylasim";
   if (/(^|\s)(selam|merhaba|hey|naber|nasılsın|ne yapıyorsun)(\s|$)/.test(text))
     return "selamlama";
@@ -73,6 +75,7 @@ function classifyIntent(message: string): string {
 
 function classifySentiment(message: string): string {
   const text = analysisText(message);
+  if (hasLocalLowMoodExpression(message)) return "duygusal_yük";
   if (EMOTIONAL_LOAD_RE.test(text)) return "duygusal_yük";
   if (
     /(çok\s+mutluyum|mutluyum|çok\s+iyiyim|keyfim\s+yerinde|teşekkür|sağ ol|harika|süper|mükemmel|seviyorum|güzel|özür)/.test(

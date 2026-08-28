@@ -30,9 +30,14 @@ export function classifyLocalEmotionalIntent(
 ): LocalEmotionalIntent | null {
   const normalized = normalizeEmotionalInput(message);
   if (EXPLICIT_SUPPORT_REQUEST_RE.test(normalized)) return null;
-  return LOW_MOOD_PATTERNS.some((pattern) => pattern.test(normalized))
+  return hasLocalLowMoodExpression(normalized)
     ? "low_mood_opening"
     : null;
+}
+
+export function hasLocalLowMoodExpression(message: string): boolean {
+  const normalized = normalizeEmotionalInput(message);
+  return LOW_MOOD_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
 export function isLocalEmotionalOpening(message: string): boolean {

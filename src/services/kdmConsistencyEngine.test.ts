@@ -96,6 +96,25 @@ describe("KDM response consistency gate", () => {
     expect(result.trace.messageInterpretation.intent).toBe("genel_sohbet");
   });
 
+  it.each([
+    "hiç havamda değilim",
+    "kafam bozuk",
+    "modum yok",
+    "modum yo",
+    "moodum düşük",
+    "keyfim yerinde değil",
+    "içim sıkılıyor",
+  ])("shares the local low-mood meaning with the KDM trace: %s", (message) => {
+    const result = analyzeKdmInteraction(message);
+
+    expect(result.trace.messageInterpretation.intent).toBe(
+      "duygusal_paylasim",
+    );
+    expect(result.trace.messageInterpretation.sentiment).toBe(
+      "duygusal_yük",
+    );
+  });
+
   it("does not damage the Kaira relationship for negativity aimed at Mert", () => {
     const result = analyzeKdmInteraction(
       "Mert bugün gerçekten çok saçmalıyor, ona sinir oldum.",
