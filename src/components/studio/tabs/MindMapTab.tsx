@@ -31,8 +31,8 @@ type Props = {
   selectedParticipantId: string;
   onSelectParticipant: (id: string) => void;
   onSendMessage: (text: string, options?: MindMapSendOptions) => void;
-  onClearChat: () => void;
   onResetTestUser: () => void | Promise<void>;
+  onClearAllTestData: () => void | Promise<void>;
 };
 type TraceScores = {
   input: number;
@@ -93,8 +93,8 @@ export const MindMapTab: React.FC<Props> = ({
   selectedParticipantId,
   onSelectParticipant,
   onSendMessage,
-  onClearChat,
   onResetTestUser,
+  onClearAllTestData,
 }) => {
   const [text, setText] = useState("");
   const [lastSubmittedMessage, setLastSubmittedMessage] = useState("");
@@ -388,21 +388,34 @@ export const MindMapTab: React.FC<Props> = ({
           </span>
           <div className="flex items-center gap-1">
             <button
-              onClick={onClearChat}
-              disabled={isLoading || messages.length === 0}
-              className="flex items-center gap-1 rounded border border-zinc-700 px-2 py-1 text-[9px] font-mono text-zinc-400 hover:border-red-500/60 hover:text-red-300 disabled:opacity-40"
-            >
-              <Trash2 className="w-3 h-3" />
-              SOHBETİ TEMİZLE
-            </button>
-            <button
-              onClick={() => void onResetTestUser()}
+              onClick={() => {
+                void onResetTestUser();
+                setLogs([]);
+                localStorage.removeItem("kaira_neural_trace_logs");
+              }}
               disabled={isLoading}
               title="İlişki state ve tekrar sayaçlarını sıfırla"
               className="flex items-center gap-1 rounded border border-amber-700/60 px-2 py-1 text-[9px] font-mono text-amber-300 hover:border-amber-400 disabled:opacity-40"
             >
               <RotateCcw className="w-3 h-3" />
-              TEST KULLANICISINI SIFIRLA
+              YENİ OTURUM
+            </button>
+            <button
+              onClick={() => {
+                const approved = window.confirm(
+                  "Mert ve Ali'nin tüm test sohbeti, KDM, KNT, ilişki ve dil hafızası kayıtları kalıcı olarak silinsin mi?",
+                );
+                if (!approved) return;
+                void onClearAllTestData();
+                setLogs([]);
+                localStorage.removeItem("kaira_neural_trace_logs");
+              }}
+              disabled={isLoading}
+              title="Mert ve Ali test sohbeti, ilişki, hafıza ve KNT kayıtlarını temizle"
+              className="flex items-center gap-1 rounded border border-red-800/70 px-2 py-1 text-[9px] font-mono text-red-300 hover:border-red-500 disabled:opacity-40"
+            >
+              <Trash2 className="w-3 h-3" />
+              TÜMÜNÜ SİL
             </button>
           </div>
         </div>
@@ -434,8 +447,8 @@ export const MindMapTab: React.FC<Props> = ({
           </div>
           <div className="mt-2 border-t border-zinc-800 pt-2">
             <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] text-zinc-500">
-              <span>İLİŞKİ TEST SEVİYESİ</span>
-              <span>AYNI KNT AKIŞI</span>
+              <span>OTURUM BAŞLANGICI</span>
+              <span>SONRAKİ MESAJLAR DEVAM EDER</span>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
               {([
@@ -473,7 +486,7 @@ export const MindMapTab: React.FC<Props> = ({
           ))}
           {messages.length === 0 && !isLoading && (
             <div className="h-full flex items-center justify-center text-center text-[9px] font-mono text-zinc-600 px-6">
-              İzole test hazır. Yeni mesaj geçmiş sohbet olmadan gönderilecek.
+              Temiz oturum hazır. İlk mesajdan sonra sohbet geçmişi ve duygu durumu devam eder.
             </div>
           )}
           {isLoading && (

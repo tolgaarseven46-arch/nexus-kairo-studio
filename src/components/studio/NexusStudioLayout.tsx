@@ -32,7 +32,10 @@ import {
   loadKairoConversation,
   saveKairoConversationMessage,
 } from "../../services/kairoConversationService";
-import { resetKdmTestUser } from "../../services/kdmTestResetService";
+import {
+  clearAllKairoTestData,
+  resetKdmTestUser,
+} from "../../services/kdmTestResetService";
 const INITIAL_PERSONALITY: DroitPersonalityTraits = {
   ...DEFAULT_PERSONALITY_TRAITS,
 };
@@ -148,6 +151,9 @@ export const NexusStudioLayout: React.FC = () => {
     [userWarmth, setUserWarmth] = useState(62),
     [lastTimings, setLastTimings] = useState<KairoTimingMetrics | null>(null),
     [lastProviderUsed, setLastProviderUsed] = useState<string | null>(null),
+    [activeConversationScope, setActiveConversationScope] = useState<
+      string | null
+    >(null),
     [selectedTestUser, setSelectedTestUser] = useState(() =>
       typeof window === "undefined"
         ? "test_user_x"
@@ -164,6 +170,8 @@ export const NexusStudioLayout: React.FC = () => {
     setLastAnalysis(null);
     setLastTimings(null);
     setLastProviderUsed(null);
+    setMessages([]);
+    setActiveConversationScope(null);
     setIsolatedConversation(false);
   }, [selectedTestUser]);
   useEffect(() => {
@@ -211,18 +219,9 @@ export const NexusStudioLayout: React.FC = () => {
       await saveKairoConversationMessage(m);
     } catch {}
   }, []);
-  const handleClearChat = useCallback(() => {
-    setMessages([]);
-    setLastTimings(null);
-    setLastProviderUsed(null);
-    setReasoningTrace(INITIAL_REASONING_TRACE);
-    setLastAnalysis(null);
-    setIsolatedConversation(true);
-    void clearKairoConversation().catch(() => {});
-  }, []);
   const handleResetTestUser = useCallback(async () => {
     if (isAiLoading) return;
-    await resetKdmTestUser(selectedTestUser);
+    await resetKdmTestUser(activeConversationScope || selectedTestUser);
     setMessages([]);
     setDynamicState(INITIAL_DYNAMIC_STATE);
     setReasoningTrace(INITIAL_REASONING_TRACE);
@@ -231,8 +230,22 @@ export const NexusStudioLayout: React.FC = () => {
     setLastProviderUsed(null);
     setUserWarmth(50);
     setIsolatedConversation(true);
+    setActiveConversationScope(null);
     await clearKairoConversation().catch(() => {});
-  }, [isAiLoading, selectedTestUser]);
+  }, [activeConversationScope, isAiLoading, selectedTestUser]);
+  const handleClearAllTestData = useCallback(async () => {
+    if (isAiLoading) return;
+    await clearAllKairoTestData();
+    setMessages([]);
+    setDynamicState(INITIAL_DYNAMIC_STATE);
+    setReasoningTrace(INITIAL_REASONING_TRACE);
+    setLastAnalysis(null);
+    setLastTimings(null);
+    setLastProviderUsed(null);
+    setUserWarmth(50);
+    setActiveConversationScope(null);
+    setIsolatedConversation(true);
+  }, [isAiLoading]);
   const handleSendMessage = useCallback(
     async (
       userText: string,
@@ -253,24 +266,31 @@ export const NexusStudioLayout: React.FC = () => {
           minute: "2-digit",
         }),
       };
-      setMessages((p) => [...p, userMsg]);
+      const relationshipLevel = options?.relationshipLevel;
+      const conversationScope = relationshipLevel
+        ? `knt_${activeParticipant.id}_${relationshipLevel}`
+        : activeParticipant.id;
+      const continuesCurrentConversation =
+        activeConversationScope === conversationScope;
+      setMessages((p) =>
+        continuesCurrentConversation ? [...p, userMsg] : [userMsg],
+      );
       setIsAiLoading(true);
       setLastTimings(null);
       try {
-        const isRelationshipTest = Boolean(options?.relationshipLevel);
-        const requestDynamicState = options?.relationshipLevel
-          ? buildRelationshipTestState(dynamicState, options.relationshipLevel)
-          : dynamicState;
+        const requestDynamicState =
+          relationshipLevel && !continuesCurrentConversation
+            ? buildRelationshipTestState(dynamicState, relationshipLevel)
+            : dynamicState;
         const response = await droitChatService.sendMessage({
           userMessage: userText.trim(),
-          userId: isRelationshipTest
-            ? `knt_${activeParticipant.id}_${options?.relationshipLevel}`
-            : activeParticipant.id,
+          userId: conversationScope,
           userName: activeParticipant.label,
           personality,
           dynamicState: requestDynamicState,
-          history: isRelationshipTest ? [] : messages,
-          suppressRecentMemory: isRelationshipTest || isolatedConversation,
+          history: continuesCurrentConversation ? messages : [],
+          suppressRecentMemory:
+            !continuesCurrentConversation || isolatedConversation,
           characterInfo: {
             name: "KAIRO",
             roleTitle: "Sunucu Yöneticisi",
@@ -284,6 +304,8 @@ export const NexusStudioLayout: React.FC = () => {
         }
         if (response.timings) setLastTimings(response.timings);
         setLastProviderUsed(response.providerUsed || null);
+        setActiveConversationScope(conversationScope);
+        setIsolatedConversation(false);
         const dm: TestMessage = {
           id: `msg-${Date.now() + 1}`,
           sender: "droit",
@@ -296,7 +318,7 @@ export const NexusStudioLayout: React.FC = () => {
           }),
         };
         setMessages((p) => [...p, dm]);
-        if (!isRelationshipTest) {
+        if (!relationshipLevel) {
           void persistMessageSafely(userMsg);
           void persistMessageSafely(dm);
         }
@@ -327,6 +349,7 @@ export const NexusStudioLayout: React.FC = () => {
       persistMessageSafely,
       isolatedConversation,
       selectedTestUser,
+      activeConversationScope,
     ],
   );
   return (
@@ -425,8 +448,8 @@ export const NexusStudioLayout: React.FC = () => {
             selectedParticipantId={selectedTestUser}
             onSelectParticipant={setSelectedTestUser}
             onSendMessage={handleSendMessage}
-            onClearChat={handleClearChat}
             onResetTestUser={handleResetTestUser}
+            onClearAllTestData={handleClearAllTestData}
           />
         )}{" "}
         {activeTab === "AYARLAR" && <SettingsTab />}{" "}
