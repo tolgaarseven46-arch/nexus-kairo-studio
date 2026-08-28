@@ -64,4 +64,68 @@ describe("Kaira dialogue decision engine", () => {
     expect(plan.move).toBe("natural_reaction");
     expect(plan.allowFollowUpQuestion).toBe(false);
   });
+
+  it("uses a bounded curiosity move for a first emotional opening", () => {
+    const plan = planDialogueResponse(
+      [],
+      "bugün moralim biraz bozuk ya",
+      "Ali",
+    );
+
+    expect(plan).toMatchObject({
+      move: "invite_emotional_context",
+      allowFollowUpQuestion: true,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 6,
+    });
+    expect(buildDialogueDecisionInstruction(plan)).toContain(
+      "ilişki seviyesini bu turda zorla sergileme",
+    );
+  });
+
+  it("rejects all three failed real emotional-opening replies", () => {
+    const plan = planDialogueResponse(
+      [],
+      "bugün moralim biraz bozuk ya",
+      "Ali",
+    );
+    const failedReplies = [
+      "Hmm canım sıkıldı bak şimdi. Ne oldu, moralini kim kırdı bugün böyle 😕",
+      "Off, geçmiş olsun ya. Canını sıkan ne olursa olsun, şu an resmi olarak bugünlük salma hakkın var bence.",
+      "off canım üzüldüm bak şimdi. sarılıyormuş gibi düşün beni 🤍",
+    ];
+
+    for (const reply of failedReplies) {
+      expect(findDialogueDecisionIssues(reply, plan).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("accepts the agreed minimal emotional-opening target", () => {
+    const plan = planDialogueResponse(
+      [],
+      "bugün moralim biraz bozuk ya",
+      "Ali",
+    );
+
+    expect(findDialogueDecisionIssues("hmm niye", plan)).toEqual([]);
+    expect(
+      buildGroundedDialogueFallback(
+        plan,
+        [],
+        "bugün moralim biraz bozuk ya",
+        "Ali",
+      ),
+    ).toBe("hmm niye");
+  });
+
+  it("does not override an explicit request for advice", () => {
+    const plan = planDialogueResponse(
+      [],
+      "moralim bozuk ne yapmalıyım",
+      "Ali",
+    );
+
+    expect(plan.move).not.toBe("invite_emotional_context");
+  });
 });

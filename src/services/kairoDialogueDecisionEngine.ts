@@ -7,6 +7,7 @@ import {
 
 export type DialogueMove =
   | "grounded_recall"
+  | "invite_emotional_context"
   | "answer_or_clarify"
   | "acknowledge_correction"
   | "join_banter"
@@ -19,6 +20,7 @@ export interface DialogueDecisionPlan {
   allowFollowUpQuestion: boolean;
   allowSpeculation: boolean;
   maxSentences: number;
+  maxWords?: number;
   hasSupportedTargetClaim: boolean;
   reason: string;
 }
@@ -27,6 +29,14 @@ const RECALL_RE =
   /(ne yapacaktı|ne yapmayı düşünüyordu|az önce ne dedi|ne demişti|ne söylemişti|hatırlıyor musun|kim söylemişti)/i;
 const SPECULATION_RE =
   /\b(büyük ihtimalle|muhtemelen|belki|herhalde|kafamdan|tahminim)\b/i;
+const EMOTIONAL_OPENING_RE =
+  /\b(moralim(?:\s+\S+){0,2}\s+(?:bozuk|kötü)|canım sıkkın|keyfim yok|üzgünüm|kötü hissediyorum|iyi hissetmiyorum|bunaldım|daraldım|çok stresliyim|ağlayacak gibiyim)\b/i;
+const EXPLICIT_SUPPORT_REQUEST_RE =
+  /\b(ne yapmalıyım|ne yapayım|yardım et|yardımcı ol|tavsiye|öneri|akıl ver)\b/i;
+const EMOTIONAL_OVERCARE_RE =
+  /\b(canım|bebeğim|bebiş|yavrum|geçmiş olsun|üzülme|yanındayım|buradayım|sarıl\w*|anlatmak ister misin|bugünlük salma hakkın)\b/i;
+const UNSOLICITED_ADVICE_RE =
+  /\b(bence|yapmalısın|denemelisin|iyi gelir|hakkın var)\b/i;
 
 function containsName(text: string, name: string): boolean {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -68,6 +78,22 @@ function supportedClaimsFor(
   );
 }
 
+function isFirstEmotionalOpening(
+  history: ConversationTurn[],
+  userMessage: string,
+): boolean {
+  if (
+    !EMOTIONAL_OPENING_RE.test(userMessage) ||
+    EXPLICIT_SUPPORT_REQUEST_RE.test(userMessage)
+  ) {
+    return false;
+  }
+  return !history
+    .filter((turn) => turn.sender === "user")
+    .slice(-4)
+    .some((turn) => EMOTIONAL_OPENING_RE.test(String(turn.text || "")));
+}
+
 export function planDialogueResponse(
   history: ConversationTurn[],
   userMessage: string,
@@ -89,6 +115,18 @@ export function planDialogueResponse(
       reason: supportedClaims.length
         ? "Sorulan kişi için kaynaklı bir kayıt var; yalnızca onu aktar."
         : "Sorulan kişi için etkin kayıt yok; reddedilmiş iddiayı canlandırmadan bilinmediğini söyle.",
+    };
+  }
+  if (isFirstEmotionalOpening(history, userMessage)) {
+    return {
+      move: "invite_emotional_context",
+      allowFollowUpQuestion: true,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 6,
+      hasSupportedTargetClaim: false,
+      reason:
+        "İlk duygusal açılışta yalnızca kısa doğal merak göster. Sebep anlatılmadan teselli, tavsiye, lakap, espri veya fiziksel yakınlık üretme; ilişki seviyesini bu turda zorla sergileme.",
     };
   }
   if (analysis.acts.includes("correction")) {
@@ -154,6 +192,7 @@ export function buildDialogueDecisionInstruction(
 - Takip sorusu: ${plan.allowFollowUpQuestion ? "gerekiyorsa en fazla bir tane" : "yasak"}
 - Desteksiz tahmin: ${plan.allowSpeculation ? "yalnızca açık şaka bağlamında" : "yasak"}
 - Uzunluk bütçesi: en fazla ${plan.maxSentences} kısa cümle
+- Kelime bütçesi: ${plan.maxWords ? `en fazla ${plan.maxWords} kelime` : "özel sınır yok"}
 - Gerekçe: ${plan.reason}
 Doğru cevabı verdikten sonra ikinci bir tahmin, seçenek listesi, yeni şaka veya otomatik soru ekleyerek cevabın mantığını BOZMA.`;
 }
@@ -171,6 +210,23 @@ export function findDialogueDecisionIssues(
       "Diyalog kararı desteksiz tahmini yasakladığı halde tahmin eklendi",
     );
   }
+  if (plan.move === "invite_emotional_context") {
+    const wordCount = (reply.match(/[\p{L}\p{N}]+/gu) || []).length;
+    if (wordCount > (plan.maxWords ?? 6)) {
+      issues.push("İlk duygusal açılış cevabı 6 kelimeyi aştı");
+    }
+    if (EMOTIONAL_OVERCARE_RE.test(reply)) {
+      issues.push(
+        "İlk duygusal açılışta lakap, teselli kalıbı veya fiziksel yakınlık üretildi",
+      );
+    }
+    if (UNSOLICITED_ADVICE_RE.test(reply)) {
+      issues.push("Sebep anlatılmadan tavsiye veya izin cümlesi üretildi");
+    }
+    if (/\bkim\b/i.test(reply)) {
+      issues.push("Moral bozukluğunun sebebi bir kişiymiş gibi varsayıldı");
+    }
+  }
   return issues;
 }
 
@@ -186,6 +242,7 @@ export function buildGroundedDialogueFallback(
   userMessage: string,
   userName: string,
 ): string | null {
+  if (plan.move === "invite_emotional_context") return "hmm niye";
   if (plan.move !== "grounded_recall" || !plan.target) return null;
   const claims = buildDialogueClaimLedger(history, userMessage, userName);
   const supported = supportedClaimsFor(claims, plan.target).at(-1);
