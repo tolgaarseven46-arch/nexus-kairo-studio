@@ -99,6 +99,35 @@ const TEST_USERS = [
   { id: "test_user_x", label: "Mert" },
   { id: "test_user_y", label: "Ali" },
 ] as const;
+type RelationshipTestLevel = "new" | "familiar" | "close";
+const buildRelationshipTestState = (
+  base: DroitDynamicState,
+  level: RelationshipTestLevel,
+): DroitDynamicState => {
+  const now = Date.now();
+  const profile =
+    level === "close"
+      ? { interactionCount: 80, familiarityDays: 90, warmth: 85, trust: 85 }
+      : level === "familiar"
+        ? { interactionCount: 20, familiarityDays: 14, warmth: 62, trust: 60 }
+        : { interactionCount: 0, familiarityDays: 0, warmth: 50, trust: 50 };
+  return {
+    ...base,
+    relationship: {
+      firstSeenAt: new Date(
+        now - profile.familiarityDays * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      lastInteractionAt: new Date(now - 60_000).toISOString(),
+      ...profile,
+      positiveEvents: Math.round(profile.interactionCount * 0.35),
+      negativeEvents: 0,
+      conflictScore: 0,
+      hurtScore: 0,
+      repairProgress: 0,
+      repeatedNegativeCount: 0,
+    },
+  };
+};
 export const NexusStudioLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NexusTab>("KARAKTER"),
     [personality, setPersonality] =
@@ -201,7 +230,10 @@ export const NexusStudioLayout: React.FC = () => {
     await clearKairoConversation().catch(() => {});
   }, [isAiLoading, selectedTestUser]);
   const handleSendMessage = useCallback(
-    async (userText: string) => {
+    async (
+      userText: string,
+      options?: { relationshipLevel?: RelationshipTestLevel },
+    ) => {
       if (!userText.trim() || isAiLoading) return;
       const activeParticipant =
         TEST_USERS.find((user) => user.id === selectedTestUser) ??
@@ -221,14 +253,20 @@ export const NexusStudioLayout: React.FC = () => {
       setIsAiLoading(true);
       setLastTimings(null);
       try {
+        const isRelationshipTest = Boolean(options?.relationshipLevel);
+        const requestDynamicState = options?.relationshipLevel
+          ? buildRelationshipTestState(dynamicState, options.relationshipLevel)
+          : dynamicState;
         const response = await droitChatService.sendMessage({
           userMessage: userText.trim(),
-          userId: activeParticipant.id,
+          userId: isRelationshipTest
+            ? `knt_${activeParticipant.id}_${options?.relationshipLevel}`
+            : activeParticipant.id,
           userName: activeParticipant.label,
           personality,
-          dynamicState,
-          history: messages,
-          suppressRecentMemory: isolatedConversation,
+          dynamicState: requestDynamicState,
+          history: isRelationshipTest ? [] : messages,
+          suppressRecentMemory: isRelationshipTest || isolatedConversation,
           characterInfo: {
             name: "KAIRO",
             roleTitle: "Sunucu Yöneticisi",
@@ -253,8 +291,10 @@ export const NexusStudioLayout: React.FC = () => {
           }),
         };
         setMessages((p) => [...p, dm]);
-        void persistMessageSafely(userMsg);
-        void persistMessageSafely(dm);
+        if (!isRelationshipTest) {
+          void persistMessageSafely(userMsg);
+          void persistMessageSafely(dm);
+        }
       } catch (e: any) {
         setMessages((p) => [
           ...p,

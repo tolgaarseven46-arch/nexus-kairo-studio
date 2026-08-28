@@ -13,7 +13,6 @@ import {
   ResponseConsistencyResult,
 } from "./kairoResponseConsistency";
 import { auth } from "../lib/firebase";
-import type { KairoSpeechIdentity } from "./kairoSpeechIdentity";
 export type KairoProvider = "gemini" | "openrouter";
 export interface KairoTimingMetrics {
   clientPrepMs: number;
@@ -42,8 +41,7 @@ export interface KairoChatResponse {
   dynamicState?: DroitDynamicState;
   reasoningTrace?: ReasoningTrace;
   consistency?: ResponseConsistencyResult;
-  speechIdentity?: KairoSpeechIdentity;
-  providerUsed?: KairoProvider | "local_language";
+  providerUsed?: KairoProvider;
   timings?: KairoTimingMetrics;
 }
 function resolveConversationUserId(explicitUserId?: string) {
@@ -142,7 +140,6 @@ export const droitChatService = {
         dynamicState: nextDynamicState,
         reasoningTrace,
         consistency,
-        speechIdentity: data.speechIdentity as KairoSpeechIdentity | undefined,
         providerUsed: data.providerUsed,
         timings,
       };

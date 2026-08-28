@@ -199,4 +199,4 @@ Yeni sohbet açıldığında:
 - Sert küfür yakın ilişkide dahi otomatik değildir; karşılıklı bağlam ve ileride tanımlanacak konuşma tercihi/izin sinyali gerekir.
 - Yerel Dil Motoru cevap havuzları da aynı ilişki kapısına bağlandı.
 - `kairoSpeechIdentity.test.ts` ile ritmin ilişki seviyelerinde sabit kaldığı, argonun yakınlıkla açıldığı, yeni kullanıcıya yakın hitap verilmediği ve emoji eğiliminin düşük tutulduğu doğrulanıyor.
-- Zihin Haritası/KNT ekranına `YAZI RİTMİ v1` karşılaştırma matrisi eklendi. Aynı mesajı sırayla `new`, `familiar`, `close` profillerinde çalıştırır; üç çağrıyı kullanıcı düğmeye bastığında yapar ve cevap uzunluğu, satır, noktalama, emoji ve yeni kullanıcıya samimiyet sızıntısını raporlar. Projedeki konuşma ve ilişki testleri ana olarak Zihin Haritası/KNT üzerinden yürütülür.
+- Projedeki konuşma ve ilişki testleri ana olarak Zihin Haritası/KNT içindeki mevcut `KAIRO CHAT · CANLI TEST` alanından yürütülür. Bu alana `Yeni / Tanıdık / Çok yakın` ilişki seviyesi ve `Örnek 1-4` mesaj seçimleri eklendi. Her gönderim mevcut KNT akışından tek tek geçer; ayrı bir üst test şeridi veya paralel sohbet arayüzü kullanılmaz.

@@ -17,7 +17,8 @@ import {
   TestMessage,
 } from "../../../types/nexus";
 import type { KairoTimingMetrics } from "../../../services/droitChatService";
-import { KairaSpeechMatrixPanel } from "../../common/KairaSpeechMatrixPanel";
+type RelationshipTestLevel = "new" | "familiar" | "close";
+type MindMapSendOptions = { relationshipLevel?: RelationshipTestLevel };
 type Props = {
   personality: DroitPersonalityTraits;
   dynamicState: DroitDynamicState;
@@ -28,7 +29,7 @@ type Props = {
   participants: ReadonlyArray<{ id: string; label: string }>;
   selectedParticipantId: string;
   onSelectParticipant: (id: string) => void;
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, options?: MindMapSendOptions) => void;
   onClearChat: () => void;
   onResetTestUser: () => void | Promise<void>;
 };
@@ -94,6 +95,8 @@ export const MindMapTab: React.FC<Props> = ({
   onResetTestUser,
 }) => {
   const [text, setText] = useState("");
+  const [relationshipLevel, setRelationshipLevel] =
+    useState<RelationshipTestLevel>("new");
   const [copied, setCopied] = useState(false);
   const activeParticipant =
     participants.find(
@@ -177,9 +180,15 @@ export const MindMapTab: React.FC<Props> = ({
   }, [isLoading, messages, reasoningTrace, scores, timings]);
   const submit = () => {
     if (!text.trim() || isLoading) return;
-    onSendMessage(text);
+    onSendMessage(text, { relationshipLevel });
     setText("");
   };
+  const presets = [
+    "bugün moralim biraz bozuk ya",
+    "yine bütün işi son dakikaya bıraktım hahah",
+    "ne anlatıyorsun ya hiçbir şey anlamadım",
+    "naber",
+  ];
   const timingItems = timings
     ? ([
         ["İstemci hazırlık", timings.clientPrepMs],
@@ -226,9 +235,6 @@ export const MindMapTab: React.FC<Props> = ({
               ● CANLI KDM
             </span>
           </div>
-        </div>
-        <div className="mb-3">
-          <KairaSpeechMatrixPanel personality={personality} />
         </div>
         <div className="grid grid-cols-4 gap-3">
           <Node
@@ -419,6 +425,29 @@ export const MindMapTab: React.FC<Props> = ({
               );
             })}
           </div>
+          <div className="mt-2 border-t border-zinc-800 pt-2">
+            <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] text-zinc-500">
+              <span>İLİŞKİ TEST SEVİYESİ</span>
+              <span>AYNI KNT AKIŞI</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                ["new", "Yeni"],
+                ["familiar", "Tanıdık"],
+                ["close", "Çok yakın"],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setRelationshipLevel(value)}
+                  disabled={isLoading}
+                  className={`rounded border px-2 py-1.5 text-[9px] font-mono font-bold ${relationshipLevel === value ? "border-fuchsia-400 bg-fuchsia-500/20 text-fuchsia-200" : "border-zinc-700 bg-zinc-900 text-zinc-500"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         <div className="flex-1 overflow-auto p-3 space-y-2">
           {messages.slice(-12).map((m) => (
@@ -447,21 +476,36 @@ export const MindMapTab: React.FC<Props> = ({
             </div>
           )}
         </div>
-        <div className="p-3 border-t border-zinc-800 flex gap-2">
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
-            placeholder={`${activeParticipant?.label || "Kişi"} olarak yaz…`}
-            className="flex-1 min-w-0 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs"
-          />
-          <button
-            onClick={submit}
-            disabled={isLoading}
-            className="rounded-lg bg-violet-600 px-3"
-          >
-            <Send className="w-4 h-4" />
-          </button>
+        <div className="p-3 border-t border-zinc-800 space-y-2">
+          <div className="grid grid-cols-4 gap-1.5">
+            {presets.map((preset, index) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setText(preset)}
+                disabled={isLoading}
+                className="rounded border border-zinc-800 bg-zinc-950 px-1 py-1 text-[8px] font-mono text-zinc-400 hover:border-violet-500 hover:text-violet-200 disabled:opacity-40"
+              >
+                Örnek {index + 1}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+              placeholder={`${activeParticipant?.label || "Kişi"} · ${relationshipLevel === "new" ? "Yeni" : relationshipLevel === "familiar" ? "Tanıdık" : "Çok yakın"} olarak yaz…`}
+              className="flex-1 min-w-0 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs"
+            />
+            <button
+              onClick={submit}
+              disabled={isLoading}
+              className="rounded-lg bg-violet-600 px-3"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </aside>
     </div>
