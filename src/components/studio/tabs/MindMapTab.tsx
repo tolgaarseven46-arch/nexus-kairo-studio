@@ -32,6 +32,7 @@ import type { ResponseConsistencyResult } from "../../../services/kairoResponseC
 type RelationshipTestLevel = "new" | "familiar" | "close";
 type InspectorTab = "decision" | "relationship" | "memory" | "performance";
 type MindMapSendOptions = { relationshipLevel?: RelationshipTestLevel };
+type CopyMode = "last" | "all" | null;
 
 type Props = {
   personality: DroitPersonalityTraits;
@@ -125,7 +126,7 @@ export const MindMapTab: React.FC<Props> = ({
     useState<RelationshipTestLevel>("new");
   const [inspectorTab, setInspectorTab] =
     useState<InspectorTab>("decision");
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<CopyMode>(null);
   const [showDangerMenu, setShowDangerMenu] = useState(false);
   const [showRawTrace, setShowRawTrace] = useState(false);
 
@@ -152,16 +153,45 @@ export const MindMapTab: React.FC<Props> = ({
     setText("");
   };
 
-  const copyReport = async () => {
+  const markCopied = (mode: Exclude<CopyMode, null>) => {
+    setCopied(mode);
+    window.setTimeout(() => setCopied(null), 1800);
+  };
+
+  const copyLastReport = async () => {
     const interactionCount =
       reasoningTrace.relationship.interactionCount ??
       relationship?.interactionCount ??
       0;
-    const report = `KAIRA KNT DEBUG RAPORU\nMesaj: ${lastUser?.text || lastSubmittedMessage || "-"}\nKonuşan: ${lastUser?.participantName || activeParticipant?.label || "-"}\nYanıt: ${lastReply?.text || "-"}\nYanıt kaynağı: ${responseSource}\nNiyet: ${reasoningTrace.messageInterpretation.intent}\nDuygu sinyali: ${reasoningTrace.messageInterpretation.sentiment}\nKarar tonu: ${reasoningTrace.decision.chosenTone}\nOturum mesaj sayısı: ${interactionCount}\nYeni kullanıcı: ${reasoningTrace.whoSent.isNewUser ? "Evet" : "Hayır"}\nİlişki: güven=${relationship?.trust ?? 50}, sıcaklık=${relationship?.warmth ?? reasoningTrace.relationship.warmthScore}, kırgınlık=${relationship?.hurtScore || 0}, çatışma=${relationship?.conflictScore || 0}, tekrar=${relationship?.repeatedNegativeCount || 0}\nDuygu durumu: sakinlik=${dynamicState.calmness}, stres=${dynamicState.stress}, öfke=${dynamicState.anger}, mutluluk=${dynamicState.happiness}\nKDM doğrulaması: ${consistency ? `${consistency.accepted ? "Kabul" : "Sorunlu"} (${consistency.score}/100)${consistency.issues.length ? ` - ${consistency.issues.join("; ")}` : ""}` : "ölçüm yok"}\nSüreler: ${timings ? `istemci=${timings.clientPrepMs}ms, hafıza=${timings.memoryMs}ms, KDM=${timings.kdmMs}ms, AI=${timings.aiMs}ms, kayıt=${timings.postProcessMs}ms, ağ=${timings.networkAndOverheadMs}ms, toplam=${timings.totalMs}ms` : "ölçüm yok"}`;
+    const report = `KAIRA KNT SON TUR RAPORU\nMesaj: ${lastUser?.text || lastSubmittedMessage || "-"}\nKonuşan: ${lastUser?.participantName || activeParticipant?.label || "-"}\nYanıt: ${lastReply?.text || "-"}\nYanıt kaynağı: ${responseSource}\nNiyet: ${reasoningTrace.messageInterpretation.intent}\nDuygu sinyali: ${reasoningTrace.messageInterpretation.sentiment}\nKarar tonu: ${reasoningTrace.decision.chosenTone}\nOturum tur sayısı: ${interactionCount}\nYeni kullanıcı: ${reasoningTrace.whoSent.isNewUser ? "Evet" : "Hayır"}\nİlişki: güven=${relationship?.trust ?? 50}, sıcaklık=${relationship?.warmth ?? reasoningTrace.relationship.warmthScore}, kırgınlık=${relationship?.hurtScore || 0}, çatışma=${relationship?.conflictScore || 0}, tekrar=${relationship?.repeatedNegativeCount || 0}\nDuygu durumu: sakinlik=${dynamicState.calmness}, stres=${dynamicState.stress}, öfke=${dynamicState.anger}, mutluluk=${dynamicState.happiness}\nKDM doğrulaması: ${consistency ? `${consistency.accepted ? "Kabul" : "Sorunlu"} (${consistency.score}/100)${consistency.issues.length ? ` - ${consistency.issues.join("; ")}` : ""}` : "ölçüm yok"}\nSüreler: ${timings ? `istemci=${timings.clientPrepMs}ms, hafıza=${timings.memoryMs}ms, KDM=${timings.kdmMs}ms, AI=${timings.aiMs}ms, kayıt=${timings.postProcessMs}ms, ağ=${timings.networkAndOverheadMs}ms, toplam=${timings.totalMs}ms` : "ölçüm yok"}`;
     try {
       await navigator.clipboard.writeText(report);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
+      markCopied("last");
+    } catch {}
+  };
+
+  const copyFullSession = async () => {
+    if (!activeSessionId) return;
+    try {
+      const response = await fetch(
+        `/api/test-sessions/${encodeURIComponent(activeSessionId)}`,
+      );
+      if (!response.ok) throw new Error("Oturum alınamadı");
+      const payload = await response.json();
+      const session = payload?.session ?? payload;
+      await navigator.clipboard.writeText(
+        JSON.stringify(
+          {
+            reportType: "KAIRA_KNT_FULL_SESSION",
+            sessionId: activeSessionId,
+            exportedAt: new Date().toISOString(),
+            session,
+          },
+          null,
+          2,
+        ),
+      );
+      markCopied("all");
     } catch {}
   };
 
@@ -203,19 +233,34 @@ export const MindMapTab: React.FC<Props> = ({
             Mesajı gönder, yanıtı ve gerçek karar izini aynı yerde incele.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={copyReport}
-          disabled={!hasResult}
-          className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-[9px] font-mono font-bold text-zinc-300 hover:border-violet-500 hover:text-violet-200 disabled:cursor-not-allowed disabled:opacity-35"
-        >
-          {copied ? (
-            <Check className="h-3.5 w-3.5" />
-          ) : (
-            <Copy className="h-3.5 w-3.5" />
-          )}
-          {copied ? "KOPYALANDI" : "KNT RAPORUNU KOPYALA"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={copyLastReport}
+            disabled={!hasResult}
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-[9px] font-mono font-bold text-zinc-300 hover:border-violet-500 hover:text-violet-200 disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            {copied === "last" ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+            {copied === "last" ? "KOPYALANDI" : "SON TURU KOPYALA"}
+          </button>
+          <button
+            type="button"
+            onClick={copyFullSession}
+            disabled={!activeSessionId || messages.length === 0 || isRestoring}
+            className="flex items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-2 text-[9px] font-mono font-bold text-violet-200 hover:border-violet-400 hover:bg-violet-500/15 disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            {copied === "all" ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+            {copied === "all" ? "KOPYALANDI" : "TÜM OTURUMU KOPYALA"}
+          </button>
+        </div>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto p-3 lg:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)] lg:overflow-hidden">
