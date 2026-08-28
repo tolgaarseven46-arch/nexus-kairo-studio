@@ -35,6 +35,10 @@ import {
 import { droitChatService } from '../../../services/droitChatService';
 import { computeBehaviorProfile } from '../../../services/droitBehaviorEngine';
 import { validateKairoResponse } from '../../../services/kairoResponseConsistency';
+import {
+  loadActiveTestSessionForUser,
+  clearTestSession,
+} from '../../../services/kdmPersistenceService';
 import { DroitAvatar } from '../DroitAvatar';
 
 export interface ReasoningTrace {
@@ -180,8 +184,18 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
   onUserWarmthChange,
   onNavigateToBrain,
 }) => {
-  // Test Session ID
-  const [testId, setTestId] = useState<string>(() => `TL-${Math.floor(1000 + Math.random() * 9000)}`);
+  // Test Session ID & Firestore Persistence
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
+    const scope = propIsNewUserMode ? 'test_user_new' : 'test_user_x';
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const cached = window.localStorage.getItem(`kairo_active_session_${scope}`);
+      if (cached?.trim()) return cached.trim();
+    }
+    return `session_${scope}`;
+  });
+  const [testId, setTestId] = useState<string>(() => activeSessionId);
+  const [isRestoringSession, setIsRestoringSession] = useState<boolean>(true);
+  const [persistedTurnCount, setPersistedTurnCount] = useState<number>(0);
 
   // Chat Messages for Test Lab
   const [testMessages, setTestMessages] = useState<TestMessage[]>([
@@ -203,6 +217,65 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
   const [isTechOpen, setIsTechOpen] = useState<boolean>(false);
   const [isNewUserMode, setIsNewUserMode] = useState<boolean>(() => propIsNewUserMode ?? false);
   const [userWarmth, setUserWarmth] = useState<number>(() => propUserWarmth ?? 62);
+
+  // Restore Active Test Session from Firestore
+  useEffect(() => {
+    let cancelled = false;
+    async function restoreSession() {
+      setIsRestoringSession(true);
+      try {
+        const userScope = isNewUserMode ? 'test_user_new' : 'test_user_x';
+        const session = await loadActiveTestSessionForUser(userScope);
+        if (session && !cancelled && session.turns && session.turns.length > 0) {
+          setActiveSessionId(session.summary.sessionId);
+          setTestId(session.summary.sessionId);
+          setPersistedTurnCount(session.summary.turnCount);
+
+          const restoredMessages: TestMessage[] = [];
+          session.turns.forEach((turn, idx) => {
+            const timeStr = turn.timestamp
+              ? new Date(turn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : '12:00';
+            restoredMessages.push({
+              id: `usr-${turn.turnId || idx}`,
+              sender: 'user',
+              text: turn.userMessage,
+              timestamp: timeStr,
+            });
+            restoredMessages.push({
+              id: `kairo-${turn.turnId || idx}`,
+              sender: 'droit',
+              text: turn.assistantReply,
+              timestamp: timeStr,
+            });
+          });
+          setTestMessages(restoredMessages);
+
+          const lastTurn = session.turns[session.turns.length - 1];
+          if (lastTurn.reasoningTrace) {
+            setReasoningTrace(lastTurn.reasoningTrace);
+            onReasoningTraceChange?.(lastTurn.reasoningTrace);
+          }
+          if (lastTurn.dynamicStateAfter) {
+            onDynamicStateChange?.(lastTurn.dynamicStateAfter);
+          }
+          const relWarmth = (lastTurn.relationshipState as any)?.warmthScore ?? (lastTurn.relationshipState as any)?.warmth;
+          if (typeof relWarmth === 'number') {
+            setUserWarmth(relWarmth);
+            onUserWarmthChange?.(relWarmth);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not restore test session:', err);
+      } finally {
+        if (!cancelled) setIsRestoringSession(false);
+      }
+    }
+    restoreSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNewUserMode]);
 
   // Sync if props change
   useEffect(() => {
@@ -408,14 +481,21 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
 
   // Reset / Clear Test Session
   const handleNewTest = () => {
-    setTestId(`TL-${Math.floor(1000 + Math.random() * 9000)}`);
+    const userScope = isNewUserMode ? 'test_user_new' : 'test_user_x';
+    const newSessionId = `session_${userScope}_${Date.now()}`;
+    setActiveSessionId(newSessionId);
+    setTestId(newSessionId);
+    setPersistedTurnCount(0);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(`kairo_active_session_${userScope}`, newSessionId);
+    }
     setTestMessages([
       {
         id: `init-${Date.now()}`,
         sender: 'droit',
         text: isNewUserMode
           ? 'Yeni kullanıcı test modu aktif. Sıfır warmth ve boş kullanıcı notuyla yeni bir oturum başlatıldı.'
-          : 'Test sıfırlandı. Yeni bir mesaj göndererek akışı başlatabilirsiniz.',
+          : 'Test oturumu sıfırlandı. Yeni bir mesaj göndererek akışı başlatabilirsiniz.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
@@ -435,7 +515,14 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
     setUserWarmth(nextWarmth);
     propOnToggleNewUserMode?.();
     onUserWarmthChange?.(nextWarmth);
-    setTestId(`TL-${Math.floor(1000 + Math.random() * 9000)}`);
+    const nextScope = nextMode ? 'test_user_new' : 'test_user_x';
+    const newSessionId = `session_${nextScope}_${Date.now()}`;
+    setActiveSessionId(newSessionId);
+    setTestId(newSessionId);
+    setPersistedTurnCount(0);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(`kairo_active_session_${nextScope}`, newSessionId);
+    }
     setTestMessages([
       {
         id: `init-${Date.now()}`,
@@ -576,7 +663,10 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
     setActiveRunningStep('KAIRO (Gemini AI) yanıt üretiyor...');
 
     try {
-      // 3. Gerçek Sunucu Tarafı Gemini Çağrısı
+      // 3. Gerçek Sunucu Tarafı Gemini Çağrısı (Session Persistence Desteğiyle)
+      const userScope = isNewUserMode ? 'test_user_new' : 'test_user_x';
+      const currentSessionId = activeSessionId || `session_${userScope}`;
+
       const response = await droitChatService.sendMessage({
         userMessage: textToSend,
         personality,
@@ -587,7 +677,19 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
           roleTitle: 'Sunucu Yöneticisi',
           raceName: 'Sentetik Droit',
         },
+        sessionId: currentSessionId,
+        userId: userScope,
+        userName: isNewUserMode ? 'Anonim Ziyaretçi' : 'Test Operatörü',
       });
+
+      if (response.sessionId) {
+        setActiveSessionId(response.sessionId);
+        setTestId(response.sessionId);
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem(`kairo_active_session_${userScope}`, response.sessionId);
+        }
+      }
+      setPersistedTurnCount((prev) => prev + 1);
 
       const endTime = performance.now();
       const latency = Math.round(endTime - startTime);
@@ -899,6 +1001,19 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
             <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
               #{testId}
             </span>
+            <div
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[9px] font-mono"
+              title="KAIRO Test Oturumu Firestore'da kalıcı olarak saklanır"
+            >
+              <Database className="w-2.5 h-2.5 text-indigo-400" />
+              <span>
+                {isRestoringSession
+                  ? 'Yükleniyor...'
+                  : persistedTurnCount > 0
+                  ? `Kalıcı: ${persistedTurnCount} Tur`
+                  : 'Firestore Aktif'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -924,6 +1039,19 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
               {lastAnalysis.latencyMs}ms
             </span>
           )}
+          <button
+            type="button"
+            onClick={async () => {
+              if (activeSessionId) {
+                await clearTestSession(activeSessionId).catch(() => {});
+              }
+              handleNewTest();
+            }}
+            className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-[10px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+            title="Mevcut oturumu Firestore'dan temizle ve sıfırla"
+          >
+            <span>Oturumu Temizle</span>
+          </button>
           <button
             type="button"
             onClick={handleNewTest}

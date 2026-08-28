@@ -13,6 +13,15 @@ export async function resetKdmTestUser(userId: string): Promise<void> {
   const traces = await getDocs(collection(stateRef, 'kdmTraces'));
   await Promise.all(traces.docs.map((item) => deleteDoc(item.ref)));
   await deleteDoc(stateRef);
+
+  // Aktif test oturumu varsa temizle
+  try {
+    await clearSubcollection('testSessions', `session_${userScope}`, 'turns');
+    await deleteDoc(doc(db, 'testSessions', `session_${userScope}`));
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(`kairo_active_session_${userScope}`);
+    }
+  } catch {}
 }
 
 const TEST_USER_SCOPES = [

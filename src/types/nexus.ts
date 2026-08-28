@@ -1,17 +1,22 @@
 export type NexusTab = 'KARAKTER' | 'TEST' | 'AYARLAR';
 
 export interface RelationshipState {
-  firstSeenAt: string;
-  lastInteractionAt: string;
-  interactionCount: number;
-  familiarityDays: number;
-  warmth: number;
+  firstSeenAt?: string;
+  lastInteractionAt?: string;
+  interactionCount?: number;
+  familiarityDays?: number;
+  warmth?: number;
+  warmthScore?: number;
+  warmthLabel?: string;
+  note?: string;
   trust?: number;
+  trustScore?: number;
   positiveEvents?: number;
   negativeEvents?: number;
   conflictScore?: number;
   hurtScore?: number;
   repairProgress?: number;
+  toleranceMultiplier?: number;
   lastConflictAt?: string;
   repeatedNegativeCount?: number;
   lastNegativePattern?: string;
@@ -43,3 +48,80 @@ export interface DroitDynamicState { calmness: number; anger: number; stress: nu
 export type DroitExpressionMode = 'NEUTRAL' | 'FOCUSED' | 'ALERT' | 'CALM' | 'ANALYTICAL' | 'FRIENDLY' | 'CONFIDENT';
 export interface TestMessage { id: string; sender: 'user' | 'droit'; text: string; timestamp: string; moodEffect?: string; participantId?: string; participantName?: string; replyToParticipantId?: string; replyToParticipantName?: string; }
 export interface DroitStudioData { id: string; codeName: string; name: string; title: string; personality: DroitPersonalityTraits; dynamicState: DroitDynamicState; expression: DroitExpressionMode; }
+
+export interface TestSessionTurnRecord {
+  id?: string;
+  turnId: string;
+  turnNumber: number;
+  sessionId: string;
+  timestamp: string;
+  userMessage: string;
+  assistantReply: string;
+  speaker: string;
+  intent: string;
+  detectedEmotion: string;
+  reasoningTrace?: ReasoningTrace;
+  kdmResult?: {
+    chosenTone?: string;
+    explanation?: string;
+    score?: number;
+    decision?: unknown;
+  };
+  activationValues?: {
+    calmness?: number;
+    anger?: number;
+    stress?: number;
+    happiness?: number;
+    confidence?: number;
+    surprise?: number;
+    deltas?: Array<{ label: string; key: string; value: number }>;
+  };
+  dynamicStateBefore?: DroitDynamicState;
+  dynamicStateAfter?: DroitDynamicState;
+  relationshipState?: RelationshipState | Record<string, unknown>;
+  retrievedMemories?: unknown[];
+  memoryUpdate?: {
+    warmthBefore: number;
+    warmthAfter: number;
+    warmthDelta: number;
+    moodChange: string;
+    reason: string;
+  };
+  consistency?: {
+    accepted?: boolean;
+    score?: number;
+    issues?: string[];
+    warnings?: string[];
+  };
+  metadata?: {
+    providerUsed?: string;
+    model?: string;
+    timings?: Record<string, number>;
+    speechIdentity?: unknown;
+  };
+}
+
+export interface TestSessionSummary {
+  sessionId: string;
+  userId: string;
+  userName: string;
+  characterId: string;
+  createdAt: string;
+  updatedAt: string;
+  turnCount: number;
+  lastUserMessage?: string;
+  lastAssistantReply?: string;
+  dynamicState?: DroitDynamicState;
+  relationship?: RelationshipState;
+  active?: boolean;
+}
+
+export interface RestoredTestSession {
+  session: TestSessionSummary;
+  summary: TestSessionSummary;
+  turns: TestSessionTurnRecord[];
+  messages: TestMessage[];
+  lastDynamicState?: DroitDynamicState;
+  lastReasoningTrace?: ReasoningTrace;
+}
+

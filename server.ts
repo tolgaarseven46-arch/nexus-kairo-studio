@@ -9,6 +9,10 @@ import {
   saveKdmInteraction,
   saveKntTrace,
   loadRecentKntTraces,
+  saveTestSessionTurn,
+  loadTestSession,
+  loadActiveTestSessionForUser,
+  clearTestSession,
 } from "./src/services/kdmPersistenceService";
 import { validateMemoryAgainstMessage } from "./src/services/kairoMemoryConsistency";
 import { validateKairoResponse } from "./src/services/kairoResponseConsistency";
@@ -135,26 +139,65 @@ async function callOpenRouter(messages: any[], temperature: number) {
   if (!text) throw new Error("OpenRouter boş yanıt döndürdü.");
   return text;
 }
+let activeAiProviderUsed = "gemini";
 async function generateText(
   system: string,
   messages: any[],
   temperature: number,
-  provider: string,
-) {
-  if (provider === "openrouter")
-    return callOpenRouter(
+  preferredProvider: string,
+): Promise<string> {
+  const hasOpenRouter = Boolean(process.env.OPENROUTER_API_KEY?.trim());
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY?.trim());
+
+  if (preferredProvider === "openrouter" && hasOpenRouter) {
+    try {
+      const text = await callOpenRouter(
+        [{ role: "system", content: system }, ...messages],
+        temperature,
+      );
+      activeAiProviderUsed = "openrouter";
+      return text;
+    } catch (openRouterErr) {
+      console.warn("[Provider] OpenRouter failed, falling back to Gemini:", openRouterErr);
+      if (hasGemini) {
+        const response = await getGeminiClient().models.generateContent({
+          model: "gemini-3.6-flash",
+          contents: messages.map((m) => ({
+            role: m.role === "assistant" ? "model" : "user",
+            parts: [{ text: m.content }],
+          })),
+          config: { systemInstruction: system },
+        });
+        activeAiProviderUsed = "gemini";
+        return (response?.text || "").trim();
+      }
+      throw openRouterErr;
+    }
+  }
+
+  if (hasGemini) {
+    const response = await getGeminiClient().models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: messages.map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      })),
+      config: { systemInstruction: system },
+    });
+    activeAiProviderUsed = "gemini";
+    return (response?.text || "").trim();
+  }
+
+  if (hasOpenRouter) {
+    const text = await callOpenRouter(
       [{ role: "system", content: system }, ...messages],
       temperature,
     );
-  const response = await getGeminiClient().models.generateContent({
-    model: "gemini-3.6-flash",
-    contents: messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    })),
-    config: { systemInstruction: system },
-  });
-  return (response?.text || "").trim();
+    activeAiProviderUsed = "openrouter";
+    return text;
+  }
+
+  throw new Error("Yapay zeka anahtarı (GEMINI_API_KEY veya OPENROUTER_API_KEY) bulunamadı.");
 }
 async function getFastRecentMemory(userId: string) {
   const c = memoryCache.get(userId);
@@ -249,7 +292,9 @@ app.get("/api/health", (_q, r) =>
   r.json({ status: "ok", timestamp: new Date().toISOString() }),
 );
 app.get("/api/runtime-info", (_q, r) => {
-  const activeProvider = "openrouter";
+  const hasOpenRouter = Boolean(process.env.OPENROUTER_API_KEY?.trim());
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY?.trim());
+  const activeProvider = hasOpenRouter ? "openrouter" : (hasGemini ? "gemini" : "local_language");
   r.json({
     status: "ok",
     activeProvider,
@@ -259,8 +304,8 @@ app.get("/api/runtime-info", (_q, r) => {
         ? "openrouter/free"
         : "gemini-3.6-flash"),
     providers: {
-      openrouter: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
-      gemini: Boolean(process.env.GEMINI_API_KEY?.trim()),
+      openrouter: hasOpenRouter,
+      gemini: hasGemini,
     },
     persistence: "Firestore",
     recentMemoryLimit: 6,
@@ -283,6 +328,44 @@ app.get("/api/kaira/language-memory", async (q, r) => {
     typeof q.query.userId === "string" ? q.query.userId : "test_user_x";
   await hydrateLanguageMemory(userId);
   r.json({ ok: true, userId, ...languageMemorySummary(userId) });
+});
+app.get("/api/test-sessions/active", async (q, r) => {
+  try {
+    const userId = typeof q.query.userId === "string" ? q.query.userId : "test_user_x";
+    const session = await loadActiveTestSessionForUser(userId);
+    r.json({ ok: true, session });
+  } catch (e: any) {
+    r.status(500).json({ ok: false, error: e?.message });
+  }
+});
+app.get("/api/test-sessions/:sessionId", async (q, r) => {
+  try {
+    const { sessionId } = q.params;
+    const session = await loadTestSession(sessionId);
+    if (!session) return r.status(404).json({ ok: false, error: "Session not found" });
+    r.json({ ok: true, session });
+  } catch (e: any) {
+    r.status(500).json({ ok: false, error: e?.message });
+  }
+});
+app.post("/api/test-sessions/new", async (q, r) => {
+  try {
+    const { userId = "test_user_x" } = q.body || {};
+    const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const sessionId = `session_${safeUserId}_${Date.now()}`;
+    r.json({ ok: true, sessionId });
+  } catch (e: any) {
+    r.status(500).json({ ok: false, error: e?.message });
+  }
+});
+app.delete("/api/test-sessions/:sessionId", async (q, r) => {
+  try {
+    const { sessionId } = q.params;
+    await clearTestSession(sessionId);
+    r.json({ ok: true });
+  } catch (e: any) {
+    r.status(500).json({ ok: false, error: e?.message });
+  }
 });
 const defaultDynamicState: DroitDynamicState = {
   calmness: 70,
@@ -314,9 +397,13 @@ app.post("/api/chat", async (req, res) => {
       dynamicState = defaultDynamicState,
       provider = "openrouter",
       suppressRecentMemory = false,
+      sessionId: incomingSessionId,
     } = req.body;
     if (!userMessage)
       return res.status(400).json({ error: "userMessage is required" });
+    const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const sessionId =
+      incomingSessionId?.trim() || `session_${safeUserId}`;
     const cleanHistory = sanitizeKairoChatHistory(history);
     const dialogueAnalysis = analyzeDialogueTurn(userMessage);
     const dialogueInstruction = buildDialogueBoardInstruction(
@@ -391,6 +478,7 @@ app.post("/api/chat", async (req, res) => {
       const reply = local.reply,
         consistency = validateKairoResponse(reply, kdm.trace),
         postStart = now();
+      let savedTurnId = "";
       await Promise.allSettled([
         saveKdmInteraction({
           userId,
@@ -417,6 +505,50 @@ app.post("/api/chat", async (req, res) => {
           providerUsed: "local_language",
           speechIdentity: speech,
         }),
+        saveTestSessionTurn({
+          sessionId,
+          userId,
+          userName,
+          userMessage,
+          assistantReply: reply,
+          speaker: userName,
+          intent: kdm.trace?.messageInterpretation?.intent,
+          detectedEmotion: kdm.trace?.messageInterpretation?.sentiment,
+          reasoningTrace: kdm.trace,
+          kdmResult: {
+            chosenTone: kdm.trace?.decision?.chosenTone,
+            explanation: kdm.trace?.decision?.explanation,
+            score: consistency.score,
+            decision: kdm.trace?.decision,
+          },
+          activationValues: {
+            calmness: kdm.nextDynamicState.calmness,
+            anger: kdm.nextDynamicState.anger,
+            stress: kdm.nextDynamicState.stress,
+            happiness: kdm.nextDynamicState.happiness,
+            confidence: kdm.nextDynamicState.confidence,
+            surprise: kdm.nextDynamicState.surprise,
+            deltas: kdm.nextDynamicState.lastEvent?.deltas || [],
+          },
+          dynamicStateBefore: requestState,
+          dynamicStateAfter: kdm.nextDynamicState,
+          relationshipState:
+            kdm.nextDynamicState.relationship || kdm.trace.relationship,
+          retrievedMemories: validatedMemory,
+          memoryUpdate: kdm.trace?.memoryUpdate,
+          consistency: {
+            accepted: consistency.accepted,
+            score: consistency.score,
+            issues: consistency.issues,
+          },
+          metadata: {
+            providerUsed: "local_language",
+            speechIdentity: speech,
+            timings: { memoryMs, kdmMs, aiMs: 0 },
+          },
+        }).then((t) => {
+          savedTurnId = t.turnId;
+        }),
       ]);
       memoryCache.delete(userId);
       const postProcessMs = Math.round(now() - postStart),
@@ -428,6 +560,8 @@ app.post("/api/chat", async (req, res) => {
           serverTotalMs: Math.round(now() - serverStart),
         };
       res.json({
+        sessionId,
+        turnId: savedTurnId,
         reply,
         providerUsed: "local_language",
         localLanguage: {
@@ -552,6 +686,7 @@ app.post("/api/chat", async (req, res) => {
       issues: [...baseConsistency.issues, ...groundingIssues],
     };
     const postStart = now();
+    let savedTurnId = "";
     await Promise.allSettled([
       saveKdmInteraction({
         userId,
@@ -577,8 +712,52 @@ app.post("/api/chat", async (req, res) => {
         reasoningTrace: kdm.trace,
         dynamicState: kdm.nextDynamicState,
         timings: { memoryMs, kdmMs, aiMs, postProcessMs: 0, serverTotalMs: 0 },
-        providerUsed: provider,
+        providerUsed: activeAiProviderUsed,
         speechIdentity: speech,
+      }),
+      saveTestSessionTurn({
+        sessionId,
+        userId,
+        userName,
+        userMessage,
+        assistantReply: reply,
+        speaker: userName,
+        intent: kdm.trace?.messageInterpretation?.intent,
+        detectedEmotion: kdm.trace?.messageInterpretation?.sentiment,
+        reasoningTrace: kdm.trace,
+        kdmResult: {
+          chosenTone: kdm.trace?.decision?.chosenTone,
+          explanation: kdm.trace?.decision?.explanation,
+          score: consistency.score,
+          decision: kdm.trace?.decision,
+        },
+        activationValues: {
+          calmness: kdm.nextDynamicState.calmness,
+          anger: kdm.nextDynamicState.anger,
+          stress: kdm.nextDynamicState.stress,
+          happiness: kdm.nextDynamicState.happiness,
+          confidence: kdm.nextDynamicState.confidence,
+          surprise: kdm.nextDynamicState.surprise,
+          deltas: kdm.nextDynamicState.lastEvent?.deltas || [],
+        },
+        dynamicStateBefore: requestState,
+        dynamicStateAfter: kdm.nextDynamicState,
+        relationshipState:
+          kdm.nextDynamicState.relationship || kdm.trace.relationship,
+        retrievedMemories: validatedMemory,
+        memoryUpdate: kdm.trace?.memoryUpdate,
+        consistency: {
+          accepted: consistency.accepted,
+          score: consistency.score,
+          issues: consistency.issues,
+        },
+        metadata: {
+          providerUsed: activeAiProviderUsed,
+          speechIdentity: speech,
+          timings: { memoryMs, kdmMs, aiMs },
+        },
+      }).then((t) => {
+        savedTurnId = t.turnId;
       }),
     ]);
     memoryCache.delete(userId);
@@ -591,8 +770,10 @@ app.post("/api/chat", async (req, res) => {
         serverTotalMs: Math.round(now() - serverStart),
       };
     res.json({
+      sessionId,
+      turnId: savedTurnId,
       reply,
-      providerUsed: provider,
+      providerUsed: activeAiProviderUsed,
       speechIdentity: speech,
       kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState },
       consistency,
@@ -612,8 +793,8 @@ async function startServer() {
     appType: "spa",
   });
   app.use(vite.middlewares);
-  app.listen(PORT, () =>
-    console.log(`NEXUS Kairo Studio running on http://localhost:${PORT}`),
+  app.listen(PORT, "0.0.0.0", () =>
+    console.log(`NEXUS Kairo Studio running on http://0.0.0.0:${PORT}`),
   );
 }
 startServer();

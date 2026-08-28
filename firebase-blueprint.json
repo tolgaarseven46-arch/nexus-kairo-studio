@@ -37,6 +37,53 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "status", "createdAt", "updatedAt"]
+    },
+    "TestSession": {
+      "title": "Test Session",
+      "description": "Kairo Studio test chat session state for persistence across page reloads",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "characterId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "turnCount": { "type": "number" },
+        "lastUserMessage": { "type": "string" },
+        "lastAssistantReply": { "type": "string" },
+        "dynamicState": { "type": "object" },
+        "relationship": { "type": "object" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["sessionId", "userId", "createdAt", "updatedAt"]
+    },
+    "TestSessionTurn": {
+      "title": "Test Session Turn",
+      "description": "Each individual conversation turn within a test session recording full KDM and dialogue trace",
+      "type": "object",
+      "properties": {
+        "turnId": { "type": "string" },
+        "turnNumber": { "type": "number" },
+        "sessionId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userMessage": { "type": "string" },
+        "assistantReply": { "type": "string" },
+        "speaker": { "type": "string" },
+        "intent": { "type": "string" },
+        "detectedEmotion": { "type": "string" },
+        "reasoningTrace": { "type": "object" },
+        "kdmResult": { "type": "object" },
+        "activationValues": { "type": "object" },
+        "dynamicStateBefore": { "type": "object" },
+        "dynamicStateAfter": { "type": "object" },
+        "relationshipState": { "type": "object" },
+        "retrievedMemories": { "type": "array" },
+        "memoryUpdate": { "type": "object" },
+        "consistency": { "type": "object" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["turnId", "sessionId", "timestamp", "userMessage", "assistantReply"]
     }
   },
   "firestore": {
@@ -48,6 +95,14 @@
       "characters": {
         "entity": "Character",
         "description": "Collection of digital being character profiles"
+      },
+      "testSessions": {
+        "entity": "TestSession",
+        "description": "Collection of test conversation sessions"
+      },
+      "testSessions/{sessionId}/turns": {
+        "entity": "TestSessionTurn",
+        "description": "Subcollection of all persistent turns in a test session"
       }
     }
   }

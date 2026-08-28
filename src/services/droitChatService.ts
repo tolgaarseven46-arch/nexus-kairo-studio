@@ -35,6 +35,7 @@ export interface SendKairoChatOptions {
   userId?: string;
   userName?: string;
   suppressRecentMemory?: boolean;
+  sessionId?: string;
 }
 export interface KairoChatResponse {
   reply: string;
@@ -44,6 +45,8 @@ export interface KairoChatResponse {
   consistency?: ResponseConsistencyResult;
   providerUsed?: KairoProviderUsed;
   timings?: KairoTimingMetrics;
+  sessionId?: string;
+  turnId?: string;
 }
 function resolveConversationUserId(explicitUserId?: string) {
   if (explicitUserId?.trim()) return explicitUserId.trim();
@@ -68,6 +71,7 @@ export const droitChatService = {
     userId: explicitUserId,
     userName = "Kullanıcı",
     suppressRecentMemory = false,
+    sessionId,
   }: SendKairoChatOptions): Promise<KairoChatResponse> {
     const totalStart = performance.now();
     const userId = resolveConversationUserId(explicitUserId);
@@ -75,6 +79,7 @@ export const droitChatService = {
     const behaviorProfile = computeBehaviorProfile(personality, userMessage);
     const clientPrepMs = Math.round(performance.now() - prepStart);
     const payload = {
+      sessionId,
       userId,
       userName,
       userMessage,
@@ -143,6 +148,8 @@ export const droitChatService = {
         consistency,
         providerUsed: data.providerUsed,
         timings,
+        sessionId: data.sessionId,
+        turnId: data.turnId,
       };
     } catch (err: any) {
       if (err?.name === "AbortError")
