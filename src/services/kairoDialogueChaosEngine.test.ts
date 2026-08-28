@@ -7,6 +7,19 @@ import {
 } from "./kairoDialogueChaosEngine";
 
 describe("Kaira complex dialogue engine", () => {
+  it.each([
+    "ne diyon aq",
+    "ne anlatıyosun ya",
+    "ne alaka",
+    "nasıl yani",
+    "bi şey anlamadım",
+  ])("separates confusion or challenge from a real question: %s", (message) => {
+    const result = analyzeDialogueTurn(message);
+
+    expect(result.acts).toContain("confusion_or_challenge");
+    expect(result.acts).not.toContain("question");
+  });
+
   it("recognizes short Turkish text laughter as banter", () => {
     const result = analyzeDialogueTurn(
       "yine bütün işi son dakikaya bıraktım hahah",

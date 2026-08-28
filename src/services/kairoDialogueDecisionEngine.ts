@@ -9,6 +9,8 @@ import { isLocalEmotionalOpening } from "./kairoEmotionalLanguage";
 export type DialogueMove =
   | "grounded_recall"
   | "invite_emotional_context"
+  | "repair_or_rephrase"
+  | "follow_previous_answer"
   | "answer_or_clarify"
   | "acknowledge_correction"
   | "join_banter"
@@ -26,6 +28,11 @@ export interface DialogueDecisionPlan {
   reason: string;
 }
 
+export interface DialogueOutputStyle {
+  emojiLevel?: number;
+  userMessage?: string;
+}
+
 const RECALL_RE =
   /(ne yapacaktı|ne yapmayı düşünüyordu|az önce ne dedi|ne demişti|ne söylemişti|hatırlıyor musun|kim söylemişti)/i;
 const SPECULATION_RE =
@@ -40,6 +47,10 @@ const CANNED_BANTER_RE =
   /\b(speedrun|full kaos|plot twist|achievement|level atla\w*|npc|boss fight|main character|challenge accepted)\b/i;
 const PROCRASTINATION_BANTER_RE =
   /\b(son dakikaya bırak\w*|ertele\w*|geciktir\w*|üşen\w*|yapmayıp bekle\w*)\b/i;
+const SHORT_CONTEXTUAL_ANSWER_RE =
+  /^(?:hiç\s*biri|hiçbiri|ikisi\s+de|hepsi|hiçbiri\s+değil|yok|hayır|evet|aynen|olmadı|bilmiyorum|fark\s+etmez|sen\s+seç|öbürü|diğeri|ilki|ikincisi)(?:\s+(?:ya|işte|kanka))?[.!?…]*$/i;
+const PREVIOUS_PROMPT_RE =
+  /[?？]|\b(?:hangisi|hangisini|seç|mı|mi|mu|mü|ne dersin|sence)\b/i;
 
 function responseUnitCount(reply: string): number {
   return reply
@@ -99,6 +110,19 @@ function isFirstEmotionalOpening(
     .some((turn) => isLocalEmotionalOpening(String(turn.text || "")));
 }
 
+function isShortAnswerToPreviousKairaTurn(
+  history: ConversationTurn[],
+  userMessage: string,
+): boolean {
+  const previous = history.at(-1);
+  if (!previous || previous.sender !== "droit") return false;
+  const previousText = String(previous.text || "");
+  return (
+    PREVIOUS_PROMPT_RE.test(previousText) &&
+    SHORT_CONTEXTUAL_ANSWER_RE.test(userMessage.trim())
+  );
+}
+
 export function planDialogueResponse(
   history: ConversationTurn[],
   userMessage: string,
@@ -108,6 +132,31 @@ export function planDialogueResponse(
   const target = recallTarget(history, userMessage, userName);
   const claims = buildDialogueClaimLedger(history, userMessage, userName);
   const supportedClaims = supportedClaimsFor(claims, target);
+
+  if (analysis.acts.includes("confusion_or_challenge")) {
+    return {
+      move: "repair_or_rephrase",
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 8,
+      hasSupportedTargetClaim: false,
+      reason:
+        "Kullanıcı Kaira'nın önceki mesajını anlamadı veya ona itiraz etti. Önceki fikri kısa ve daha doğal biçimde yeniden söyle ya da gereksiz kısmı geri çek; kendini savunma, yeni konu açma ve soru sorma.",
+    };
+  }
+  if (isShortAnswerToPreviousKairaTurn(history, userMessage)) {
+    return {
+      move: "follow_previous_answer",
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 8,
+      hasSupportedTargetClaim: false,
+      reason:
+        "Bu kısa mesaj bağımsız bir konu değil, Kaira'nın hemen önceki sorusuna veya seçeneklerine verilen cevaptır. Yalnızca o cevaba bağlan; yeni duygu, sebep veya konu uydurma.",
+    };
+  }
 
   if (RECALL_RE.test(userMessage)) {
     return {
@@ -207,9 +256,32 @@ Doğru cevabı verdikten sonra ikinci bir tahmin, seçenek listesi, yeni şaka v
 export function findDialogueDecisionIssues(
   reply: string,
   plan: DialogueDecisionPlan,
+  style?: DialogueOutputStyle,
 ): string[] {
   const issues: string[] = [];
   const wordCount = (reply.match(/[\p{L}\p{N}]+/gu) || []).length;
+  const emojiCount = (reply.match(/\p{Extended_Pictographic}/gu) || []).length;
+  const emojiBudget =
+    plan.move === "join_banter"
+      ? 0
+      : style?.emojiLevel === undefined
+        ? 1
+        : style.emojiLevel >= 15
+          ? 1
+          : 0;
+  if (emojiCount > emojiBudget) {
+    issues.push(
+      `Konuşma kimliği bu turda en fazla ${emojiBudget} emojiye izin veriyor`,
+    );
+  }
+  if (
+    CANNED_BANTER_RE.test(reply) &&
+    !CANNED_BANTER_RE.test(style?.userMessage || "")
+  ) {
+    issues.push(
+      "Kullanıcının başlatmadığı hazır internet esprisi veya oyun metaforu eklendi",
+    );
+  }
   if (responseUnitCount(reply) > plan.maxSentences) {
     issues.push(
       `Diyalog kararı ${plan.maxSentences} kısa cümle sınırını aştı`,
@@ -244,14 +316,6 @@ export function findDialogueDecisionIssues(
       issues.push("Moral bozukluğunun sebebi bir kişiymiş gibi varsayıldı");
     }
   }
-  if (plan.move === "join_banter") {
-    if (/\p{Extended_Pictographic}/u.test(reply)) {
-      issues.push("Kısa şakaya gereksiz emoji eklendi");
-    }
-    if (CANNED_BANTER_RE.test(reply)) {
-      issues.push("Kısa şakaya hazır internet esprisi veya oyun metaforu eklendi");
-    }
-  }
   return issues;
 }
 
@@ -268,6 +332,8 @@ export function buildGroundedDialogueFallback(
   userName: string,
 ): string | null {
   if (plan.move === "invite_emotional_context") return "hmm niye";
+  if (plan.move === "repair_or_rephrase") return "biraz saçmaladım galiba";
+  if (plan.move === "follow_previous_answer") return "he tamam o zaman";
   if (plan.move === "join_banter") {
     return PROCRASTINATION_BANTER_RE.test(userMessage)
       ? "yine şaşırtmadın hahah"

@@ -59,6 +59,15 @@ export function applyRelationshipContext(
   ];
 
   const tone = friendlyRelationship && profile.tone === 'formal' ? 'confident' : profile.tone;
+  const relationshipInstruction = damagedRelationship
+    ? 'İlişki gerilimli veya kırgın. Kısa ve ölçülü konuş; eski samimiyeti, şakayı ya da toleransı otomatik olarak geri getirme.'
+    : healingRelationship
+      ? 'İlişki toparlanıyor. Biraz yumuşayabilirsin ama tek mesajda eski yakınlığa dönme.'
+      : friendlyRelationship
+        ? 'İlişki sıcak ve güvenli. Rahat konuşabilir ve küçük hatalara daha toleranslı davranabilirsin; rahatsızlığı tamamen yok sayma.'
+        : establishedRelationship
+          ? 'Kullanıcı tanıdık ama ilişki tam güvenli değil. Gereksiz resmiyeti azalt; samimiyeti mevcut güven kadar göster.'
+          : 'İlişki yeni. Doğal ve sıcak ol ama argo, lakap, aşırı samimiyet veya geçmiş varsayma.';
   const dominantSummary = `${profile.dominantSummary}, ${damagedRelationship ? 'gerilimli ilişki' : healingRelationship ? 'iyileşen ilişki' : establishedRelationship ? 'yerleşmiş ilişki' : 'gelişen ilişki'}`;
   const responseStyle = `${tone}_${profile.decisionSpeed}_rel${Math.round(closeness * 100)}`;
 
@@ -71,6 +80,7 @@ export function applyRelationshipContext(
     humorLevel,
     responseStyle,
     behaviorDirectives: [...profile.behaviorDirectives, ...relationshipDirectives],
+    relationshipInstruction,
     dominantSummary,
     debugMatrix: {
       ...profile.debugMatrix,

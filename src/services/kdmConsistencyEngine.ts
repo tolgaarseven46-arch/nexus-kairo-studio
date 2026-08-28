@@ -9,6 +9,8 @@ import {
 } from "./droitBehaviorEngine";
 import { normalizeKairoLanguageInput } from "./kairoLanguageNormalizer";
 import { hasLocalLowMoodExpression } from "./kairoEmotionalLanguage";
+import { isConfusionOrChallenge } from "./kairoDialogueChaosEngine";
+import { applyRelationshipContext } from "./relationshipBehaviorService";
 
 export interface KdmAnalysisResult {
   trace: ReasoningTrace;
@@ -49,6 +51,7 @@ function classifyIntent(message: string): string {
   const text = analysisText(message);
   if (/(özür dilerim|özür|pardon|kusura bakma)/.test(text))
     return "özür_ve_telafi";
+  if (isConfusionOrChallenge(message)) return "anlamama_ve_itiraz";
   if (hasLocalLowMoodExpression(message)) return "duygusal_paylasim";
   if (EMOTIONAL_SHARE_RE.test(text)) return "duygusal_paylasim";
   if (/(^|\s)(selam|merhaba|hey|naber|nasılsın|ne yapıyorsun)(\s|$)/.test(text))
@@ -183,9 +186,9 @@ export function analyzeKdmInteraction(
     ...DEFAULT_DYNAMIC_STATE,
     ...(currentDynamicState || {}),
   };
-  const behaviorProfile = computeBehaviorProfile(
-    personality || undefined,
-    userMessage,
+  const behaviorProfile = applyRelationshipContext(
+    computeBehaviorProfile(personality || undefined, userMessage),
+    state,
   );
   const intent = classifyIntent(userMessage);
   const sentiment = classifySentiment(userMessage);

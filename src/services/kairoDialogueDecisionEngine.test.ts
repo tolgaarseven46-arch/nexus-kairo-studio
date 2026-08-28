@@ -65,6 +65,70 @@ describe("Kaira dialogue decision engine", () => {
     expect(plan.allowFollowUpQuestion).toBe(false);
   });
 
+  it.each([
+    "ne diyon aq",
+    "ne anlatıyosun ya",
+    "ne alaka",
+    "nasıl yani",
+    "bi şey anlamadım",
+  ])("uses one bounded repair move for confusion or challenge: %s", (message) => {
+    const plan = planDialogueResponse(
+      [{ sender: "droit", text: "gereksiz uzun bir şey anlattım" }],
+      message,
+      "Mert",
+    );
+
+    expect(plan).toMatchObject({
+      move: "repair_or_rephrase",
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 8,
+    });
+    expect(findDialogueDecisionIssues("neyse bugün ne yapıyorsun?", plan)).toContain(
+      "Diyalog kararı takip sorusunu yasakladığı halde soru eklendi",
+    );
+  });
+
+  it.each(["hiç biri", "hiçbiri", "yok", "ikisi de", "olmadı"])(
+    "binds a short answer to Kaira's previous prompt: %s",
+    (message) => {
+      const plan = planDialogueResponse(
+        [
+          {
+            sender: "droit",
+            text: "ders mi iş mi, hangisi canını sıkıyor?",
+          },
+        ],
+        message,
+        "Mert",
+      );
+
+      expect(plan).toMatchObject({
+        move: "follow_previous_answer",
+        allowFollowUpQuestion: false,
+        allowSpeculation: false,
+        maxSentences: 1,
+      });
+    },
+  );
+
+  it("applies the speech emoji budget and canned-language gate globally", () => {
+    const plan = planDialogueResponse([], "bugün hava iyi", "Mert");
+    const issues = findDialogueDecisionIssues(
+      "level atlamış bu 😄",
+      plan,
+      { emojiLevel: 10, userMessage: "bugün hava iyi" },
+    );
+
+    expect(issues).toContain(
+      "Konuşma kimliği bu turda en fazla 0 emojiye izin veriyor",
+    );
+    expect(issues).toContain(
+      "Kullanıcının başlatmadığı hazır internet esprisi veya oyun metaforu eklendi",
+    );
+  });
+
   it("bounds self-deprecating banter to one short everyday reaction", () => {
     const message = "yine bütün işi son dakikaya bıraktım hahah";
     const plan = planDialogueResponse([], message, "Mert");

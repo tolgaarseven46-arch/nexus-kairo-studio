@@ -36,7 +36,6 @@ import {
   computeKairoSpeechIdentity,
   speechIdentityPrompt,
 } from "./src/services/kairoSpeechIdentity";
-import { applyRelationshipContext } from "./src/services/relationshipBehaviorService";
 import { tryLocalKairoReply } from "./src/services/kairoLocalLanguageEngine";
 import {
   hydrateLanguageMemory,
@@ -291,7 +290,6 @@ app.post("/api/chat", async (req, res) => {
       userMessage,
       character = {},
       personality = {},
-      behaviorProfile: baseBehaviorProfile,
       history = [],
       dynamicState = defaultDynamicState,
       provider = "openrouter",
@@ -324,10 +322,6 @@ app.post("/api/chat", async (req, res) => {
       effective = dynamicState?.relationship
         ? requestState
         : normalizeDynamicState(persistedState ?? dynamicState),
-      behaviorProfile = applyRelationshipContext(
-        baseBehaviorProfile,
-        effective,
-      ),
       safePersonality = personality as DroitPersonalityTraits,
       kdmStart = now(),
       kdm = analyzeKdmInteraction(
@@ -335,11 +329,16 @@ app.post("/api/chat", async (req, res) => {
         safePersonality,
         effective,
       ),
+      behaviorProfile = kdm.behaviorProfile,
       speech = computeKairoSpeechIdentity(
         safePersonality,
         kdm.nextDynamicState,
         kdm.trace,
       ),
+      dialogueOutputStyle = {
+        emojiLevel: speech.emojiLevel,
+        userMessage,
+      },
       local = tryLocalKairoReply(
         userMessage,
         safePersonality,
@@ -434,7 +433,10 @@ app.post("/api/chat", async (req, res) => {
       userName,
       userId,
     );
-    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bunlar ne söyleyeceğini dikte etmez; yalnızca davranış sınırların ve mevcut ilişkin hakkında bağlamdır.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const relationshipInstruction = behaviorProfile.relationshipInstruction
+      ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
+      : "";
+    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bunlar ne söyleyeceğini dikte etmez; yalnızca davranış sınırların ve mevcut ilişkin hakkında bağlamdır.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
@@ -449,7 +451,11 @@ app.post("/api/chat", async (req, res) => {
         userMessage,
         userName,
       ),
-      ...findDialogueDecisionIssues(reply, dialogueDecision),
+      ...findDialogueDecisionIssues(
+        reply,
+        dialogueDecision,
+        dialogueOutputStyle,
+      ),
     ];
     let repairAttempts = 0;
     if (groundingIssues.length && now() - aiStart < 24000) {
@@ -475,7 +481,11 @@ app.post("/api/chat", async (req, res) => {
             userMessage,
             userName,
           ),
-          ...findDialogueDecisionIssues(repairedReply, dialogueDecision),
+          ...findDialogueDecisionIssues(
+            repairedReply,
+            dialogueDecision,
+            dialogueOutputStyle,
+          ),
         ];
         if (repairedIssues.length < groundingIssues.length) {
           reply = repairedReply;
@@ -501,7 +511,11 @@ app.post("/api/chat", async (req, res) => {
             userMessage,
             userName,
           ),
-          ...findDialogueDecisionIssues(fallback, dialogueDecision),
+          ...findDialogueDecisionIssues(
+            fallback,
+            dialogueDecision,
+            dialogueOutputStyle,
+          ),
         ];
         if (fallbackIssues.length < groundingIssues.length) {
           reply = fallback;

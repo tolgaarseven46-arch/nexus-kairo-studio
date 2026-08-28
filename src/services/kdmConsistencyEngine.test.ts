@@ -105,6 +105,20 @@ describe("KDM response consistency gate", () => {
     expect(result.trace.messageInterpretation.sentiment).toBe("nötr");
   });
 
+  it.each([
+    "ne diyon aq",
+    "ne anlatıyosun ya",
+    "ne alaka",
+    "nasıl yani",
+    "bi şey anlamadım",
+  ])("shares the confusion/challenge family with the KDM trace: %s", (message) => {
+    const result = analyzeKdmInteraction(message);
+
+    expect(result.trace.messageInterpretation.intent).toBe(
+      "anlamama_ve_itiraz",
+    );
+  });
+
   it("advances one continuous relationship interaction per message", () => {
     const first = analyzeKdmInteraction(
       "naber kaira",

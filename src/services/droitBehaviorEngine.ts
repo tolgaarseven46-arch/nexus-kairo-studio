@@ -23,6 +23,7 @@ export interface BehaviorLayerProfile {
   decisionSpeed: 'hesitant' | 'deliberate' | 'balanced' | 'decisive' | 'instant';
   responseStyle: string;
   behaviorDirectives: string[];
+  relationshipInstruction?: string;
   dominantSummary: string;
   debugMatrix: {
     inputTraits: Partial<DroitPersonalityTraits>;

@@ -3,6 +3,7 @@ import type { ConversationTurn } from "./kairoConversationGrounding";
 export type DialogueAct =
   | "statement"
   | "question"
+  | "confusion_or_challenge"
   | "correction"
   | "topic_shift"
   | "banter"
@@ -35,6 +36,8 @@ const UNCERTAINTY_RE =
   /\b(herhalde|galiba|sanırım|belki|muhtemelen|olabilir|emin değilim|düşünüyorum|düşünüyor|düşünüyordu|gibi)\b/i;
 const QUESTION_RE =
   /[?？]|(?:^|\s)(kim|kime|kimi|ne|neyi|neden|niye|nasıl|nerede|nereye|hangi|kaç|mı|mi|mu|mü)(?:\s|$)/i;
+const CONFUSION_OR_CHALLENGE_RE =
+  /^(?:(?:sen\s+)?ne(?:yi)?\s+(?:diyon|diyosun|diyorsun|anlatıyon|anlatıyosun|anlatıyorsun|saçmalıyon|saçmalıyosun|saçmalıyorsun)|ne\s+alaka|nasıl\s+yani|(?:hiçbir|hiç\s+bir|bi|bir)\s+şey\s+anlamadım|anlamadım\s+(?:ki|ya)|ne\s+demek\s+şimdi\s+bu|bu\s+ne\s+şimdi)(?:\s+(?:aq|amk|ya|lan|la))?$/i;
 const BANTER_RE =
   /(?:😂|🤣|😄|😅|:d|\b(?:şaka|dalga|taşak|ha(?:ha)+h*|a?haha+|asdasd+|dfghj+)\b)/i;
 const NOISE_RE = /^(?:\s|[.!?])+$/i;
@@ -43,6 +46,15 @@ const ABSURD_RE =
   /(?<![\p{L}])(uzaylı|marslı|ejderha|zombi|müdür aslında robot|dünyayı ele geçir)(?![\p{L}])/iu;
 const DURABLE_RE =
   /\b(benim adım|adım|ismim|yaşım|yaşındayım|mesleğim|işim|şehirde yaşıyorum|seviyorum|sevmiyorum|favorim|hedefim|amacım|üzerinde çalışıyorum|geliştiriyorum)\b/i;
+
+export function isConfusionOrChallenge(text: string): boolean {
+  const normalized = String(text || "")
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[!?.,;:…]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return CONFUSION_OR_CHALLENGE_RE.test(normalized);
+}
 
 const TOPIC_STOP_WORDS = new Set([
   "ama",
@@ -101,12 +113,14 @@ export function analyzeDialogueTurn(text: string): DialogueTurnAnalysis {
   const correction = CORRECTION_RE.test(raw);
   const topicShift = TOPIC_SHIFT_RE.test(raw);
   const uncertain = UNCERTAINTY_RE.test(raw);
-  const question = QUESTION_RE.test(raw);
+  const confusionOrChallenge = isConfusionOrChallenge(raw);
+  const question = !confusionOrChallenge && QUESTION_RE.test(raw);
   const banter = BANTER_RE.test(raw);
   const absurd = ABSURD_RE.test(raw);
   const durable = DURABLE_RE.test(raw) && !absurd && !noise;
 
   if (noise) acts.push("noise");
+  if (confusionOrChallenge) acts.push("confusion_or_challenge");
   if (correction) acts.push("correction");
   if (topicShift) acts.push("topic_shift");
   if (uncertain) acts.push("uncertain");
