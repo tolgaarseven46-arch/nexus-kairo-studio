@@ -38,10 +38,12 @@ function analysisText(message: string) {
 const EMOTIONAL_SHARE_RE =
   /(moralim\b.{0,30}\bbozuk|üzgünüm|çok\s+mutluyum|mutluyum|bunaldım|canım\s+(çok\s+)?sıkkın|kendimi\s+(çok\s+)?kötü\s+hissediyorum|kendimi\s+(çok\s+)?iyi\s+hissediyorum)/;
 const EMOTIONAL_LOAD_RE =
-  /(moralim\b.{0,30}\bbozuk|üzgün|kötü\s+hissed|bunaldım|canım\s+(çok\s+)?sıkkın|kaygı|endişe|stres|çok\s+sıcak.*bunaldım)/;
-const NEGATIVE_WORD_RE =
-  /(sinir|kızgın|nefret|rezalet|bok|amk|lanet|berbat|aptal|salak|gerizekalı|mal\b|defol|siktir)/;
-const DIRECT_INSULT_RE = /(aptal|salak|gerizekalı|mal\b|nefret|defol|siktir)/;
+  /(moralim\b.{0,30}\bbozuk|üzgün|kötü\s+hissed|bunaldım|canım\s+(çok\s+)?sıkkın|kaygı|endişe|stres|çok\s+sıcak.*bunaldım|yoruldum|tükendim)/;
+const INSULT_RE =
+  /(aptal|salak|gerizekalı|geri\s+zekalı|mal\b|çirkin|boş\s+konuş|kaşar|orospu|orosp[uy]|sürtük|piç|yavşak|şerefsiz|haysiyetsiz|ezik|defol|siktir|sus\b|kes\b|kaybol|nefret|rezalet|berbat|bok)/;
+const AGGRESSIVE_RE =
+  /(sinir|kızgın|nefret|rezalet|bok|amk|aq\b|mk\b|lanet|berbat|aptal|salak|gerizekalı|geri\s+zekalı|mal\b|çirkin|boş\s+konuş|kaşar|orospu|orosp[uy]|sürtük|piç|yavşak|şerefsiz|haysiyetsiz|ezik|defol|siktir|sus\b|kes\b|kaybol)/;
+const DIRECT_INSULT_RE = INSULT_RE;
 const THIRD_PARTY_RE =
   /\b(mert|müdür|patron|çocuk|çocuğa|çocuğu|adam|adama|adamı|kadın|kadına|kadını|arkadaşım|arkadaşıma|arkadaşına|ona|onu|onun|o)\b/;
 const REPORTING_RE =
@@ -51,6 +53,7 @@ function classifyIntent(message: string): string {
   const text = analysisText(message);
   if (/(özür dilerim|özür|pardon|kusura bakma)/.test(text))
     return "özür_ve_telafi";
+  if (INSULT_RE.test(text)) return "hakaret_ve_saldiri";
   if (isConfusionOrChallenge(message)) return "anlamama_ve_itiraz";
   if (hasLocalLowMoodExpression(message)) return "duygusal_paylasim";
   if (EMOTIONAL_SHARE_RE.test(text)) return "duygusal_paylasim";
@@ -81,77 +84,65 @@ function classifySentiment(message: string): string {
   const text = analysisText(message);
   if (hasLocalLowMoodExpression(message)) return "duygusal_yük";
   if (EMOTIONAL_LOAD_RE.test(text)) return "duygusal_yük";
+  if (AGGRESSIVE_RE.test(text)) return "negatif";
   if (
     /(çok\s+mutluyum|mutluyum|çok\s+iyiyim|keyfim\s+yerinde|teşekkür|sağ ol|harika|süper|mükemmel|seviyorum|güzel|özür)/.test(
       text,
     )
   )
     return "pozitif";
-  if (NEGATIVE_WORD_RE.test(text)) return "negatif";
   return "nötr";
 }
 
 function classifyNegativeTarget(message: string): NegativeTarget {
   const text = analysisText(message);
 
-  // Kaira/Kairo açıkça hedefse ilişki olayıdır.
   if (/\b(kaira|kairo)\b/.test(text)) return "kaira";
-
-  // Aktarılan konuşma veya üçüncü kişi hakkında hakaret, Kaira'ya yönelmiş değildir.
   if (REPORTING_RE.test(text) && THIRD_PARTY_RE.test(text))
     return "third_party";
   if (THIRD_PARTY_RE.test(text) && DIRECT_INSULT_RE.test(text))
     return "third_party";
-
-  // İkinci şahsa doğrudan hitap ilişki hedefidir.
   if (/\b(sen|sana|seni|senden|senin)\b/.test(text)) return "kaira";
   if (/\b(mısın|misin|musun|müsün)\b/.test(text) && !REPORTING_RE.test(text))
     return "kaira";
   if (
-    /(^|\s)(defol|siktir|sus|kes)(\s|$)/.test(text) &&
+    /(^|\s)(defol|siktir|sus|kes|kaybol)(\s|$)/.test(text) &&
     !REPORTING_RE.test(text)
   )
     return "kaira";
-
-  // Sohbette hedef belirtilmeden doğrudan söylenen ağır negatif ifade varsayılan olarak Kaira'ya yöneliktir.
-  if (DIRECT_INSULT_RE.test(text)) return "kaira";
-
-  // Genel küfür/agresif dil veya olaya sövme ilişki hasarı değildir.
+  if (DIRECT_INSULT_RE.test(text) && !REPORTING_RE.test(text)) return "kaira";
   return "event";
 }
 
 function warmthDeltaFor(message: string, sentiment: string): number {
-  const text = message.toLowerCase();
-  let delta = sentiment === "pozitif" ? 3 : sentiment === "negatif" ? -2 : 0;
+  const text = analysisText(message);
+  let delta = sentiment === "pozitif" ? 2 : sentiment === "negatif" ? -3 : 0;
   if (/(teşekkür|sağ ol|eyvallah|kanka|kardeşim|dostum|özür)/.test(text))
     delta += 2;
-  if (/(siktir|defol|sus|aptal|salak|gerizekalı|mal\b)/.test(text)) delta -= 5;
+  if (INSULT_RE.test(text)) delta -= 5;
   return clamp(delta, -10, 10);
 }
 
 function eventKind(message: string, sentiment: string): EventKind {
-  const text = message.toLowerCase();
+  const text = analysisText(message);
   if (
     /(özür|teşekkür|sağ ol|iyi ki varsın|seviyorum|harika|süper)/.test(text) ||
     sentiment === "pozitif"
   )
     return "positive";
-  if (
-    /(aptal|salak|gerizekalı|mal\b|defol|siktir|nefret|rezalet|berbat|bok)/.test(
-      text,
-    ) ||
-    sentiment === "negatif"
-  )
-    return "negative";
+  if (INSULT_RE.test(text) || sentiment === "negatif") return "negative";
   return "neutral";
 }
 
 function negativePattern(message: string): string | null {
-  const t = message.toLowerCase();
-  if (/(aptal|salak|gerizekalı|mal\b)/.test(t)) return "hakaret";
-  if (/(siktir|defol|sus|kaybol)/.test(t)) return "kovma_ve_reddetme";
+  const t = analysisText(message);
+  if (/(aptal|salak|gerizekalı|geri\s+zekalı|mal\b|çirkin|boş\s+konuş|ezik)/.test(t))
+    return "hakaret";
+  if (/(kaşar|orospu|orosp[uy]|sürtük|piç|yavşak|şerefsiz|haysiyetsiz)/.test(t))
+    return "agir_hakaret";
+  if (/(siktir|defol|sus\b|kes\b|kaybol)/.test(t)) return "kovma_ve_reddetme";
   if (/(nefret|rezalet|berbat|bok)/.test(t)) return "aşağılama";
-  if (/(amk|lanet)/.test(t)) return "agresif_dil";
+  if (/(amk|aq\b|mk\b|lanet)/.test(t)) return "agresif_dil";
   return null;
 }
 
@@ -165,6 +156,11 @@ function moodChangeFromDelta(delta: number): string {
   if (delta >= 4) return "daha pozitif ve sıcak";
   if (delta <= -4) return "daha temkinli ve mesafeli";
   return "stabil";
+}
+
+function approachBaseline(value: number, baseline: number, maxStep = 1): number {
+  if (value === baseline) return 0;
+  return value > baseline ? -Math.min(maxStep, value - baseline) : Math.min(maxStep, baseline - value);
 }
 
 const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
@@ -186,10 +182,8 @@ export function analyzeKdmInteraction(
     ...DEFAULT_DYNAMIC_STATE,
     ...(currentDynamicState || {}),
   };
-  const behaviorProfile = applyRelationshipContext(
-    computeBehaviorProfile(personality || undefined, userMessage),
-    state,
-  );
+  const baseBehaviorProfile = computeBehaviorProfile(personality || undefined, userMessage);
+  const behaviorProfile = applyRelationshipContext(baseBehaviorProfile, state);
   const intent = classifyIntent(userMessage);
   const sentiment = classifySentiment(userMessage);
 
@@ -235,22 +229,10 @@ export function analyzeKdmInteraction(
     repeatedNegativeCount: 0,
   };
 
-  const calculatedDays = Number.isFinite(
-    new Date(relationship.firstSeenAt).getTime(),
-  )
-    ? Math.max(
-        0,
-        Math.floor(
-          (Date.now() - new Date(relationship.firstSeenAt).getTime()) /
-            86400000,
-        ),
-      )
+  const calculatedDays = Number.isFinite(new Date(relationship.firstSeenAt).getTime())
+    ? Math.max(0, Math.floor((Date.now() - new Date(relationship.firstSeenAt).getTime()) / 86400000))
     : 0;
-  const familiarityDays = Math.max(
-    0,
-    relationship.familiarityDays || 0,
-    calculatedDays,
-  );
+  const familiarityDays = Math.max(0, relationship.familiarityDays || 0, calculatedDays);
   const interactionCount = Math.max(0, relationship.interactionCount || 0);
   const nextInteractionCount = interactionCount + 1;
   const interactionAt = new Date().toISOString();
@@ -258,34 +240,16 @@ export function analyzeKdmInteraction(
   const baseTrust = clamp(relationship.trust ?? 50);
   const positiveEvents = Math.max(0, relationship.positiveEvents || 0);
   const negativeEvents = Math.max(0, relationship.negativeEvents || 0);
-  const baseConflict = clamp(
-    relationship.conflictScore ?? Math.min(100, negativeEvents * 4),
-  );
+  const baseConflict = clamp(relationship.conflictScore ?? Math.min(100, negativeEvents * 4));
   const baseHurt = clamp(relationship.hurtScore ?? 0);
   const baseRepair = clamp(relationship.repairProgress ?? 0);
 
-  const passiveHealingDays =
-    relationship.lastConflictAt &&
-    Number.isFinite(new Date(relationship.lastConflictAt).getTime())
-      ? Math.max(
-          0,
-          Math.floor(
-            (Date.now() - new Date(relationship.lastConflictAt).getTime()) /
-              86400000,
-          ),
-        )
-      : 0;
-  const healingRate = Math.max(
-    0.45,
-    Math.min(1.6, forgivenessFactor - (sensitivity - 50) / 350),
-  );
-  const passivelyHealedHurt = clamp(
-    baseHurt - Math.min(18, passiveHealingDays * healingRate),
-  );
-  const passivelyHealedConflict = clamp(
-    baseConflict -
-      Math.min(12, Math.floor(passiveHealingDays / 2) * healingRate),
-  );
+  const passiveHealingDays = relationship.lastConflictAt && Number.isFinite(new Date(relationship.lastConflictAt).getTime())
+    ? Math.max(0, Math.floor((Date.now() - new Date(relationship.lastConflictAt).getTime()) / 86400000))
+    : 0;
+  const healingRate = Math.max(0.45, Math.min(1.6, forgivenessFactor - (sensitivity - 50) / 350));
+  const passivelyHealedHurt = clamp(baseHurt - Math.min(18, passiveHealingDays * healingRate));
+  const passivelyHealedConflict = clamp(baseConflict - Math.min(12, Math.floor(passiveHealingDays / 2) * healingRate));
 
   const familiarityFactor = Math.min(familiarityDays / 30, 1);
   const closeness = clamp(
@@ -296,66 +260,40 @@ export function analyzeKdmInteraction(
   );
   const loyaltyBetrayalFactor = 1 + ((loyalty - 50) / 250) * (closeness / 100);
   const historyQuality = clamp(
-    50 +
-      positiveEvents * 3 -
-      negativeEvents * 5 -
-      passivelyHealedConflict * 0.35 -
-      passivelyHealedHurt * 0.25,
+    50 + positiveEvents * 3 - negativeEvents * 5 - passivelyHealedConflict * 0.35 - passivelyHealedHurt * 0.25,
   );
-  const relationshipQuality = clamp(
-    baseWarmth * 0.35 + baseTrust * 0.35 + historyQuality * 0.3,
-  );
+  const relationshipQuality = clamp(baseWarmth * 0.35 + baseTrust * 0.35 + historyQuality * 0.3);
   const toleranceMultiplier = Math.max(
     0.35,
-    1 -
-      0.55 * familiarityFactor * (relationshipQuality / 100) +
-      (passivelyHealedConflict / 100) * 0.25 +
-      (passivelyHealedHurt / 100) * 0.2,
+    1 - 0.55 * familiarityFactor * (relationshipQuality / 100) + (passivelyHealedConflict / 100) * 0.25 + (passivelyHealedHurt / 100) * 0.2,
   );
 
   const rawKind = eventKind(userMessage, sentiment);
-  const negativeTarget: NegativeTarget | null =
-    rawKind === "negative" ? classifyNegativeTarget(userMessage) : null;
+  const negativeTarget: NegativeTarget | null = rawKind === "negative" ? classifyNegativeTarget(userMessage) : null;
   const targetsKaira = rawKind === "negative" && negativeTarget === "kaira";
-  const kind: EventKind =
-    rawKind === "negative" && !targetsKaira ? "neutral" : rawKind;
+  const kind: EventKind = rawKind === "negative" && !targetsKaira ? "neutral" : rawKind;
   const apology = isApology(userMessage);
   const pattern = kind === "negative" ? negativePattern(userMessage) : null;
   const samePattern = !!pattern && relationship.lastNegativePattern === pattern;
   const priorRepeatCount = Math.max(0, relationship.repeatedNegativeCount || 0);
-  const repeatCount = pattern
-    ? samePattern
-      ? priorRepeatCount + 1
-      : 1
-    : priorRepeatCount;
-  const repeatEscalation = samePattern
-    ? Math.min(2.2, 1 + Math.max(0, repeatCount - 1) * 0.25)
-    : 1;
-  const personalityImpact =
-    kind === "negative" ? negativeSensitivity * loyaltyBetrayalFactor : 1;
+  const repeatCount = pattern ? (samePattern ? priorRepeatCount + 1 : 1) : priorRepeatCount;
+  const repeatEscalation = samePattern ? Math.min(2.2, 1 + Math.max(0, repeatCount - 1) * 0.25) : 1;
+  const personalityImpact = kind === "negative" ? negativeSensitivity * loyaltyBetrayalFactor : 1;
 
-  const rawWarmthDelta =
-    rawKind === "negative" && !targetsKaira
-      ? 0
-      : warmthDeltaFor(userMessage, sentiment);
+  const rawWarmthDelta = rawKind === "negative" && !targetsKaira ? 0 : warmthDeltaFor(userMessage, sentiment);
   const warmthDelta = Math.round(
-    rawWarmthDelta *
-      toleranceMultiplier *
-      (kind === "negative" ? repeatEscalation * personalityImpact : 1),
+    rawWarmthDelta * toleranceMultiplier * (kind === "negative" ? repeatEscalation * personalityImpact : 1),
   );
   const warmthBefore = baseWarmth;
   const warmthAfter = clamp(warmthBefore + warmthDelta);
-  const trustDelta =
-    kind === "negative"
-      ? -4 * repeatEscalation * personalityImpact
-      : apology
-        ? 1.5 * forgivenessFactor
-        : kind === "positive"
-          ? 2
-          : 0;
-  const trustAfter = clamp(
-    baseTrust + Math.round(trustDelta * toleranceMultiplier),
-  );
+  const trustDelta = kind === "negative"
+    ? -4 * repeatEscalation * personalityImpact
+    : apology
+      ? 1.5 * forgivenessFactor
+      : kind === "positive"
+        ? 2
+        : 0;
+  const trustAfter = clamp(baseTrust + Math.round(trustDelta * toleranceMultiplier));
 
   let conflictAfter = passivelyHealedConflict;
   let hurtAfter = passivelyHealedHurt;
@@ -365,12 +303,11 @@ export function analyzeKdmInteraction(
   let lastNegativePatternAt = relationship.lastNegativePatternAt;
 
   if (kind === "negative") {
-    conflictAfter = clamp(
-      conflictAfter + 8 * repeatEscalation * personalityImpact,
-    );
-    hurtAfter = clamp(hurtAfter + 12 * repeatEscalation * personalityImpact);
-    repairAfter = clamp(repairAfter - 8 * repeatEscalation * personalityImpact);
-    lastConflictAt = new Date().toISOString();
+    const severityBoost = pattern === "agir_hakaret" ? 1.35 : 1;
+    conflictAfter = clamp(conflictAfter + 8 * repeatEscalation * personalityImpact * severityBoost);
+    hurtAfter = clamp(hurtAfter + 12 * repeatEscalation * personalityImpact * severityBoost);
+    repairAfter = clamp(repairAfter - 8 * repeatEscalation * personalityImpact * severityBoost);
+    lastConflictAt = interactionAt;
     if (pattern) {
       lastNegativePattern = pattern;
       lastNegativePatternAt = lastConflictAt;
@@ -391,38 +328,71 @@ export function analyzeKdmInteraction(
 
   const positiveEventsAfter = positiveEvents + (kind === "positive" ? 1 : 0);
   const negativeEventsAfter = negativeEvents + (kind === "negative" ? 1 : 0);
-
-  // Genel negatif atmosfer Kaira'nın anlık durumunu etkileyebilir; ilişki hasarı ise yalnızca hedef Kaira ise uygulanır.
-  const stressDelta = Math.round(
-    (sentiment === "negatif"
-      ? 3 * repeatEscalation * personalityImpact
-      : sentiment === "duygusal_yük"
-        ? 2
-        : -1) * toleranceMultiplier,
-  );
-  const happinessDelta = Math.round(
-    (sentiment === "pozitif"
-      ? 4
-      : sentiment === "negatif"
-        ? -2 * repeatEscalation * personalityImpact
-        : 1) * toleranceMultiplier,
-  );
-  const confidenceDelta =
-    intent === "eylem_talebi"
-      ? Math.max(1, Math.round(toleranceMultiplier))
-      : 0;
-  const calmnessDelta = Math.round(
-    (sentiment === "negatif" ? -2 * repeatEscalation * personalityImpact : 1) *
-      toleranceMultiplier,
-  );
-
-  const unresolvedHurt = hurtAfter >= 20 || conflictAfter >= 25;
+  const unresolvedHurt = hurtAfter >= 20 || conflictAfter >= 20;
   const repeatedProblem = samePattern && repeatCount >= 2;
+
+  const neutralStress = approachBaseline(state.stress ?? 20, DEFAULT_DYNAMIC_STATE.stress, 1);
+  const neutralHappiness = approachBaseline(state.happiness ?? 70, DEFAULT_DYNAMIC_STATE.happiness, 1);
+  const neutralCalmness = approachBaseline(state.calmness ?? 70, DEFAULT_DYNAMIC_STATE.calmness, 1);
+  const neutralAnger = approachBaseline(state.anger ?? 10, DEFAULT_DYNAMIC_STATE.anger, 1);
+
+  let stressDelta = 0;
+  let happinessDelta = 0;
+  let calmnessDelta = 0;
+  let angerDelta = 0;
+
+  if (kind === "negative" && targetsKaira) {
+    stressDelta = Math.max(2, Math.round(4 * repeatEscalation * personalityImpact * toleranceMultiplier));
+    happinessDelta = Math.min(-2, Math.round(-3 * repeatEscalation * personalityImpact * toleranceMultiplier));
+    calmnessDelta = Math.min(-2, Math.round(-3 * repeatEscalation * personalityImpact * toleranceMultiplier));
+    angerDelta = Math.max(2, Math.round((2 + angerTrait / 50) * repeatEscalation * negativeSensitivity));
+  } else if (sentiment === "negatif") {
+    stressDelta = 2;
+    happinessDelta = -1;
+    calmnessDelta = -1;
+    angerDelta = 1;
+  } else if (sentiment === "duygusal_yük") {
+    stressDelta = 1;
+    happinessDelta = unresolvedHurt ? -1 : 0;
+    calmnessDelta = 0;
+    angerDelta = neutralAnger;
+  } else if (apology) {
+    stressDelta = unresolvedHurt ? -1 : neutralStress;
+    happinessDelta = unresolvedHurt ? 0 : 1;
+    calmnessDelta = 1;
+    angerDelta = -Math.min(2, Math.max(0, (state.anger ?? 10) - DEFAULT_DYNAMIC_STATE.anger));
+  } else if (kind === "positive") {
+    stressDelta = -1;
+    happinessDelta = 2;
+    calmnessDelta = 1;
+    angerDelta = neutralAnger;
+  } else {
+    stressDelta = neutralStress;
+    happinessDelta = neutralHappiness;
+    calmnessDelta = neutralCalmness;
+    angerDelta = neutralAnger;
+  }
+
+  if (unresolvedHurt && kind === "neutral" && !apology) {
+    happinessDelta = Math.min(happinessDelta, 0);
+    calmnessDelta = Math.min(calmnessDelta, 0);
+    stressDelta = Math.max(stressDelta, 0);
+  }
+
+  const confidenceDelta = intent === "eylem_talebi" ? Math.max(1, Math.round(toleranceMultiplier)) : 0;
   const lastStatus = repeatedProblem
     ? "Tekrarlanan davranıştan rahatsız"
-    : apology && unresolvedHurt
-      ? "Yumuşuyor ama temkinli"
-      : moodChangeFromDelta(warmthDelta);
+    : kind === "negative" && targetsKaira
+      ? hurtAfter >= 45 || conflictAfter >= 45
+        ? "Kırgın ve sınır koyuyor"
+        : "Rahatsız ve mesafeli"
+      : apology && unresolvedHurt
+        ? "Yumuşuyor ama temkinli"
+        : unresolvedHurt
+          ? "Kırgınlık sürüyor"
+          : sentiment === "duygusal_yük"
+            ? "Empatik ve dikkatli"
+            : moodChangeFromDelta(warmthDelta);
 
   const nextDynamicState: DroitDynamicState = {
     ...state,
@@ -430,6 +400,7 @@ export function analyzeKdmInteraction(
     happiness: clamp((state.happiness ?? 70) + happinessDelta),
     confidence: clamp((state.confidence ?? 70) + confidenceDelta),
     calmness: clamp((state.calmness ?? 70) + calmnessDelta),
+    anger: clamp((state.anger ?? 10) + angerDelta),
     relationship: {
       ...relationship,
       lastInteractionAt: interactionAt,
@@ -459,29 +430,22 @@ export function analyzeKdmInteraction(
         { label: "Stres", key: "stress", value: stressDelta },
         { label: "Mutluluk", key: "happiness", value: happinessDelta },
         { label: "Sakinlik", key: "calmness", value: calmnessDelta },
+        { label: "Öfke", key: "anger", value: angerDelta },
       ],
     },
   };
 
-  const targetNote =
-    rawKind === "negative" ? ` Negatif hedef=${negativeTarget}.` : "";
+  const finalBehaviorProfile = applyRelationshipContext(baseBehaviorProfile, nextDynamicState);
+  const targetNote = rawKind === "negative" ? ` Negatif hedef=${negativeTarget}.` : "";
   const trace: ReasoningTrace = {
     whoSent: {
       userName: "Kullanıcı",
       isNewUser: interactionCount === 0,
-      recognitionText:
-        interactionCount === 0
-          ? "İlk etkileşim."
-          : `${interactionCount} etkileşimlik tanışıklık.`,
+      recognitionText: interactionCount === 0 ? "İlk etkileşim." : `${interactionCount} etkileşimlik tanışıklık.`,
     },
     relationship: {
       warmthScore: warmthAfter,
-      warmthLabel:
-        warmthAfter >= 70
-          ? "Sıcak"
-          : warmthAfter >= 40
-            ? "Dengeli"
-            : "Mesafeli",
+      warmthLabel: warmthAfter >= 70 ? "Sıcak" : warmthAfter >= 40 ? "Dengeli" : "Mesafeli",
       note: `${familiarityDays} gün; güven %${trustAfter}; çatışma %${conflictAfter}; kırgınlık %${hurtAfter}; kişilik etkisi x${personalityImpact.toFixed(2)}.${targetNote}`,
       familiarityDays,
       interactionCount: nextInteractionCount,
@@ -498,24 +462,22 @@ export function analyzeKdmInteraction(
         ? `Aynı olumsuz davranış (${pattern}) tekrarlandı; sabır, hassasiyet, öfke ve sadakat tepki ağırlığını belirledi.`
         : apology
           ? `Özür; empati ve sabır kaynaklı x${forgivenessFactor.toFixed(2)} affetme katsayısıyla değerlendirildi.`
-          : `Mesaj ve ilişki geçmişi Kaira'nın kişilik özellikleriyle birlikte değerlendirildi.${targetNote}`,
+          : unresolvedHurt
+            ? `Çözülmemiş kırgınlık mevcut; nötr mesajlar bu duyguyu otomatik olarak silmiyor.${targetNote}`
+            : `Mesaj ve ilişki geçmişi Kaira'nın kişilik özellikleriyle birlikte değerlendirildi.${targetNote}`,
     },
     messageInterpretation: {
-      intent: apology
-        ? "özür_ve_telafi"
-        : repeatedProblem
-          ? "tekrarlanan_olumsuz_davranış"
-          : intent,
+      intent: apology ? "özür_ve_telafi" : repeatedProblem ? "tekrarlanan_olumsuz_davranış" : intent,
       sentiment,
       explanation: `Kullanıcı niyeti ve duygu sinyali ayrı sınıflandırıldı.${targetNote} KDM kişilik×ilişki katmanı aktif: sabır ${patience}, hassasiyet ${sensitivity}, öfke ${angerTrait}, empati ${empathy}, sadakat ${loyalty}.`,
     },
     decision: {
-      chosenTone: behaviorProfile.tone,
+      chosenTone: finalBehaviorProfile.tone,
       explanation: repeatedProblem
         ? "Tekrar etkisi ve kişilik hassasiyeti birlikte uygulanarak tolerans düşürüldü."
         : unresolvedHurt
-          ? "Kişilik özellikleri ve çözülmemiş kırgınlık nedeniyle temkinli tepki seçildi."
-          : `${behaviorProfile.decisionSpeed} karar stili uygulandı.`,
+          ? `Çözülmemiş kırgınlık nedeniyle ${finalBehaviorProfile.tone} tonuna geçildi; playful ton bastırıldı.`
+          : `${finalBehaviorProfile.decisionSpeed} karar stili uygulandı.`,
     },
     memoryUpdate: {
       warmthBefore,
@@ -528,9 +490,9 @@ export function analyzeKdmInteraction(
           ? `Negatif ifade ${negativeTarget} hedefli olduğu için Kaira-kullanıcı ilişkisine hasar yazılmadı.`
           : kind === "negative"
             ? `Olumsuz olay kişilik etkisi x${personalityImpact.toFixed(2)} ve tekrar etkisi x${repeatEscalation.toFixed(2)} ile işlendi.`
-            : `KDM ${intent}/${sentiment} etkileşimini kişilik ve ilişki geçmişine dönüştürdü.`,
+            : `KDM ${intent}/${sentiment} etkileşimini kişilik, homeostaz ve ilişki geçmişine dönüştürdü.`,
     },
   };
 
-  return { trace, behaviorProfile, nextDynamicState };
+  return { trace, behaviorProfile: finalBehaviorProfile, nextDynamicState };
 }
