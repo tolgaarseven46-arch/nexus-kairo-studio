@@ -4,6 +4,7 @@ import {
   buildDialogueClaimLedger,
   type DialogueClaim,
 } from "./kairoDialogueChaosEngine";
+import { isLocalEmotionalOpening } from "./kairoEmotionalLanguage";
 
 export type DialogueMove =
   | "grounded_recall"
@@ -29,10 +30,6 @@ const RECALL_RE =
   /(ne yapacaktı|ne yapmayı düşünüyordu|az önce ne dedi|ne demişti|ne söylemişti|hatırlıyor musun|kim söylemişti)/i;
 const SPECULATION_RE =
   /\b(büyük ihtimalle|muhtemelen|belki|herhalde|kafamdan|tahminim)\b/i;
-const EMOTIONAL_OPENING_RE =
-  /\b(moralim(?:\s+\S+){0,2}\s+(?:bozuk|kötü)|canım sıkkın|keyfim yok|üzgünüm|kötü hissediyorum|iyi hissetmiyorum|bunaldım|daraldım|çok stresliyim|ağlayacak gibiyim)\b/i;
-const EXPLICIT_SUPPORT_REQUEST_RE =
-  /\b(ne yapmalıyım|ne yapayım|yardım et|yardımcı ol|tavsiye|öneri|akıl ver)\b/i;
 const EMOTIONAL_OVERCARE_RE =
   /\b(canım|bebeğim|bebiş|yavrum|geçmiş olsun|üzülme|yanındayım|buradayım|sarıl\w*|anlatmak ister misin|bugünlük salma hakkın)\b/i;
 const UNSOLICITED_ADVICE_RE =
@@ -84,16 +81,11 @@ function isFirstEmotionalOpening(
   history: ConversationTurn[],
   userMessage: string,
 ): boolean {
-  if (
-    !EMOTIONAL_OPENING_RE.test(userMessage) ||
-    EXPLICIT_SUPPORT_REQUEST_RE.test(userMessage)
-  ) {
-    return false;
-  }
+  if (!isLocalEmotionalOpening(userMessage)) return false;
   return !history
     .filter((turn) => turn.sender === "user")
     .slice(-4)
-    .some((turn) => EMOTIONAL_OPENING_RE.test(String(turn.text || "")));
+    .some((turn) => isLocalEmotionalOpening(String(turn.text || "")));
 }
 
 export function planDialogueResponse(

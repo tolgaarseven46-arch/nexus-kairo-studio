@@ -14,6 +14,7 @@ import {
 } from "./kairoResponseConsistency";
 import { auth } from "../lib/firebase";
 export type KairoProvider = "gemini" | "openrouter";
+export type KairoProviderUsed = KairoProvider | "local_language";
 export interface KairoTimingMetrics {
   clientPrepMs: number;
   serverTotalMs: number;
@@ -41,7 +42,7 @@ export interface KairoChatResponse {
   dynamicState?: DroitDynamicState;
   reasoningTrace?: ReasoningTrace;
   consistency?: ResponseConsistencyResult;
-  providerUsed?: KairoProvider;
+  providerUsed?: KairoProviderUsed;
   timings?: KairoTimingMetrics;
 }
 function resolveConversationUserId(explicitUserId?: string) {

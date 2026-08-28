@@ -147,6 +147,7 @@ export const NexusStudioLayout: React.FC = () => {
     [isNewUserMode, setIsNewUserMode] = useState(false),
     [userWarmth, setUserWarmth] = useState(62),
     [lastTimings, setLastTimings] = useState<KairoTimingMetrics | null>(null),
+    [lastProviderUsed, setLastProviderUsed] = useState<string | null>(null),
     [selectedTestUser, setSelectedTestUser] = useState(() =>
       typeof window === "undefined"
         ? "test_user_x"
@@ -162,6 +163,7 @@ export const NexusStudioLayout: React.FC = () => {
     setReasoningTrace(INITIAL_REASONING_TRACE);
     setLastAnalysis(null);
     setLastTimings(null);
+    setLastProviderUsed(null);
     setIsolatedConversation(false);
   }, [selectedTestUser]);
   useEffect(() => {
@@ -212,6 +214,7 @@ export const NexusStudioLayout: React.FC = () => {
   const handleClearChat = useCallback(() => {
     setMessages([]);
     setLastTimings(null);
+    setLastProviderUsed(null);
     setReasoningTrace(INITIAL_REASONING_TRACE);
     setLastAnalysis(null);
     setIsolatedConversation(true);
@@ -225,6 +228,7 @@ export const NexusStudioLayout: React.FC = () => {
     setReasoningTrace(INITIAL_REASONING_TRACE);
     setLastAnalysis(null);
     setLastTimings(null);
+    setLastProviderUsed(null);
     setUserWarmth(50);
     setIsolatedConversation(true);
     await clearKairoConversation().catch(() => {});
@@ -279,6 +283,7 @@ export const NexusStudioLayout: React.FC = () => {
           setUserWarmth(response.reasoningTrace.relationship.warmthScore);
         }
         if (response.timings) setLastTimings(response.timings);
+        setLastProviderUsed(response.providerUsed || null);
         const dm: TestMessage = {
           id: `msg-${Date.now() + 1}`,
           sender: "droit",
@@ -415,6 +420,7 @@ export const NexusStudioLayout: React.FC = () => {
             messages={messages}
             isLoading={isAiLoading}
             timings={lastTimings}
+            providerUsed={lastProviderUsed}
             participants={TEST_USERS}
             selectedParticipantId={selectedTestUser}
             onSelectParticipant={setSelectedTestUser}

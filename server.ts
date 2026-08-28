@@ -346,6 +346,7 @@ app.post("/api/chat", async (req, res) => {
         kdm.nextDynamicState,
         kdm.trace,
         userId,
+        dialogueDecision.move,
       ),
       kdmMs = Math.round(now() - kdmStart),
       validatedMemory = persistentMemory.filter(

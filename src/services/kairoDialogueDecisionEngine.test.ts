@@ -143,4 +143,18 @@ describe("Kaira dialogue decision engine", () => {
 
     expect(plan.move).not.toBe("invite_emotional_context");
   });
+
+  it.each([
+    "hiç havamda değilim",
+    "kafam bozuk",
+    "modum yok",
+    "modum yo",
+    "moodum düşük",
+    "keyfim yerinde değil",
+    "içim sıkılıyor",
+  ])("groups the local low-mood variant: %s", (message) => {
+    expect(planDialogueResponse([], message, "Mert").move).toBe(
+      "invite_emotional_context",
+    );
+  });
 });
