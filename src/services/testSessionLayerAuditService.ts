@@ -4,6 +4,12 @@ import { db } from "../lib/firebase";
 export interface TestSessionLayerAudit {
   semanticEvent?: unknown;
   semanticSource?: string;
+  languageUnderstanding?: {
+    semanticProvider?: string;
+    morphologyProvider?: string;
+    morphology?: unknown;
+    warnings?: string[];
+  };
   appraisalTemperament?: unknown;
   personalityTendency?: unknown;
   motivation?: unknown;
