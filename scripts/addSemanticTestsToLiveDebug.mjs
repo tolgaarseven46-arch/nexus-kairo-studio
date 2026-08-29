@@ -9,7 +9,7 @@ if (source.includes('const semanticQuickTests = [')) {
 }
 
 const stateAnchor = '  const [showRawTrace, setShowRawTrace] = useState(false);\n';
-const stateInsert = `${stateAnchor}\n  const semanticQuickTests = [\n    { label: "Ekli Hakaret", prompt: "Sen dümdüz salaksın" },\n    { label: "Morfoloji", prompt: "Sen malsın" },\n    { label: "Aktarılan Hakaret", prompt: "Mert bana salak dedi" },\n    { label: "Çok Anlamlı Mal", prompt: "Mal aldım" },\n  ] as const;\n\n  const runSemanticQuickTest = (prompt) => {\n    if (isLoading) return;\n    setLastSubmittedMessage(prompt);\n    onSendMessage(prompt, { relationshipLevel });\n  };\n`;
+const stateInsert = `${stateAnchor}\n  const semanticQuickTests = [\n    { label: "Ekli Hakaret", prompt: "Sen dümdüz salaksın" },\n    { label: "Morfoloji", prompt: "Sen malsın" },\n    { label: "Aktarılan Hakaret", prompt: "Mert bana salak dedi" },\n    { label: "Çok Anlamlı Mal", prompt: "Mal aldım" },\n  ] as const;\n\n  const runSemanticQuickTest = (prompt: string) => {\n    if (isLoading) return;\n    setLastSubmittedMessage(prompt);\n    onSendMessage(prompt, { relationshipLevel });\n  };\n`;
 
 if (!source.includes(stateAnchor)) {
   throw new Error("MindMapTab state anchor not found");
