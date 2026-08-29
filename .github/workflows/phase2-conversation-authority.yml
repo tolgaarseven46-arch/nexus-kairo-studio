@@ -1,0 +1,90 @@
+name: Phase2 Conversation State Authority
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/phase2-conversation-authority.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wire post-transition conversation authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          server = Path('server.ts')
+          s = server.read_text()
+
+          anchor = 'import { resolveCanonicalSemanticEvent } from "./src/services/semanticEventAuthority";\n'
+          addition = anchor + 'import { applyConversationStateAuthority } from "./src/services/conversationStateAuthority";\n'
+          if 'applyConversationStateAuthority' not in s:
+              if anchor not in s:
+                  raise SystemExit('authority import anchor not found')
+              s = s.replace(anchor, addition, 1)
+
+          old = '''      ),
+      behaviorProfile = kdm.behaviorProfile,
+      speech = computeKairoSpeechIdentity(
+        safePersonality,
+        kdm.nextDynamicState,
+        kdm.trace,
+      ),
+      enforcementRules = {
+        continueConversation: runtimeFlag(safePersonality, "runtimeContinueConversation", true),
+        humorAllowed: runtimeFlag(safePersonality, "runtimeHumorAllowed", true),
+        askQuestion: runtimeFlag(safePersonality, "runtimeAskQuestion", true),
+'''
+          new = '''      ),
+      conversationAuthority = applyConversationStateAuthority(safePersonality, kdm.nextDynamicState),
+      authoritativePersonality = conversationAuthority.personality,
+      behaviorProfile = kdm.behaviorProfile,
+      speech = computeKairoSpeechIdentity(
+        authoritativePersonality,
+        kdm.nextDynamicState,
+        kdm.trace,
+      ),
+      enforcementRules = {
+        continueConversation: runtimeFlag(authoritativePersonality, "runtimeContinueConversation", true),
+        humorAllowed: runtimeFlag(authoritativePersonality, "runtimeHumorAllowed", true),
+        askQuestion: runtimeFlag(authoritativePersonality, "runtimeAskQuestion", true),
+'''
+          if old not in s:
+              raise SystemExit('post-KDM authority anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''      local = tryLocalKairoReply(
+        userMessage,
+        safePersonality,
+'''
+          new = '''      local = tryLocalKairoReply(
+        userMessage,
+        authoritativePersonality,
+'''
+          if old not in s:
+              raise SystemExit('local personality anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = 'kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source },'
+          new = 'kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },'
+          count = s.count(old)
+          if count != 2:
+              raise SystemExit(f'expected 2 KDM response anchors, found {count}')
+          s = s.replace(old, new)
+
+          server.write_text(s)
+          PY
+      - name: Commit wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "refactor(kdm): make post-transition relationship state authoritative"
+          git push
