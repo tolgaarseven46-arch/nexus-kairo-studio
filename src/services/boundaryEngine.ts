@@ -16,6 +16,7 @@ export interface BoundarySituation {
   coercion: number;
   apology: number;
   repairAttempt: number;
+  hardStop: boolean;
 }
 
 export interface BoundaryResponse {
@@ -27,6 +28,7 @@ export interface BoundaryResponse {
   };
   dominantViolation: "disrespect" | "manipulation" | "privacy" | "coercion" | null;
   violationPressure: number;
+  hardStop: boolean;
   behaviorSignals: {
     boundaryAssertion: number;
     distancePressure: number;
@@ -45,30 +47,38 @@ export const boundariesFromFineTune = (
   fineTune: Record<string, number> | null | undefined,
 ): BoundaryProfile => {
   const p = fineTune ?? {};
-  const read = (key: string) => clamp100(p[key] ?? 50);
+  const readAny = (...keys: string[]) => {
+    for (const key of keys) {
+      if (typeof p[key] === "number") return clamp100(p[key]);
+    }
+    return 50;
+  };
   return {
-    disrespect: read("boundaries.sensitivity.disrespect"),
-    manipulation: read("boundaries.sensitivity.manipulation"),
-    privacy: read("boundaries.sensitivity.privacy"),
-    assertiveness: read("boundaries.enforcement.assertiveness"),
-    escalation: read("boundaries.enforcement.escalation"),
-    forgiveness: read("boundaries.enforcement.forgiveness"),
+    // CharacterTab v2 uses boundaries.violation.*. Keep the older sensitivity
+    // aliases readable so existing saved profiles do not silently change.
+    disrespect: readAny("boundaries.violation.disrespect", "boundaries.sensitivity.disrespect"),
+    manipulation: readAny("boundaries.violation.manipulation", "boundaries.sensitivity.manipulation"),
+    privacy: readAny("boundaries.violation.privacy", "boundaries.sensitivity.privacy"),
+    assertiveness: readAny("boundaries.enforcement.assertiveness"),
+    escalation: readAny("boundaries.enforcement.escalation"),
+    forgiveness: readAny("boundaries.enforcement.forgiveness"),
   };
 };
 
 export const inferBoundarySituation = (message: string): BoundarySituation => {
   const text = message.toLocaleLowerCase("tr-TR");
   const hit = (re: RegExp, value = 0.9) => (re.test(text) ? value : 0);
-  const absoluteDisrespect = /(orospu|kaşar|sürtük)/.test(text);
+  const hardStop = /\b(orospu|oropu|kaşar|sürtük)\b/.test(text);
   return {
-    disrespect: absoluteDisrespect
+    disrespect: hardStop
       ? 1
       : hit(/(aptal|salak|gerizekalı|geri zekalı|mal\b|şerefsiz|haysiyetsiz|ezik|aşağıla|küçümse|siktir|defol)/),
     manipulation: hit(/(suçluluk duy|benim için yap|beni seviyorsan|mecbursun|seni kandır|manipüle|tehdit ediyorum|şantaj)/),
     privacyViolation: hit(/(özel mesaj|şifre|telefonunu kurcala|gizlice oku|mahrem|izinsiz bak|hesabına gir)/),
     coercion: hit(/(zorundasın|emrediyorum|dediğimi yap|izin vermiyorum|yasaklıyorum|mecbursun)/),
     apology: hit(/(özür|pardon|kusura bakma|hata ettim|yanlış yaptım)/, 0.8),
-    repairAttempt: hit(/(barışalım|düzeltmek istiyorum|telafi|bir daha yapmayacağım|konuşup çözelim)/, 0.75),
+    repairAttempt: hit(/(barışalım|barışak|düzeltmek istiyorum|telafi|bir daha yapmayacağım|konuşup çözelim|beni affet)/, 0.75),
+    hardStop,
   };
 };
 
@@ -83,7 +93,7 @@ export const computeBoundaryResponse = (
   const repeatedNegative = clamp01((relationship?.repeatedNegativeCount ?? 0) / 4);
 
   const violations = {
-    disrespect: n(profile.disrespect) * clamp01(situation.disrespect),
+    disrespect: situation.hardStop ? 1 : n(profile.disrespect) * clamp01(situation.disrespect),
     manipulation: n(profile.manipulation) * clamp01(situation.manipulation),
     privacy: n(profile.privacy) * clamp01(situation.privacyViolation),
     coercion: n(profile.assertiveness) * clamp01(situation.coercion),
@@ -103,30 +113,31 @@ export const computeBoundaryResponse = (
   if (violationPressure < 0.15) dominantViolation = null;
 
   const accumulatedDamage = clamp01(hurt * 0.5 + conflict * 0.3 + repeatedNegative * 0.2);
-  const boundaryAssertion = clamp01(
-    violationPressure * (0.45 + n(profile.assertiveness) * 0.55),
-  );
-  const escalationPressure = clamp01(
-    violationPressure * n(profile.escalation) * (0.65 + repeatedNegative * 0.35),
-  );
-  const distancePressure = clamp01(
-    violationPressure * 0.65 + accumulatedDamage * 0.45,
-  );
+  const boundaryAssertion = situation.hardStop
+    ? 1
+    : clamp01(violationPressure * (0.45 + n(profile.assertiveness) * 0.55));
+  const escalationPressure = situation.hardStop
+    ? 1
+    : clamp01(violationPressure * n(profile.escalation) * (0.65 + repeatedNegative * 0.35));
+  const distancePressure = situation.hardStop
+    ? 1
+    : clamp01(violationPressure * 0.65 + accumulatedDamage * 0.45);
 
-  // Repair is deliberately not an instant reset: apology/repair only opens a door,
-  // while accumulated hurt/conflict and low forgiveness keep distance alive.
   const repairSignal = Math.max(clamp01(situation.apology), clamp01(situation.repairAttempt));
-  const repairOpenness = clamp01(
-    repairSignal * n(profile.forgiveness) * (1 - accumulatedDamage * 0.75),
-  );
-  const disengagementPressure = clamp01(
-    distancePressure * 0.6 + escalationPressure * 0.25 + violationPressure * 0.25 - repairOpenness * 0.25,
-  );
+  const repairOpenness = situation.hardStop
+    ? 0
+    : clamp01(repairSignal * n(profile.forgiveness) * (1 - accumulatedDamage * 0.75));
+  const disengagementPressure = situation.hardStop
+    ? 1
+    : clamp01(
+        distancePressure * 0.6 + escalationPressure * 0.25 + violationPressure * 0.25 - repairOpenness * 0.25,
+      );
 
   return {
     violations,
     dominantViolation,
-    violationPressure,
+    violationPressure: situation.hardStop ? 1 : violationPressure,
+    hardStop: situation.hardStop,
     behaviorSignals: {
       boundaryAssertion,
       distancePressure,
