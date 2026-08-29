@@ -130,18 +130,6 @@ export const MindMapTab: React.FC<Props> = ({
   const [showDangerMenu, setShowDangerMenu] = useState(false);
   const [showRawTrace, setShowRawTrace] = useState(false);
 
-  const semanticQuickTests = [
-    { label: "Ekli Hakaret", prompt: "Sen dümdüz salaksın" },
-    { label: "Morfoloji", prompt: "Sen malsın" },
-    { label: "Aktarılan Hakaret", prompt: "Mert bana salak dedi" },
-    { label: "Çok Anlamlı Mal", prompt: "Mal aldım" },
-  ] as const;
-
-  const runSemanticQuickTest = (prompt: string) => {
-    if (isLoading) return;
-    setLastSubmittedMessage(prompt);
-    onSendMessage(prompt, { relationshipLevel });
-  };
 
   const activeParticipant =
     participants.find((item) => item.id === selectedParticipantId) ??
@@ -409,30 +397,6 @@ export const MindMapTab: React.FC<Props> = ({
           </div>
 
           <div className="shrink-0 border-t border-zinc-800 bg-zinc-950/65 p-3">
-            <div className="mb-2.5 rounded-lg border border-violet-500/25 bg-violet-500/5 p-2.5">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-[9px] font-mono font-bold tracking-wide text-violet-300">
-                  SEMANTIC TESTLER
-                </span>
-                <span className="text-[8px] font-mono text-zinc-600">
-                  Yeni dil-anlama hattı
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {semanticQuickTests.map((test) => (
-                  <button
-                    key={test.label}
-                    type="button"
-                    onClick={() => runSemanticQuickTest(test.prompt)}
-                    disabled={isLoading}
-                    title={test.prompt}
-                    className="rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-2 text-left text-[9px] font-mono font-bold text-zinc-300 transition-colors hover:border-violet-500/60 hover:bg-violet-500/10 hover:text-violet-200 disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    {test.label}
-                  </button>
-                ))}
-              </div>
-            </div>
             <div className="flex gap-2">
               <textarea
                 value={text}
