@@ -322,4 +322,31 @@ describe("KDM response consistency gate", () => {
     expect(result.nextDynamicState.relationship?.repairProgress).toBe(0);
     expect(result.nextDynamicState.relationship?.repairAttempts).toBe(0);
   });
+
+  it("uses the shared SemanticEvent for degrading coercive language", () => {
+    const result = analyzeKdmInteraction(
+      "moduna başlatma köle",
+      undefined,
+      relationshipState(),
+    );
+
+    expect(result.trace.messageInterpretation.intent).toBe("hakaret_ve_saldiri");
+    expect(result.trace.messageInterpretation.sentiment).toBe("negatif");
+    expect(result.nextDynamicState.relationship?.lastNegativePattern).toBe("hakaret");
+    expect(result.nextDynamicState.relationship?.warmth).toBeLessThan(50);
+    expect(result.nextDynamicState.relationship?.trust).toBeLessThan(50);
+  });
+
+  it("keeps third-party insults from damaging the Kaira relationship through SemanticEvent targeting", () => {
+    const result = analyzeKdmInteraction(
+      "Mert salak herif ya",
+      undefined,
+      relationshipState(),
+    );
+
+    expect(result.trace.messageInterpretation.sentiment).toBe("negatif");
+    expect(result.nextDynamicState.relationship?.warmth).toBe(50);
+    expect(result.nextDynamicState.relationship?.trust).toBe(50);
+    expect(result.nextDynamicState.relationship?.negativeEvents).toBe(0);
+  });
 });
