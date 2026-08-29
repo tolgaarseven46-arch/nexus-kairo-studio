@@ -57,8 +57,9 @@ const word = (source: string) =>
 const THIRD_PARTY_RE = word("mert|müdür|patron|çocuk|adam|kadın|arkadaş(?:ım|ın)?|ona|onu|onun");
 const REPORTING_RE = word("dedim|dedi|demiş|söyledim|söyledi|diyor|diyordu|diye");
 const RED_LINE_RE = word("orospu|oropu|orosp[uy]|kaşar|sürtük");
+const DISRESPECT_SLANG_RE = word("yarrak|yarak|yarrağım|yarrağim|yarram|yaram|yarrm|yavrum");
 const INSULT_RE = new RegExp(
-  `${word("aptal|salak|gerizekalı|mal|şerefsiz|haysiyetsiz|ezik|piç|yavşak|köle").source}|geri zekalı|siktir|defol|boş konuş`,
+  `${word("aptal|salak|gerizekalı|mal|şerefsiz|haysiyetsiz|ezik|piç|yavşak|köle").source}|${DISRESPECT_SLANG_RE.source}|geri zekalı|siktir|defol|boş konuş|sanane`,
   "u",
 );
 const APOLOGY_RE = new RegExp(
@@ -72,12 +73,13 @@ const REPAIR_RE = new RegExp(
 const STOP_QUESTIONS_RE = /(soru\s+sorma|sorma artık|sormayı bırak|hala soruyorsun|hâlâ soruyorsun|yine soru|sorgu yapma)/u;
 const STOP_TALKING_RE = /(^|\s)(sus|konuşma|kes artık|yeter konuşma)(\s|$)/u;
 const REJECTION_RE = /(istemiyorum|git başımdan|bırak beni|kaybol|defol|senden hiç hoşlanmıyorum|seni sevmiyorum)/u;
-const COERCION_RE = /(zorundasın|emrediyorum|dediğimi yap|izin vermiyorum|yasaklıyorum|mecbursun|köle)/u;
+const STRONG_COERCION_RE = /(zorundasın|emrediyorum|dediğimi yap|izin vermiyorum|yasaklıyorum|mecbursun|köle)/u;
+const DIRECT_COMMAND_RE = /(?:^|\s)(soyun|soyunsana|susma|konuş|gel|git|otur|kalk)(?:\s|$)|beni\s+eğlendir|beni\s+eglendir/u;
 const MANIPULATION_RE = /(suçluluk duy|benim için yap|beni seviyorsan|seni kandır|manipüle|tehdit ediyorum|şantaj)/u;
 const PRIVACY_RE = /(özel mesaj|şifre|telefonunu kurcala|gizlice oku|mahrem|izinsiz bak|hesabına gir)/u;
 const SUPPORT_RE = /(yanındayım|haklısın|seni anlıyorum|destekliyorum|merak etme)/u;
 const COMPLIMENT_RE = /(harika|süper|mükemmel|çok iyisin|seviyorum|teşekkür|sağ ol|iyi ki varsın)/u;
-const AFFECTION_RE = word("bebeğim|bebegim|bebeğim|aşkım|askım|tatlım|sevgilim");
+const AFFECTION_RE = word("bebeğim|bebegim|aşkım|askım|tatlım|sevgilim");
 const FRUSTRATION_RE = /(yeter|bıktım|sinir|aynı şeyi|kaç kere|neden anlamıyorsun|niye anlamıyorsun|hala soruyorsun|hâlâ soruyorsun|soru sorma|saçmalıyorsun|saçmalıyor)/u;
 const CONFUSION_RE = /(ne diyon|ne diyorsun|ne anlatıyosun|ne anlatıyorsun|ne alaka|nasıl yani|bi şey anlamadım|bir şey anlamadım)/u;
 const VENTING_PROFANITY_RE = word("amk|aq|mk");
@@ -90,8 +92,9 @@ function inferTarget(
   negative: boolean,
   insult: boolean,
   rejection: boolean,
+  directCommand: boolean,
 ): SemanticTarget {
-  if (!negative) return "unknown";
+  if (!negative && !directCommand) return "unknown";
   if (word("kaira|kairo|sen|sana|seni|senden|senin").test(text)) return "kaira";
   if (REPORTING_RE.test(text) && THIRD_PARTY_RE.test(text)) return "third_party";
   if (THIRD_PARTY_RE.test(text)) return "third_party";
@@ -99,8 +102,9 @@ function inferTarget(
     RED_LINE_RE.test(text) ||
     insult ||
     rejection ||
-    COERCION_RE.test(text) ||
-    MANIPULATION_RE.test(text)
+    STRONG_COERCION_RE.test(text) ||
+    MANIPULATION_RE.test(text) ||
+    directCommand
   )
     return "kaira";
   return "event";
@@ -115,7 +119,9 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   const stopQuestions = STOP_QUESTIONS_RE.test(text);
   const stopTalking = STOP_TALKING_RE.test(text);
   const rejection = REJECTION_RE.test(text);
-  const coercion = COERCION_RE.test(text) ? 0.9 : 0;
+  const directCommand = DIRECT_COMMAND_RE.test(text);
+  const strongCoercion = STRONG_COERCION_RE.test(text);
+  const coercion = strongCoercion ? 0.9 : directCommand ? 0.5 : 0;
   const manipulation = MANIPULATION_RE.test(text) ? 0.9 : 0;
   const privacyViolation = PRIVACY_RE.test(text) ? 0.9 : 0;
   const support = SUPPORT_RE.test(text) ? 0.8 : 0;
@@ -137,7 +143,7 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
     manipulation > 0 ||
     privacyViolation > 0 ||
     frustration > 0;
-  const target = inferTarget(text, negative, insult, rejection);
+  const target = inferTarget(text, negative, insult, rejection, directCommand);
 
   let intent: SemanticIntent = "general_chat";
   if (apology) intent = "apology";
@@ -145,7 +151,7 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   else if (insult) intent = "insult";
   else if (stopQuestions || stopTalking || confusion || frustration >= 0.7)
     intent = "complaint";
-  else if (coercion > 0) intent = "command";
+  else if (directCommand || coercion > 0) intent = "command";
   else if (rejection) intent = "rejection";
   else if (support > 0) intent = "support";
   else if (compliment > 0) intent = "compliment";
