@@ -1,7 +1,8 @@
-import { doc, setDoc } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 export interface TestSessionLayerAudit {
+  semanticEvent?: unknown;
   appraisalTemperament?: unknown;
   personalityTendency?: unknown;
   motivation?: unknown;
@@ -19,8 +20,7 @@ export interface TestSessionLayerAudit {
 
 /**
  * Adds client-side layer snapshots to the exact server-created turn.
- * The audit lives under kdmResult so the existing session loader/exporter
- * preserves it without creating a second parallel turn schema.
+ * Dot-path update keeps existing kdmResult siblings (tone/score/decision) intact.
  */
 export async function saveTestSessionLayerAudit(
   sessionId: string | undefined,
@@ -30,18 +30,12 @@ export async function saveTestSessionLayerAudit(
   if (!sessionId?.trim() || !turnId?.trim()) return;
   try {
     const turnRef = doc(db, "testSessions", sessionId.trim(), "turns", turnId.trim());
-    await setDoc(
-      turnRef,
-      {
-        kdmResult: {
-          layerAudit: {
-            ...audit,
-            recordedAt: new Date().toISOString(),
-          },
-        },
+    await updateDoc(turnRef, {
+      "kdmResult.layerAudit": {
+        ...audit,
+        recordedAt: new Date().toISOString(),
       },
-      { merge: true },
-    );
+    });
   } catch (error) {
     console.warn("[TestSessionLayerAudit] save skipped:", error);
   }
