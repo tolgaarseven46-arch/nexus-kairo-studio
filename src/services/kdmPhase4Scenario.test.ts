@@ -72,7 +72,7 @@ describe("KDM Phase 4 end-to-end relationship scenarios", () => {
 
   it("requires time and repeated repair before reactivation", () => {
     const hardStop = turn("orospu");
-    let state = backdateDisengagement(hardStop.nextDynamicState, 31);
+    const state = backdateDisengagement(hardStop.nextDynamicState, 31);
 
     const repair1 = turn("özür dilerim", state);
     expect(repair1.nextDynamicState.relationship?.conversationState).toBe("repairing");
@@ -82,14 +82,15 @@ describe("KDM Phase 4 end-to-end relationship scenarios", () => {
 
     const repair3 = turn("özür dilerim, hata ettim", repair2.nextDynamicState);
     expect(repair3.nextDynamicState.relationship?.conversationState).toBe("repairing");
+    expect(repair3.nextDynamicState.relationship?.repairAttempts).toBeGreaterThanOrEqual(3);
 
     const repair4 = turn("özür dilerim, bunu düzeltmek istiyorum", repair3.nextDynamicState);
     const relationship = repair4.nextDynamicState.relationship!;
     const contract = buildBehaviorContract(repair4.nextDynamicState, repair4.trace);
 
-    expect(relationship.repairAttempts).toBeGreaterThanOrEqual(3);
     expect(relationship.repairProgress).toBeGreaterThanOrEqual(35);
     expect(relationship.conversationState).toBe("active");
+    expect(relationship.repairAttempts).toBe(0);
     expect(contract.continueConversation).toBe(true);
   });
 
