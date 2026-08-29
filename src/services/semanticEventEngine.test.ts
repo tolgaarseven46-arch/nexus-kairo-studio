@@ -18,6 +18,13 @@ describe("semantic event engine", () => {
     expect(event.valence).toBe("negative");
   });
 
+  it("recognizes Turkish apology forms without ASCII word-boundary bugs", () => {
+    const apology = interpretSemanticEvent("özür diledim ama bu geçerli bir sebep");
+    expect(apology.apology).toBe(true);
+    expect(apology.intent).toBe("apology");
+    expect(apology.valence).toBe("positive");
+  });
+
   it("recognizes apology and repair as distinct signals", () => {
     const apology = interpretSemanticEvent("tamam özür dilerim");
     const repair = interpretSemanticEvent("gel barışalım bunu düzeltmek istiyorum");
@@ -25,6 +32,25 @@ describe("semantic event engine", () => {
     expect(apology.intent).toBe("apology");
     expect(repair.repairAttempt).toBe(true);
     expect(repair.intent).toBe("repair");
+  });
+
+  it("recognizes emotional sharing before legacy KDM fallback is needed", () => {
+    const event = interpretSemanticEvent("iyi sıcaktan bunaldım");
+    expect(event.intent).toBe("emotional_share");
+    expect(event.emotionalLoad).toBeGreaterThan(0);
+  });
+
+  it("recognizes natural information questions without a question mark", () => {
+    const event = interpretSemanticEvent("orası nasıl");
+    expect(event.intent).toBe("information_request");
+    expect(event.valence).toBe("neutral");
+  });
+
+  it("keeps venting profanity negative but targets the event instead of Kaira", () => {
+    const event = interpretSemanticEvent("sıcak diye amk");
+    expect(event.valence).toBe("negative");
+    expect(event.target).toBe("event");
+    expect(event.insult).toBe(false);
   });
 
   it("does not misread third-party insults as attacks on Kaira", () => {
