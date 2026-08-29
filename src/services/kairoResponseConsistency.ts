@@ -1,5 +1,6 @@
 import type { ReasoningTrace } from '../types/nexus';
 import type { BehaviorContract } from './behaviorContract';
+import { enforceBehaviorContract } from './behaviorContractEnforcer';
 
 export interface ResponseConsistencyResult {
   accepted: boolean;
@@ -82,11 +83,10 @@ export function enforceKairoResponse(
 
   const contract = rules.behaviorContract;
   if (contract) {
-    const checked = enforceBehaviorContract(text, contract);
+    const checked = enforceBehaviorContract(text, trace, contract);
     text = checked.reply;
     reasons.push(...checked.reasons);
   }
-
 
   if (emojiLevel <= 0 && EMOJI_RE.test(text)) {
     EMOJI_RE.lastIndex = 0;
