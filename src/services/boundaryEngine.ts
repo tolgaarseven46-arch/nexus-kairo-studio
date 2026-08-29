@@ -1,4 +1,5 @@
 import type { DroitDynamicState, DroitPersonalityTraits } from "../types/nexus";
+import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 
 export interface BoundaryProfile {
   disrespect: number;
@@ -54,8 +55,6 @@ export const boundariesFromFineTune = (
     return 50;
   };
   return {
-    // CharacterTab v2 uses boundaries.violation.*. Keep the older sensitivity
-    // aliases readable so existing saved profiles do not silently change.
     disrespect: readAny("boundaries.violation.disrespect", "boundaries.sensitivity.disrespect"),
     manipulation: readAny("boundaries.violation.manipulation", "boundaries.sensitivity.manipulation"),
     privacy: readAny("boundaries.violation.privacy", "boundaries.sensitivity.privacy"),
@@ -65,20 +64,19 @@ export const boundariesFromFineTune = (
   };
 };
 
-export const inferBoundarySituation = (message: string): BoundarySituation => {
-  const text = message.toLocaleLowerCase("tr-TR");
-  const hit = (re: RegExp, value = 0.9) => (re.test(text) ? value : 0);
-  const hardStop = /\b(orospu|oropu|kaşar|sürtük)\b/.test(text);
+export const inferBoundarySituation = (
+  message: string,
+  semanticEvent?: SemanticEvent,
+): BoundarySituation => {
+  const event = semanticEvent ?? interpretSemanticEvent(message);
   return {
-    disrespect: hardStop
-      ? 1
-      : hit(/(aptal|salak|gerizekalı|geri zekalı|mal\b|şerefsiz|haysiyetsiz|ezik|aşağıla|küçümse|siktir|defol)/),
-    manipulation: hit(/(suçluluk duy|benim için yap|beni seviyorsan|mecbursun|seni kandır|manipüle|tehdit ediyorum|şantaj)/),
-    privacyViolation: hit(/(özel mesaj|şifre|telefonunu kurcala|gizlice oku|mahrem|izinsiz bak|hesabına gir)/),
-    coercion: hit(/(zorundasın|emrediyorum|dediğimi yap|izin vermiyorum|yasaklıyorum|mecbursun)/),
-    apology: hit(/(özür|pardon|kusura bakma|hata ettim|yanlış yaptım)/, 0.8),
-    repairAttempt: hit(/(barışalım|barışak|düzeltmek istiyorum|telafi|bir daha yapmayacağım|konuşup çözelim|beni affet)/, 0.75),
-    hardStop,
+    disrespect: event.disrespect,
+    manipulation: event.manipulation,
+    privacyViolation: event.privacyViolation,
+    coercion: event.coercion,
+    apology: event.apology ? 0.8 : 0,
+    repairAttempt: event.repairAttempt ? 0.75 : 0,
+    hardStop: event.redLine,
   };
 };
 
@@ -159,9 +157,10 @@ export const applyBoundaries = (
   fineTune: Record<string, number> | null | undefined,
   message: string,
   dynamicState?: DroitDynamicState,
+  semanticEvent?: SemanticEvent,
 ): { personality: DroitPersonalityTraits; response: BoundaryResponse } => {
   const profile = boundariesFromFineTune(fineTune);
-  const situation = inferBoundarySituation(message);
+  const situation = inferBoundarySituation(message, semanticEvent);
   const response = computeBoundaryResponse(profile, situation, dynamicState);
   return {
     personality: { ...base, ...response.legacyTraits },
