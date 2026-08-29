@@ -35,6 +35,8 @@ const relationshipState = (): DroitDynamicState => ({
     hurtScore: 0,
     repairProgress: 0,
     repeatedNegativeCount: 0,
+    conversationState: "active",
+    repairAttempts: 0,
   },
 });
 
@@ -99,65 +101,38 @@ describe("KDM response consistency gate", () => {
   });
 
   it("classifies a past-action recall as a question, not an action request", () => {
-    const result = analyzeKdmInteraction(
-      "bu arada mert yarın ne yapacaktı ya 😄",
-    );
+    const result = analyzeKdmInteraction("bu arada mert yarın ne yapacaktı ya 😄");
     expect(result.trace.messageInterpretation.intent).toBe("soru");
   });
 
   it("classifies an uncertainty-preserving recall as a question", () => {
-    const result = analyzeKdmInteraction(
-      "bu arada Mert yarın ne yapmayı düşünüyordu?",
-    );
+    const result = analyzeKdmInteraction("bu arada Mert yarın ne yapmayı düşünüyordu?");
     expect(result.trace.messageInterpretation.intent).toBe("soru");
   });
 
   it("does not treat the Turkish word bugün as the software term bug", () => {
-    const result = analyzeKdmInteraction(
-      "neyse boşver, bugün hava da baya sıcak ya",
-    );
+    const result = analyzeKdmInteraction("neyse boşver, bugün hava da baya sıcak ya");
     expect(result.trace.messageInterpretation.intent).toBe("genel_sohbet");
   });
 
   it("labels a self-deprecating laugh as banter", () => {
-    const result = analyzeKdmInteraction(
-      "yine bütün işi son dakikaya bıraktım hahah",
-    );
-
+    const result = analyzeKdmInteraction("yine bütün işi son dakikaya bıraktım hahah");
     expect(result.trace.messageInterpretation.intent).toBe("şakalaşma");
     expect(result.trace.messageInterpretation.sentiment).toBe("nötr");
   });
 
-  it.each([
-    "ne diyon aq",
-    "ne anlatıyosun ya",
-    "ne alaka",
-    "nasıl yani",
-    "bi şey anlamadım",
-  ])("shares the confusion/challenge family with the KDM trace: %s", (message) => {
-    const result = analyzeKdmInteraction(message);
-
-    expect(result.trace.messageInterpretation.intent).toBe(
-      "anlamama_ve_itiraz",
-    );
-  });
+  it.each(["ne diyon aq", "ne anlatıyosun ya", "ne alaka", "nasıl yani", "bi şey anlamadım"])(
+    "shares the confusion/challenge family with the KDM trace: %s",
+    (message) => {
+      const result = analyzeKdmInteraction(message);
+      expect(result.trace.messageInterpretation.intent).toBe("anlamama_ve_itiraz");
+    },
+  );
 
   it("advances one continuous relationship interaction per message", () => {
-    const first = analyzeKdmInteraction(
-      "naber kaira",
-      undefined,
-      relationshipState(),
-    );
-    const second = analyzeKdmInteraction(
-      "tanışalım mı",
-      undefined,
-      first.nextDynamicState,
-    );
-    const third = analyzeKdmInteraction(
-      "ben öğrenciyim",
-      undefined,
-      second.nextDynamicState,
-    );
+    const first = analyzeKdmInteraction("naber kaira", undefined, relationshipState());
+    const second = analyzeKdmInteraction("tanışalım mı", undefined, first.nextDynamicState);
+    const third = analyzeKdmInteraction("ben öğrenciyim", undefined, second.nextDynamicState);
 
     expect(first.trace.whoSent.isNewUser).toBe(true);
     expect(second.trace.whoSent.isNewUser).toBe(false);
@@ -178,13 +153,8 @@ describe("KDM response consistency gate", () => {
     "içim sıkılıyor",
   ])("shares the local low-mood meaning with the KDM trace: %s", (message) => {
     const result = analyzeKdmInteraction(message);
-
-    expect(result.trace.messageInterpretation.intent).toBe(
-      "duygusal_paylasim",
-    );
-    expect(result.trace.messageInterpretation.sentiment).toBe(
-      "duygusal_yük",
-    );
+    expect(result.trace.messageInterpretation.intent).toBe("duygusal_paylasim");
+    expect(result.trace.messageInterpretation.sentiment).toBe("duygusal_yük");
   });
 
   it("does not damage the Kaira relationship for negativity aimed at Mert", () => {
@@ -222,11 +192,7 @@ describe("KDM response consistency gate", () => {
   });
 
   it("keeps Mert and Ali relationship states isolated", () => {
-    const states = {
-      mert: relationshipState(),
-      ali: relationshipState(),
-    };
-
+    const states = { mert: relationshipState(), ali: relationshipState() };
     states.mert = analyzeKdmInteraction(
       "Kaira senden hiç hoşlanmıyorum, çok saçmalıyorsun.",
       undefined,
@@ -281,5 +247,79 @@ describe("KDM response consistency gate", () => {
     expect(result.behaviorProfile.curiosity).toBe(0);
     expect(result.behaviorProfile.relationshipInstruction).toContain("konuşmadan çekiliyor");
     expect(result.behaviorProfile.behaviorDirectives.some((x) => x.includes("Cevabı kısa tut"))).toBe(true);
+    expect(result.nextDynamicState.relationship?.conversationState).toBe("disengaged");
+  });
+
+  it("recognizes the tested typo 'oropu' as a direct severe insult", () => {
+    const result = analyzeKdmInteraction(
+      "seni oropu",
+      runtimePersonality({
+        runtimeContinueConversation: 0,
+        runtimeHumorAllowed: 0,
+        runtimeAskQuestion: 0,
+        runtimeStance: 100,
+        runtimePriority: 100,
+      }),
+      relationshipState(),
+    );
+
+    expect(result.trace.messageInterpretation.intent).toBe("hakaret_ve_saldiri");
+    expect(result.trace.messageInterpretation.sentiment).toBe("negatif");
+    expect(result.nextDynamicState.relationship?.lastNegativePattern).toBe("agir_hakaret");
+    expect(result.nextDynamicState.relationship?.conversationState).toBe("disengaged");
+  });
+
+  it("keeps disengagement persistent on a neutral plea to continue", () => {
+    const first = analyzeKdmInteraction(
+      "seni oropu",
+      runtimePersonality({ runtimeContinueConversation: 0, runtimeStance: 100, runtimePriority: 100 }),
+      relationshipState(),
+    );
+    const second = analyzeKdmInteraction(
+      "kesme dur",
+      runtimePersonality({
+        runtimeContinueConversation: 0,
+        runtimeHumorAllowed: 0,
+        runtimeAskQuestion: 0,
+        runtimeStance: 100,
+        runtimePriority: 100,
+        runtimePriorConversationState: 100,
+      }),
+      first.nextDynamicState,
+    );
+
+    expect(second.nextDynamicState.relationship?.conversationState).toBe("disengaged");
+    expect(second.nextDynamicState.relationship?.repairProgress).toBe(0);
+  });
+
+  it("does not count neutral flirting as repair after disengagement", () => {
+    const state = relationshipState();
+    state.relationship = {
+      ...state.relationship!,
+      conversationState: "disengaged",
+      disengagedAt: new Date().toISOString(),
+      disengageReason: "agir_hakaret",
+      repairProgress: 0,
+      repairAttempts: 0,
+      hurtScore: 25,
+      conflictScore: 20,
+    };
+
+    const result = analyzeKdmInteraction(
+      "gel öp",
+      runtimePersonality({
+        runtimeContinueConversation: 0,
+        runtimeHumorAllowed: 0,
+        runtimeAskQuestion: 0,
+        runtimeStance: 100,
+        runtimePriority: 100,
+        runtimePriorConversationState: 100,
+      }),
+      state,
+    );
+
+    expect(result.nextDynamicState.relationship?.conversationState).toBe("disengaged");
+    expect(result.nextDynamicState.relationship?.repairProgress).toBe(0);
+    expect(result.nextDynamicState.relationship?.repairAttempts).toBe(0);
   });
 });
