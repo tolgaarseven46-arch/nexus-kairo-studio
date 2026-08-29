@@ -77,7 +77,7 @@ export function resolveMessageEntities(
 
   const tokens = message.match(/[\p{L}ÇĞİÖŞÜçğıöşü]+/gu) ?? [];
 
-  for (const token of tokens) {
+  for (const [tokenIndex, token] of tokens.entries()) {
     const normalized = normalize(token);
     if (!normalized) continue;
 
@@ -130,9 +130,13 @@ export function resolveMessageEntities(
       continue;
     }
 
-    // Conservative proper-name candidate. Sentence-initial ordinary words can
-    // be false positives, so unresolved names stay low-confidence.
-    if (/^[A-ZÇĞİÖŞÜ][a-zçğıöşü]+$/u.test(token)) {
+    // Unknown words at sentence start are capitalized by Turkish orthography,
+    // so capitalization alone is not enough evidence that the token is a person.
+    // Known participant names above are still resolved even at token index 0.
+    if (
+      tokenIndex > 0 &&
+      /^[A-ZÇĞİÖŞÜ][a-zçğıöşü]+$/u.test(token)
+    ) {
       namedPeople.add(token);
       references.push({
         surface: token,
