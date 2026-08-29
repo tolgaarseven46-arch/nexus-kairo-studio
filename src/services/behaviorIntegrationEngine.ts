@@ -67,9 +67,17 @@ const priorityCode: Record<IntegratedBehaviorDecision["priority"], number> = {
 const inferMetaSocialRequest = (message = "") => {
   const text = message.toLocaleLowerCase("tr-TR");
   return {
-    stopQuestions: /(soru\s+sorma|sorma artık|sormayı bırak|hala soruyorsun|yine soru|sorgu yapma)/.test(text),
+    stopQuestions: /(soru\s+sorma|sorma artık|sormayı bırak|hala soruyorsun|hâlâ soruyorsun|yine soru|sorgu yapma)/.test(text),
     stopTalking: /(^|\s)(sus|konuşma|kes artık|yeter konuşma)(\s|$)/.test(text),
+    apology: /(özür|pardon|kusura bakma|hata ettim|yanlış yaptım)/.test(text),
+    repairAttempt: /(barışalım|barışak|telafi|düzeltmek istiyorum|bir daha yapmayacağım|beni affet|konuşup çözelim)/.test(text),
   };
+};
+
+const minutesSince = (iso?: string) => {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? Math.max(0, (Date.now() - t) / 60000) : 0;
 };
 
 export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): BehaviorIntegrationResult => {
@@ -87,47 +95,80 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
   const conflict = clamp01((relationship?.conflictScore ?? 0) / 100);
   const anger = clamp01((input.dynamicState?.anger ?? 0) / 100);
   const stress = clamp01((input.dynamicState?.stress ?? 0) / 100);
+  const priorConversationState = relationship?.conversationState ?? "active";
+  const priorDisengaged = priorConversationState === "disengaged";
+  const priorRepairing = priorConversationState === "repairing";
+  const repairAttempts = Math.max(0, relationship?.repairAttempts ?? 0);
+  const disengagedMinutes = minutesSince(relationship?.disengagedAt);
+  const repairSignal = meta.apology || meta.repairAttempt;
 
   const boundaryPressure = input.boundaries.hardStop
     ? 1
     : clamp01(b.boundaryAssertion * 0.35 + b.distancePressure * 0.25 + b.escalationPressure * 0.15 + b.disengagementPressure * 0.25);
   const valuePressure = clamp01(v.moralObjection * 0.35 + v.boundaryPressure * 0.25 + v.autonomyDefense * 0.2 + v.accountabilityPressure * 0.2);
-  const relationshipPressure = clamp01(s.socialDistancePressure * 0.5 + hurt * 0.3 + conflict * 0.2);
+  const relationshipPressure = clamp01(s.socialDistancePressure * 0.5 + hurt * 0.3 + conflict * 0.2 + (priorDisengaged ? 0.55 : priorRepairing ? 0.28 : 0));
   const approachPressure = clamp01(m.approachPressure);
-  const withdrawalPressure = clamp01(Math.max(m.withdrawalPressure, b.distancePressure));
+  const withdrawalPressure = clamp01(Math.max(m.withdrawalPressure, b.distancePressure, priorDisengaged ? 1 : priorRepairing ? 0.6 : 0));
   const engagementPressure = clamp01(p.engagementDrive);
   const humorPressure = clamp01(e.humor.strength * (1 - e.inhibition));
 
   let priority: IntegratedBehaviorDecision["priority"] = "expression";
-  if (input.boundaries.hardStop || boundaryPressure >= 0.45) priority = "boundary";
+  if (input.boundaries.hardStop || priorDisengaged || boundaryPressure >= 0.45) priority = "boundary";
   else if (valuePressure >= 0.4) priority = "values";
-  else if (relationshipPressure >= 0.38) priority = "relationship";
+  else if (priorRepairing || relationshipPressure >= 0.38) priority = "relationship";
   else if (Math.max(approachPressure, withdrawalPressure) >= 0.42) priority = "goal";
   else if (engagementPressure >= 0.35) priority = "preference";
 
   const severeBoundary = input.boundaries.hardStop || b.disengagementPressure >= 0.72 || input.boundaries.violationPressure >= 0.82;
   const accumulatedDamage = clamp01(hurt * 0.55 + conflict * 0.45);
-  const disengage = input.boundaries.hardStop || (severeBoundary && (b.repairOpenness < 0.35 || accumulatedDamage >= 0.5));
 
-  const distance = disengage ? 1 : clamp01(boundaryPressure * 0.5 + relationshipPressure * 0.3 + withdrawalPressure * 0.2 - b.repairOpenness * 0.2);
-  const warmth = disengage ? 0 : clamp01(s.affiliationPressure * 0.35 + s.carePressure * 0.3 + approachPressure * 0.2 + b.repairOpenness * 0.15 - distance * 0.55);
-  const stance: IntegratedBehaviorDecision["stance"] = disengage ? "disengage" : distance >= 0.62 ? "distant" : boundaryPressure >= 0.38 || valuePressure >= 0.4 ? "firm" : warmth >= 0.55 ? "warm" : "neutral";
+  // A prior hard disengagement is a relationship state, not a one-turn tone.
+  // Immediate pleas/flirting cannot erase it. Repair needs explicit repair behavior
+  // and accumulated progress/time before the state can relax.
+  const eligibleForRepairing = priorDisengaged && repairSignal && (repairAttempts >= 1 || (relationship?.repairProgress ?? 0) >= 12 || disengagedMinutes >= 30);
+  const persistentDisengage = priorDisengaged && !eligibleForRepairing;
+  const freshDisengage = input.boundaries.hardStop || (severeBoundary && (b.repairOpenness < 0.35 || accumulatedDamage >= 0.5));
+  const disengage = persistentDisengage || freshDisengage;
+  const repairingHold = priorRepairing || eligibleForRepairing;
 
-  const humorAllowed = !disengage && !meta.stopTalking && stance !== "firm" && stance !== "distant" && boundaryPressure < 0.3 && valuePressure < 0.3 && relationshipPressure < 0.35 && anger < 0.55 && stress < 0.7 && e.humor.enabled;
-  const askQuestion = !disengage && !meta.stopQuestions && !meta.stopTalking && distance < 0.58 && e.speech.questionDrive >= 0.32 && b.escalationPressure < 0.45;
-  const acknowledgeComplaint = meta.stopQuestions || meta.stopTalking || valuePressure >= 0.28 || boundaryPressure >= 0.28 || s.carePressure >= 0.45;
-  const repairAllowed = b.repairOpenness >= 0.2 && !severeBoundary;
-  const directness = clamp01(pt.assertivePressure * 0.35 + s.leadershipPressure * 0.2 + b.boundaryAssertion * 0.3 + valuePressure * 0.15);
-  const responseLength: IntegratedBehaviorDecision["responseLength"] = disengage || meta.stopTalking || distance >= 0.6 || e.speech.brevity >= 0.65 ? "short" : pt.analysisPressure >= 0.62 || p.depthDrive >= 0.58 ? "long" : "medium";
+  const distance = disengage
+    ? 1
+    : repairingHold
+      ? Math.max(0.68, clamp01(relationshipPressure * 0.55 + withdrawalPressure * 0.25 - b.repairOpenness * 0.1))
+      : clamp01(boundaryPressure * 0.5 + relationshipPressure * 0.3 + withdrawalPressure * 0.2 - b.repairOpenness * 0.2);
+  const warmth = disengage
+    ? 0
+    : repairingHold
+      ? Math.min(0.24, clamp01(s.affiliationPressure * 0.18 + b.repairOpenness * 0.12))
+      : clamp01(s.affiliationPressure * 0.35 + s.carePressure * 0.3 + approachPressure * 0.2 + b.repairOpenness * 0.15 - distance * 0.55);
+  const stance: IntegratedBehaviorDecision["stance"] = disengage
+    ? "disengage"
+    : repairingHold || distance >= 0.62
+      ? "distant"
+      : boundaryPressure >= 0.38 || valuePressure >= 0.4
+        ? "firm"
+        : warmth >= 0.55
+          ? "warm"
+          : "neutral";
+
+  const humorAllowed = !disengage && !repairingHold && !meta.stopTalking && stance !== "firm" && stance !== "distant" && boundaryPressure < 0.3 && valuePressure < 0.3 && relationshipPressure < 0.35 && anger < 0.55 && stress < 0.7 && e.humor.enabled;
+  const askQuestion = !disengage && !repairingHold && !meta.stopQuestions && !meta.stopTalking && distance < 0.58 && e.speech.questionDrive >= 0.32 && b.escalationPressure < 0.45;
+  const acknowledgeComplaint = meta.stopQuestions || meta.stopTalking || priorDisengaged || priorRepairing || valuePressure >= 0.28 || boundaryPressure >= 0.28 || s.carePressure >= 0.45;
+  const repairAllowed = repairSignal && !input.boundaries.hardStop && (priorDisengaged || priorRepairing || b.repairOpenness >= 0.2);
+  const directness = clamp01(pt.assertivePressure * 0.35 + s.leadershipPressure * 0.2 + b.boundaryAssertion * 0.3 + valuePressure * 0.15 + (priorDisengaged ? 0.25 : priorRepairing ? 0.12 : 0));
+  const responseLength: IntegratedBehaviorDecision["responseLength"] = disengage || repairingHold || meta.stopTalking || distance >= 0.6 || e.speech.brevity >= 0.65 ? "short" : pt.analysisPressure >= 0.62 || p.depthDrive >= 0.58 ? "long" : "medium";
 
   const explanation: string[] = [];
   if (input.boundaries.hardStop) explanation.push("Mutlak kırmızı çizgi tetiklendi; konuşma kesildi.");
+  else if (persistentDisengage) explanation.push("Önceki disengage durumu kalıcı; bu tur ilişki yeniden açılmadı.");
+  else if (eligibleForRepairing) explanation.push("Onarım sinyali var; ilişki yalnızca repairing aşamasına geçebilir.");
+  else if (priorRepairing) explanation.push("İlişki hâlâ onarım aşamasında; normal yakınlık geri açılmadı.");
   else if (priority === "boundary") explanation.push("Sınır ihlali alt katmanların önüne geçti.");
   if (priority === "values") explanation.push("Değer çatışması davranış stilini bastırdı.");
   if (relationshipPressure >= 0.38) explanation.push("İlişki hasarı yakınlık ve mizahı düşürdü.");
   if (meta.stopQuestions) explanation.push("Kullanıcının soru sormama talebi uygulandı.");
   if (meta.stopTalking) explanation.push("Kullanıcının konuşmayı durdurma talebi uygulandı.");
-  if (repairAllowed) explanation.push("Onarım sinyali kontrollü yakınlaşmaya izin verdi.");
+  if (repairAllowed) explanation.push("Onarım sinyali kayda değer; ancak ilişki anında normale dönmez.");
   if (!humorAllowed && e.humor.enabled) explanation.push("Mizah adayı üst öncelikli baskılar nedeniyle kapatıldı.");
 
   const decision: IntegratedBehaviorDecision = {
@@ -164,6 +205,8 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
     runtimeWarmth: clamp100(decision.warmth * 100),
     runtimeDistance: clamp100(decision.distance * 100),
     runtimePriority: priorityCode[decision.priority],
+    runtimePriorConversationState: priorDisengaged ? 100 : priorRepairing ? 75 : priorConversationState === "distancing" ? 50 : 0,
+    runtimeRepairSignal: repairSignal ? 100 : 0,
   };
 
   return {
