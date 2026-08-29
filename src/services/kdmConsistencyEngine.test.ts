@@ -5,7 +5,7 @@ import {
   decideResponseRepair,
   selectBestConsistency,
 } from "./kdmResponseRepairPolicy";
-import type { DroitDynamicState, ReasoningTrace } from "../types/nexus";
+import type { DroitDynamicState, DroitPersonalityTraits, ReasoningTrace } from "../types/nexus";
 
 const trace = (tone = "sıcak ve empatik"): ReasoningTrace =>
   ({
@@ -36,6 +36,29 @@ const relationshipState = (): DroitDynamicState => ({
     repairProgress: 0,
     repeatedNegativeCount: 0,
   },
+});
+
+const runtimePersonality = (overrides: Partial<DroitPersonalityTraits> = {}): DroitPersonalityTraits => ({
+  anger: 50,
+  patience: 50,
+  empathy: 50,
+  emotionalSensitivity: 50,
+  socialIntelligence: 50,
+  selfConfidence: 50,
+  humor: 80,
+  communication: 50,
+  charisma: 50,
+  curiosity: 80,
+  analyticalThinking: 50,
+  creativity: 50,
+  decisionMaking: 50,
+  attention: 50,
+  authority: 50,
+  courage: 50,
+  seriousness: 50,
+  loyalty: 50,
+  initiative: 50,
+  ...overrides,
 });
 
 describe("KDM response consistency gate", () => {
@@ -219,5 +242,44 @@ describe("KDM response consistency gate", () => {
     expect(states.mert.relationship!.hurtScore).toBeGreaterThan(0);
     expect(states.ali.relationship!.warmth).toBe(50);
     expect(states.ali.relationship!.hurtScore).toBe(0);
+  });
+
+  it("forces no-humor and no-question directives from the integrated runtime decision", () => {
+    const result = analyzeKdmInteraction(
+      "tamam",
+      runtimePersonality({
+        runtimeHumorAllowed: 0,
+        runtimeAskQuestion: 0,
+        runtimeStance: 50,
+        runtimePriority: 82,
+      }),
+      relationshipState(),
+    );
+
+    expect(result.behaviorProfile.humorLevel).toBe(0);
+    expect(result.behaviorProfile.tone).toBe("firm");
+    expect(result.behaviorProfile.behaviorDirectives.some((x) => x.includes("soru"))).toBe(true);
+    expect(result.behaviorProfile.relationshipInstruction).toContain("Üst öncelik değer/sınır");
+  });
+
+  it("forces disengagement as a short boundary response instead of allowing lower layers to reopen chat", () => {
+    const result = analyzeKdmInteraction(
+      "neyse konuşalım",
+      runtimePersonality({
+        runtimeContinueConversation: 0,
+        runtimeHumorAllowed: 0,
+        runtimeAskQuestion: 0,
+        runtimeStance: 100,
+        runtimeResponseLength: 25,
+        runtimePriority: 100,
+      }),
+      relationshipState(),
+    );
+
+    expect(result.behaviorProfile.tone).toBe("firm");
+    expect(result.behaviorProfile.humorLevel).toBe(0);
+    expect(result.behaviorProfile.curiosity).toBe(0);
+    expect(result.behaviorProfile.relationshipInstruction).toContain("konuşmadan çekiliyor");
+    expect(result.behaviorProfile.behaviorDirectives.some((x) => x.includes("Cevabı kısa tut"))).toBe(true);
   });
 });
