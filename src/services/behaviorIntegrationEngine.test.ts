@@ -13,6 +13,7 @@ const basePersonality = {
 
 const base = () => ({
   personality: basePersonality,
+  userMessage: "naber",
   dynamicState: {
     calmness: 70,
     anger: 10,
@@ -72,6 +73,7 @@ const base = () => ({
     },
   },
   boundaries: {
+    hardStop: false,
     violationPressure: 0.05,
     behaviorSignals: {
       boundaryAssertion: 0.05,
@@ -114,6 +116,35 @@ describe("behavior integration", () => {
     expect(result.decision.continueConversation).toBe(false);
     expect(result.decision.humorAllowed).toBe(false);
     expect(result.personality.humor).toBe(0);
+  });
+
+  it("forces an absolute hard stop even when the character sliders are permissive", () => {
+    const input = base();
+    input.boundaries.hardStop = true;
+    input.boundaries.violationPressure = 1;
+    input.boundaries.behaviorSignals.boundaryAssertion = 1;
+    input.boundaries.behaviorSignals.distancePressure = 1;
+    input.boundaries.behaviorSignals.escalationPressure = 1;
+    input.boundaries.behaviorSignals.disengagementPressure = 1;
+
+    const result = integrateBehaviorLayers(input);
+    expect(result.decision.priority).toBe("boundary");
+    expect(result.decision.stance).toBe("disengage");
+    expect(result.decision.continueConversation).toBe(false);
+    expect(result.decision.repairAllowed).toBe(false);
+    expect(result.personality.runtimeContinueConversation).toBe(0);
+    expect(result.personality.runtimePriority).toBe(100);
+  });
+
+  it("obeys a direct request to stop asking questions without ending the conversation", () => {
+    const input = base();
+    input.userMessage = "hala soruyorsun lan soru sorma artık";
+
+    const result = integrateBehaviorLayers(input);
+    expect(result.decision.continueConversation).toBe(true);
+    expect(result.decision.askQuestion).toBe(false);
+    expect(result.decision.acknowledgeComplaint).toBe(true);
+    expect(result.personality.runtimeAskQuestion).toBe(0);
   });
 
   it("does not let a repair attempt instantly erase accumulated relationship damage", () => {
