@@ -51,6 +51,29 @@ export interface BehaviorIntegrationResult {
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 const clamp100 = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
 
+const stanceCode: Record<IntegratedBehaviorDecision["stance"], number> = {
+  warm: 0,
+  neutral: 25,
+  firm: 50,
+  distant: 75,
+  disengage: 100,
+};
+
+const lengthCode: Record<IntegratedBehaviorDecision["responseLength"], number> = {
+  short: 25,
+  medium: 50,
+  long: 75,
+};
+
+const priorityCode: Record<IntegratedBehaviorDecision["priority"], number> = {
+  expression: 20,
+  preference: 35,
+  goal: 50,
+  relationship: 65,
+  values: 82,
+  boundary: 100,
+};
+
 /**
  * Cross-layer arbitration policy.
  * This is an explicit engineering hierarchy, not a claim that human cognition
@@ -167,6 +190,21 @@ export const integrateBehaviorLayers = (
   if (repairAllowed) explanation.push("Onarım sinyali kontrollü yakınlaşmaya izin verdi.");
   if (!humorAllowed && e.humor.enabled) explanation.push("Mizah adayı üst öncelikli baskılar nedeniyle kapatıldı.");
 
+  const decision: IntegratedBehaviorDecision = {
+    priority,
+    continueConversation: !disengage,
+    humorAllowed,
+    askQuestion,
+    acknowledgeComplaint,
+    repairAllowed,
+    stance,
+    responseLength,
+    directness,
+    warmth,
+    distance,
+    explanation,
+  };
+
   const finalPersonality: DroitPersonalityTraits = {
     ...input.personality,
     humor: humorAllowed ? clamp100(humorPressure * 100) : 0,
@@ -186,24 +224,26 @@ export const integrateBehaviorLayers = (
     communication: clamp100(
       responseLength === "short" ? 30 : responseLength === "long" ? 80 : 55,
     ),
+
+    // Reserved runtime bridge fields. These are not permanent personality traits;
+    // they let the server-side KDM consume the already-arbitrated behavior decision
+    // without teaching the LLM to reinterpret raw psychological scores.
+    runtimeContinueConversation: decision.continueConversation ? 100 : 0,
+    runtimeHumorAllowed: decision.humorAllowed ? 100 : 0,
+    runtimeAskQuestion: decision.askQuestion ? 100 : 0,
+    runtimeAcknowledgeComplaint: decision.acknowledgeComplaint ? 100 : 0,
+    runtimeRepairAllowed: decision.repairAllowed ? 100 : 0,
+    runtimeStance: stanceCode[decision.stance],
+    runtimeResponseLength: lengthCode[decision.responseLength],
+    runtimeDirectness: clamp100(decision.directness * 100),
+    runtimeWarmth: clamp100(decision.warmth * 100),
+    runtimeDistance: clamp100(decision.distance * 100),
+    runtimePriority: priorityCode[decision.priority],
   };
 
   return {
     personality: finalPersonality,
-    decision: {
-      priority,
-      continueConversation: !disengage,
-      humorAllowed,
-      askQuestion,
-      acknowledgeComplaint,
-      repairAllowed,
-      stance,
-      responseLength,
-      directness,
-      warmth,
-      distance,
-      explanation,
-    },
+    decision,
     pressures: {
       boundary: boundaryPressure,
       values: valuePressure,
