@@ -201,13 +201,16 @@ export const droitChatService = {
       const reply = data.reply || "";
       const nextDynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined;
       const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
+      const canonicalSemanticEvent = (data.kdm?.semanticEvent as SemanticEvent | undefined) ?? semanticEvent;
+      const semanticSource = String(data.kdm?.semanticSource || "client_fallback");
       const consistency = (data.consistency as ResponseConsistencyResult | undefined) ?? (reasoningTrace ? validateKairoResponse(reply, reasoningTrace) : undefined);
       const totalMs = Math.round(performance.now() - totalStart);
       const server = data.timings || {};
       const serverTotalMs = Number(server.serverTotalMs || 0);
       const timings: KairoTimingMetrics = { clientPrepMs, serverTotalMs, memoryMs: Number(server.memoryMs || 0), kdmMs: Number(server.kdmMs || 0), aiMs: Number(server.aiMs || 0), postProcessMs: Number(server.postProcessMs || 0), networkAndOverheadMs: Math.max(0, totalMs - clientPrepMs - serverTotalMs), totalMs };
       void saveTestSessionLayerAudit(data.sessionId || resolvedSessionId, data.turnId, {
-        semanticEvent,
+        semanticEvent: canonicalSemanticEvent,
+        semanticSource,
         appraisalTemperament: { event: appraisalEvent, fineTune: temperamentFromFineTune(fineTune) },
         personalityTendency: personalityRuntime.response,
         motivation: motivationRuntime.response,
