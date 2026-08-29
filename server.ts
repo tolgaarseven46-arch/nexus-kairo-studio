@@ -5,6 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
 import { resolveCanonicalSemanticEvent } from "./src/services/semanticEventAuthority";
 import { applyConversationStateAuthority } from "./src/services/conversationStateAuthority";
+import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
 import {
   loadKdmState,
   loadRecentKdmMemory,
@@ -451,6 +452,7 @@ app.post("/api/chat", async (req, res) => {
       ),
       conversationAuthority = applyConversationStateAuthority(safePersonality, kdm.nextDynamicState),
       authoritativePersonality = conversationAuthority.personality,
+      behaviorContract = buildBehaviorContract(kdm.nextDynamicState, kdm.trace),
       behaviorProfile = kdm.behaviorProfile,
       speech = computeKairoSpeechIdentity(
         authoritativePersonality,
@@ -458,9 +460,10 @@ app.post("/api/chat", async (req, res) => {
         kdm.trace,
       ),
       enforcementRules = {
-        continueConversation: runtimeFlag(authoritativePersonality, "runtimeContinueConversation", true),
-        humorAllowed: runtimeFlag(authoritativePersonality, "runtimeHumorAllowed", true),
-        askQuestion: runtimeFlag(authoritativePersonality, "runtimeAskQuestion", true),
+        continueConversation: behaviorContract.continueConversation && runtimeFlag(authoritativePersonality, "runtimeContinueConversation", true),
+        humorAllowed: behaviorContract.playfulness === "allowed" && runtimeFlag(authoritativePersonality, "runtimeHumorAllowed", true),
+        askQuestion: behaviorContract.questions === "allowed" && runtimeFlag(authoritativePersonality, "runtimeAskQuestion", true),
+        behaviorContract,
         emojiLevel: speech.emojiLevel,
         conversationState: kdm.nextDynamicState.relationship?.conversationState,
       },
@@ -595,7 +598,7 @@ app.post("/api/chat", async (req, res) => {
         },
         enforcement: enforced,
         speechIdentity: speech,
-        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source },
+        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
         consistency,
         dialogue: dialogueAnalysis,
         timings,
@@ -615,7 +618,7 @@ app.post("/api/chat", async (req, res) => {
     const relationshipInstruction = behaviorProfile.relationshipInstruction
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
-    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
@@ -805,7 +808,7 @@ app.post("/api/chat", async (req, res) => {
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source },
+      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
       consistency,
       dialogue: dialogueAnalysis,
       dialogueDecision,
