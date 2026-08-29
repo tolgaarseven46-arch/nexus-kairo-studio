@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Activity,
   Check,
   Cpu,
   Fingerprint,
@@ -76,6 +77,7 @@ const tabs: Array<{
 }> = [
   { key: "KARAKTER", title: "KARAKTER", icon: Sliders },
   { key: "TEST", title: "TEST & DEBUG", icon: FlaskConical },
+  { key: "IC_SISTEMLER", title: "İÇ SİSTEMLER", icon: Activity },
   { key: "AYARLAR", title: "SİSTEM", icon: Settings },
 ];
 
