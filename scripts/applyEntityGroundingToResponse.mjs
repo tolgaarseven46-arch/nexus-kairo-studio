@@ -17,17 +17,23 @@ if (!source.includes("const entityGroundingInstruction = buildEntityGroundingIns
   source = source.replace(anchor, insert);
 }
 
-if (!source.includes("${entityGroundingInstruction}\\n${dialogueInstruction}")) {
+const entityAlreadyInPrompt =
+  source.includes("${entityGroundingInstruction}\\n${dialogueInstruction}") ||
+  source.includes("${entityGroundingInstruction}\\n${worldEventInstruction}");
+
+if (!entityAlreadyInPrompt) {
   const before = "${activeParticipantInstruction}\\n${dialogueInstruction}";
   const after = "${activeParticipantInstruction}\\n${entityGroundingInstruction}\\n${dialogueInstruction}";
   if (!source.includes(before)) throw new Error("system prompt anchor not found");
   source = source.replace(before, after);
 }
 
-source = source.replace(
-  "semanticSource: canonicalSemantic.source, behaviorContract",
-  "semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, behaviorContract",
-);
+if (!source.includes("entityResolution: languageUnderstanding.entityResolution")) {
+  source = source.replace(
+    "semanticSource: canonicalSemantic.source, behaviorContract",
+    "semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, behaviorContract",
+  );
+}
 
 fs.writeFileSync(path, source);
 console.log("entity grounding connected to response generation");
