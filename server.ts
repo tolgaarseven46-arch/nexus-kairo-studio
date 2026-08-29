@@ -903,6 +903,8 @@ app.post("/api/chat", async (req, res) => {
           providerUsed: activeAiProviderUsed,
           speechIdentity: speech,
           entityResolution: languageUnderstanding.entityResolution,
+          worldEvent: languageUnderstanding.worldEvent,
+          retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, reasons: item.reasons, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })),
           timings: { memoryMs, kdmMs, aiMs },
         },
       }).then((t) => {
@@ -925,7 +927,7 @@ app.post("/api/chat", async (req, res) => {
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
+      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
       consistency,
       dialogue: dialogueAnalysis,
       dialogueDecision,
