@@ -103,11 +103,11 @@ function classifyAppraisalEvent(message: string): {
 } {
   const text = message.toLocaleLowerCase("tr-TR");
   const apology = /(özür|pardon|kusura bakma|hata ettim|yanlış yaptım)/.test(text);
-  const insult = /(aptal|salak|gerizekalı|geri zekalı|mal\b|çirkin|kaşar|orospu|sürtük|piç|yavşak|şerefsiz|haysiyetsiz|ezik|defol|siktir|sus\b|kes\b|kaybol)/.test(text);
+  const insult = /(aptal|salak|gerizekalı|geri zekalı|mal\b|çirkin|kaşar|orospu|oropu|sürtük|piç|yavşak|şerefsiz|haysiyetsiz|ezik|defol|siktir)/.test(text);
   const rejection = /(istemiyorum|git başımdan|konuşma benimle|bırak beni|defol|kaybol)/.test(text);
   const support = /(yanındayım|haklısın|seni anlıyorum|destekliyorum|merak etme)/.test(text);
   const compliment = /(harika|süper|mükemmel|çok iyisin|seviyorum|teşekkür|sağ ol|iyi ki varsın)/.test(text);
-  const frustration = /(yeter|bıktım|sinir|sinirlen|aynı şeyi|kaç kere|neden anlamıyorsun|niye anlamıyorsun)/.test(text);
+  const frustration = /(yeter|bıktım|sinir|sinirlen|aynı şeyi|kaç kere|neden anlamıyorsun|niye anlamıyorsun|hala soruyorsun|soru sorma)/.test(text);
 
   if (apology) return { kind: "apology", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.55 };
   if (insult) return { kind: "insult", valence: "negative", negativeLoad: 1, frustrationLoad: frustration ? 1 : 0.85, threatLoad: 0.7, rewardLoad: 0 };
@@ -134,28 +134,16 @@ function applyTemperamentBeforeKdm(userMessage: string, dynamicState?: DroitDyna
   const interactionCount = Math.max(0, relationship?.interactionCount || 0);
   const firstSeenAt = relationship?.firstSeenAt ? new Date(relationship.firstSeenAt).getTime() : Date.now();
   const relationshipAgeMinutes = Number.isFinite(firstSeenAt) ? Math.max(0, (Date.now() - firstSeenAt) / 60000) : 0;
-  const similarEventsFromSource = event.valence === "negative"
-    ? Math.max(0, relationship?.negativeEvents || 0)
-    : event.valence === "positive" ? Math.max(0, relationship?.positiveEvents || 0) : 0;
-
+  const similarEventsFromSource = event.valence === "negative" ? Math.max(0, relationship?.negativeEvents || 0) : event.valence === "positive" ? Math.max(0, relationship?.positiveEvents || 0) : 0;
   const appraisal = appraiseEventV0(
     { kind: event.kind, sourceId: "active-user", targetIsKaira: true, valence: event.valence },
-    {
-      relationshipAgeMinutes,
-      interactionCount,
-      similarEventsFromSource,
-      similarEventsRecentGlobal: similarEventsFromSource,
-      distinctSourcesRecentGlobal: 1,
-      minutesSinceLastSimilarEvent: event.valence === "negative" ? minutesBetween(relationship?.lastConflictAt) : null,
-    },
+    { relationshipAgeMinutes, interactionCount, similarEventsFromSource, similarEventsRecentGlobal: similarEventsFromSource, distinctSourcesRecentGlobal: 1, minutesSinceLastSimilarEvent: event.valence === "negative" ? minutesBetween(relationship?.lastConflictAt) : null },
   );
-
   const warmth = Math.max(0, Math.min(100, relationship?.warmth ?? 50));
   const trust = Math.max(0, Math.min(100, relationship?.trust ?? 50));
   const conflict = Math.max(0, Math.min(100, relationship?.conflictScore ?? 0));
   const hurt = Math.max(0, Math.min(100, relationship?.hurtScore ?? 0));
   const relationshipSafety = Math.max(0, Math.min(1, (warmth * 0.35 + trust * 0.45 - conflict * 0.1 - hurt * 0.1) / 80));
-
   const temperamentResponse = computeTemperamentResponse(temperament, {
     negativeLoad: event.negativeLoad,
     frustrationLoad: event.frustrationLoad,
@@ -167,37 +155,16 @@ function applyTemperamentBeforeKdm(userMessage: string, dynamicState?: DroitDyna
     currentStress: Math.max(0, Math.min(1, dynamicState.stress / 100)),
     minutesSinceEvent: 0,
   });
-
   const delta = temperamentResponse.stateDelta;
-  return {
-    ...dynamicState,
-    anger: clamp100(dynamicState.anger + delta.anger),
-    stress: clamp100(dynamicState.stress + delta.stress),
-    happiness: clamp100(dynamicState.happiness + delta.happiness),
-    calmness: clamp100(dynamicState.calmness + delta.calmness),
-    confidence: clamp100(dynamicState.confidence + delta.confidence),
-    surprise: clamp100(dynamicState.surprise + delta.surprise),
-  };
+  return { ...dynamicState, anger: clamp100(dynamicState.anger + delta.anger), stress: clamp100(dynamicState.stress + delta.stress), happiness: clamp100(dynamicState.happiness + delta.happiness), calmness: clamp100(dynamicState.calmness + delta.calmness), confidence: clamp100(dynamicState.confidence + delta.confidence), surprise: clamp100(dynamicState.surprise + delta.surprise) };
 }
 
 export const droitChatService = {
-  async sendMessage({
-    userMessage,
-    personality,
-    dynamicState,
-    history = [],
-    characterInfo = { name: "KAIRO", roleTitle: "Sunucu Yöneticisi", raceName: "Sentetik Droit" },
-    provider = "openrouter",
-    userId: explicitUserId,
-    userName = "Kullanıcı",
-    suppressRecentMemory = false,
-    sessionId,
-  }: SendKairoChatOptions): Promise<KairoChatResponse> {
+  async sendMessage({ userMessage, personality, dynamicState, history = [], characterInfo = { name: "KAIRO", roleTitle: "Sunucu Yöneticisi", raceName: "Sentetik Droit" }, provider = "openrouter", userId: explicitUserId, userName = "Kullanıcı", suppressRecentMemory = false, sessionId }: SendKairoChatOptions): Promise<KairoChatResponse> {
     const totalStart = performance.now();
     const userId = resolveConversationUserId(explicitUserId);
     const prepStart = performance.now();
     const fineTune = readFineTuneProfile();
-
     const temperamentAdjustedState = applyTemperamentBeforeKdm(userMessage, dynamicState);
     const personalityRuntime = applyPersonalityTendencies(personality, fineTune, userMessage);
     const motivationRuntime = applyMotivations(personalityRuntime.personality, fineTune, userMessage);
@@ -206,10 +173,10 @@ export const droitChatService = {
     const socialRuntime = applySocialOrientation(preferenceRuntime.personality, fineTune, userMessage, temperamentAdjustedState);
     const boundaryRuntime = applyBoundaries(socialRuntime.personality, fineTune, userMessage, temperamentAdjustedState);
     const expressionRuntime = applyExpressionStyle(boundaryRuntime.personality, fineTune, userMessage, temperamentAdjustedState);
-
     const integrationRuntime = integrateBehaviorLayers({
       personality: expressionRuntime.personality,
       dynamicState: temperamentAdjustedState,
+      userMessage,
       personalityTendency: personalityRuntime.response,
       motivation: motivationRuntime.response,
       values: valueRuntime.response,
@@ -219,78 +186,25 @@ export const droitChatService = {
       expression: expressionRuntime.response,
     });
     const runtimePersonality = integrationRuntime.personality;
-
     const behaviorProfile = computeBehaviorProfile(runtimePersonality, userMessage);
     const clientPrepMs = Math.round(performance.now() - prepStart);
-
-    const payload = {
-      sessionId,
-      userId,
-      userName,
-      userMessage,
-      character: characterInfo,
-      personality: runtimePersonality,
-      behaviorProfile,
-      personalityTendency: personalityRuntime.response,
-      motivation: motivationRuntime.response,
-      values: valueRuntime.response,
-      preferences: preferenceRuntime.response,
-      socialOrientation: socialRuntime.response,
-      boundaries: boundaryRuntime.response,
-      expressionStyle: expressionRuntime.response,
-      behaviorDecision: integrationRuntime.decision,
-      behaviorPressures: integrationRuntime.pressures,
-      dynamicState: temperamentAdjustedState,
-      history: history.slice(-24).map((m) => ({
-        sender: m.sender,
-        text: m.text,
-        participantId: m.participantId,
-        participantName: m.participantName,
-        replyToParticipantId: m.replyToParticipantId,
-        replyToParticipantName: m.replyToParticipantName,
-      })),
-      provider,
-      suppressRecentMemory,
-    };
-
+    const payload = { sessionId, userId, userName, userMessage, character: characterInfo, personality: runtimePersonality, behaviorProfile, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState: temperamentAdjustedState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        signal: controller.signal,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e.error || `Sunucu hatası: ${res.status}`);
-      }
+      const res = await fetch("/api/chat", { method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Sunucu hatası: ${res.status}`); }
       const data = await res.json();
       const reply = data.reply || "";
       const nextDynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined;
       const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
-      const consistency = (data.consistency as ResponseConsistencyResult | undefined) ??
-        (reasoningTrace ? validateKairoResponse(reply, reasoningTrace) : undefined);
+      const consistency = (data.consistency as ResponseConsistencyResult | undefined) ?? (reasoningTrace ? validateKairoResponse(reply, reasoningTrace) : undefined);
       const totalMs = Math.round(performance.now() - totalStart);
       const server = data.timings || {};
       const serverTotalMs = Number(server.serverTotalMs || 0);
-      const timings: KairoTimingMetrics = {
-        clientPrepMs,
-        serverTotalMs,
-        memoryMs: Number(server.memoryMs || 0),
-        kdmMs: Number(server.kdmMs || 0),
-        aiMs: Number(server.aiMs || 0),
-        postProcessMs: Number(server.postProcessMs || 0),
-        networkAndOverheadMs: Math.max(0, totalMs - clientPrepMs - serverTotalMs),
-        totalMs,
-      };
-
+      const timings: KairoTimingMetrics = { clientPrepMs, serverTotalMs, memoryMs: Number(server.memoryMs || 0), kdmMs: Number(server.kdmMs || 0), aiMs: Number(server.aiMs || 0), postProcessMs: Number(server.postProcessMs || 0), networkAndOverheadMs: Math.max(0, totalMs - clientPrepMs - serverTotalMs), totalMs };
       void saveTestSessionLayerAudit(data.sessionId, data.turnId, {
-        appraisalTemperament: {
-          event: classifyAppraisalEvent(userMessage),
-          fineTune: temperamentFromFineTune(fineTune),
-        },
+        appraisalTemperament: { event: classifyAppraisalEvent(userMessage), fineTune: temperamentFromFineTune(fineTune) },
         personalityTendency: personalityRuntime.response,
         motivation: motivationRuntime.response,
         values: valueRuntime.response,
@@ -303,23 +217,10 @@ export const droitChatService = {
         rawDynamicStateBefore: dynamicState,
         temperamentAdjustedState,
       });
-
-      return {
-        reply,
-        profile: behaviorProfile,
-        dynamicState: nextDynamicState,
-        reasoningTrace,
-        consistency,
-        providerUsed: data.providerUsed,
-        timings,
-        sessionId: data.sessionId,
-        turnId: data.turnId,
-      };
+      return { reply, profile: behaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId, turnId: data.turnId };
     } catch (err: any) {
       if (err?.name === "AbortError") throw new Error("Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.");
       throw err;
-    } finally {
-      clearTimeout(timeout);
-    }
+    } finally { clearTimeout(timeout); }
   },
 };
