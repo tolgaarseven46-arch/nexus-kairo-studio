@@ -34,16 +34,57 @@ describe("semantic event engine", () => {
     expect(repair.intent).toBe("repair");
   });
 
-  it("recognizes emotional sharing before legacy KDM fallback is needed", () => {
+  it("recognizes emotional sharing before any downstream fallback is needed", () => {
     const event = interpretSemanticEvent("iyi sıcaktan bunaldım");
     expect(event.intent).toBe("emotional_share");
     expect(event.emotionalLoad).toBeGreaterThan(0);
   });
 
+  it.each([
+    "hiç havamda değilim",
+    "kafam bozuk",
+    "modum yok",
+    "modum yo",
+    "moodum düşük",
+    "keyfim yerinde değil",
+    "içim sıkılıyor",
+  ])("owns the low-mood interpretation: %s", (message) => {
+    const event = interpretSemanticEvent(message);
+    expect(event.intent).toBe("emotional_share");
+    expect(event.emotionalLoad).toBeGreaterThan(0);
+  });
+
+  it.each(["ne diyon aq", "ne anlatıyosun ya", "ne alaka", "nasıl yani", "bi şey anlamadım"])(
+    "owns the confusion/challenge interpretation: %s",
+    (message) => {
+      const event = interpretSemanticEvent(message);
+      expect(event.intent).toBe("complaint");
+    },
+  );
+
   it("recognizes natural information questions without a question mark", () => {
     const event = interpretSemanticEvent("orası nasıl");
     expect(event.intent).toBe("information_request");
     expect(event.valence).toBe("neutral");
+  });
+
+  it("recognizes past-action recall as an information request", () => {
+    expect(interpretSemanticEvent("Mert yarın ne yapmayı düşünüyordu?").intent).toBe(
+      "information_request",
+    );
+  });
+
+  it("keeps ordinary activity reports as general chat", () => {
+    const event = interpretSemanticEvent("koştum spor yaptım");
+    expect(event.intent).toBe("general_chat");
+    expect(event.valence).toBe("neutral");
+  });
+
+  it("captures affectionate address as a social approach signal", () => {
+    const event = interpretSemanticEvent("iyi bebeğim");
+    expect(event.intent).toBe("affection");
+    expect(event.affection).toBeGreaterThan(0);
+    expect(event.valence).toBe("positive");
   });
 
   it("keeps venting profanity negative but targets the event instead of Kaira", () => {
