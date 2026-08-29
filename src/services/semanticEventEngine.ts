@@ -85,7 +85,8 @@ const CONFUSION_RE = /(ne diyon|ne diyorsun|ne anlatıyosun|ne anlatıyorsun|ne 
 const VENTING_PROFANITY_RE = word("amk|aq|mk");
 const EMOTIONAL_SHARE_RE = /(moralim.{0,30}bozuk|üzgünüm|çok mutluyum|mutluyum|bunaldım|canım (?:çok )?sıkkın|kendimi (?:çok )?kötü hissediyorum|kendimi (?:çok )?iyi hissediyorum|kaygılıyım|endişeliyim|yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|moodum düşük|keyfim yerinde değil|içim sıkılıyor)/u;
 const LOW_MOOD_RE = /(moralim.{0,30}bozuk|üzgün|kötü hissed|bunaldım|canım (?:çok )?sıkkın|kaygı|endişe|stres|yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|moodum düşük|keyfim yerinde değil|içim sıkılıyor)/u;
-const INFORMATION_REQUEST_RE = /(?:^|\s)(neden|niye|nasıl|nedir|ne demek|kim|kime|kimi|hangi|hangisi|nerede|neresi|neydi|ne yapacaktı)(?:\s|$|[?.!,])|ne\s+yapmayı\s+düşünüyordu|ne\s+yapacaktı|hatırlıyor\s+musun|hatırladın\s+mı/u;
+const INFORMATION_REQUEST_RE = /(?:^|\s)(neden|niye|nasıl|nedir|ne demek|kim|kime|kimi|hangi|hangisi|nerede|neresi)(?:\s|$|[?.!,])/u;
+const RECALL_QUESTION_RE = /(?:^|\s)(?:neydi|ne yapacaktı)(?:\s|$|[?.!,])|ne\s+yapmayı\s+düşünüyordu|hatırlıyor\s+musun|hatırladın\s+mı/u;
 
 function inferTarget(
   text: string,
@@ -157,6 +158,7 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   else if (compliment > 0) intent = "compliment";
   else if (emotionalShare) intent = "emotional_share";
   else if (affection > 0) intent = "affection";
+  else if (RECALL_QUESTION_RE.test(text)) intent = "question";
   else if (/[?]/u.test(message) || INFORMATION_REQUEST_RE.test(text))
     intent = "information_request";
   else if (/^(selam|merhaba|hey|naber|nabr|nasılsın)(?:\s|$)/u.test(text))
