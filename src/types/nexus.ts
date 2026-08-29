@@ -1,4 +1,4 @@
-export type NexusTab = 'KARAKTER' | 'TEST' | 'AYARLAR';
+export type NexusTab = 'KARAKTER' | 'TEST' | 'IC_SISTEMLER' | 'AYARLAR';
 
 export interface RelationshipState {
   firstSeenAt?: string;
@@ -127,4 +127,3 @@ export interface RestoredTestSession {
   lastTimings?: any;
   lastProviderUsed?: string;
 }
-
