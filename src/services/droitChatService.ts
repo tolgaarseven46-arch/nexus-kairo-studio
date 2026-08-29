@@ -19,6 +19,7 @@ import { integrateBehaviorLayers } from "./behaviorIntegrationEngine";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 import { saveTestSessionLayerAudit } from "./testSessionLayerAuditService";
 import { auth } from "../lib/firebase";
+import { requestCanonicalLanguageUnderstanding, type ClientLanguageUnderstandingResult } from "./clientLanguageUnderstanding";
 
 export type KairoProvider = "gemini" | "openrouter";
 export type KairoProviderUsed = KairoProvider | "local_language";
@@ -57,6 +58,7 @@ export interface KairoChatResponse {
   timings?: KairoTimingMetrics;
   sessionId?: string;
   turnId?: string;
+  languageUnderstanding?: ClientLanguageUnderstandingResult;
 }
 
 function resolveConversationUserId(explicitUserId?: string) {
@@ -164,7 +166,28 @@ export const droitChatService = {
     const resolvedSessionId = sessionId?.trim() || freshSessionId(userId);
     const prepStart = performance.now();
     const fineTune = readFineTuneProfile();
-    const semanticEvent = interpretSemanticEvent(userMessage);
+    let languageUnderstanding: ClientLanguageUnderstandingResult;
+    try {
+      languageUnderstanding = await requestCanonicalLanguageUnderstanding({
+        message: userMessage,
+        userName,
+        characterName: characterInfo.name || "KAIRO",
+        provider,
+        recentMessages: history.slice(-8).map((m) => ({
+          role: m.sender === "droit" ? ("assistant" as const) : ("user" as const),
+          content: m.text,
+        })),
+      });
+    } catch (error) {
+      languageUnderstanding = {
+        event: interpretSemanticEvent(userMessage),
+        semanticSource: "fallback_regex",
+        warnings: [
+          `Canonical language preflight failed: ${error instanceof Error ? error.message : String(error)}`,
+        ],
+      };
+    }
+    const semanticEvent = languageUnderstanding.event;
     const appraisalEvent = appraisalEventFromSemantic(semanticEvent);
     const temperamentAdjustedState = applyTemperamentBeforeKdm(semanticEvent, dynamicState);
     const personalityRuntime = applyPersonalityTendencies(personality, fineTune, userMessage);
@@ -202,7 +225,7 @@ export const droitChatService = {
       const nextDynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined;
       const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
       const canonicalSemanticEvent = (data.kdm?.semanticEvent as SemanticEvent | undefined) ?? semanticEvent;
-      const semanticSource = String(data.kdm?.semanticSource || "client_fallback");
+      const semanticSource = languageUnderstanding.semanticSource;
       const consistency = (data.consistency as ResponseConsistencyResult | undefined) ?? (reasoningTrace ? validateKairoResponse(reply, reasoningTrace) : undefined);
       const totalMs = Math.round(performance.now() - totalStart);
       const server = data.timings || {};
@@ -224,7 +247,7 @@ export const droitChatService = {
         rawDynamicStateBefore: dynamicState,
         temperamentAdjustedState,
       });
-      return { reply, profile: behaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId };
+      return { reply, profile: behaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId, languageUnderstanding };
     } catch (err: any) {
       if (err?.name === "AbortError") throw new Error("Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.");
       throw err;

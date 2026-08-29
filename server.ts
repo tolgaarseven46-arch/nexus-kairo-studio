@@ -295,6 +295,41 @@ function buildSessionWorkingMemory(history: any[], userMessage: string) {
     )
     .join("\n");
 }
+app.post("/api/language-understanding", async (req, res) => {
+  try {
+    const {
+      userMessage,
+      userName = "Kullanıcı",
+      characterName = "KAIRO",
+      history = [],
+      provider = "openrouter",
+    } = req.body || {};
+    if (!userMessage?.trim())
+      return res.status(400).json({ error: "userMessage is required" });
+
+    const recentMessages = Array.isArray(history)
+      ? history.slice(-8).map((item: any) => ({
+          role: item?.role === "assistant" ? ("assistant" as const) : ("user" as const),
+          content: String(item?.content || ""),
+        }))
+      : [];
+
+    const result = await resolveServerLanguageUnderstanding({
+      message: String(userMessage),
+      context: { userName, characterName, recentMessages },
+      preferredProvider: provider,
+      generateText,
+    });
+
+    res.json({ ok: true, ...result });
+  } catch (error: any) {
+    res.status(500).json({
+      ok: false,
+      error: error?.message || "Language understanding failed",
+    });
+  }
+});
+
 app.get("/api/health", (_q, r) =>
   r.json({ status: "ok", timestamp: new Date().toISOString() }),
 );
