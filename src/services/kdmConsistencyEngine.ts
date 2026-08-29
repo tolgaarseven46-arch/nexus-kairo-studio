@@ -188,10 +188,12 @@ function classifySentiment(message: string): string {
   return "nötr";
 }
 
-function semanticIntentToKdm(event: SemanticEvent, message: string): string {
+function semanticIntentToKdm(event: SemanticEvent): string {
   switch (event.intent) {
     case "greeting": return "selamlama";
     case "question": return "soru";
+    case "information_request": return "bilgi_ve_aciklama";
+    case "emotional_share": return "duygusal_paylasim";
     case "banter": return "şakalaşma";
     case "insult": return "hakaret_ve_saldiri";
     case "rejection": return "reddetme_ve_mesafe";
@@ -201,15 +203,17 @@ function semanticIntentToKdm(event: SemanticEvent, message: string): string {
     case "command": return "eylem_talebi";
     case "support": return "duygusal_destek";
     case "compliment": return "genel_sohbet";
-    default: return classifyIntent(message);
+    case "general_chat":
+    default:
+      return "genel_sohbet";
   }
 }
 
-function semanticSentimentToKdm(event: SemanticEvent, message: string): string {
-  if (hasLocalLowMoodExpression(message) || EMOTIONAL_LOAD_RE.test(analysisText(message))) return "duygusal_yük";
+function semanticSentimentToKdm(event: SemanticEvent): string {
+  if (event.emotionalLoad > 0) return "duygusal_yük";
   if (event.valence === "negative") return "negatif";
   if (event.valence === "positive") return "pozitif";
-  return classifySentiment(message);
+  return "nötr";
 }
 
 function semanticNegativeTarget(event: SemanticEvent): NegativeTarget {
@@ -269,8 +273,8 @@ export function analyzeKdmInteraction(
   };
   const semanticEvent = interpretSemanticEvent(userMessage);
   const baseBehaviorProfile = computeBehaviorProfile(personality || undefined, userMessage);
-  const intent = semanticIntentToKdm(semanticEvent, userMessage);
-  const sentiment = semanticSentimentToKdm(semanticEvent, userMessage);
+  const intent = semanticIntentToKdm(semanticEvent);
+  const sentiment = semanticSentimentToKdm(semanticEvent);
 
   const patience = trait(personality, "patience");
   const sensitivity = trait(personality, "emotionalSensitivity");
