@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
+import { resolveCanonicalSemanticEvent } from "./src/services/semanticEventAuthority";
 import {
   loadKdmState,
   loadRecentKdmMemory,
@@ -405,6 +406,7 @@ app.post("/api/chat", async (req, res) => {
       dynamicState = defaultDynamicState,
       provider = "openrouter",
       suppressRecentMemory = false,
+      semanticEvent: incomingSemanticEvent,
       sessionId: incomingSessionId,
     } = req.body;
     if (!userMessage)
@@ -438,11 +440,13 @@ app.post("/api/chat", async (req, res) => {
         ? requestState
         : normalizeDynamicState(persistedState ?? dynamicState),
       safePersonality = personality as DroitPersonalityTraits,
+      canonicalSemantic = resolveCanonicalSemanticEvent(userMessage, incomingSemanticEvent),
       kdmStart = now(),
       kdm = analyzeKdmInteraction(
-        normalizeKdmSemanticAliases(userMessage),
+        userMessage,
         safePersonality,
         effective,
+        canonicalSemantic.event,
       ),
       behaviorProfile = kdm.behaviorProfile,
       speech = computeKairoSpeechIdentity(
@@ -588,7 +592,7 @@ app.post("/api/chat", async (req, res) => {
         },
         enforcement: enforced,
         speechIdentity: speech,
-        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState },
+        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source },
         consistency,
         dialogue: dialogueAnalysis,
         timings,
@@ -798,7 +802,7 @@ app.post("/api/chat", async (req, res) => {
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState },
+      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source },
       consistency,
       dialogue: dialogueAnalysis,
       dialogueDecision,
