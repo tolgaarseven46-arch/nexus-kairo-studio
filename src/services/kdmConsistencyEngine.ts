@@ -266,12 +266,13 @@ export function analyzeKdmInteraction(
   userMessage: string,
   personality?: DroitPersonalityTraits | null,
   currentDynamicState?: DroitDynamicState | null,
+  canonicalSemanticEvent?: SemanticEvent | null,
 ): KdmAnalysisResult {
   const state: DroitDynamicState = {
     ...DEFAULT_DYNAMIC_STATE,
     ...(currentDynamicState || {}),
   };
-  const semanticEvent = interpretSemanticEvent(userMessage);
+  const semanticEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage);
   const baseBehaviorProfile = computeBehaviorProfile(personality || undefined, userMessage);
   const intent = semanticIntentToKdm(semanticEvent);
   const sentiment = semanticSentimentToKdm(semanticEvent);
