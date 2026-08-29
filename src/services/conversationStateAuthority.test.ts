@@ -11,7 +11,7 @@ const personality = {
   runtimeWarmth: 90,
   runtimeDistance: 0,
   runtimePriority: 20,
-} as DroitPersonalityTraits;
+} as unknown as DroitPersonalityTraits;
 
 const state = (conversationState: "active" | "distancing" | "disengaged" | "repairing") => ({
   calmness: 70,
