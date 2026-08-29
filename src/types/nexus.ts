@@ -105,6 +105,7 @@ export interface TestSessionTurnRecord {
     model?: string;
     timings?: Record<string, number>;
     speechIdentity?: unknown;
+    entityResolution?: unknown;
   };
 }
 
