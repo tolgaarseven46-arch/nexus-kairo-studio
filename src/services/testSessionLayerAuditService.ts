@@ -3,6 +3,7 @@ import { db } from "../lib/firebase";
 
 export interface TestSessionLayerAudit {
   semanticEvent?: unknown;
+  semanticSource?: string;
   appraisalTemperament?: unknown;
   personalityTendency?: unknown;
   motivation?: unknown;
