@@ -644,6 +644,7 @@ app.post("/api/chat", async (req, res) => {
           metadata: {
             providerUsed: "local_language",
             speechIdentity: speech,
+            entityResolution: languageUnderstanding.entityResolution,
             timings: { memoryMs, kdmMs, aiMs: 0 },
           },
         }).then((t) => {
@@ -864,6 +865,7 @@ app.post("/api/chat", async (req, res) => {
         metadata: {
           providerUsed: activeAiProviderUsed,
           speechIdentity: speech,
+          entityResolution: languageUnderstanding.entityResolution,
           timings: { memoryMs, kdmMs, aiMs },
         },
       }).then((t) => {
@@ -886,7 +888,7 @@ app.post("/api/chat", async (req, res) => {
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
+      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
       consistency,
       dialogue: dialogueAnalysis,
       dialogueDecision,

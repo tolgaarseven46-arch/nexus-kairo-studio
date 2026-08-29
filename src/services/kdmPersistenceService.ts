@@ -110,6 +110,7 @@ export interface SaveTestSessionTurnPayload {
     model?: string;
     timings?: Record<string, number>;
     speechIdentity?: unknown;
+    entityResolution?: unknown;
   };
 }
 
@@ -220,6 +221,7 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
       model: payload.metadata?.model,
       timings: payload.metadata?.timings,
       speechIdentity: payload.metadata?.speechIdentity,
+      entityResolution: payload.metadata?.entityResolution,
     },
   };
 
