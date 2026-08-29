@@ -28,6 +28,7 @@ import { applySocialOrientation } from "./socialOrientationEngine";
 import { applyBoundaries } from "./boundaryEngine";
 import { applyExpressionStyle } from "./expressionStyleEngine";
 import { integrateBehaviorLayers } from "./behaviorIntegrationEngine";
+import { saveTestSessionLayerAudit } from "./testSessionLayerAuditService";
 import { auth } from "../lib/firebase";
 
 export type KairoProvider = "gemini" | "openrouter";
@@ -284,6 +285,25 @@ export const droitChatService = {
         networkAndOverheadMs: Math.max(0, totalMs - clientPrepMs - serverTotalMs),
         totalMs,
       };
+
+      void saveTestSessionLayerAudit(data.sessionId, data.turnId, {
+        appraisalTemperament: {
+          event: classifyAppraisalEvent(userMessage),
+          fineTune: temperamentFromFineTune(fineTune),
+        },
+        personalityTendency: personalityRuntime.response,
+        motivation: motivationRuntime.response,
+        values: valueRuntime.response,
+        preferences: preferenceRuntime.response,
+        socialOrientation: socialRuntime.response,
+        boundaries: boundaryRuntime.response,
+        expressionStyle: expressionRuntime.response,
+        behaviorDecision: integrationRuntime.decision,
+        behaviorPressures: integrationRuntime.pressures,
+        rawDynamicStateBefore: dynamicState,
+        temperamentAdjustedState,
+      });
+
       return {
         reply,
         profile: behaviorProfile,
