@@ -80,7 +80,7 @@ export const inferMotivationSituation = (message: string): MotivationSituation =
     autonomyThreat: /(mecbursun|zorundasın|emrediyorum|dediğimi yap|sus|izin vermiyorum|yasak|itaat)/.test(text) ? 0.95 : 0.1,
     achievementOpportunity: /(hedef|başar|çöz|bitir|tamamla|proje|görev|yapabilir miyiz|nasıl yaparız|plan)/.test(text) ? 0.85 : 0.2,
     influenceOpportunity: /(karar ver|sen seç|yönet|öner|ne yapalım|fikrin|lider|yönlendir)/.test(text) ? 0.85 : 0.2,
-    uncertainty: /(bilmiyorum|emin değilim|belirsiz|acaba|ne olacak|risk|kararsız|muhtemelen|belki)/.test(text) ? 0.85 : 0.2,
+    uncertainty: /(bilmiyorum|emin değilim|belirsiz|belli değil|ne olacağı belli değil|acaba|ne olacak|risk|kararsız|muhtemelen|belki)/.test(text) ? 0.85 : 0.2,
     instability: /(değişti|bozuldu|dağıldı|kriz|kaos|istikrarsız|sürekli değiş|altüst)/.test(text) ? 0.9 : 0.1,
   };
 };
