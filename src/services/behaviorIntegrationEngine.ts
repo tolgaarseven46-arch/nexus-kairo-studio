@@ -6,11 +6,13 @@ import type { PreferenceResponse } from "./preferenceEngine";
 import type { SocialOrientationResponse } from "./socialOrientationEngine";
 import type { BoundaryResponse } from "./boundaryEngine";
 import type { ExpressionStyleResponse } from "./expressionStyleEngine";
+import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 
 export interface BehaviorIntegrationInput {
   personality: DroitPersonalityTraits;
   dynamicState?: DroitDynamicState;
   userMessage?: string;
+  semanticEvent?: SemanticEvent;
   personalityTendency: PersonalityTendencyResponse;
   motivation: MotivationResponse;
   values: ValueResponse;
@@ -64,16 +66,6 @@ const priorityCode: Record<IntegratedBehaviorDecision["priority"], number> = {
   expression: 20, preference: 35, goal: 50, relationship: 65, values: 82, boundary: 100,
 };
 
-const inferMetaSocialRequest = (message = "") => {
-  const text = message.toLocaleLowerCase("tr-TR");
-  return {
-    stopQuestions: /(soru\s+sorma|sorma artık|sormayı bırak|hala soruyorsun|hâlâ soruyorsun|yine soru|sorgu yapma)/.test(text),
-    stopTalking: /(^|\s)(sus|konuşma|kes artık|yeter konuşma)(\s|$)/.test(text),
-    apology: /(özür|pardon|kusura bakma|hata ettim|yanlış yaptım)/.test(text),
-    repairAttempt: /(barışalım|barışak|telafi|düzeltmek istiyorum|bir daha yapmayacağım|beni affet|konuşup çözelim)/.test(text),
-  };
-};
-
 const minutesSince = (iso?: string) => {
   if (!iso) return 0;
   const t = new Date(iso).getTime();
@@ -89,7 +81,7 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
   const e = input.expression;
   const pt = input.personalityTendency.behaviorSignals;
   const relationship = input.dynamicState?.relationship;
-  const meta = inferMetaSocialRequest(input.userMessage);
+  const semanticEvent = input.semanticEvent ?? interpretSemanticEvent(input.userMessage ?? "");
 
   const hurt = clamp01((relationship?.hurtScore ?? 0) / 100);
   const conflict = clamp01((relationship?.conflictScore ?? 0) / 100);
@@ -100,7 +92,7 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
   const priorRepairing = priorConversationState === "repairing";
   const repairAttempts = Math.max(0, relationship?.repairAttempts ?? 0);
   const disengagedMinutes = minutesSince(relationship?.disengagedAt);
-  const repairSignal = meta.apology || meta.repairAttempt;
+  const repairSignal = semanticEvent.apology || semanticEvent.repairAttempt;
 
   const boundaryPressure = input.boundaries.hardStop
     ? 1
@@ -122,9 +114,6 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
   const severeBoundary = input.boundaries.hardStop || b.disengagementPressure >= 0.72 || input.boundaries.violationPressure >= 0.82;
   const accumulatedDamage = clamp01(hurt * 0.55 + conflict * 0.45);
 
-  // A prior hard disengagement is a relationship state, not a one-turn tone.
-  // Immediate pleas/flirting cannot erase it. Repair needs explicit repair behavior
-  // and accumulated progress/time before the state can relax.
   const eligibleForRepairing = priorDisengaged && repairSignal && (repairAttempts >= 1 || (relationship?.repairProgress ?? 0) >= 12 || disengagedMinutes >= 30);
   const persistentDisengage = priorDisengaged && !eligibleForRepairing;
   const freshDisengage = input.boundaries.hardStop || (severeBoundary && (b.repairOpenness < 0.35 || accumulatedDamage >= 0.5));
@@ -151,12 +140,12 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
           ? "warm"
           : "neutral";
 
-  const humorAllowed = !disengage && !repairingHold && !meta.stopTalking && stance !== "firm" && stance !== "distant" && boundaryPressure < 0.3 && valuePressure < 0.3 && relationshipPressure < 0.35 && anger < 0.55 && stress < 0.7 && e.humor.enabled;
-  const askQuestion = !disengage && !repairingHold && !meta.stopQuestions && !meta.stopTalking && distance < 0.58 && e.speech.questionDrive >= 0.32 && b.escalationPressure < 0.45;
-  const acknowledgeComplaint = meta.stopQuestions || meta.stopTalking || priorDisengaged || priorRepairing || valuePressure >= 0.28 || boundaryPressure >= 0.28 || s.carePressure >= 0.45;
+  const humorAllowed = !disengage && !repairingHold && !semanticEvent.stopTalking && stance !== "firm" && stance !== "distant" && boundaryPressure < 0.3 && valuePressure < 0.3 && relationshipPressure < 0.35 && anger < 0.55 && stress < 0.7 && e.humor.enabled;
+  const askQuestion = !disengage && !repairingHold && !semanticEvent.stopQuestions && !semanticEvent.stopTalking && distance < 0.58 && e.speech.questionDrive >= 0.32 && b.escalationPressure < 0.45;
+  const acknowledgeComplaint = semanticEvent.stopQuestions || semanticEvent.stopTalking || semanticEvent.intent === "complaint" || priorDisengaged || priorRepairing || valuePressure >= 0.28 || boundaryPressure >= 0.28 || s.carePressure >= 0.45;
   const repairAllowed = repairSignal && !input.boundaries.hardStop && (priorDisengaged || priorRepairing || b.repairOpenness >= 0.2);
   const directness = clamp01(pt.assertivePressure * 0.35 + s.leadershipPressure * 0.2 + b.boundaryAssertion * 0.3 + valuePressure * 0.15 + (priorDisengaged ? 0.25 : priorRepairing ? 0.12 : 0));
-  const responseLength: IntegratedBehaviorDecision["responseLength"] = disengage || repairingHold || meta.stopTalking || distance >= 0.6 || e.speech.brevity >= 0.65 ? "short" : pt.analysisPressure >= 0.62 || p.depthDrive >= 0.58 ? "long" : "medium";
+  const responseLength: IntegratedBehaviorDecision["responseLength"] = disengage || repairingHold || semanticEvent.stopTalking || distance >= 0.6 || e.speech.brevity >= 0.65 ? "short" : pt.analysisPressure >= 0.62 || p.depthDrive >= 0.58 ? "long" : "medium";
 
   const explanation: string[] = [];
   if (input.boundaries.hardStop) explanation.push("Mutlak kırmızı çizgi tetiklendi; konuşma kesildi.");
@@ -166,8 +155,8 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
   else if (priority === "boundary") explanation.push("Sınır ihlali alt katmanların önüne geçti.");
   if (priority === "values") explanation.push("Değer çatışması davranış stilini bastırdı.");
   if (relationshipPressure >= 0.38) explanation.push("İlişki hasarı yakınlık ve mizahı düşürdü.");
-  if (meta.stopQuestions) explanation.push("Kullanıcının soru sormama talebi uygulandı.");
-  if (meta.stopTalking) explanation.push("Kullanıcının konuşmayı durdurma talebi uygulandı.");
+  if (semanticEvent.stopQuestions) explanation.push("Kullanıcının soru sormama talebi uygulandı.");
+  if (semanticEvent.stopTalking) explanation.push("Kullanıcının konuşmayı durdurma talebi uygulandı.");
   if (repairAllowed) explanation.push("Onarım sinyali kayda değer; ancak ilişki anında normale dönmez.");
   if (!humorAllowed && e.humor.enabled) explanation.push("Mizah adayı üst öncelikli baskılar nedeniyle kapatıldı.");
 
