@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
-import { resolveCanonicalSemanticEvent } from "./src/services/semanticEventAuthority";
+import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
 import { applyConversationStateAuthority } from "./src/services/conversationStateAuthority";
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
 import { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";
@@ -418,6 +418,27 @@ app.post("/api/chat", async (req, res) => {
     const sessionId =
       incomingSessionId?.trim() || `session_${safeUserId}`;
     const cleanHistory = sanitizeKairoChatHistory(history);
+    const languageUnderstanding = await resolveServerLanguageUnderstanding({
+      message: userMessage,
+      incomingSemanticEvent,
+      context: {
+        userName,
+        characterName: character.name || "KAIRO",
+        recentMessages: cleanHistory.slice(-8).map((item: any) => ({
+          role:
+            item.sender === "user"
+              ? ("user" as const)
+              : ("assistant" as const),
+          content: String(item.text || ""),
+        })),
+      },
+      preferredProvider: provider,
+      generateText,
+    });
+    const canonicalSemantic = {
+      event: languageUnderstanding.event,
+      source: languageUnderstanding.semanticSource,
+    };
     const dialogueAnalysis = analyzeDialogueTurn(userMessage);
     const dialogueInstruction = buildDialogueBoardInstruction(
       cleanHistory,
@@ -443,7 +464,6 @@ app.post("/api/chat", async (req, res) => {
         ? requestState
         : normalizeDynamicState(persistedState ?? dynamicState),
       safePersonality = personality as DroitPersonalityTraits,
-      canonicalSemantic = resolveCanonicalSemanticEvent(userMessage, incomingSemanticEvent),
       kdmStart = now(),
       kdm = analyzeKdmInteraction(
         userMessage,
