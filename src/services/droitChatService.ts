@@ -26,6 +26,7 @@ import { applyValues } from "./valueEngine";
 import { applyPreferences } from "./preferenceEngine";
 import { applySocialOrientation } from "./socialOrientationEngine";
 import { applyBoundaries } from "./boundaryEngine";
+import { applyExpressionStyle } from "./expressionStyleEngine";
 import { auth } from "../lib/firebase";
 
 export type KairoProvider = "gemini" | "openrouter";
@@ -106,24 +107,12 @@ function classifyAppraisalEvent(message: string): {
   const compliment = /(harika|süper|mükemmel|çok iyisin|seviyorum|teşekkür|sağ ol|iyi ki varsın)/.test(text);
   const frustration = /(yeter|bıktım|sinir|sinirlen|aynı şeyi|kaç kere|neden anlamıyorsun|niye anlamıyorsun)/.test(text);
 
-  if (apology) {
-    return { kind: "apology", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.55 };
-  }
-  if (insult) {
-    return { kind: "insult", valence: "negative", negativeLoad: 1, frustrationLoad: frustration ? 1 : 0.85, threatLoad: 0.7, rewardLoad: 0 };
-  }
-  if (rejection) {
-    return { kind: "rejection", valence: "negative", negativeLoad: 0.75, frustrationLoad: 0.5, threatLoad: 0.55, rewardLoad: 0 };
-  }
-  if (support) {
-    return { kind: "support", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.7 };
-  }
-  if (compliment) {
-    return { kind: "compliment", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.8 };
-  }
-  if (frustration) {
-    return { kind: "neutral", valence: "negative", negativeLoad: 0.45, frustrationLoad: 0.75, threatLoad: 0.15, rewardLoad: 0 };
-  }
+  if (apology) return { kind: "apology", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.55 };
+  if (insult) return { kind: "insult", valence: "negative", negativeLoad: 1, frustrationLoad: frustration ? 1 : 0.85, threatLoad: 0.7, rewardLoad: 0 };
+  if (rejection) return { kind: "rejection", valence: "negative", negativeLoad: 0.75, frustrationLoad: 0.5, threatLoad: 0.55, rewardLoad: 0 };
+  if (support) return { kind: "support", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.7 };
+  if (compliment) return { kind: "compliment", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.8 };
+  if (frustration) return { kind: "neutral", valence: "negative", negativeLoad: 0.45, frustrationLoad: 0.75, threatLoad: 0.15, rewardLoad: 0 };
   return { kind: "neutral", valence: "neutral", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0 };
 }
 
@@ -134,47 +123,28 @@ function minutesBetween(iso?: string) {
   return Math.max(0, (Date.now() - timestamp) / 60000);
 }
 
-function applyTemperamentBeforeKdm(
-  userMessage: string,
-  dynamicState?: DroitDynamicState,
-): DroitDynamicState | undefined {
+function applyTemperamentBeforeKdm(userMessage: string, dynamicState?: DroitDynamicState): DroitDynamicState | undefined {
   if (!dynamicState) return dynamicState;
-
   const fineTune = readFineTuneProfile();
   const temperament = temperamentFromFineTune(fineTune);
   const event = classifyAppraisalEvent(userMessage);
   const relationship = dynamicState.relationship;
   const interactionCount = Math.max(0, relationship?.interactionCount || 0);
-  const firstSeenAt = relationship?.firstSeenAt
-    ? new Date(relationship.firstSeenAt).getTime()
-    : Date.now();
-  const relationshipAgeMinutes = Number.isFinite(firstSeenAt)
-    ? Math.max(0, (Date.now() - firstSeenAt) / 60000)
-    : 0;
-  const similarEventsFromSource =
-    event.valence === "negative"
-      ? Math.max(0, relationship?.negativeEvents || 0)
-      : event.valence === "positive"
-        ? Math.max(0, relationship?.positiveEvents || 0)
-        : 0;
+  const firstSeenAt = relationship?.firstSeenAt ? new Date(relationship.firstSeenAt).getTime() : Date.now();
+  const relationshipAgeMinutes = Number.isFinite(firstSeenAt) ? Math.max(0, (Date.now() - firstSeenAt) / 60000) : 0;
+  const similarEventsFromSource = event.valence === "negative"
+    ? Math.max(0, relationship?.negativeEvents || 0)
+    : event.valence === "positive" ? Math.max(0, relationship?.positiveEvents || 0) : 0;
 
   const appraisal = appraiseEventV0(
-    {
-      kind: event.kind,
-      sourceId: "active-user",
-      targetIsKaira: true,
-      valence: event.valence,
-    },
+    { kind: event.kind, sourceId: "active-user", targetIsKaira: true, valence: event.valence },
     {
       relationshipAgeMinutes,
       interactionCount,
       similarEventsFromSource,
       similarEventsRecentGlobal: similarEventsFromSource,
       distinctSourcesRecentGlobal: 1,
-      minutesSinceLastSimilarEvent:
-        event.valence === "negative"
-          ? minutesBetween(relationship?.lastConflictAt)
-          : null,
+      minutesSinceLastSimilarEvent: event.valence === "negative" ? minutesBetween(relationship?.lastConflictAt) : null,
     },
   );
 
@@ -182,10 +152,7 @@ function applyTemperamentBeforeKdm(
   const trust = Math.max(0, Math.min(100, relationship?.trust ?? 50));
   const conflict = Math.max(0, Math.min(100, relationship?.conflictScore ?? 0));
   const hurt = Math.max(0, Math.min(100, relationship?.hurtScore ?? 0));
-  const relationshipSafety = Math.max(
-    0,
-    Math.min(1, (warmth * 0.35 + trust * 0.45 - conflict * 0.1 - hurt * 0.1) / 80),
-  );
+  const relationshipSafety = Math.max(0, Math.min(1, (warmth * 0.35 + trust * 0.45 - conflict * 0.1 - hurt * 0.1) / 80));
 
   const temperamentResponse = computeTemperamentResponse(temperament, {
     negativeLoad: event.negativeLoad,
@@ -217,11 +184,7 @@ export const droitChatService = {
     personality,
     dynamicState,
     history = [],
-    characterInfo = {
-      name: "KAIRO",
-      roleTitle: "Sunucu Yöneticisi",
-      raceName: "Sentetik Droit",
-    },
+    characterInfo = { name: "KAIRO", roleTitle: "Sunucu Yöneticisi", raceName: "Sentetik Droit" },
     provider = "openrouter",
     userId: explicitUserId,
     userName = "Kullanıcı",
@@ -233,45 +196,17 @@ export const droitChatService = {
     const prepStart = performance.now();
     const fineTune = readFineTuneProfile();
 
-    const personalityRuntime = applyPersonalityTendencies(
-      personality,
-      fineTune,
-      userMessage,
-    );
-    const motivationRuntime = applyMotivations(
-      personalityRuntime.personality,
-      fineTune,
-      userMessage,
-    );
-    const valueRuntime = applyValues(
-      motivationRuntime.personality,
-      fineTune,
-      userMessage,
-    );
-    const preferenceRuntime = applyPreferences(
-      valueRuntime.personality,
-      fineTune,
-      userMessage,
-    );
-    const socialRuntime = applySocialOrientation(
-      preferenceRuntime.personality,
-      fineTune,
-      userMessage,
-      dynamicState,
-    );
-    const boundaryRuntime = applyBoundaries(
-      socialRuntime.personality,
-      fineTune,
-      userMessage,
-      dynamicState,
-    );
-    const runtimePersonality = boundaryRuntime.personality;
+    const personalityRuntime = applyPersonalityTendencies(personality, fineTune, userMessage);
+    const motivationRuntime = applyMotivations(personalityRuntime.personality, fineTune, userMessage);
+    const valueRuntime = applyValues(motivationRuntime.personality, fineTune, userMessage);
+    const preferenceRuntime = applyPreferences(valueRuntime.personality, fineTune, userMessage);
+    const socialRuntime = applySocialOrientation(preferenceRuntime.personality, fineTune, userMessage, dynamicState);
+    const boundaryRuntime = applyBoundaries(socialRuntime.personality, fineTune, userMessage, dynamicState);
+    const expressionRuntime = applyExpressionStyle(boundaryRuntime.personality, fineTune, userMessage, dynamicState);
+    const runtimePersonality = expressionRuntime.personality;
 
     const behaviorProfile = computeBehaviorProfile(runtimePersonality, userMessage);
-    const temperamentAdjustedState = applyTemperamentBeforeKdm(
-      userMessage,
-      dynamicState,
-    );
+    const temperamentAdjustedState = applyTemperamentBeforeKdm(userMessage, dynamicState);
     const clientPrepMs = Math.round(performance.now() - prepStart);
 
     const payload = {
@@ -288,17 +223,16 @@ export const droitChatService = {
       preferences: preferenceRuntime.response,
       socialOrientation: socialRuntime.response,
       boundaries: boundaryRuntime.response,
+      expressionStyle: expressionRuntime.response,
       dynamicState: temperamentAdjustedState,
-      history: history
-        .slice(-24)
-        .map((m) => ({
-          sender: m.sender,
-          text: m.text,
-          participantId: m.participantId,
-          participantName: m.participantName,
-          replyToParticipantId: m.replyToParticipantId,
-          replyToParticipantName: m.replyToParticipantName,
-        })),
+      history: history.slice(-24).map((m) => ({
+        sender: m.sender,
+        text: m.text,
+        participantId: m.participantId,
+        participantName: m.participantName,
+        replyToParticipantId: m.replyToParticipantId,
+        replyToParticipantName: m.replyToParticipantName,
+      })),
       provider,
       suppressRecentMemory,
     };
@@ -320,8 +254,7 @@ export const droitChatService = {
       const reply = data.reply || "";
       const nextDynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined;
       const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
-      const consistency =
-        (data.consistency as ResponseConsistencyResult | undefined) ??
+      const consistency = (data.consistency as ResponseConsistencyResult | undefined) ??
         (reasoningTrace ? validateKairoResponse(reply, reasoningTrace) : undefined);
       const totalMs = Math.round(performance.now() - totalStart);
       const server = data.timings || {};
@@ -348,9 +281,7 @@ export const droitChatService = {
         turnId: data.turnId,
       };
     } catch (err: any) {
-      if (err?.name === "AbortError") {
-        throw new Error("Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.");
-      }
+      if (err?.name === "AbortError") throw new Error("Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.");
       throw err;
     } finally {
       clearTimeout(timeout);
