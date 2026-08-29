@@ -71,13 +71,6 @@ jobs:
               raise SystemExit('local personality anchor not found')
           s = s.replace(old, new, 1)
 
-          old = 'kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source },'
-          new = 'kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },'
-          count = s.count(old)
-          if count != 2:
-              raise SystemExit(f'expected 2 KDM response anchors, found {count}')
-          s = s.replace(old, new)
-
           server.write_text(s)
           PY
       - name: Commit wiring
@@ -88,4 +81,4 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "refactor(kdm): make post-transition relationship state authoritative"
           git push
-# one-shot trigger
+# retrigger
