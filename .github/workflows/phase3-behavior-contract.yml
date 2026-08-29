@@ -15,38 +15,58 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Wire binding behavior contract
+      - name: Enforce behavior contract after generation
         run: |
           python - <<'PY'
           from pathlib import Path
-          p=Path('server.ts')
+          p=Path('src/services/kairoResponseConsistency.ts')
           s=p.read_text()
-          imp='import { applyConversationStateAuthority } from "./src/services/conversationStateAuthority";'
-          newimp=imp+'\nimport { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";'
-          if 'behaviorContractInstruction' not in s:
-              assert imp in s
-              s=s.replace(imp,newimp,1)
-          anchor='      conversationAuthority = applyConversationStateAuthority(safePersonality, kdm.nextDynamicState),\n      authoritativePersonality = conversationAuthority.personality,\n      behaviorProfile = kdm.behaviorProfile,'
-          replacement='      conversationAuthority = applyConversationStateAuthority(safePersonality, kdm.nextDynamicState),\n      authoritativePersonality = conversationAuthority.personality,\n      behaviorContract = buildBehaviorContract(kdm.nextDynamicState, kdm.trace),\n      behaviorProfile = kdm.behaviorProfile,'
-          if 'behaviorContract = buildBehaviorContract' not in s:
-              assert anchor in s
-              s=s.replace(anchor,replacement,1)
-          old='        continueConversation: runtimeFlag(authoritativePersonality, "runtimeContinueConversation", true),\n        humorAllowed: runtimeFlag(authoritativePersonality, "runtimeHumorAllowed", true),\n        askQuestion: runtimeFlag(authoritativePersonality, "runtimeAskQuestion", true),'
-          new='        continueConversation: behaviorContract.continueConversation && runtimeFlag(authoritativePersonality, "runtimeContinueConversation", true),\n        humorAllowed: behaviorContract.playfulness === "allowed" && runtimeFlag(authoritativePersonality, "runtimeHumorAllowed", true),\n        askQuestion: behaviorContract.questions === "allowed" && runtimeFlag(authoritativePersonality, "runtimeAskQuestion", true),\n        behaviorContract,'
-          if '        behaviorContract,' not in s:
-              assert old in s
-              s=s.replace(old,new,1)
-          prompt='${relationshipInstruction}\\nKDM: niyet='
-          if '${behaviorContractInstruction(behaviorContract)}' not in s:
-              assert prompt in s
-              s=s.replace(prompt,'${relationshipInstruction}\\n${behaviorContractInstruction(behaviorContract)}\\nKDM: niyet=',1)
-          oldk='kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source },'
-          newk='kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },'
-          s=s.replace(oldk,newk)
+          imp="import type { ReasoningTrace } from '../types/nexus';"
+          if "BehaviorContract" not in s.split('\n',3)[0:3]:
+              s=s.replace(imp, imp+"\nimport type { BehaviorContract } from './behaviorContract';", 1)
+          field='  conversationState?: string;\n}'
+          if '  behaviorContract?: BehaviorContract;' not in s:
+              assert field in s
+              s=s.replace(field,'  conversationState?: string;\n  behaviorContract?: BehaviorContract;\n}',1)
+          marker="  const emojiLevel = Number.isFinite(rules.emojiLevel) ? Number(rules.emojiLevel) : 100;"
+          insert=marker+"\n  const contract = rules.behaviorContract;"
+          if '  const contract = rules.behaviorContract;' not in s:
+              assert marker in s
+              s=s.replace(marker,insert,1)
+          hard='  const hardClosed = disengaged || !continueConversation;'
+          contract_gate='''  if (contract) {
+    const lower = normalize(text);
+    const playfulMeaning = hasAny(lower, [/(hahaha|hehe|şaka|takılıyorum|dalga|hızlı onayladın|güldür|komik)/iu]);
+    const affectionMeaning = AFFECTION_MARKER_RE.test(text);
+    const forgivenessMeaning = hasAny(lower, [/(geçti gitti|sorun yok|affettim|affettim seni|tamamen geçti|kapandı gitti)/iu]);
+    const reopeningMeaning = REOPEN_MARKER_RE.test(text) || hasAny(lower, [/(eski halimize|normale dön|barıştık|tamamdır.*devam|hadi kaldığımız yerden)/iu]);
+
+    if (contract.playfulness === 'forbidden' && playfulMeaning) {
+      text = contract.stance === 'closed' ? fallbackForTrace(trace) : 'şu an şakalaşacak modda değilim';
+      reasons.push('contract_playfulness_blocked');
+    }
+    if (contract.affection === 'forbidden' && affectionMeaning) {
+      text = contract.stance === 'closed' ? fallbackForTrace(trace) : 'şu an o kadar yakın davranmak istemiyorum';
+      reasons.push('contract_affection_blocked');
+    }
+    if (!contract.forgivenessGranted && forgivenessMeaning) {
+      text = 'özrünü duydum ama geçti gitti diyemem henüz';
+      reasons.push('contract_forgiveness_blocked');
+    }
+    if (contract.reopeningCloseness === 'forbidden' && reopeningMeaning) {
+      text = contract.stance === 'closed' ? fallbackForTrace(trace) : 'konuşabiliriz ama aramız hemen normale dönmüş değil';
+      reasons.push('contract_reopening_blocked');
+    }
+  }
+
+'''+hard
+          if "contract_playfulness_blocked" not in s:
+              assert hard in s
+              s=s.replace(hard,contract_gate,1)
           p.write_text(s)
           PY
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add server.ts
-          git diff --cached --quiet || git commit -m "refactor(kdm): enforce post-transition behavior contract"
+          git add src/services/kairoResponseConsistency.ts
+          git diff --cached --quiet || git commit -m "feat(kdm): enforce semantic behavior contract"
           git push
