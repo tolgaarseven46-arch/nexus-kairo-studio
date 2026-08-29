@@ -18,8 +18,9 @@ export interface TestSessionLayerAudit {
 }
 
 /**
- * Adds the client-side layer snapshots to the exact server-created turn.
- * Merge semantics preserve the canonical server KDM/memory/response record.
+ * Adds client-side layer snapshots to the exact server-created turn.
+ * The audit lives under kdmResult so the existing session loader/exporter
+ * preserves it without creating a second parallel turn schema.
  */
 export async function saveTestSessionLayerAudit(
   sessionId: string | undefined,
@@ -32,9 +33,11 @@ export async function saveTestSessionLayerAudit(
     await setDoc(
       turnRef,
       {
-        layerAudit: {
-          ...audit,
-          recordedAt: new Date().toISOString(),
+        kdmResult: {
+          layerAudit: {
+            ...audit,
+            recordedAt: new Date().toISOString(),
+          },
         },
       },
       { merge: true },
