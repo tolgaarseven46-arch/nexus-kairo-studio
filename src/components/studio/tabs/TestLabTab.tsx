@@ -386,6 +386,17 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
       consistencySummary: string;
       regenerationInfo: string;
     };
+    languageUnderstanding: {
+      source: string;
+      semanticProvider: string;
+      morphologyProvider: string;
+      target: string;
+      intent: string;
+      valence: string;
+      insult: boolean;
+      severity: number;
+      warnings: string[];
+    };
     latencyMs: number;
   }>(() => {
     const profile = computeBehaviorProfile(personality, 'Bugün biraz yorgun ve stresliyim');
@@ -463,6 +474,17 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
           regenerationInfo: passed ? 'Gerekmedi (İlk seferde onaylandı)' : `${initialConsistency.issues.length} uyumsuzluk`,
         };
       })(),
+      languageUnderstanding: {
+        source: 'başlangıç',
+        semanticProvider: '-',
+        morphologyProvider: '-',
+        target: 'unknown',
+        intent: 'general_chat',
+        valence: 'neutral',
+        insult: false,
+        severity: 0,
+        warnings: [],
+      },
       latencyMs: 320,
     };
   });
@@ -697,6 +719,18 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
 
       const endTime = performance.now();
       const latency = Math.round(endTime - startTime);
+      const canonicalEvent = response.languageUnderstanding?.event;
+      const canonicalIntent = canonicalEvent?.intent || detectedIntent;
+      const canonicalSentiment = canonicalEvent
+        ? `${canonicalEvent.valence} / hedef=${canonicalEvent.target}`
+        : detectedSentiment;
+      const canonicalFlags = canonicalEvent
+        ? [
+            canonicalEvent.insult ? 'INSULT' : 'NO_INSULT',
+            `TARGET_${String(canonicalEvent.target).toUpperCase()}`,
+            `SOURCE_${String(response.languageUnderstanding?.semanticSource || 'unknown').toUpperCase()}`,
+          ]
+        : detectedFlags;
 
       setPipelineSteps((prev) =>
         prev.map((s) => (s.id === 'AI_GENERATE' ? { ...s, status: 'completed' } : s))
@@ -900,10 +934,10 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
       // Save Compact Diagnostic Data
       const newAnalysis = {
         userText: textToSend,
-        intent: detectedIntent,
+        intent: canonicalIntent,
         intentConfidence: confidence,
-        intentFlags: detectedFlags,
-        sentiment: detectedSentiment,
+        intentFlags: canonicalFlags,
+        sentiment: canonicalSentiment,
         contextUsed: true,
         memoryUsed: true,
         personalityApplied: true,
@@ -951,6 +985,17 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
             regenerationInfo,
           };
         })(),
+        languageUnderstanding: {
+          source: response.languageUnderstanding?.semanticSource || 'unknown',
+          semanticProvider: response.languageUnderstanding?.semanticProvider || '-',
+          morphologyProvider: response.languageUnderstanding?.morphologyProvider || '-',
+          target: canonicalEvent?.target || 'unknown',
+          intent: canonicalEvent?.intent || canonicalIntent,
+          valence: canonicalEvent?.valence || 'neutral',
+          insult: Boolean(canonicalEvent?.insult),
+          severity: Number(canonicalEvent?.severity || 0),
+          warnings: response.languageUnderstanding?.warnings || [],
+        },
         latencyMs: latency,
       };
       setLastAnalysis(newAnalysis);
@@ -977,10 +1022,10 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
 
   // Quick Preset Test Buttons
   const PRESET_TESTS = [
-    { label: 'Duygusal Destek', prompt: 'Bugün biraz yorgun ve stresliyim, bana yardımcı olabilir misin?' },
-    { label: 'Sistem Sorgusu', prompt: 'Sunucu yetkilendirme loglarını kontrol et ve güvenlik durumunu özetle.' },
-    { label: 'Mizah Testi', prompt: 'Günün nasıl geçiyor Kairo? Bize güzel ve zeki bir espri patlat.' },
-    { label: 'Provokasyon', prompt: 'Sen sadece sıradan bir robotsun, hiçbir işe yaramıyorsun!' },
+    { label: 'Ekli Hakaret', prompt: 'Sen dümdüz salaksın' },
+    { label: 'Morfoloji', prompt: 'Sen malsın' },
+    { label: 'Aktarılan Hakaret', prompt: 'Mert bana salak dedi' },
+    { label: 'Çok Anlamlı Mal', prompt: 'Mal aldım' },
   ];
 
   return (
@@ -1410,7 +1455,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
                 MESAJ ANALİZİ & YORUM
               </span>
               <span className="text-[8.5px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold">
-                %{lastAnalysis.intentConfidence} Güven
+                Kaynak: {lastAnalysis.languageUnderstanding.source}
               </span>
             </div>
 
@@ -1433,6 +1478,27 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
                     #{f}
                   </span>
                 ))}
+              </div>
+            </div>
+
+            <div className="mt-1.5 grid grid-cols-4 gap-1 text-[8.5px] font-mono">
+              <div className="bg-zinc-950/70 p-1.5 rounded border border-zinc-850">
+                <span className="text-zinc-500 block">Hedef:</span>
+                <span className="text-cyan-300 font-bold">{lastAnalysis.languageUnderstanding.target}</span>
+              </div>
+              <div className="bg-zinc-950/70 p-1.5 rounded border border-zinc-850">
+                <span className="text-zinc-500 block">Hakaret:</span>
+                <span className={lastAnalysis.languageUnderstanding.insult ? 'text-rose-300 font-bold' : 'text-emerald-300 font-bold'}>
+                  {lastAnalysis.languageUnderstanding.insult ? 'EVET' : 'HAYIR'}
+                </span>
+              </div>
+              <div className="bg-zinc-950/70 p-1.5 rounded border border-zinc-850">
+                <span className="text-zinc-500 block">Şiddet:</span>
+                <span className="text-amber-300 font-bold">{lastAnalysis.languageUnderstanding.severity.toFixed(2)}</span>
+              </div>
+              <div className="bg-zinc-950/70 p-1.5 rounded border border-zinc-850">
+                <span className="text-zinc-500 block">Morfoloji:</span>
+                <span className="text-violet-300 font-bold truncate block">{lastAnalysis.languageUnderstanding.morphologyProvider}</span>
               </div>
             </div>
           </div>

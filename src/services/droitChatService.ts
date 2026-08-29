@@ -234,6 +234,12 @@ export const droitChatService = {
       void saveTestSessionLayerAudit(data.sessionId || resolvedSessionId, data.turnId, {
         semanticEvent: canonicalSemanticEvent,
         semanticSource,
+        languageUnderstanding: {
+          semanticProvider: languageUnderstanding.semanticProvider,
+          morphologyProvider: languageUnderstanding.morphologyProvider,
+          morphology: languageUnderstanding.morphology,
+          warnings: languageUnderstanding.warnings,
+        },
         appraisalTemperament: { event: appraisalEvent, fineTune: temperamentFromFineTune(fineTune) },
         personalityTendency: personalityRuntime.response,
         motivation: motivationRuntime.response,
