@@ -10,6 +10,7 @@ import type { ExpressionStyleResponse } from "./expressionStyleEngine";
 export interface BehaviorIntegrationInput {
   personality: DroitPersonalityTraits;
   dynamicState?: DroitDynamicState;
+  userMessage?: string;
   personalityTendency: PersonalityTendencyResponse;
   motivation: MotivationResponse;
   values: ValueResponse;
@@ -58,31 +59,20 @@ const stanceCode: Record<IntegratedBehaviorDecision["stance"], number> = {
   distant: 75,
   disengage: 100,
 };
-
-const lengthCode: Record<IntegratedBehaviorDecision["responseLength"], number> = {
-  short: 25,
-  medium: 50,
-  long: 75,
-};
-
+const lengthCode: Record<IntegratedBehaviorDecision["responseLength"], number> = { short: 25, medium: 50, long: 75 };
 const priorityCode: Record<IntegratedBehaviorDecision["priority"], number> = {
-  expression: 20,
-  preference: 35,
-  goal: 50,
-  relationship: 65,
-  values: 82,
-  boundary: 100,
+  expression: 20, preference: 35, goal: 50, relationship: 65, values: 82, boundary: 100,
 };
 
-/**
- * Cross-layer arbitration policy.
- * This is an explicit engineering hierarchy, not a claim that human cognition
- * uses one fixed global ordering. It prevents later style/preferences from
- * accidentally overriding boundaries, value conflicts, or relationship damage.
- */
-export const integrateBehaviorLayers = (
-  input: BehaviorIntegrationInput,
-): BehaviorIntegrationResult => {
+const inferMetaSocialRequest = (message = "") => {
+  const text = message.toLocaleLowerCase("tr-TR");
+  return {
+    stopQuestions: /(soru\s+sorma|sorma artık|sormayı bırak|hala soruyorsun|yine soru|sorgu yapma)/.test(text),
+    stopTalking: /(^|\s)(sus|konuşma|kes artık|yeter konuşma)(\s|$)/.test(text),
+  };
+};
+
+export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): BehaviorIntegrationResult => {
   const b = input.boundaries.behaviorSignals;
   const v = input.values.behaviorSignals;
   const s = input.social.behaviorSignals;
@@ -91,102 +81,52 @@ export const integrateBehaviorLayers = (
   const e = input.expression;
   const pt = input.personalityTendency.behaviorSignals;
   const relationship = input.dynamicState?.relationship;
+  const meta = inferMetaSocialRequest(input.userMessage);
 
   const hurt = clamp01((relationship?.hurtScore ?? 0) / 100);
   const conflict = clamp01((relationship?.conflictScore ?? 0) / 100);
   const anger = clamp01((input.dynamicState?.anger ?? 0) / 100);
   const stress = clamp01((input.dynamicState?.stress ?? 0) / 100);
 
-  const boundaryPressure = clamp01(
-    b.boundaryAssertion * 0.35 +
-      b.distancePressure * 0.25 +
-      b.escalationPressure * 0.15 +
-      b.disengagementPressure * 0.25,
-  );
-  const valuePressure = clamp01(
-    v.moralObjection * 0.35 +
-      v.boundaryPressure * 0.25 +
-      v.autonomyDefense * 0.2 +
-      v.accountabilityPressure * 0.2,
-  );
-  const relationshipPressure = clamp01(
-    s.socialDistancePressure * 0.5 + hurt * 0.3 + conflict * 0.2,
-  );
+  const boundaryPressure = input.boundaries.hardStop
+    ? 1
+    : clamp01(b.boundaryAssertion * 0.35 + b.distancePressure * 0.25 + b.escalationPressure * 0.15 + b.disengagementPressure * 0.25);
+  const valuePressure = clamp01(v.moralObjection * 0.35 + v.boundaryPressure * 0.25 + v.autonomyDefense * 0.2 + v.accountabilityPressure * 0.2);
+  const relationshipPressure = clamp01(s.socialDistancePressure * 0.5 + hurt * 0.3 + conflict * 0.2);
   const approachPressure = clamp01(m.approachPressure);
-  const withdrawalPressure = clamp01(
-    Math.max(m.withdrawalPressure, b.distancePressure),
-  );
+  const withdrawalPressure = clamp01(Math.max(m.withdrawalPressure, b.distancePressure));
   const engagementPressure = clamp01(p.engagementDrive);
   const humorPressure = clamp01(e.humor.strength * (1 - e.inhibition));
 
   let priority: IntegratedBehaviorDecision["priority"] = "expression";
-  if (boundaryPressure >= 0.45) priority = "boundary";
+  if (input.boundaries.hardStop || boundaryPressure >= 0.45) priority = "boundary";
   else if (valuePressure >= 0.4) priority = "values";
   else if (relationshipPressure >= 0.38) priority = "relationship";
   else if (Math.max(approachPressure, withdrawalPressure) >= 0.42) priority = "goal";
   else if (engagementPressure >= 0.35) priority = "preference";
 
-  const severeBoundary = b.disengagementPressure >= 0.72 || input.boundaries.violationPressure >= 0.82;
+  const severeBoundary = input.boundaries.hardStop || b.disengagementPressure >= 0.72 || input.boundaries.violationPressure >= 0.82;
   const accumulatedDamage = clamp01(hurt * 0.55 + conflict * 0.45);
-  const disengage = severeBoundary && (b.repairOpenness < 0.35 || accumulatedDamage >= 0.5);
+  const disengage = input.boundaries.hardStop || (severeBoundary && (b.repairOpenness < 0.35 || accumulatedDamage >= 0.5));
 
-  const distance = clamp01(
-    boundaryPressure * 0.5 + relationshipPressure * 0.3 + withdrawalPressure * 0.2 - b.repairOpenness * 0.2,
-  );
-  const warmth = clamp01(
-    s.affiliationPressure * 0.35 + s.carePressure * 0.3 + approachPressure * 0.2 + b.repairOpenness * 0.15 - distance * 0.55,
-  );
+  const distance = disengage ? 1 : clamp01(boundaryPressure * 0.5 + relationshipPressure * 0.3 + withdrawalPressure * 0.2 - b.repairOpenness * 0.2);
+  const warmth = disengage ? 0 : clamp01(s.affiliationPressure * 0.35 + s.carePressure * 0.3 + approachPressure * 0.2 + b.repairOpenness * 0.15 - distance * 0.55);
+  const stance: IntegratedBehaviorDecision["stance"] = disengage ? "disengage" : distance >= 0.62 ? "distant" : boundaryPressure >= 0.38 || valuePressure >= 0.4 ? "firm" : warmth >= 0.55 ? "warm" : "neutral";
 
-  const stance: IntegratedBehaviorDecision["stance"] = disengage
-    ? "disengage"
-    : distance >= 0.62
-      ? "distant"
-      : boundaryPressure >= 0.38 || valuePressure >= 0.4
-        ? "firm"
-        : warmth >= 0.55
-          ? "warm"
-          : "neutral";
-
-  const humorAllowed =
-    !disengage &&
-    stance !== "firm" &&
-    stance !== "distant" &&
-    boundaryPressure < 0.3 &&
-    valuePressure < 0.3 &&
-    relationshipPressure < 0.35 &&
-    anger < 0.55 &&
-    stress < 0.7 &&
-    e.humor.enabled;
-
-  const askQuestion =
-    !disengage &&
-    distance < 0.58 &&
-    e.speech.questionDrive >= 0.32 &&
-    b.escalationPressure < 0.45;
-
-  const acknowledgeComplaint =
-    valuePressure >= 0.28 || boundaryPressure >= 0.28 || s.carePressure >= 0.45;
-
+  const humorAllowed = !disengage && !meta.stopTalking && stance !== "firm" && stance !== "distant" && boundaryPressure < 0.3 && valuePressure < 0.3 && relationshipPressure < 0.35 && anger < 0.55 && stress < 0.7 && e.humor.enabled;
+  const askQuestion = !disengage && !meta.stopQuestions && !meta.stopTalking && distance < 0.58 && e.speech.questionDrive >= 0.32 && b.escalationPressure < 0.45;
+  const acknowledgeComplaint = meta.stopQuestions || meta.stopTalking || valuePressure >= 0.28 || boundaryPressure >= 0.28 || s.carePressure >= 0.45;
   const repairAllowed = b.repairOpenness >= 0.2 && !severeBoundary;
-
-  const directness = clamp01(
-    pt.assertivePressure * 0.35 +
-      s.leadershipPressure * 0.2 +
-      b.boundaryAssertion * 0.3 +
-      valuePressure * 0.15,
-  );
-
-  const responseLength: IntegratedBehaviorDecision["responseLength"] =
-    disengage || distance >= 0.6 || e.speech.brevity >= 0.65
-      ? "short"
-      : pt.analysisPressure >= 0.62 || p.depthDrive >= 0.58
-        ? "long"
-        : "medium";
+  const directness = clamp01(pt.assertivePressure * 0.35 + s.leadershipPressure * 0.2 + b.boundaryAssertion * 0.3 + valuePressure * 0.15);
+  const responseLength: IntegratedBehaviorDecision["responseLength"] = disengage || meta.stopTalking || distance >= 0.6 || e.speech.brevity >= 0.65 ? "short" : pt.analysisPressure >= 0.62 || p.depthDrive >= 0.58 ? "long" : "medium";
 
   const explanation: string[] = [];
-  if (priority === "boundary") explanation.push("Sınır ihlali alt katmanların önüne geçti.");
+  if (input.boundaries.hardStop) explanation.push("Mutlak kırmızı çizgi tetiklendi; konuşma kesildi.");
+  else if (priority === "boundary") explanation.push("Sınır ihlali alt katmanların önüne geçti.");
   if (priority === "values") explanation.push("Değer çatışması davranış stilini bastırdı.");
   if (relationshipPressure >= 0.38) explanation.push("İlişki hasarı yakınlık ve mizahı düşürdü.");
+  if (meta.stopQuestions) explanation.push("Kullanıcının soru sormama talebi uygulandı.");
+  if (meta.stopTalking) explanation.push("Kullanıcının konuşmayı durdurma talebi uygulandı.");
   if (repairAllowed) explanation.push("Onarım sinyali kontrollü yakınlaşmaya izin verdi.");
   if (!humorAllowed && e.humor.enabled) explanation.push("Mizah adayı üst öncelikli baskılar nedeniyle kapatıldı.");
 
@@ -208,26 +148,11 @@ export const integrateBehaviorLayers = (
   const finalPersonality: DroitPersonalityTraits = {
     ...input.personality,
     humor: humorAllowed ? clamp100(humorPressure * 100) : 0,
-    authority: clamp100(
-      (input.personality.authority ?? 50) * 0.45 + directness * 55,
-    ),
-    empathy: clamp100(
-      (input.personality.empathy ?? 50) * 0.55 + warmth * 45,
-    ),
-    patience: clamp100(
-      (input.personality.patience ?? 50) * 0.55 + (1 - boundaryPressure) * 25 + b.repairOpenness * 20,
-    ),
-    seriousness: clamp100(
-      (input.personality.seriousness ?? 50) * 0.5 +
-        Math.max(boundaryPressure, valuePressure, relationshipPressure) * 50,
-    ),
-    communication: clamp100(
-      responseLength === "short" ? 30 : responseLength === "long" ? 80 : 55,
-    ),
-
-    // Reserved runtime bridge fields. These are not permanent personality traits;
-    // they let the server-side KDM consume the already-arbitrated behavior decision
-    // without teaching the LLM to reinterpret raw psychological scores.
+    authority: clamp100((input.personality.authority ?? 50) * 0.45 + directness * 55),
+    empathy: clamp100((input.personality.empathy ?? 50) * 0.55 + warmth * 45),
+    patience: clamp100((input.personality.patience ?? 50) * 0.55 + (1 - boundaryPressure) * 25 + b.repairOpenness * 20),
+    seriousness: clamp100((input.personality.seriousness ?? 50) * 0.5 + Math.max(boundaryPressure, valuePressure, relationshipPressure) * 50),
+    communication: clamp100(responseLength === "short" ? 30 : responseLength === "long" ? 80 : 55),
     runtimeContinueConversation: decision.continueConversation ? 100 : 0,
     runtimeHumorAllowed: decision.humorAllowed ? 100 : 0,
     runtimeAskQuestion: decision.askQuestion ? 100 : 0,
@@ -244,14 +169,6 @@ export const integrateBehaviorLayers = (
   return {
     personality: finalPersonality,
     decision,
-    pressures: {
-      boundary: boundaryPressure,
-      values: valuePressure,
-      relationship: relationshipPressure,
-      approach: approachPressure,
-      withdrawal: withdrawalPressure,
-      engagement: engagementPressure,
-      humor: humorPressure,
-    },
+    pressures: { boundary: boundaryPressure, values: valuePressure, relationship: relationshipPressure, approach: approachPressure, withdrawal: withdrawalPressure, engagement: engagementPressure, humor: humorPressure },
   };
 };
