@@ -27,6 +27,7 @@ import { applyPreferences } from "./preferenceEngine";
 import { applySocialOrientation } from "./socialOrientationEngine";
 import { applyBoundaries } from "./boundaryEngine";
 import { applyExpressionStyle } from "./expressionStyleEngine";
+import { integrateBehaviorLayers } from "./behaviorIntegrationEngine";
 import { auth } from "../lib/firebase";
 
 export type KairoProvider = "gemini" | "openrouter";
@@ -196,17 +197,29 @@ export const droitChatService = {
     const prepStart = performance.now();
     const fineTune = readFineTuneProfile();
 
+    const temperamentAdjustedState = applyTemperamentBeforeKdm(userMessage, dynamicState);
     const personalityRuntime = applyPersonalityTendencies(personality, fineTune, userMessage);
     const motivationRuntime = applyMotivations(personalityRuntime.personality, fineTune, userMessage);
     const valueRuntime = applyValues(motivationRuntime.personality, fineTune, userMessage);
     const preferenceRuntime = applyPreferences(valueRuntime.personality, fineTune, userMessage);
-    const socialRuntime = applySocialOrientation(preferenceRuntime.personality, fineTune, userMessage, dynamicState);
-    const boundaryRuntime = applyBoundaries(socialRuntime.personality, fineTune, userMessage, dynamicState);
-    const expressionRuntime = applyExpressionStyle(boundaryRuntime.personality, fineTune, userMessage, dynamicState);
-    const runtimePersonality = expressionRuntime.personality;
+    const socialRuntime = applySocialOrientation(preferenceRuntime.personality, fineTune, userMessage, temperamentAdjustedState);
+    const boundaryRuntime = applyBoundaries(socialRuntime.personality, fineTune, userMessage, temperamentAdjustedState);
+    const expressionRuntime = applyExpressionStyle(boundaryRuntime.personality, fineTune, userMessage, temperamentAdjustedState);
+
+    const integrationRuntime = integrateBehaviorLayers({
+      personality: expressionRuntime.personality,
+      dynamicState: temperamentAdjustedState,
+      personalityTendency: personalityRuntime.response,
+      motivation: motivationRuntime.response,
+      values: valueRuntime.response,
+      preferences: preferenceRuntime.response,
+      social: socialRuntime.response,
+      boundaries: boundaryRuntime.response,
+      expression: expressionRuntime.response,
+    });
+    const runtimePersonality = integrationRuntime.personality;
 
     const behaviorProfile = computeBehaviorProfile(runtimePersonality, userMessage);
-    const temperamentAdjustedState = applyTemperamentBeforeKdm(userMessage, dynamicState);
     const clientPrepMs = Math.round(performance.now() - prepStart);
 
     const payload = {
@@ -224,6 +237,8 @@ export const droitChatService = {
       socialOrientation: socialRuntime.response,
       boundaries: boundaryRuntime.response,
       expressionStyle: expressionRuntime.response,
+      behaviorDecision: integrationRuntime.decision,
+      behaviorPressures: integrationRuntime.pressures,
       dynamicState: temperamentAdjustedState,
       history: history.slice(-24).map((m) => ({
         sender: m.sender,
