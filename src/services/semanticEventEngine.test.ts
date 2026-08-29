@@ -68,9 +68,9 @@ describe("semantic event engine", () => {
     expect(event.valence).toBe("neutral");
   });
 
-  it("recognizes past-action recall as an information request", () => {
+  it("recognizes past-action recall as a direct question", () => {
     expect(interpretSemanticEvent("Mert yarın ne yapmayı düşünüyordu?").intent).toBe(
-      "information_request",
+      "question",
     );
   });
 
