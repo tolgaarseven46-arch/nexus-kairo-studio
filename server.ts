@@ -43,6 +43,7 @@ import {
   planDialogueResponse,
 } from "./src/services/kairoDialogueDecisionEngine";
 import { recordKdmMetric } from "./src/services/kdmMetricsService";
+import { saveWorldEventObservation } from "./src/services/worldModelEventStore";
 import {
   computeKairoSpeechIdentity,
   speechIdentityPrompt,
@@ -589,6 +590,12 @@ app.post("/api/chat", async (req, res) => {
         postStart = now();
       let savedTurnId = "";
       await Promise.allSettled([
+        saveWorldEventObservation({
+          userId,
+          sessionId,
+          speakerName: userName,
+          event: languageUnderstanding.worldEvent,
+        }),
         saveKdmInteraction({
           userId,
           dynamicState: kdm.nextDynamicState,
@@ -812,6 +819,12 @@ app.post("/api/chat", async (req, res) => {
     const postStart = now();
     let savedTurnId = "";
     await Promise.allSettled([
+      saveWorldEventObservation({
+        userId,
+        sessionId,
+        speakerName: userName,
+        event: languageUnderstanding.worldEvent,
+      }),
       saveKdmInteraction({
         userId,
         dynamicState: kdm.nextDynamicState,
