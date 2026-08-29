@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Brain,
   Check,
+  ChevronDown,
+  ChevronRight,
   CircleUserRound,
   Compass,
-  HeartHandshake,
   Laugh,
   Loader2,
   MessageCircleMore,
@@ -47,14 +48,25 @@ type SectionId =
   | 'boundaries'
   | 'expression';
 
-type ProfileNotes = {
-  motivations: string[];
-  values: string[];
-  likes: string;
-  dislikes: string;
-  boundaries: string;
-  sensitivities: string;
-};
+type HumorParameterKey =
+  | 'preference'
+  | 'generationDrive'
+  | 'detectionSensitivity'
+  | 'riskTolerance'
+  | 'inhibition';
+
+type HumorTypeId =
+  | 'absurd'
+  | 'irony'
+  | 'sarcasm'
+  | 'dark'
+  | 'affiliative'
+  | 'aggressive'
+  | 'selfDefeating'
+  | 'wordplay';
+
+type HumorParameterSet = Record<HumorParameterKey, number>;
+type HumorProfile = Record<HumorTypeId, HumorParameterSet>;
 
 const DEFAULT_IDENTITY = {
   name: 'KAIRA-01',
@@ -65,28 +77,48 @@ const DEFAULT_IDENTITY = {
   shortDescription: '',
 };
 
-const DEFAULT_PROFILE_NOTES: ProfileNotes = {
-  motivations: [],
-  values: [],
-  likes: '',
-  dislikes: '',
-  boundaries: '',
-  sensitivities: '',
+const LAYERS = [
+  { id: 'temperament' as const, label: 'Mizaç', subtitle: 'Doğal tepki mekanizmaları', icon: Sparkles },
+  { id: 'personality' as const, label: 'Kişilik eğilimleri', subtitle: 'Genel davranış eğilimleri', icon: Brain },
+  { id: 'motivation' as const, label: 'Motivasyonlar', subtitle: 'Davranışı ne sürüklüyor?', icon: Target },
+  { id: 'values' as const, label: 'Değerler', subtitle: 'Neyi önemli kabul ediyor?', icon: Scale },
+  { id: 'preferences' as const, label: 'Tercihler', subtitle: 'Neye yöneliyor?', icon: Compass },
+  { id: 'social' as const, label: 'Sosyal yönelim', subtitle: 'İnsanlarla nasıl konumlanıyor?', icon: Users },
+  { id: 'boundaries' as const, label: 'Sınırlar', subtitle: 'Nerede duruyor?', icon: Shield },
+  { id: 'expression' as const, label: 'İfade tarzı', subtitle: 'Davranışı nasıl dışa vuruyor?', icon: MessageCircleMore },
+];
+
+const HUMOR_TYPES: Array<{ id: HumorTypeId; label: string; description: string }> = [
+  { id: 'absurd', label: 'Absürt / sürreal', description: 'Mantık kırılması ve beklenmedik bağlantılar' },
+  { id: 'irony', label: 'İroni', description: 'Söylenen ile kastedilen arasındaki terslik' },
+  { id: 'sarcasm', label: 'Sarkazm', description: 'İğneleyici ve eleştirel ironi' },
+  { id: 'dark', label: 'Kara mizah', description: 'Ağır veya tabu konular üzerinden mizah' },
+  { id: 'affiliative', label: 'Yakınlaştırıcı', description: 'Bağ kurmak ve ortamı rahatlatmak için mizah' },
+  { id: 'aggressive', label: 'Saldırgan', description: 'Alay, küçümseme veya hedefe yönelen mizah' },
+  { id: 'selfDefeating', label: 'Kendini hedef alan', description: 'Kendisini şakanın hedefi yapma' },
+  { id: 'wordplay', label: 'Kelime mizahı', description: 'Kelime oyunu, çift anlam ve dil oyunları' },
+];
+
+const HUMOR_PARAMETERS: Array<{ key: HumorParameterKey; label: string; help: string }> = [
+  { key: 'preference', label: 'Hoşlanma', help: 'Bu mizah türünü ne kadar seviyor?' },
+  { key: 'generationDrive', label: 'Üretme eğilimi', help: 'Uygun durumda kendiliğinden üretmeye ne kadar yatkın?' },
+  { key: 'detectionSensitivity', label: 'Algılama hassasiyeti', help: 'Bu mizah biçimini ne kadar kolay fark ediyor?' },
+  { key: 'riskTolerance', label: 'Sosyal risk toleransı', help: 'Yanlış anlaşılma ihtimaline rağmen kullanma eğilimi' },
+  { key: 'inhibition', label: 'Baskılama gücü', help: 'Uygunsuz bağlamda kendini ne kadar güçlü frenliyor?' },
+];
+
+const DEFAULT_HUMOR_SET: HumorParameterSet = {
+  preference: 50,
+  generationDrive: 50,
+  detectionSensitivity: 50,
+  riskTolerance: 50,
+  inhibition: 50,
 };
 
-const MOTIVATION_OPTIONS = ['Bağ kurmak', 'Bağımsızlık', 'Keşfetmek', 'Başarmak', 'Güvenlik', 'Etki yaratmak'];
-const VALUE_OPTIONS = ['Dürüstlük', 'Saygı', 'Sadakat', 'Adalet', 'Özgürlük', 'Mahremiyet', 'Şefkat', 'Sorumluluk'];
-
-const LAYERS = [
-  { id: 'temperament' as const, label: 'Mizaç', subtitle: 'Doğal tepki eğilimleri', icon: Sparkles },
-  { id: 'personality' as const, label: 'Kişilik eğilimleri', subtitle: 'Genel davranış biçimi', icon: Brain },
-  { id: 'motivation' as const, label: 'Motivasyonlar', subtitle: 'Neyin peşinden gider?', icon: Target },
-  { id: 'values' as const, label: 'Değerler', subtitle: 'Neyi önemli ve doğru bulur?', icon: Scale },
-  { id: 'preferences' as const, label: 'Tercihler', subtitle: 'Neyi sever, sevmez?', icon: Compass },
-  { id: 'social' as const, label: 'Sosyal yönelim', subtitle: 'İnsanlarla nasıl konumlanır?', icon: Users },
-  { id: 'boundaries' as const, label: 'Sınırlar', subtitle: 'Neyi kabul etmez?', icon: Shield },
-  { id: 'expression' as const, label: 'İfade tarzı', subtitle: 'Kendini nasıl dışa vurur?', icon: MessageCircleMore },
-];
+const DEFAULT_HUMOR_PROFILE = HUMOR_TYPES.reduce((acc, type) => {
+  acc[type.id] = { ...DEFAULT_HUMOR_SET };
+  return acc;
+}, {} as HumorProfile);
 
 export const CharacterTab: React.FC<CharacterTabProps> = ({
   personality,
@@ -96,18 +128,20 @@ export const CharacterTab: React.FC<CharacterTabProps> = ({
   isSaved,
   isSaving,
 }) => {
-  const [activeSection, setActiveSection] = useState<SectionId>('temperament');
+  const [activeSection, setActiveSection] = useState<SectionId>('expression');
   const [identity, setIdentity] = useState(DEFAULT_IDENTITY);
-  const [notes, setNotes] = useState<ProfileNotes>(DEFAULT_PROFILE_NOTES);
+  const [humorOpen, setHumorOpen] = useState(true);
+  const [activeHumorType, setActiveHumorType] = useState<HumorTypeId>('absurd');
+  const [humorProfile, setHumorProfile] = useState<HumorProfile>(DEFAULT_HUMOR_PROFILE);
 
   useEffect(() => {
     try {
       const savedIdentity = localStorage.getItem('kairo_identity_v2');
-      const savedNotes = localStorage.getItem('kairo_character_profile_v1');
+      const savedHumor = localStorage.getItem('kairo_humor_profile_v1');
       if (savedIdentity) setIdentity({ ...DEFAULT_IDENTITY, ...JSON.parse(savedIdentity) });
-      if (savedNotes) setNotes({ ...DEFAULT_PROFILE_NOTES, ...JSON.parse(savedNotes) });
+      if (savedHumor) setHumorProfile({ ...DEFAULT_HUMOR_PROFILE, ...JSON.parse(savedHumor) });
     } catch {
-      // Keep safe defaults when local data is malformed.
+      // Keep defaults if local data is malformed.
     }
   }, []);
 
@@ -119,20 +153,28 @@ export const CharacterTab: React.FC<CharacterTabProps> = ({
     });
   };
 
-  const updateNotes = (partial: Partial<ProfileNotes>) => {
-    setNotes((prev) => {
-      const next = { ...prev, ...partial };
-      localStorage.setItem('kairo_character_profile_v1', JSON.stringify(next));
+  const updateHumorParameter = (typeId: HumorTypeId, key: HumorParameterKey, value: number) => {
+    setHumorProfile((prev) => {
+      const next: HumorProfile = {
+        ...prev,
+        [typeId]: {
+          ...prev[typeId],
+          [key]: value,
+        },
+      };
+      localStorage.setItem('kairo_humor_profile_v1', JSON.stringify(next));
+
+      const meanGeneration = Math.round(
+        HUMOR_TYPES.reduce((sum, type) => sum + next[type.id].generationDrive, 0) / HUMOR_TYPES.length,
+      );
+      onPersonalityChange({ humor: meanGeneration });
       return next;
     });
   };
 
-  const toggleListValue = (key: 'motivations' | 'values', value: string) => {
-    const current = notes[key];
-    updateNotes({ [key]: current.includes(value) ? current.filter((item) => item !== value) : [...current, value] });
-  };
-
   const activeLayer = useMemo(() => LAYERS.find((layer) => layer.id === activeSection), [activeSection]);
+  const selectedHumor = humorProfile[activeHumorType];
+  const selectedHumorMeta = HUMOR_TYPES.find((type) => type.id === activeHumorType)!;
 
   return (
     <div className="flex-1 min-h-0 overflow-hidden bg-zinc-950 text-zinc-100">
@@ -143,11 +185,8 @@ export const CharacterTab: React.FC<CharacterTabProps> = ({
               <DroitAvatar expression={expression} size="sm" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-semibold truncate">{identity.name || 'Kaira-01'}</h1>
-                <span className="text-[8px] px-1.5 py-0.5 rounded border border-zinc-700 text-zinc-500">BİREY TASLAĞI</span>
-              </div>
-              <p className="text-[9px] text-zinc-500 truncate">Başlangıç karakter profili</p>
+              <h1 className="text-sm font-semibold truncate">{identity.name || 'Kaira-01'}</h1>
+              <p className="text-[9px] text-zinc-500 truncate">Başlangıç karakter motoru</p>
             </div>
           </div>
 
@@ -182,7 +221,7 @@ export const CharacterTab: React.FC<CharacterTabProps> = ({
             </button>
 
             <div className="border-t border-zinc-800 mb-2" />
-            <p className="px-2 pb-2 text-[9px] uppercase tracking-[0.16em] text-zinc-600">Başlangıç karakteri</p>
+            <p className="px-2 pb-2 text-[9px] uppercase tracking-[0.16em] text-zinc-600">Karakter motoru</p>
 
             <div className="space-y-1 min-h-0 overflow-y-auto pr-0.5">
               {LAYERS.map(({ id, label, subtitle, icon: Icon }) => (
@@ -216,91 +255,76 @@ export const CharacterTab: React.FC<CharacterTabProps> = ({
                     <p className="text-[9px] uppercase tracking-[0.16em] text-zinc-600">{activeLayer?.label}</p>
                     <h2 className="text-sm font-semibold mt-0.5">{activeLayer?.subtitle}</h2>
                   </div>
-                  <span className="text-[9px] text-zinc-600">Kolay düzenleme</span>
+                  <span className="text-[9px] font-mono text-zinc-600">0–100 PARAMETRE</span>
                 </div>
 
-                <div className="flex-1 min-h-0 p-5 overflow-y-auto">
-                  {activeSection === 'temperament' && (
-                    <SimpleTraitGrid
-                      items={[
-                        { key: 'patience', title: 'Tepki eşiği', description: 'Gerilim ve tekrar karşısında ne kadar çabuk tepki verir?', options: [['Çabuk tepki', 25], ['Dengeli', 50], ['Yüksek tolerans', 80]] },
-                        { key: 'curiosity', title: 'Keşif eğilimi', description: 'Yeni şeylere yönelme isteği ne kadar güçlü?', options: [['Odaklı', 30], ['Meraklı', 55], ['Keşifçi', 85]] },
-                      ]}
-                      personality={personality}
-                      onChange={onPersonalityChange}
-                    />
-                  )}
+                <div className="flex-1 min-h-0 p-4 overflow-y-auto">
+                  {activeSection === 'expression' ? (
+                    <div className="max-w-[1050px] space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setHumorOpen((value) => !value)}
+                        className="w-full h-11 rounded-lg border border-zinc-800 bg-zinc-950/45 px-3 flex items-center gap-2 text-left hover:border-zinc-700"
+                      >
+                        {humorOpen ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
+                        <Laugh className="w-4 h-4 text-indigo-400" />
+                        <div>
+                          <div className="text-[11px] font-medium">Mizah</div>
+                          <div className="text-[8.5px] text-zinc-600">Tür → parametre → matematiksel davranış</div>
+                        </div>
+                        <span className="ml-auto text-[9px] text-zinc-600">8 alt katman</span>
+                      </button>
 
-                  {activeSection === 'personality' && (
-                    <SimpleTraitGrid
-                      items={[
-                        { key: 'selfConfidence', title: 'Kendini ortaya koyma', description: 'Kararlarında ve görüşlerinde ne kadar net durur?', options: [['Temkinli', 30], ['Dengeli', 55], ['Kararlı', 85]] },
-                        { key: 'analyticalThinking', title: 'Düşünme tarzı', description: 'Pratik tepki mi, daha derin analiz mi?', options: [['Pratik', 30], ['Dengeli', 55], ['Derin analiz', 85]] },
-                      ]}
-                      personality={personality}
-                      onChange={onPersonalityChange}
-                    />
-                  )}
+                      {humorOpen && (
+                        <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-3 pt-1">
+                          <div className="rounded-lg border border-zinc-800 bg-zinc-950/30 p-1.5 space-y-1">
+                            {HUMOR_TYPES.map((type) => (
+                              <button
+                                key={type.id}
+                                type="button"
+                                onClick={() => setActiveHumorType(type.id)}
+                                className={`w-full px-2.5 py-2 rounded-md text-left transition ${
+                                  activeHumorType === type.id
+                                    ? 'bg-indigo-500/15 text-indigo-100 border border-indigo-500/25'
+                                    : 'border border-transparent text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
+                                }`}
+                              >
+                                <span className="block text-[10px] font-medium">{type.label}</span>
+                                <span className="block mt-0.5 text-[8px] leading-tight text-zinc-600">{type.description}</span>
+                              </button>
+                            ))}
+                          </div>
 
-                  {activeSection === 'motivation' && (
-                    <ChoiceEditor title="Kaira'yı doğal olarak neler çeker?" help="Birden fazlasını seçebilirsin. Bunlar kesin hedef değil, başlangıç yönelimleri." options={MOTIVATION_OPTIONS} selected={notes.motivations} onToggle={(value) => toggleListValue('motivations', value)} />
-                  )}
+                          <div className="rounded-lg border border-zinc-800 bg-zinc-950/30 p-4">
+                            <div className="mb-4 flex items-start justify-between gap-3">
+                              <div>
+                                <h3 className="text-[12px] font-semibold">{selectedHumorMeta.label}</h3>
+                                <p className="mt-1 text-[9px] text-zinc-600">{selectedHumorMeta.description}</p>
+                              </div>
+                              <span className="text-[9px] font-mono text-zinc-700">humor.{activeHumorType}</span>
+                            </div>
 
-                  {activeSection === 'values' && (
-                    <ChoiceEditor title="Kaira için hangi ilkeler özellikle önemli?" help="Değerleri sayı vermeden seçiyoruz. Öncelik ve çatışma kurallarını daha sonra bilimsel modele bağlayacağız." options={VALUE_OPTIONS} selected={notes.values} onToggle={(value) => toggleListValue('values', value)} />
+                            <div className="space-y-3">
+                              {HUMOR_PARAMETERS.map((parameter) => (
+                                <ParameterSlider
+                                  key={parameter.key}
+                                  label={parameter.label}
+                                  help={parameter.help}
+                                  value={selectedHumor[parameter.key]}
+                                  onChange={(value) => updateHumorParameter(activeHumorType, parameter.key, value)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="max-w-[850px] rounded-xl border border-zinc-800 bg-zinc-950/30 p-5">
+                      <p className="text-[11px] text-zinc-400">Bu katmanın matematiksel alt parametrelerini sırayla kuracağız.</p>
+                      <p className="mt-1 text-[9px] text-zinc-600">Şimdilik yalnızca Mizah katmanı gerçek parametre yapısına geçirildi.</p>
+                    </div>
                   )}
-
-                  {activeSection === 'preferences' && (
-                    <TwoTextEditor
-                      firstLabel="Sevdiği / hoşlandığı şeyler"
-                      firstPlaceholder="Örn. absürt mizah, uzun gece sohbetleri, rekabet..."
-                      firstValue={notes.likes}
-                      onFirst={(value) => updateNotes({ likes: value })}
-                      secondLabel="Sevmediği / itici bulduğu şeyler"
-                      secondPlaceholder="Örn. yapmacıklık, tekrar, aşırı resmiyet..."
-                      secondValue={notes.dislikes}
-                      onSecond={(value) => updateNotes({ dislikes: value })}
-                    />
-                  )}
-
-                  {activeSection === 'social' && (
-                    <SimpleTraitGrid
-                      items={[
-                        { key: 'empathy', title: 'Yakınlık tarzı', description: 'İnsanlara yaklaşırken ne kadar sıcak ve destekleyici?', options: [['Mesafeli', 30], ['Dengeli', 55], ['Sıcak', 85]] },
-                        { key: 'authority', title: 'Sosyal duruş', description: 'Eşitlikçi mi, yönlendirici mi?', options: [['Eşitlikçi', 25], ['Dengeli', 50], ['Yönlendirici', 80]] },
-                      ]}
-                      personality={personality}
-                      onChange={onPersonalityChange}
-                    />
-                  )}
-
-                  {activeSection === 'boundaries' && (
-                    <TwoTextEditor
-                      firstLabel="Kırmızı çizgiler"
-                      firstPlaceholder="Asla normalleştirmeyeceği davranışlar..."
-                      firstValue={notes.boundaries}
-                      onFirst={(value) => updateNotes({ boundaries: value })}
-                      secondLabel="Hassas konular"
-                      secondPlaceholder="Bağlama göre daha dikkatli değerlendireceği konular..."
-                      secondValue={notes.sensitivities}
-                      onSecond={(value) => updateNotes({ sensitivities: value })}
-                    />
-                  )}
-
-                  {activeSection === 'expression' && (
-                    <SimpleTraitGrid
-                      items={[
-                        { key: 'humor', title: 'Mizah kullanımı', description: 'Konuşmada mizaha ne kadar sık başvurur?', options: [['Nadiren', 25], ['Yerinde', 55], ['Sık', 80]] },
-                        { key: 'communication', title: 'Konuşma yoğunluğu', description: 'Kısa mı konuşur, ayrıntılı mı?', options: [['Kısa', 25], ['Dengeli', 50], ['Açıklayıcı', 80]] },
-                      ]}
-                      personality={personality}
-                      onChange={onPersonalityChange}
-                    />
-                  )}
-
-                  <div className="mt-5 rounded-lg border border-zinc-800 bg-zinc-950/35 px-3 py-2.5 text-[9px] leading-relaxed text-zinc-600">
-                    Bu ekran insan tarafından kolay düzenleme içindir. Arkadaki sayısal değerler sadece mevcut motorla uyumluluk için tutuluyor; karakteri tek başına bu sayılar tanımlamayacak.
-                  </div>
                 </div>
               </>
             )}
@@ -311,6 +335,50 @@ export const CharacterTab: React.FC<CharacterTabProps> = ({
   );
 };
 
+function ParameterSlider({
+  label,
+  help,
+  value,
+  onChange,
+}: {
+  label: string;
+  help: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/45 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10.5px] font-medium text-zinc-300">{label}</div>
+          <div className="mt-0.5 text-[8.5px] text-zinc-600 truncate">{help}</div>
+        </div>
+        <input
+          type="number"
+          min={0}
+          max={100}
+          value={value}
+          onChange={(event) => onChange(Math.max(0, Math.min(100, Number(event.target.value))))}
+          className="w-14 h-7 rounded-md border border-zinc-700 bg-zinc-950 text-center text-[10px] font-mono text-zinc-300 outline-none focus:border-indigo-500/60"
+        />
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="mt-2.5 w-full h-1 accent-indigo-500 cursor-pointer"
+      />
+      <div className="mt-1 flex justify-between text-[8px] font-mono text-zinc-700">
+        <span>0</span>
+        <span>{value}</span>
+        <span>100</span>
+      </div>
+    </div>
+  );
+}
+
 function IdentityEditor({
   identity,
   updateIdentity,
@@ -320,134 +388,49 @@ function IdentityEditor({
 }) {
   return (
     <>
-      <div className="h-14 shrink-0 px-5 border-b border-zinc-800 flex items-center justify-between">
+      <div className="h-14 shrink-0 px-5 border-b border-zinc-800 flex items-center">
         <div>
           <p className="text-[9px] uppercase tracking-[0.16em] text-zinc-600">KİMLİK</p>
           <h2 className="text-sm font-semibold mt-0.5">Bu birey kim?</h2>
         </div>
-        <CircleUserRound className="w-4 h-4 text-zinc-700" />
       </div>
-      <div className="flex-1 min-h-0 p-5 grid grid-cols-2 gap-x-4 gap-y-3 content-start max-w-[920px]">
+      <div className="flex-1 min-h-0 p-5 grid grid-cols-2 gap-x-4 gap-y-3 content-start max-w-[900px] overflow-y-auto">
         <Field label="İsim" value={identity.name} onChange={(value) => updateIdentity('name', value)} />
         <Field label="Tür" value={identity.type} onChange={(value) => updateIdentity('type', value)} />
         <Field label="Cinsiyet" value={identity.gender} onChange={(value) => updateIdentity('gender', value)} />
-        <Field label="Yaş" value={identity.age} onChange={(value) => updateIdentity('age', value)} placeholder="Henüz belirlenmedi" />
-        <Field label="Rol / uğraş" value={identity.role} onChange={(value) => updateIdentity('role', value)} placeholder="Henüz belirlenmedi" />
+        <Field label="Yaş" value={identity.age} onChange={(value) => updateIdentity('age', value)} />
+        <Field label="Rol / uğraş" value={identity.role} onChange={(value) => updateIdentity('role', value)} />
         <div />
         <label className="col-span-2 block">
           <span className="text-[9px] uppercase tracking-[0.12em] text-zinc-600">Kısa tanım</span>
-          <textarea value={identity.shortDescription} onChange={(event) => updateIdentity('shortDescription', event.target.value)} placeholder="Bu bireyi kısa şekilde tanımlayan not." className="mt-1.5 w-full h-24 resize-none rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-[11px] text-zinc-200 placeholder:text-zinc-700 outline-none focus:border-indigo-500/50" />
+          <textarea
+            value={identity.shortDescription}
+            onChange={(event) => updateIdentity('shortDescription', event.target.value)}
+            className="mt-1.5 w-full h-24 resize-none rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-[11px] text-zinc-200 outline-none focus:border-indigo-500/50"
+          />
         </label>
       </div>
     </>
   );
 }
 
-type TraitItem = {
-  key: keyof DroitPersonalityTraits;
-  title: string;
-  description: string;
-  options: Array<[string, number]>;
-};
-
-function SimpleTraitGrid({
-  items,
-  personality,
+function Field({
+  label,
+  value,
   onChange,
 }: {
-  items: TraitItem[];
-  personality: DroitPersonalityTraits;
-  onChange: (partial: Partial<DroitPersonalityTraits>) => void;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
 }) {
-  return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-      {items.map((item) => {
-        const current = Number(personality[item.key] ?? 50);
-        const selectedIndex = item.options.reduce((best, option, index) => Math.abs(option[1] - current) < Math.abs(item.options[best][1] - current) ? index : best, 0);
-        return (
-          <div key={String(item.key)} className="rounded-xl border border-zinc-800 bg-zinc-950/35 p-4">
-            <h3 className="text-[12px] font-semibold text-zinc-200">{item.title}</h3>
-            <p className="text-[9.5px] text-zinc-600 mt-1 leading-relaxed">{item.description}</p>
-            <div className="grid grid-cols-3 gap-2 mt-4">
-              {item.options.map(([label, value], index) => (
-                <button key={label} type="button" onClick={() => onChange({ [item.key]: value } as Partial<DroitPersonalityTraits>)} className={`h-9 rounded-lg border text-[10px] transition ${selectedIndex === index ? 'border-indigo-500/40 bg-indigo-500/12 text-indigo-200' : 'border-zinc-800 bg-zinc-900/60 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'}`}>{label}</button>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ChoiceEditor({
-  title,
-  help,
-  options,
-  selected,
-  onToggle,
-}: {
-  title: string;
-  help: string;
-  options: string[];
-  selected: string[];
-  onToggle: (value: string) => void;
-}) {
-  return (
-    <div className="max-w-[860px]">
-      <h3 className="text-[13px] font-semibold text-zinc-200">{title}</h3>
-      <p className="text-[9.5px] text-zinc-600 mt-1">{help}</p>
-      <div className="flex flex-wrap gap-2 mt-4">
-        {options.map((option) => {
-          const active = selected.includes(option);
-          return <button key={option} type="button" onClick={() => onToggle(option)} className={`h-9 px-3 rounded-lg border text-[10px] transition ${active ? 'border-indigo-500/40 bg-indigo-500/12 text-indigo-200' : 'border-zinc-800 bg-zinc-950/40 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700'}`}>{active && <Check className="inline w-3 h-3 mr-1.5" />}{option}</button>;
-        })}
-      </div>
-    </div>
-  );
-}
-
-function TwoTextEditor({
-  firstLabel,
-  firstPlaceholder,
-  firstValue,
-  onFirst,
-  secondLabel,
-  secondPlaceholder,
-  secondValue,
-  onSecond,
-}: {
-  firstLabel: string;
-  firstPlaceholder: string;
-  firstValue: string;
-  onFirst: (value: string) => void;
-  secondLabel: string;
-  secondPlaceholder: string;
-  secondValue: string;
-  onSecond: (value: string) => void;
-}) {
-  return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 max-w-[980px]">
-      <TextAreaCard label={firstLabel} placeholder={firstPlaceholder} value={firstValue} onChange={onFirst} icon={<HeartHandshake className="w-4 h-4" />} />
-      <TextAreaCard label={secondLabel} placeholder={secondPlaceholder} value={secondValue} onChange={onSecond} icon={<Shield className="w-4 h-4" />} />
-    </div>
-  );
-}
-
-function TextAreaCard({ label, placeholder, value, onChange, icon }: { label: string; placeholder: string; value: string; onChange: (value: string) => void; icon: React.ReactNode }) {
-  return (
-    <label className="rounded-xl border border-zinc-800 bg-zinc-950/35 p-4 block">
-      <span className="flex items-center gap-2 text-[11px] font-medium text-zinc-300">{icon}{label}</span>
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-3 w-full h-28 resize-none rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-[10px] text-zinc-300 placeholder:text-zinc-700 outline-none focus:border-indigo-500/50" />
-    </label>
-  );
-}
-
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
   return (
     <label className="block">
       <span className="text-[9px] uppercase tracking-[0.12em] text-zinc-600">{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-1.5 w-full h-9 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 text-[11px] text-zinc-200 placeholder:text-zinc-700 outline-none focus:border-indigo-500/50" />
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1.5 w-full h-9 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 text-[11px] text-zinc-200 outline-none focus:border-indigo-500/50"
+      />
     </label>
   );
 }
