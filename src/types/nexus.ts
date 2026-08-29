@@ -107,6 +107,7 @@ export interface TestSessionTurnRecord {
     speechIdentity?: unknown;
     entityResolution?: unknown;
     worldEvent?: unknown;
+    retrievedWorldEvents?: unknown;
   };
 }
 
