@@ -24,6 +24,7 @@ import { applyPersonalityTendencies } from "./personalityTendencyEngine";
 import { applyMotivations } from "./motivationEngine";
 import { applyValues } from "./valueEngine";
 import { applyPreferences } from "./preferenceEngine";
+import { applySocialOrientation } from "./socialOrientationEngine";
 import { auth } from "../lib/firebase";
 
 export type KairoProvider = "gemini" | "openrouter";
@@ -251,7 +252,13 @@ export const droitChatService = {
       fineTune,
       userMessage,
     );
-    const runtimePersonality = preferenceRuntime.personality;
+    const socialRuntime = applySocialOrientation(
+      preferenceRuntime.personality,
+      fineTune,
+      userMessage,
+      dynamicState,
+    );
+    const runtimePersonality = socialRuntime.personality;
 
     const behaviorProfile = computeBehaviorProfile(runtimePersonality, userMessage);
     const temperamentAdjustedState = applyTemperamentBeforeKdm(
@@ -272,6 +279,7 @@ export const droitChatService = {
       motivation: motivationRuntime.response,
       values: valueRuntime.response,
       preferences: preferenceRuntime.response,
+      socialOrientation: socialRuntime.response,
       dynamicState: temperamentAdjustedState,
       history: history
         .slice(-24)
