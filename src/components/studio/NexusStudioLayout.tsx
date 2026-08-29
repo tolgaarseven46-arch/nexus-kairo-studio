@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { StudioTopBar } from "./StudioTopBar";
 import { CharacterTab } from "./tabs/CharacterTab";
 import { MindMapTab } from "./tabs/MindMapTab";
@@ -144,6 +144,7 @@ export const NexusStudioLayout: React.FC = () => {
     [expression, setExpression] = useState<DroitExpressionMode>("NEUTRAL"),
     [messages, setMessages] = useState<TestMessage[]>(INITIAL_MESSAGES),
     [isAiLoading, setIsAiLoading] = useState(false),
+    [isResettingSession, setIsResettingSession] = useState(false),
     [reasoningTrace, setReasoningTrace] = useState<ReasoningTrace>(
       INITIAL_REASONING_TRACE,
     ),
@@ -173,10 +174,15 @@ export const NexusStudioLayout: React.FC = () => {
     [isSaved, setIsSaved] = useState(true),
     [isSaving, setIsSaving] = useState(false),
     [isolatedConversation, setIsolatedConversation] = useState(false);
+  const restoreGenerationRef = useRef(0);
 
   // Restore Active Test Session from Firestore whenever participant changes or on mount
   useEffect(() => {
     let isCurrent = true;
+    const generation = ++restoreGenerationRef.current;
+    const restoreIsCurrent = () =>
+      isCurrent && generation === restoreGenerationRef.current;
+
     async function hydrateSession() {
       if (typeof window !== "undefined") {
         localStorage.setItem("kairo_test_user_id", selectedTestUser);
@@ -185,7 +191,7 @@ export const NexusStudioLayout: React.FC = () => {
 
       try {
         const restored = await loadActiveTestSessionForUser(selectedTestUser);
-        if (!isCurrent) return;
+        if (!restoreIsCurrent()) return;
 
         if (restored && restored.turns && restored.turns.length > 0) {
           setMessages(restored.messages);
@@ -219,7 +225,7 @@ export const NexusStudioLayout: React.FC = () => {
         console.warn("[NexusStudioLayout] Failed to restore test session:", err);
       }
 
-      if (!isCurrent) return;
+      if (!restoreIsCurrent()) return;
       setDynamicState(INITIAL_DYNAMIC_STATE);
       setReasoningTrace(INITIAL_REASONING_TRACE);
       setLastAnalysis(null);
@@ -283,11 +289,19 @@ export const NexusStudioLayout: React.FC = () => {
     } catch {}
   }, []);
   const handleResetTestUser = useCallback(async () => {
-    if (isAiLoading) return;
-    if (activeSessionId) {
-      await clearTestSession(activeSessionId).catch(() => {});
-    }
-    await resetKdmTestUser(activeConversationScope || selectedTestUser);
+    if (isAiLoading || isResettingSession) return;
+
+    const sessionToClear = activeSessionId;
+    const scopeToReset = activeConversationScope || selectedTestUser;
+
+    // Invalidate an in-flight Firestore restore before clearing the UI. Otherwise
+    // a late restore response can repopulate the just-reset conversation.
+    restoreGenerationRef.current += 1;
+    setIsRestoringSession(false);
+    setIsResettingSession(true);
+
+    // Reset the visible test state immediately. Firestore cleanup can take a few
+    // seconds, but the user should never need F5 to see a fresh session.
     setMessages([]);
     setDynamicState(INITIAL_DYNAMIC_STATE);
     setReasoningTrace(INITIAL_REASONING_TRACE);
@@ -301,10 +315,27 @@ export const NexusStudioLayout: React.FC = () => {
       localStorage.removeItem("kairo_active_session_id");
       localStorage.removeItem(`kairo_active_session_${selectedTestUser}`);
     }
-    await clearKairoConversation().catch(() => {});
-  }, [activeConversationScope, activeSessionId, isAiLoading, selectedTestUser]);
+
+    try {
+      await Promise.allSettled([
+        sessionToClear
+          ? clearTestSession(sessionToClear)
+          : Promise.resolve(),
+        resetKdmTestUser(scopeToReset),
+        clearKairoConversation(),
+      ]);
+    } finally {
+      setIsResettingSession(false);
+    }
+  }, [
+    activeConversationScope,
+    activeSessionId,
+    isAiLoading,
+    isResettingSession,
+    selectedTestUser,
+  ]);
   const handleClearAllTestData = useCallback(async () => {
-    if (isAiLoading) return;
+    if (isAiLoading || isResettingSession) return;
     if (activeSessionId) {
       await clearTestSession(activeSessionId).catch(() => {});
     }
@@ -324,13 +355,13 @@ export const NexusStudioLayout: React.FC = () => {
         localStorage.removeItem(`kairo_active_session_${user.id}`);
       }
     }
-  }, [activeSessionId, isAiLoading]);
+  }, [activeSessionId, isAiLoading, isResettingSession]);
   const handleSendMessage = useCallback(
     async (
       userText: string,
       options?: { relationshipLevel?: RelationshipTestLevel },
     ) => {
-      if (!userText.trim() || isAiLoading) return;
+      if (!userText.trim() || isAiLoading || isResettingSession) return;
       const activeParticipant =
         TEST_USERS.find((user) => user.id === selectedTestUser) ??
         TEST_USERS[0];
@@ -437,6 +468,7 @@ export const NexusStudioLayout: React.FC = () => {
       dynamicState,
       messages,
       isAiLoading,
+      isResettingSession,
       persistMessageSafely,
       isolatedConversation,
       selectedTestUser,
@@ -473,7 +505,7 @@ export const NexusStudioLayout: React.FC = () => {
             dynamicState={dynamicState}
             reasoningTrace={reasoningTrace}
             messages={messages}
-            isLoading={isAiLoading}
+            isLoading={isAiLoading || isResettingSession}
             timings={lastTimings}
             providerUsed={lastProviderUsed}
             consistency={lastAnalysis}
