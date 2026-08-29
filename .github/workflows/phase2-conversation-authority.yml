@@ -22,54 +22,62 @@ jobs:
           server = Path('server.ts')
           s = server.read_text()
 
-          anchor = 'import { resolveCanonicalSemanticEvent } from "./src/services/semanticEventAuthority";\n'
-          addition = anchor + 'import { applyConversationStateAuthority } from "./src/services/conversationStateAuthority";\n'
-          if 'applyConversationStateAuthority' not in s:
-              if anchor not in s:
-                  raise SystemExit('authority import anchor not found')
-              s = s.replace(anchor, addition, 1)
+          import_anchor = 'import { resolveCanonicalSemanticEvent } from "./src/services/semanticEventAuthority";\n'
+          import_line = 'import { applyConversationStateAuthority } from "./src/services/conversationStateAuthority";\n'
+          if import_line not in s:
+              if import_anchor not in s:
+                  raise SystemExit('semantic authority import anchor not found')
+              s = s.replace(import_anchor, import_anchor + import_line, 1)
 
-          old = '''      ),
-      behaviorProfile = kdm.behaviorProfile,
-      speech = computeKairoSpeechIdentity(
-        safePersonality,
-        kdm.nextDynamicState,
-        kdm.trace,
-      ),
-      enforcementRules = {
-        continueConversation: runtimeFlag(safePersonality, "runtimeContinueConversation", true),
-        humorAllowed: runtimeFlag(safePersonality, "runtimeHumorAllowed", true),
-        askQuestion: runtimeFlag(safePersonality, "runtimeAskQuestion", true),
-'''
-          new = '''      ),
-      conversationAuthority = applyConversationStateAuthority(safePersonality, kdm.nextDynamicState),
-      authoritativePersonality = conversationAuthority.personality,
-      behaviorProfile = kdm.behaviorProfile,
-      speech = computeKairoSpeechIdentity(
-        authoritativePersonality,
-        kdm.nextDynamicState,
-        kdm.trace,
-      ),
-      enforcementRules = {
-        continueConversation: runtimeFlag(authoritativePersonality, "runtimeContinueConversation", true),
-        humorAllowed: runtimeFlag(authoritativePersonality, "runtimeHumorAllowed", true),
-        askQuestion: runtimeFlag(authoritativePersonality, "runtimeAskQuestion", true),
-'''
-          if old not in s:
-              raise SystemExit('post-KDM authority anchor not found')
-          s = s.replace(old, new, 1)
+          if 'conversationAuthority = applyConversationStateAuthority' not in s:
+              marker = '      behaviorProfile = kdm.behaviorProfile,\n'
+              insertion = (
+                  '      conversationAuthority = applyConversationStateAuthority(safePersonality, kdm.nextDynamicState),\n'
+                  '      authoritativePersonality = conversationAuthority.personality,\n'
+              )
+              if marker not in s:
+                  raise SystemExit('behaviorProfile anchor not found')
+              s = s.replace(marker, insertion + marker, 1)
 
-          old = '''      local = tryLocalKairoReply(
-        userMessage,
-        safePersonality,
-'''
-          new = '''      local = tryLocalKairoReply(
-        userMessage,
-        authoritativePersonality,
-'''
-          if old not in s:
-              raise SystemExit('local personality anchor not found')
-          s = s.replace(old, new, 1)
+          s = s.replace(
+              '      speech = computeKairoSpeechIdentity(\n        safePersonality,\n',
+              '      speech = computeKairoSpeechIdentity(\n        authoritativePersonality,\n',
+              1,
+          )
+          s = s.replace(
+              'continueConversation: runtimeFlag(safePersonality, "runtimeContinueConversation", true)',
+              'continueConversation: runtimeFlag(authoritativePersonality, "runtimeContinueConversation", true)',
+              1,
+          )
+          s = s.replace(
+              'humorAllowed: runtimeFlag(safePersonality, "runtimeHumorAllowed", true)',
+              'humorAllowed: runtimeFlag(authoritativePersonality, "runtimeHumorAllowed", true)',
+              1,
+          )
+          s = s.replace(
+              'askQuestion: runtimeFlag(safePersonality, "runtimeAskQuestion", true)',
+              'askQuestion: runtimeFlag(authoritativePersonality, "runtimeAskQuestion", true)',
+              1,
+          )
+          s = s.replace(
+              '      local = tryLocalKairoReply(\n        userMessage,\n        safePersonality,\n',
+              '      local = tryLocalKairoReply(\n        userMessage,\n        authoritativePersonality,\n',
+              1,
+          )
+
+          required = [
+              'applyConversationStateAuthority',
+              'conversationAuthority = applyConversationStateAuthority',
+              'authoritativePersonality = conversationAuthority.personality',
+              'computeKairoSpeechIdentity(\n        authoritativePersonality,',
+              'runtimeFlag(authoritativePersonality, "runtimeContinueConversation"',
+              'runtimeFlag(authoritativePersonality, "runtimeHumorAllowed"',
+              'runtimeFlag(authoritativePersonality, "runtimeAskQuestion"',
+              'tryLocalKairoReply(\n        userMessage,\n        authoritativePersonality,',
+          ]
+          missing = [x for x in required if x not in s]
+          if missing:
+              raise SystemExit('wiring verification failed: ' + repr(missing))
 
           server.write_text(s)
           PY
@@ -81,4 +89,3 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "refactor(kdm): make post-transition relationship state authoritative"
           git push
-# retrigger
