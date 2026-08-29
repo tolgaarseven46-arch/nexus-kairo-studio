@@ -8,6 +8,7 @@ on:
       - "scripts/fixTestLabCanonicalState.mjs"
       - "scripts/makeSemanticQuickTestsVisible.mjs"
       - "scripts/removeSemanticTestsFromLiveDebug.mjs"
+      - "scripts/applyEntityGroundingToResponse.mjs"
       - "server.ts"
       - "src/components/studio/tabs/TestLabTab.tsx"
       - "src/components/studio/tabs/MindMapTab.tsx"
@@ -39,6 +40,8 @@ jobs:
         run: node scripts/makeSemanticQuickTestsVisible.mjs
       - name: Remove semantic tests from live Test & Debug
         run: node scripts/removeSemanticTestsFromLiveDebug.mjs
+      - name: Apply entity grounding to response generation
+        run: node scripts/applyEntityGroundingToResponse.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: TypeScript check
@@ -56,5 +59,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server.ts src/services/droitChatService.ts src/components/studio/tabs/TestLabTab.tsx src/components/studio/tabs/MindMapTab.tsx
-          git commit -m "chore(testlab): remove semantic quick tests from live debug"
+          git commit -m "feat(world-model): ground response generation with entities"
           git push
