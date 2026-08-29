@@ -15,7 +15,10 @@ import {
   clearTestSession,
 } from "./src/services/kdmPersistenceService";
 import { validateMemoryAgainstMessage } from "./src/services/kairoMemoryConsistency";
-import { validateKairoResponse } from "./src/services/kairoResponseConsistency";
+import {
+  enforceKairoResponse,
+  validateKairoResponse,
+} from "./src/services/kairoResponseConsistency";
 import {
   buildActiveParticipantInstruction,
   buildKairoGroundingInstruction,
@@ -384,6 +387,11 @@ function normalizeKdmSemanticAliases(message: string) {
     .replace(/\bmalsın\b/gi, "salaksın")
     .replace(/\bmal\b/gi, "salak");
 }
+function runtimeFlag(personality: DroitPersonalityTraits, key: string, fallback = true) {
+  const value = personality?.[key];
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return value >= 50;
+}
 app.post("/api/chat", async (req, res) => {
   const serverStart = now();
   try {
@@ -442,6 +450,13 @@ app.post("/api/chat", async (req, res) => {
         kdm.nextDynamicState,
         kdm.trace,
       ),
+      enforcementRules = {
+        continueConversation: runtimeFlag(safePersonality, "runtimeContinueConversation", true),
+        humorAllowed: runtimeFlag(safePersonality, "runtimeHumorAllowed", true),
+        askQuestion: runtimeFlag(safePersonality, "runtimeAskQuestion", true),
+        emojiLevel: speech.emojiLevel,
+        conversationState: kdm.nextDynamicState.relationship?.conversationState,
+      },
       dialogueOutputStyle = {
         emojiLevel: speech.emojiLevel,
         userMessage,
@@ -475,7 +490,8 @@ app.post("/api/chat", async (req, res) => {
       );
     kdm.trace.whoSent.userName = userName;
     if (local.handled && local.reply) {
-      const reply = local.reply,
+      const enforced = enforceKairoResponse(local.reply, kdm.trace, enforcementRules),
+        reply = enforced.reply,
         consistency = validateKairoResponse(reply, kdm.trace),
         postStart = now();
       let savedTurnId = "";
@@ -540,6 +556,7 @@ app.post("/api/chat", async (req, res) => {
             accepted: consistency.accepted,
             score: consistency.score,
             issues: consistency.issues,
+            warnings: enforced.reasons,
           },
           metadata: {
             providerUsed: "local_language",
@@ -569,6 +586,7 @@ app.post("/api/chat", async (req, res) => {
           confidence: local.confidence,
           memory: languageMemorySummary(userId),
         },
+        enforcement: enforced,
         speechIdentity: speech,
         kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState },
         consistency,
@@ -590,7 +608,7 @@ app.post("/api/chat", async (req, res) => {
     const relationshipInstruction = behaviorProfile.relationshipInstruction
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
-    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bunlar ne söyleyeceğini dikte etmez; yalnızca davranış sınırların ve mevcut ilişkin hakkında bağlamdır.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
@@ -677,6 +695,8 @@ app.post("/api/chat", async (req, res) => {
         }
       }
     }
+    const enforced = enforceKairoResponse(reply, kdm.trace, enforcementRules);
+    reply = enforced.reply;
     const aiMs = Math.round(now() - aiStart);
     const baseConsistency = validateKairoResponse(reply, kdm.trace);
     const consistency = {
@@ -684,6 +704,7 @@ app.post("/api/chat", async (req, res) => {
       accepted: baseConsistency.accepted && groundingIssues.length === 0,
       score: Math.max(0, baseConsistency.score - groundingIssues.length * 15),
       issues: [...baseConsistency.issues, ...groundingIssues],
+      warnings: enforced.reasons,
     };
     const postStart = now();
     let savedTurnId = "";
@@ -750,6 +771,7 @@ app.post("/api/chat", async (req, res) => {
           accepted: consistency.accepted,
           score: consistency.score,
           issues: consistency.issues,
+          warnings: enforced.reasons,
         },
         metadata: {
           providerUsed: activeAiProviderUsed,
@@ -774,6 +796,7 @@ app.post("/api/chat", async (req, res) => {
       turnId: savedTurnId,
       reply,
       providerUsed: activeAiProviderUsed,
+      enforcement: enforced,
       speechIdentity: speech,
       kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState },
       consistency,
