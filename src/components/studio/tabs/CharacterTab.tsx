@@ -2,11 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Brain,
   Check,
-  ChevronDown,
   ChevronRight,
   CircleUserRound,
   Compass,
-  Laugh,
   Loader2,
   MessageCircleMore,
   Save,
@@ -48,25 +46,29 @@ type SectionId =
   | 'boundaries'
   | 'expression';
 
-type HumorParameterKey =
-  | 'preference'
-  | 'generationDrive'
-  | 'detectionSensitivity'
-  | 'riskTolerance'
-  | 'inhibition';
+type ParameterDefinition = {
+  key: string;
+  label: string;
+  help: string;
+  legacyTrait?: keyof DroitPersonalityTraits;
+};
 
-type HumorTypeId =
-  | 'absurd'
-  | 'irony'
-  | 'sarcasm'
-  | 'dark'
-  | 'affiliative'
-  | 'aggressive'
-  | 'selfDefeating'
-  | 'wordplay';
+type GroupDefinition = {
+  id: string;
+  label: string;
+  description: string;
+  parameters: ParameterDefinition[];
+};
 
-type HumorParameterSet = Record<HumorParameterKey, number>;
-type HumorProfile = Record<HumorTypeId, HumorParameterSet>;
+type LayerDefinition = {
+  id: Exclude<SectionId, 'identity'>;
+  label: string;
+  subtitle: string;
+  icon: React.ComponentType<{ className?: string }>;
+  groups: GroupDefinition[];
+};
+
+type FineTuneProfile = Record<string, number>;
 
 const DEFAULT_IDENTITY = {
   name: 'KAIRA-01',
@@ -77,48 +79,281 @@ const DEFAULT_IDENTITY = {
   shortDescription: '',
 };
 
-const LAYERS = [
-  { id: 'temperament' as const, label: 'Mizaç', subtitle: 'Doğal tepki mekanizmaları', icon: Sparkles },
-  { id: 'personality' as const, label: 'Kişilik eğilimleri', subtitle: 'Genel davranış eğilimleri', icon: Brain },
-  { id: 'motivation' as const, label: 'Motivasyonlar', subtitle: 'Davranışı ne sürüklüyor?', icon: Target },
-  { id: 'values' as const, label: 'Değerler', subtitle: 'Neyi önemli kabul ediyor?', icon: Scale },
-  { id: 'preferences' as const, label: 'Tercihler', subtitle: 'Neye yöneliyor?', icon: Compass },
-  { id: 'social' as const, label: 'Sosyal yönelim', subtitle: 'İnsanlarla nasıl konumlanıyor?', icon: Users },
-  { id: 'boundaries' as const, label: 'Sınırlar', subtitle: 'Nerede duruyor?', icon: Shield },
-  { id: 'expression' as const, label: 'İfade tarzı', subtitle: 'Davranışı nasıl dışa vuruyor?', icon: MessageCircleMore },
+const LAYERS: LayerDefinition[] = [
+  {
+    id: 'temperament',
+    label: 'Mizaç',
+    subtitle: 'Doğal tepki mekanizmaları',
+    icon: Sparkles,
+    groups: [
+      {
+        id: 'reactivity',
+        label: 'Tepkisellik',
+        description: 'Uyaranların iç durumda ne kadar hızlı ve güçlü değişim yarattığı.',
+        parameters: [
+          { key: 'temperament.reactivity.sensitivity', label: 'Uyaran hassasiyeti', help: 'Küçük olayları bile ne kadar kolay fark edip etkilenir?' },
+          { key: 'temperament.reactivity.intensity', label: 'Tepki şiddeti', help: 'Tetiklendiğinde içsel tepkinin büyüklüğü.' },
+          { key: 'temperament.reactivity.threshold', label: 'Tepki eşiği', help: 'Belirgin tepki oluşması için gereken toplam baskı.' },
+        ],
+      },
+      {
+        id: 'regulation',
+        label: 'Düzenleme',
+        description: 'İlk tepki oluştuktan sonra kendini ne ölçüde düzenlediği.',
+        parameters: [
+          { key: 'temperament.regulation.inhibitoryControl', label: 'Frenleme kontrolü', help: 'İlk dürtüyü davranışa dökmeden tutabilme gücü.', legacyTrait: 'patience' },
+          { key: 'temperament.regulation.recoveryRate', label: 'Toparlanma hızı', help: 'Yoğun durumdan normale dönme hızı.' },
+          { key: 'temperament.regulation.persistence', label: 'Duygusal kalıcılık', help: 'Bir tepkinin iç durumda ne kadar uzun süre iz bıraktığı.' },
+        ],
+      },
+      {
+        id: 'exploration',
+        label: 'Keşif',
+        description: 'Yeni ve belirsiz uyaranlara doğal yaklaşım.',
+        parameters: [
+          { key: 'temperament.exploration.noveltySeeking', label: 'Yenilik arayışı', help: 'Yeni deneyim ve fikirleri aktif arama eğilimi.', legacyTrait: 'curiosity' },
+          { key: 'temperament.exploration.uncertaintyTolerance', label: 'Belirsizlik toleransı', help: 'Sonucu bilinmeyen durumlarda rahat kalabilme.' },
+          { key: 'temperament.exploration.approachDrive', label: 'Yaklaşma dürtüsü', help: 'Merak uyandıran şeye doğru ilerleme isteği.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'personality',
+    label: 'Kişilik eğilimleri',
+    subtitle: 'Genel davranış eğilimleri',
+    icon: Brain,
+    groups: [
+      {
+        id: 'assertion',
+        label: 'Kendini ortaya koyma',
+        description: 'Fikir, karar ve kimliğini sosyal ortamda ne kadar belirgin taşıdığı.',
+        parameters: [
+          { key: 'personality.assertion.confidence', label: 'Öz güven', help: 'Kendi değerlendirmesine güvenme düzeyi.', legacyTrait: 'selfConfidence' },
+          { key: 'personality.assertion.directness', label: 'Doğrudanlık', help: 'Düşündüğünü dolandırmadan söyleme eğilimi.' },
+          { key: 'personality.assertion.stubbornness', label: 'Israrcılık', help: 'Kararından vazgeçmek için gereken karşı kanıt miktarı.' },
+        ],
+      },
+      {
+        id: 'cognition',
+        label: 'Düşünme eğilimi',
+        description: 'Karar öncesi zihinsel işlem derinliği ve biçimi.',
+        parameters: [
+          { key: 'personality.cognition.analysisDepth', label: 'Analiz derinliği', help: 'Karar vermeden önce ne kadar çok değişken hesaba katar?', legacyTrait: 'analyticalThinking' },
+          { key: 'personality.cognition.flexibility', label: 'Bilişsel esneklik', help: 'Yeni bilgi geldiğinde bakış açısını değiştirebilme.' },
+          { key: 'personality.cognition.deciveness', label: 'Karar hızı', help: 'Yeterli bilgi oluştuğunda kararı ne kadar hızlı kilitler?' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'motivation',
+    label: 'Motivasyonlar',
+    subtitle: 'Davranışı ne sürüklüyor?',
+    icon: Target,
+    groups: [
+      {
+        id: 'socialNeeds',
+        label: 'Sosyal ihtiyaçlar',
+        description: 'İnsanlarla ilişkide davranışı çeken temel yönelimler.',
+        parameters: [
+          { key: 'motivation.social.connection', label: 'Bağ kurma ihtiyacı', help: 'Kalıcı sosyal bağ oluşturma isteği.' },
+          { key: 'motivation.social.belonging', label: 'Ait olma ihtiyacı', help: 'Bir grup veya ilişki içinde kabul görme isteği.' },
+          { key: 'motivation.social.recognition', label: 'Takdir ihtiyacı', help: 'Katkısının görülmesi ve değerinin tanınması isteği.' },
+        ],
+      },
+      {
+        id: 'agencyNeeds',
+        label: 'Özerklik ve başarı',
+        description: 'Kendi kararını verme, ilerleme ve etki yaratma güdüsü.',
+        parameters: [
+          { key: 'motivation.agency.autonomy', label: 'Özerklik ihtiyacı', help: 'Kararlarını başkasından bağımsız verme isteği.' },
+          { key: 'motivation.agency.achievement', label: 'Başarma ihtiyacı', help: 'Zor hedefleri tamamlama ve gelişme isteği.' },
+          { key: 'motivation.agency.impact', label: 'Etki yaratma ihtiyacı', help: 'Çevresinde sonuç değiştirme isteği.' },
+        ],
+      },
+      {
+        id: 'securityNeeds',
+        label: 'Güvenlik ve düzen',
+        description: 'Belirsizliği azaltma ve istikrarı koruma motivasyonu.',
+        parameters: [
+          { key: 'motivation.security.predictability', label: 'Öngörülebilirlik ihtiyacı', help: 'Ne olacağını bilme ve planlı ilerleme isteği.' },
+          { key: 'motivation.security.stability', label: 'İstikrar ihtiyacı', help: 'Mevcut düzenin korunmasına verilen önem.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'values',
+    label: 'Değerler',
+    subtitle: 'Neyi önemli kabul ediyor?',
+    icon: Scale,
+    groups: [
+      {
+        id: 'moralValues',
+        label: 'Ahlaki ilkeler',
+        description: 'Davranış ve olay değerlendirmesinde ağırlık taşıyan ilkeler.',
+        parameters: [
+          { key: 'values.moral.honesty', label: 'Dürüstlük', help: 'Doğruluk ve açık sözlülüğe verdiği ağırlık.' },
+          { key: 'values.moral.fairness', label: 'Adalet', help: 'Haksızlık ve çifte standarda karşı hassasiyet.' },
+          { key: 'values.moral.loyalty', label: 'Sadakat', help: 'Bağ kurduğu kişilere bağlılığa verdiği önem.' },
+          { key: 'values.moral.compassion', label: 'Şefkat', help: 'Başkalarının zarar görmesini önlemeye verdiği önem.' },
+        ],
+      },
+      {
+        id: 'personalValues',
+        label: 'Kişisel ilkeler',
+        description: 'Kendi yaşam alanı ve ilişki biçiminde vazgeçilmez gördüğü ilkeler.',
+        parameters: [
+          { key: 'values.personal.freedom', label: 'Özgürlük', help: 'Kendi seçimlerini yapabilmeye verdiği önem.' },
+          { key: 'values.personal.privacy', label: 'Mahremiyet', help: 'Kişisel alan ve bilgi kontrolüne verdiği önem.' },
+          { key: 'values.personal.respect', label: 'Saygı', help: 'Karşılıklı sınır ve onura verdiği önem.' },
+          { key: 'values.personal.responsibility', label: 'Sorumluluk', help: 'Söz ve görevlerin yerine getirilmesine verdiği önem.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'preferences',
+    label: 'Tercihler',
+    subtitle: 'Neye yöneliyor?',
+    icon: Compass,
+    groups: [
+      {
+        id: 'stimulation',
+        label: 'Uyarım tercihleri',
+        description: 'Hangi tür ortam ve etkileşimlerin doğal olarak daha çekici geldiği.',
+        parameters: [
+          { key: 'preferences.stimulation.novelty', label: 'Yenilik tercihi', help: 'Yeni konu ve deneyimleri tanıdık olana tercih etme.' },
+          { key: 'preferences.stimulation.complexity', label: 'Karmaşıklık tercihi', help: 'Basit yerine katmanlı ve zorlayıcı içerikleri tercih etme.' },
+          { key: 'preferences.stimulation.intensity', label: 'Yoğunluk tercihi', help: 'Sakin yerine yüksek enerjili etkileşime yönelme.' },
+        ],
+      },
+      {
+        id: 'interaction',
+        label: 'Etkileşim tercihleri',
+        description: 'Sohbetin biçimine dair doğal zevkler.',
+        parameters: [
+          { key: 'preferences.interaction.depth', label: 'Derin sohbet tercihi', help: 'Yüzeysel yerine derin konulara yönelme.' },
+          { key: 'preferences.interaction.playfulness', label: 'Oyunbazlık tercihi', help: 'Ciddi olmayan, yaratıcı ve oyunlu etkileşimi sevme.' },
+          { key: 'preferences.interaction.competition', label: 'Rekabet tercihi', help: 'Rekabet içeren etkileşimlerden hoşlanma.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'social',
+    label: 'Sosyal yönelim',
+    subtitle: 'İnsanlarla nasıl konumlanıyor?',
+    icon: Users,
+    groups: [
+      {
+        id: 'communion',
+        label: 'Yakınlık / communion',
+        description: 'İlişkide sıcaklık, destek ve yakınlık ekseni.',
+        parameters: [
+          { key: 'social.communion.warmth', label: 'Sıcaklık', help: 'İlk yaklaşımda ne kadar sıcak davranır?' },
+          { key: 'social.communion.empathy', label: 'Empatik yönelim', help: 'Karşı tarafın durumunu hesaba katma eğilimi.', legacyTrait: 'empathy' },
+          { key: 'social.communion.closenessDrive', label: 'Yakınlaşma isteği', help: 'İlişki ilerledikçe mesafeyi azaltma eğilimi.' },
+        ],
+      },
+      {
+        id: 'agency',
+        label: 'Agency / sosyal güç',
+        description: 'Sosyal ortamda yön verme ve alan kaplama biçimi.',
+        parameters: [
+          { key: 'social.agency.dominance', label: 'Baskınlık', help: 'Etkileşimin yönünü belirleme eğilimi.', legacyTrait: 'authority' },
+          { key: 'social.agency.initiative', label: 'İnisiyatif', help: 'Sohbet veya eylemi ilk başlatma eğilimi.' },
+          { key: 'social.agency.compliance', label: 'Uyum gösterme', help: 'Karşı tarafın önerisine direnmeden uyma eğilimi.' },
+        ],
+      },
+      {
+        id: 'trust',
+        label: 'Güven açılımı',
+        description: 'Yeni insanlara başlangıçtaki sosyal açıklık.',
+        parameters: [
+          { key: 'social.trust.initialTrust', label: 'Başlangıç güveni', help: 'Yeni tanıştığı birine varsayılan güven düzeyi.' },
+          { key: 'social.trust.disclosure', label: 'Kendini açma', help: 'Kişisel düşünce ve duygularını paylaşma eğilimi.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'boundaries',
+    label: 'Sınırlar',
+    subtitle: 'Nerede duruyor?',
+    icon: Shield,
+    groups: [
+      {
+        id: 'violation',
+        label: 'İhlal hassasiyeti',
+        description: 'Sınır aşımını ne kadar hızlı ve güçlü algıladığı.',
+        parameters: [
+          { key: 'boundaries.violation.disrespect', label: 'Saygısızlık hassasiyeti', help: 'Küçümseme ve hakareti sınır ihlali olarak algılama gücü.' },
+          { key: 'boundaries.violation.manipulation', label: 'Manipülasyon hassasiyeti', help: 'Kontrol edilme veya yönlendirilme girişimlerine hassasiyet.' },
+          { key: 'boundaries.violation.privacy', label: 'Mahremiyet hassasiyeti', help: 'Özel alana müdahaleyi sınır ihlali olarak algılama gücü.' },
+        ],
+      },
+      {
+        id: 'enforcement',
+        label: 'Sınır uygulama',
+        description: 'İhlal algılandıktan sonra sınırı nasıl koruduğu.',
+        parameters: [
+          { key: 'boundaries.enforcement.assertiveness', label: 'Sınır koyma gücü', help: 'Rahatsızlığını açık biçimde ifade etme eğilimi.' },
+          { key: 'boundaries.enforcement.escalation', label: 'Yaptırım sertliği', help: 'Tekrarlanan ihlalde mesafe veya yaptırımı artırma eğilimi.' },
+          { key: 'boundaries.enforcement.forgiveness', label: 'Onarım açıklığı', help: 'Samimi telafi sonrasında ilişkiyi onarmaya açıklık.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'expression',
+    label: 'İfade tarzı',
+    subtitle: 'Davranışı nasıl dışa vuruyor?',
+    icon: MessageCircleMore,
+    groups: [
+      {
+        id: 'humor',
+        label: 'Mizah',
+        description: 'Mizahın türünü, üretimini ve kullanım koşullarını ayrı parametrelerle kontrol eder.',
+        parameters: [
+          { key: 'expression.humor.absurd', label: 'Absürt / sürreal', help: 'Absürt mizahı üretme ve kullanma eğilimi.' },
+          { key: 'expression.humor.irony', label: 'İroni', help: 'İronik anlatımı kullanma eğilimi.' },
+          { key: 'expression.humor.sarcasm', label: 'Sarkazm', help: 'İğneleyici mizaha yönelme eğilimi.' },
+          { key: 'expression.humor.dark', label: 'Kara mizah', help: 'Ağır veya tabu konularda mizah üretme eğilimi.' },
+          { key: 'expression.humor.affiliative', label: 'Yakınlaştırıcı mizah', help: 'Bağ kurmak için mizah kullanma eğilimi.' },
+          { key: 'expression.humor.aggressive', label: 'Saldırgan mizah', help: 'Alay veya hedefe yönelen mizah kullanma eğilimi.' },
+          { key: 'expression.humor.selfDirected', label: 'Kendini hedef alan mizah', help: 'Kendisini şakanın konusu yapma eğilimi.' },
+          { key: 'expression.humor.wordplay', label: 'Kelime mizahı', help: 'Kelime oyunu ve dilsel mizah kullanma eğilimi.' },
+          { key: 'expression.humor.contextInhibition', label: 'Bağlamsal fren', help: 'Ciddi veya uygunsuz bağlamda mizahı bastırma gücü.', legacyTrait: 'humor' },
+        ],
+      },
+      {
+        id: 'speech',
+        label: 'Konuşma biçimi',
+        description: 'Cümlelerin biçimi ve yoğunluğu.',
+        parameters: [
+          { key: 'expression.speech.verbosity', label: 'Konuşma yoğunluğu', help: 'Kısa yanıt yerine ayrıntılı konuşma eğilimi.', legacyTrait: 'communication' },
+          { key: 'expression.speech.informality', label: 'Samimiyet / argo', help: 'Resmi dil yerine gündelik ve argo dil kullanma eğilimi.' },
+          { key: 'expression.speech.emotionalDisplay', label: 'Duygu gösterimi', help: 'İçsel durumunu diline ne kadar yansıtır?' },
+          { key: 'expression.speech.questionDrive', label: 'Soru sorma eğilimi', help: 'Sohbeti soru sorarak sürdürme eğilimi.' },
+        ],
+      },
+    ],
+  },
 ];
 
-const HUMOR_TYPES: Array<{ id: HumorTypeId; label: string; description: string }> = [
-  { id: 'absurd', label: 'Absürt / sürreal', description: 'Mantık kırılması ve beklenmedik bağlantılar' },
-  { id: 'irony', label: 'İroni', description: 'Söylenen ile kastedilen arasındaki terslik' },
-  { id: 'sarcasm', label: 'Sarkazm', description: 'İğneleyici ve eleştirel ironi' },
-  { id: 'dark', label: 'Kara mizah', description: 'Ağır veya tabu konular üzerinden mizah' },
-  { id: 'affiliative', label: 'Yakınlaştırıcı', description: 'Bağ kurmak ve ortamı rahatlatmak için mizah' },
-  { id: 'aggressive', label: 'Saldırgan', description: 'Alay, küçümseme veya hedefe yönelen mizah' },
-  { id: 'selfDefeating', label: 'Kendini hedef alan', description: 'Kendisini şakanın hedefi yapma' },
-  { id: 'wordplay', label: 'Kelime mizahı', description: 'Kelime oyunu, çift anlam ve dil oyunları' },
-];
+function buildDefaultProfile(): FineTuneProfile {
+  const profile: FineTuneProfile = {};
+  for (const layer of LAYERS) {
+    for (const group of layer.groups) {
+      for (const parameter of group.parameters) profile[parameter.key] = 50;
+    }
+  }
+  return profile;
+}
 
-const HUMOR_PARAMETERS: Array<{ key: HumorParameterKey; label: string; help: string }> = [
-  { key: 'preference', label: 'Hoşlanma', help: 'Bu mizah türünü ne kadar seviyor?' },
-  { key: 'generationDrive', label: 'Üretme eğilimi', help: 'Uygun durumda kendiliğinden üretmeye ne kadar yatkın?' },
-  { key: 'detectionSensitivity', label: 'Algılama hassasiyeti', help: 'Bu mizah biçimini ne kadar kolay fark ediyor?' },
-  { key: 'riskTolerance', label: 'Sosyal risk toleransı', help: 'Yanlış anlaşılma ihtimaline rağmen kullanma eğilimi' },
-  { key: 'inhibition', label: 'Baskılama gücü', help: 'Uygunsuz bağlamda kendini ne kadar güçlü frenliyor?' },
-];
-
-const DEFAULT_HUMOR_SET: HumorParameterSet = {
-  preference: 50,
-  generationDrive: 50,
-  detectionSensitivity: 50,
-  riskTolerance: 50,
-  inhibition: 50,
-};
-
-const DEFAULT_HUMOR_PROFILE = HUMOR_TYPES.reduce((acc, type) => {
-  acc[type.id] = { ...DEFAULT_HUMOR_SET };
-  return acc;
-}, {} as HumorProfile);
+const DEFAULT_PROFILE = buildDefaultProfile();
 
 export const CharacterTab: React.FC<CharacterTabProps> = ({
   personality,
@@ -128,20 +363,21 @@ export const CharacterTab: React.FC<CharacterTabProps> = ({
   isSaved,
   isSaving,
 }) => {
-  const [activeSection, setActiveSection] = useState<SectionId>('expression');
+  const [activeSection, setActiveSection] = useState<SectionId>('temperament');
   const [identity, setIdentity] = useState(DEFAULT_IDENTITY);
-  const [humorOpen, setHumorOpen] = useState(true);
-  const [activeHumorType, setActiveHumorType] = useState<HumorTypeId>('absurd');
-  const [humorProfile, setHumorProfile] = useState<HumorProfile>(DEFAULT_HUMOR_PROFILE);
+  const [fineTune, setFineTune] = useState<FineTuneProfile>(DEFAULT_PROFILE);
+  const [activeGroupByLayer, setActiveGroupByLayer] = useState<Record<string, string>>(() =>
+    Object.fromEntries(LAYERS.map((layer) => [layer.id, layer.groups[0]?.id ?? ''])),
+  );
 
   useEffect(() => {
     try {
       const savedIdentity = localStorage.getItem('kairo_identity_v2');
-      const savedHumor = localStorage.getItem('kairo_humor_profile_v1');
+      const savedFineTune = localStorage.getItem('kairo_character_finetune_v2');
       if (savedIdentity) setIdentity({ ...DEFAULT_IDENTITY, ...JSON.parse(savedIdentity) });
-      if (savedHumor) setHumorProfile({ ...DEFAULT_HUMOR_PROFILE, ...JSON.parse(savedHumor) });
+      if (savedFineTune) setFineTune({ ...DEFAULT_PROFILE, ...JSON.parse(savedFineTune) });
     } catch {
-      // Keep defaults if local data is malformed.
+      // Keep safe defaults when local data is malformed.
     }
   }, []);
 
@@ -153,28 +389,27 @@ export const CharacterTab: React.FC<CharacterTabProps> = ({
     });
   };
 
-  const updateHumorParameter = (typeId: HumorTypeId, key: HumorParameterKey, value: number) => {
-    setHumorProfile((prev) => {
-      const next: HumorProfile = {
-        ...prev,
-        [typeId]: {
-          ...prev[typeId],
-          [key]: value,
-        },
-      };
-      localStorage.setItem('kairo_humor_profile_v1', JSON.stringify(next));
-
-      const meanGeneration = Math.round(
-        HUMOR_TYPES.reduce((sum, type) => sum + next[type.id].generationDrive, 0) / HUMOR_TYPES.length,
-      );
-      onPersonalityChange({ humor: meanGeneration });
+  const updateParameter = (parameter: ParameterDefinition, value: number) => {
+    const safeValue = Math.max(0, Math.min(100, value));
+    setFineTune((prev) => {
+      const next = { ...prev, [parameter.key]: safeValue };
+      localStorage.setItem('kairo_character_finetune_v2', JSON.stringify(next));
       return next;
     });
+
+    if (parameter.legacyTrait) {
+      onPersonalityChange({ [parameter.legacyTrait]: safeValue } as Partial<DroitPersonalityTraits>);
+    }
   };
 
-  const activeLayer = useMemo(() => LAYERS.find((layer) => layer.id === activeSection), [activeSection]);
-  const selectedHumor = humorProfile[activeHumorType];
-  const selectedHumorMeta = HUMOR_TYPES.find((type) => type.id === activeHumorType)!;
+  const activeLayer = useMemo(
+    () => LAYERS.find((layer) => layer.id === activeSection),
+    [activeSection],
+  );
+
+  const activeGroup = activeLayer?.groups.find(
+    (group) => group.id === activeGroupByLayer[activeLayer.id],
+  ) ?? activeLayer?.groups[0];
 
   return (
     <div className="flex-1 min-h-0 overflow-hidden bg-zinc-950 text-zinc-100">
@@ -248,86 +483,65 @@ export const CharacterTab: React.FC<CharacterTabProps> = ({
           <main className="min-h-0 rounded-xl border border-zinc-800 bg-zinc-900/55 overflow-hidden flex flex-col">
             {activeSection === 'identity' ? (
               <IdentityEditor identity={identity} updateIdentity={updateIdentity} />
-            ) : (
+            ) : activeLayer && activeGroup ? (
               <>
                 <div className="h-14 shrink-0 px-5 border-b border-zinc-800 flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-[9px] uppercase tracking-[0.16em] text-zinc-600">{activeLayer?.label}</p>
-                    <h2 className="text-sm font-semibold mt-0.5">{activeLayer?.subtitle}</h2>
+                    <p className="text-[9px] uppercase tracking-[0.16em] text-zinc-600">{activeLayer.label}</p>
+                    <h2 className="text-sm font-semibold mt-0.5">{activeLayer.subtitle}</h2>
                   </div>
                   <span className="text-[9px] font-mono text-zinc-600">0–100 PARAMETRE</span>
                 </div>
 
-                <div className="flex-1 min-h-0 p-4 overflow-y-auto">
-                  {activeSection === 'expression' ? (
-                    <div className="max-w-[1050px] space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => setHumorOpen((value) => !value)}
-                        className="w-full h-11 rounded-lg border border-zinc-800 bg-zinc-950/45 px-3 flex items-center gap-2 text-left hover:border-zinc-700"
-                      >
-                        {humorOpen ? <ChevronDown className="w-4 h-4 text-zinc-500" /> : <ChevronRight className="w-4 h-4 text-zinc-500" />}
-                        <Laugh className="w-4 h-4 text-indigo-400" />
-                        <div>
-                          <div className="text-[11px] font-medium">Mizah</div>
-                          <div className="text-[8.5px] text-zinc-600">Tür → parametre → matematiksel davranış</div>
-                        </div>
-                        <span className="ml-auto text-[9px] text-zinc-600">8 alt katman</span>
-                      </button>
-
-                      {humorOpen && (
-                        <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-3 pt-1">
-                          <div className="rounded-lg border border-zinc-800 bg-zinc-950/30 p-1.5 space-y-1">
-                            {HUMOR_TYPES.map((type) => (
-                              <button
-                                key={type.id}
-                                type="button"
-                                onClick={() => setActiveHumorType(type.id)}
-                                className={`w-full px-2.5 py-2 rounded-md text-left transition ${
-                                  activeHumorType === type.id
-                                    ? 'bg-indigo-500/15 text-indigo-100 border border-indigo-500/25'
-                                    : 'border border-transparent text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
-                                }`}
-                              >
-                                <span className="block text-[10px] font-medium">{type.label}</span>
-                                <span className="block mt-0.5 text-[8px] leading-tight text-zinc-600">{type.description}</span>
-                              </button>
-                            ))}
+                <div className="flex-1 min-h-0 grid grid-cols-[230px_minmax(0,1fr)]">
+                  <div className="border-r border-zinc-800 p-2 overflow-y-auto">
+                    {activeLayer.groups.map((group) => {
+                      const selected = activeGroup.id === group.id;
+                      return (
+                        <button
+                          key={group.id}
+                          type="button"
+                          onClick={() => setActiveGroupByLayer((prev) => ({ ...prev, [activeLayer.id]: group.id }))}
+                          className={`w-full mb-1 rounded-lg border px-3 py-2.5 text-left transition ${
+                            selected
+                              ? 'border-indigo-500/25 bg-indigo-500/10 text-indigo-100'
+                              : 'border-transparent text-zinc-400 hover:border-zinc-800 hover:bg-zinc-900/60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10.5px] font-medium">{group.label}</span>
+                            <ChevronRight className="ml-auto w-3 h-3 text-zinc-600" />
                           </div>
+                          <p className="mt-1 text-[8.5px] leading-snug text-zinc-600">{group.description}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                          <div className="rounded-lg border border-zinc-800 bg-zinc-950/30 p-4">
-                            <div className="mb-4 flex items-start justify-between gap-3">
-                              <div>
-                                <h3 className="text-[12px] font-semibold">{selectedHumorMeta.label}</h3>
-                                <p className="mt-1 text-[9px] text-zinc-600">{selectedHumorMeta.description}</p>
-                              </div>
-                              <span className="text-[9px] font-mono text-zinc-700">humor.{activeHumorType}</span>
-                            </div>
+                  <div className="min-h-0 overflow-y-auto p-4">
+                    <div className="max-w-[900px]">
+                      <div className="mb-4">
+                        <h3 className="text-[12px] font-semibold">{activeGroup.label}</h3>
+                        <p className="mt-1 text-[9px] text-zinc-600">{activeGroup.description}</p>
+                      </div>
 
-                            <div className="space-y-3">
-                              {HUMOR_PARAMETERS.map((parameter) => (
-                                <ParameterSlider
-                                  key={parameter.key}
-                                  label={parameter.label}
-                                  help={parameter.help}
-                                  value={selectedHumor[parameter.key]}
-                                  onChange={(value) => updateHumorParameter(activeHumorType, parameter.key, value)}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      <div className="space-y-2.5">
+                        {activeGroup.parameters.map((parameter) => (
+                          <ParameterSlider
+                            key={parameter.key}
+                            label={parameter.label}
+                            help={parameter.help}
+                            codeKey={parameter.key}
+                            value={fineTune[parameter.key] ?? 50}
+                            onChange={(value) => updateParameter(parameter, value)}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="max-w-[850px] rounded-xl border border-zinc-800 bg-zinc-950/30 p-5">
-                      <p className="text-[11px] text-zinc-400">Bu katmanın matematiksel alt parametrelerini sırayla kuracağız.</p>
-                      <p className="mt-1 text-[9px] text-zinc-600">Şimdilik yalnızca Mizah katmanı gerçek parametre yapısına geçirildi.</p>
-                    </div>
-                  )}
+                  </div>
                 </div>
               </>
-            )}
+            ) : null}
           </main>
         </div>
       </div>
@@ -338,28 +552,31 @@ export const CharacterTab: React.FC<CharacterTabProps> = ({
 function ParameterSlider({
   label,
   help,
+  codeKey,
   value,
   onChange,
 }: {
   label: string;
   help: string;
+  codeKey: string;
   value: number;
   onChange: (value: number) => void;
 }) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/45 px-3 py-2.5">
-      <div className="flex items-center justify-between gap-3">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950/35 px-3 py-2.5">
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="text-[10.5px] font-medium text-zinc-300">{label}</div>
-          <div className="mt-0.5 text-[8.5px] text-zinc-600 truncate">{help}</div>
+          <div className="mt-0.5 text-[8.5px] text-zinc-600">{help}</div>
+          <div className="mt-1 text-[8px] font-mono text-zinc-700">{codeKey}</div>
         </div>
         <input
           type="number"
           min={0}
           max={100}
           value={value}
-          onChange={(event) => onChange(Math.max(0, Math.min(100, Number(event.target.value))))}
-          className="w-14 h-7 rounded-md border border-zinc-700 bg-zinc-950 text-center text-[10px] font-mono text-zinc-300 outline-none focus:border-indigo-500/60"
+          onChange={(event) => onChange(Number(event.target.value))}
+          className="w-14 h-7 shrink-0 rounded-md border border-zinc-700 bg-zinc-950 text-center text-[10px] font-mono text-zinc-300 outline-none focus:border-indigo-500/60"
         />
       </div>
       <input
