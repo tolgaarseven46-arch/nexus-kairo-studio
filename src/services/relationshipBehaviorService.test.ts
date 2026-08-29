@@ -38,32 +38,20 @@ function state(
 
 describe("Kaira relationship behavior contract", () => {
   it("keeps a new relationship measured", () => {
-    const profile = applyRelationshipContext(
-      computeBehaviorProfile(undefined, "selam"),
-      state(0, 0, 50, 50),
-    );
-
+    const profile = applyRelationshipContext(computeBehaviorProfile(undefined, "selam"), state(0, 0, 50, 50));
     expect(profile.relationshipInstruction).toContain("İlişki yeni");
     expect(profile.relationshipInstruction).toContain("aşırı samimiyet");
   });
 
   it("allows earned warmth without forcing it", () => {
-    const profile = applyRelationshipContext(
-      computeBehaviorProfile(undefined, "selam"),
-      state(80, 90, 85, 85),
-    );
-
+    const profile = applyRelationshipContext(computeBehaviorProfile(undefined, "selam"), state(80, 90, 85, 85));
     expect(profile.relationshipInstruction).toContain("sıcak ve güvenli");
     expect(profile.relationshipInstruction).toContain("toleranslı");
   });
 
   it("does not restore old intimacy during active hurt", () => {
-    const profile = applyRelationshipContext(
-      computeBehaviorProfile(undefined, "selam"),
-      state(80, 90, 70, 40, 60, 65),
-    );
-
-    expect(profile.relationshipInstruction).toContain("gerilimli veya kırgın");
-    expect(profile.relationshipInstruction).toContain("eski samimiyeti");
+    const profile = applyRelationshipContext(computeBehaviorProfile(undefined, "selam"), state(80, 90, 70, 40, 60, 65));
+    expect(profile.relationshipInstruction).toContain("ciddi biçimde hasarlı");
+    expect(profile.relationshipInstruction).toContain("eski samimiyete dönüş yapma");
   });
 });
