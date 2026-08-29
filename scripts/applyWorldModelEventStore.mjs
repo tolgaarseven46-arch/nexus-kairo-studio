@@ -3,8 +3,12 @@ import fs from "node:fs";
 const path = "server.ts";
 let source = fs.readFileSync(path, "utf8");
 
-const importLine = 'import { saveWorldEventObservation } from "./src/services/worldModelEventStore";\n';
-if (!source.includes(importLine.trim())) {
+// The retrieval layer may already have merged saveWorldEventObservation into a
+// combined import from worldModelEventStore. Detect the symbol/module pair
+// instead of requiring one exact single-symbol import line.
+const hasStoreImport = /import\s*\{[^}]*\bsaveWorldEventObservation\b[^}]*\}\s*from\s*["']\.\/src\/services\/worldModelEventStore["'];?/.test(source);
+if (!hasStoreImport) {
+  const importLine = 'import { saveWorldEventObservation } from "./src/services/worldModelEventStore";\n';
   const anchor = 'import { recordKdmMetric } from "./src/services/kdmMetricsService";\n';
   if (!source.includes(anchor)) throw new Error("world event store import anchor not found");
   source = source.replace(anchor, `${anchor}${importLine}`);
