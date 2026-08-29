@@ -141,9 +141,9 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
     : repairingHold
       ? Math.min(0.24, clamp01(s.affiliationPressure * 0.18 + b.repairOpenness * 0.12))
       : clamp01(s.affiliationPressure * 0.35 + s.carePressure * 0.3 + approachPressure * 0.2 + b.repairOpenness * 0.15 - distance * 0.55);
-  const stance: IntegratedBehaviorDecision["stance"] = disengage
+  const stance: IntegratedBehaviorDecision["stance"] = freshDisengage
     ? "disengage"
-    : repairingHold || distance >= 0.62
+    : persistentDisengage || repairingHold || distance >= 0.62
       ? "distant"
       : boundaryPressure >= 0.38 || valuePressure >= 0.4
         ? "firm"
