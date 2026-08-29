@@ -1,0 +1,42 @@
+name: Phase3 Enforcer Wiring
+
+on:
+  push:
+    paths:
+      - '.github/workflows/phase3-enforcer-wiring.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Wire semantic contract enforcer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/services/kairoResponseConsistency.ts')
+          s=p.read_text()
+          if "import type { BehaviorContract } from './behaviorContract';" not in s:
+              s=s.replace("import type { ReasoningTrace } from '../types/nexus';", "import type { ReasoningTrace } from '../types/nexus';\nimport type { BehaviorContract } from './behaviorContract';", 1)
+          old="  conversationState?: string;\n}"
+          new="  conversationState?: string;\n  behaviorContract?: BehaviorContract;\n}"
+          if 'behaviorContract?: BehaviorContract;' not in s:
+              assert old in s
+              s=s.replace(old,new,1)
+          anchor="  const emojiLevel = Number.isFinite(rules.emojiLevel) ? Number(rules.emojiLevel) : 100;\n"
+          insert="""  const contract = rules.behaviorContract;\n  if (contract) {\n    const checked = enforceBehaviorContract(text, contract);\n    text = checked.reply;\n    reasons.push(...checked.reasons);\n  }\n\n"""
+          if 'const contract = rules.behaviorContract;' not in s:
+              assert anchor in s
+              s=s.replace(anchor,anchor+'\n'+insert,1)
+          p.write_text(s)
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/services/kairoResponseConsistency.ts
+          git diff --cached --quiet || git commit -m "refactor(kdm): enforce behavior contract after generation"
+          git push
