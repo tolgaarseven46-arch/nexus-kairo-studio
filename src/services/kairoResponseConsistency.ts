@@ -16,12 +16,113 @@ export interface ResponseConsistencyResult {
   };
 }
 
+export interface KairoResponseEnforcementRules {
+  continueConversation?: boolean;
+  humorAllowed?: boolean;
+  askQuestion?: boolean;
+  emojiLevel?: number;
+  conversationState?: string;
+}
+
+export interface KairoResponseEnforcementResult {
+  reply: string;
+  changed: boolean;
+  reasons: string[];
+}
+
 function hasAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
 }
 
 function normalize(value: unknown): string {
   return String(value ?? '').trim().toLocaleLowerCase('tr-TR');
+}
+
+const EMOJI_RE = /\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*/gu;
+const HUMOR_MARKER_RE = /(?:\b(?:haha+h*|hehe+h*|lol)\b|😂|🤣|😄|😅|🙃|😏)/giu;
+const AFFECTION_MARKER_RE = /(öp|öpüc|sarıl|kucağ|dudak|bebeğim|aşkım|tatlım|sevgilim)/iu;
+const REOPEN_MARKER_RE = /(hadi\s+(?:konuş|devam)|konuşalım|devam edelim|ne yapıyorsun|naber|anlat bakalım)/iu;
+
+function fallbackForTrace(trace: ReasoningTrace): string {
+  const intent = normalize(trace?.messageInterpretation?.intent);
+  if (intent.includes('özür') || intent.includes('telafi')) {
+    return 'özrünü duydum ama şu an konuşmak istemiyorum';
+  }
+  return 'bu şekilde devam etmeyeceğim';
+}
+
+function removeQuestionSentences(text: string): string {
+  const parts = text
+    .split(/(?<=[.!?])\s+|\n+/u)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => !part.includes('?'));
+  return parts.join(' ').trim();
+}
+
+/**
+ * Deterministic enforcement gate applied AFTER generation and BEFORE persistence/user delivery.
+ * KDM decisions are treated as hard behavior rules here; the model is only the verbalizer.
+ */
+export function enforceKairoResponse(
+  reply: string,
+  trace: ReasoningTrace,
+  rules: KairoResponseEnforcementRules = {},
+): KairoResponseEnforcementResult {
+  const original = String(reply ?? '').trim();
+  let text = original;
+  const reasons: string[] = [];
+  const disengaged = normalize(rules.conversationState) === 'disengaged';
+  const continueConversation = rules.continueConversation !== false;
+  const humorAllowed = rules.humorAllowed !== false;
+  const askQuestion = rules.askQuestion !== false;
+  const emojiLevel = Number.isFinite(rules.emojiLevel) ? Number(rules.emojiLevel) : 100;
+
+  if (emojiLevel <= 0 && EMOJI_RE.test(text)) {
+    EMOJI_RE.lastIndex = 0;
+    text = text.replace(EMOJI_RE, '').replace(/\s{2,}/g, ' ').trim();
+    reasons.push('emoji_blocked');
+  }
+  EMOJI_RE.lastIndex = 0;
+
+  if (!humorAllowed && HUMOR_MARKER_RE.test(text)) {
+    HUMOR_MARKER_RE.lastIndex = 0;
+    text = text.replace(HUMOR_MARKER_RE, '').replace(/\s{2,}/g, ' ').trim();
+    reasons.push('humor_blocked');
+  }
+  HUMOR_MARKER_RE.lastIndex = 0;
+
+  if (!askQuestion && text.includes('?')) {
+    const withoutQuestions = removeQuestionSentences(text);
+    text = withoutQuestions || fallbackForTrace(trace);
+    reasons.push('question_blocked');
+  }
+
+  const hardClosed = disengaged || !continueConversation;
+  if (hardClosed) {
+    const violatesClosedConversation =
+      text.length > 220 ||
+      text.includes('?') ||
+      HUMOR_MARKER_RE.test(text) ||
+      AFFECTION_MARKER_RE.test(text) ||
+      REOPEN_MARKER_RE.test(text);
+    HUMOR_MARKER_RE.lastIndex = 0;
+    if (violatesClosedConversation) {
+      text = fallbackForTrace(trace);
+      reasons.push('closed_conversation_enforced');
+    }
+  }
+
+  if (!text.trim()) {
+    text = fallbackForTrace(trace);
+    reasons.push('empty_after_enforcement');
+  }
+
+  return {
+    reply: text.trim(),
+    changed: text.trim() !== original,
+    reasons,
+  };
 }
 
 /** Deterministic KDM post-generation consistency gate. */
