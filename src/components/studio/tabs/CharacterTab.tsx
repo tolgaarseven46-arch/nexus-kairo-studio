@@ -556,6 +556,7 @@ function ParameterSlider({
   value,
   onChange,
 }: {
+  key?: React.Key;
   label: string;
   help: string;
   codeKey: string;
