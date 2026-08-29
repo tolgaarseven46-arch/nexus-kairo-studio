@@ -32,6 +32,7 @@ describe("semantic event engine", () => {
     expect(apology.intent).toBe("apology");
     expect(repair.repairAttempt).toBe(true);
     expect(repair.intent).toBe("repair");
+    expect(repair.relationalAct).toBe("reconciliation_attempt");
   });
 
   it("recognizes emotional sharing before any downstream fallback is needed", () => {
@@ -126,4 +127,34 @@ describe("semantic event engine", () => {
       expect(event.coercion).toBeGreaterThan(0);
     },
   );
+
+  it("recognizes reassurance seeking as a relationship-directed question", () => {
+    const event = interpretSemanticEvent("bana küsmedin dimi");
+    expect(event.intent).toBe("question");
+    expect(event.target).toBe("kaira");
+    expect(event.relationalAct).toBe("reassurance_seek");
+    expect(event.relationalIntensity).toBeGreaterThan(0);
+  });
+
+  it("recognizes forgiveness checking as a repair probe", () => {
+    const event = interpretSemanticEvent("affettin mi beni");
+    expect(event.intent).toBe("question");
+    expect(event.target).toBe("kaira");
+    expect(event.relationalAct).toBe("repair_probe");
+  });
+
+  it("recognizes conversational challenge instead of flattening it to general chat", () => {
+    const event = interpretSemanticEvent("ne saçmalıyon");
+    expect(event.intent).toBe("complaint");
+    expect(event.valence).toBe("negative");
+    expect(event.target).toBe("kaira");
+    expect(event.relationalAct).toBe("challenge");
+  });
+
+  it("recognizes a closeness bid independently from generic affection", () => {
+    const event = interpretSemanticEvent("gel öp beni");
+    expect(event.target).toBe("kaira");
+    expect(event.relationalAct).toBe("closeness_bid");
+    expect(event.affection).toBeGreaterThan(0);
+  });
 });
