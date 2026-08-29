@@ -4,22 +4,10 @@ import {
   DroitDynamicState,
   ReasoningTrace,
 } from "../types/nexus";
-import {
-  computeBehaviorProfile,
-  BehaviorLayerProfile,
-} from "./droitBehaviorEngine";
-import {
-  validateKairoResponse,
-  ResponseConsistencyResult,
-} from "./kairoResponseConsistency";
-import {
-  appraiseEventV0,
-  type AppraisalEventKind,
-} from "./appraisalEngine";
-import {
-  computeTemperamentResponse,
-  temperamentFromFineTune,
-} from "./temperamentEngine";
+import { computeBehaviorProfile, BehaviorLayerProfile } from "./droitBehaviorEngine";
+import { validateKairoResponse, ResponseConsistencyResult } from "./kairoResponseConsistency";
+import { appraiseEventV0, type AppraisalEventKind } from "./appraisalEngine";
+import { computeTemperamentResponse, temperamentFromFineTune } from "./temperamentEngine";
 import { applyPersonalityTendencies } from "./personalityTendencyEngine";
 import { applyMotivations } from "./motivationEngine";
 import { applyValues } from "./valueEngine";
@@ -77,6 +65,12 @@ function resolveConversationUserId(explicitUserId?: string) {
     if (id?.trim()) return id.trim();
   }
   return auth.currentUser?.uid || "anonymous";
+}
+
+function freshSessionId(userId: string) {
+  const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const random = Math.random().toString(36).slice(2, 8);
+  return `session_${safeUserId}_${Date.now()}_${random}`;
 }
 
 const clamp100 = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
@@ -163,6 +157,7 @@ export const droitChatService = {
   async sendMessage({ userMessage, personality, dynamicState, history = [], characterInfo = { name: "KAIRO", roleTitle: "Sunucu Yöneticisi", raceName: "Sentetik Droit" }, provider = "openrouter", userId: explicitUserId, userName = "Kullanıcı", suppressRecentMemory = false, sessionId }: SendKairoChatOptions): Promise<KairoChatResponse> {
     const totalStart = performance.now();
     const userId = resolveConversationUserId(explicitUserId);
+    const resolvedSessionId = sessionId?.trim() || freshSessionId(userId);
     const prepStart = performance.now();
     const fineTune = readFineTuneProfile();
     const temperamentAdjustedState = applyTemperamentBeforeKdm(userMessage, dynamicState);
@@ -188,7 +183,7 @@ export const droitChatService = {
     const runtimePersonality = integrationRuntime.personality;
     const behaviorProfile = computeBehaviorProfile(runtimePersonality, userMessage);
     const clientPrepMs = Math.round(performance.now() - prepStart);
-    const payload = { sessionId, userId, userName, userMessage, character: characterInfo, personality: runtimePersonality, behaviorProfile, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState: temperamentAdjustedState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory };
+    const payload = { sessionId: resolvedSessionId, userId, userName, userMessage, character: characterInfo, personality: runtimePersonality, behaviorProfile, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState: temperamentAdjustedState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     try {
@@ -203,7 +198,7 @@ export const droitChatService = {
       const server = data.timings || {};
       const serverTotalMs = Number(server.serverTotalMs || 0);
       const timings: KairoTimingMetrics = { clientPrepMs, serverTotalMs, memoryMs: Number(server.memoryMs || 0), kdmMs: Number(server.kdmMs || 0), aiMs: Number(server.aiMs || 0), postProcessMs: Number(server.postProcessMs || 0), networkAndOverheadMs: Math.max(0, totalMs - clientPrepMs - serverTotalMs), totalMs };
-      void saveTestSessionLayerAudit(data.sessionId, data.turnId, {
+      void saveTestSessionLayerAudit(data.sessionId || resolvedSessionId, data.turnId, {
         appraisalTemperament: { event: classifyAppraisalEvent(userMessage), fineTune: temperamentFromFineTune(fineTune) },
         personalityTendency: personalityRuntime.response,
         motivation: motivationRuntime.response,
@@ -217,7 +212,7 @@ export const droitChatService = {
         rawDynamicStateBefore: dynamicState,
         temperamentAdjustedState,
       });
-      return { reply, profile: behaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId, turnId: data.turnId };
+      return { reply, profile: behaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId };
     } catch (err: any) {
       if (err?.name === "AbortError") throw new Error("Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.");
       throw err;
