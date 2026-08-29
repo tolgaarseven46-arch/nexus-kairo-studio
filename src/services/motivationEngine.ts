@@ -85,10 +85,7 @@ export const inferMotivationSituation = (message: string): MotivationSituation =
   };
 };
 
-/**
- * Stable motivation values are needs/goal priorities, not direct behaviors.
- * The current situation determines which need becomes behaviorally salient.
- */
+/** Stable motivation values are needs/goal priorities, not direct behaviors. */
 export const computeMotivationResponse = (
   profile: MotivationProfile,
   situation: MotivationSituation,
@@ -116,7 +113,7 @@ export const computeMotivationResponse = (
   const autonomyDrive = clamp01(n(autonomy) * 0.7 + autonomyThreat * 0.3);
   const achievementDrive = clamp01(n(achievement) * 0.7 + achievementOpportunity * 0.3);
   const influenceDrive = clamp01(n(impact) * 0.7 + influenceOpportunity * 0.3);
-  const securityDrive = clamp01(n(predictability) * 0.48 + n(stability) * 0.42 + uncertainty * 0.1);
+  const securityDrive = clamp01(n(predictability) * 0.45 + n(stability) * 0.4 + uncertainty * 0.15);
 
   const approachPressure = clamp01(
     affiliationDrive * socialOpportunity * 0.34 +
@@ -126,21 +123,12 @@ export const computeMotivationResponse = (
 
   const withdrawalPressure = clamp01(
     rejectionRisk * (0.55 + affiliationDrive * 0.2) +
-      autonomyThreat * autonomyDrive * 0.35 +
+      autonomyThreat * (0.2 + autonomyDrive * 0.45) +
       instability * securityDrive * 0.2,
   );
 
   return {
-    effective: {
-      connection,
-      belonging,
-      recognition,
-      autonomy,
-      achievement,
-      impact,
-      predictability,
-      stability,
-    },
+    effective: { connection, belonging, recognition, autonomy, achievement, impact, predictability, stability },
     drives: {
       affiliationDrive,
       approvalDrive,
@@ -170,12 +158,5 @@ export const applyMotivations = (
   const profile = motivationsFromFineTune(fineTune);
   const situation = inferMotivationSituation(message);
   const response = computeMotivationResponse(profile, situation);
-
-  return {
-    personality: {
-      ...base,
-      ...response.legacyTraits,
-    },
-    response,
-  };
+  return { personality: { ...base, ...response.legacyTraits }, response };
 };
