@@ -16,6 +16,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Apply integration patch
         run: node scripts/applyLanguageUnderstandingIntegration.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript check
+        run: npm run lint
+      - name: Tests
+        run: npm test
+      - name: Production build
+        run: npm run build
       - name: Commit server integration
         run: |
           if git diff --quiet -- server.ts; then
