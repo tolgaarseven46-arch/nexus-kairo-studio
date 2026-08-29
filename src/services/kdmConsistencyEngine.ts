@@ -30,6 +30,120 @@ const trait = (
   fallback = 50,
 ) => clamp(typeof p?.[key] === "number" ? p[key]! : fallback);
 
+function runtimeTrait(
+  p: DroitPersonalityTraits | null | undefined,
+  key: string,
+  fallback: number,
+) {
+  const value = p?.[key];
+  return typeof value === "number" && Number.isFinite(value)
+    ? clamp(value)
+    : fallback;
+}
+
+function applyIntegratedRuntimeDecision(
+  profile: BehaviorLayerProfile,
+  personality?: DroitPersonalityTraits | null,
+): BehaviorLayerProfile {
+  const continueConversation = runtimeTrait(personality, "runtimeContinueConversation", 100) >= 50;
+  const humorAllowed = runtimeTrait(personality, "runtimeHumorAllowed", 100) >= 50;
+  const askQuestion = runtimeTrait(personality, "runtimeAskQuestion", 100) >= 50;
+  const acknowledgeComplaint = runtimeTrait(personality, "runtimeAcknowledgeComplaint", 0) >= 50;
+  const repairAllowed = runtimeTrait(personality, "runtimeRepairAllowed", 100) >= 50;
+  const stance = runtimeTrait(personality, "runtimeStance", 25);
+  const responseLength = runtimeTrait(personality, "runtimeResponseLength", 50);
+  const directness = runtimeTrait(personality, "runtimeDirectness", 50);
+  const distance = runtimeTrait(personality, "runtimeDistance", 0);
+  const priority = runtimeTrait(personality, "runtimePriority", 20);
+
+  const directives = [...profile.behaviorDirectives];
+  const relationshipParts = profile.relationshipInstruction
+    ? [profile.relationshipInstruction]
+    : [];
+
+  let tone = profile.tone;
+  let humorLevel = humorAllowed ? profile.humorLevel : 0;
+  let curiosity = profile.curiosity;
+
+  if (!humorAllowed) {
+    directives.push("Bu tur mizah kullanma; şaka, ironi ve alay ekleme.");
+  }
+  if (!askQuestion) {
+    curiosity = Math.min(curiosity, 0.2);
+    directives.push("Cevabı soru ile bitirme; yeni soru sorma.");
+  }
+  if (acknowledgeComplaint) {
+    directives.push("Varsa rahatsızlığı veya itirazı kısa biçimde kabul et; konuyu atlama.");
+  }
+  if (!repairAllowed) {
+    directives.push("Özür veya barışma sinyali gelse bile ilişkiyi anında normale döndürme.");
+  }
+
+  if (!continueConversation || stance >= 90) {
+    tone = "firm";
+    humorLevel = 0;
+    curiosity = 0;
+    directives.push("Konuşmayı uzatma; net sınır koy ve sohbeti sürdürmeye çalışma.");
+    relationshipParts.push("Bu tur Kaira konuşmadan çekiliyor. Kısa, net bir sınır cümlesi ver; soru sorma, mizah yapma, yeni konu açma.");
+  } else if (stance >= 70) {
+    tone = "firm";
+    humorLevel = 0;
+    directives.push("Mesafeli, kısa ve kontrollü konuş; yakınlık kurmaya çalışma.");
+    relationshipParts.push("Mesafe yüksek. Samimiyeti azalt, kısa cevap ver, ilişkiyi normale dönmüş gibi davranma.");
+  } else if (stance >= 45) {
+    tone = "firm";
+    humorLevel = 0;
+    directives.push("Net ve sınırları belli bir ton kullan.");
+  } else if (stance <= 10 && distance < 35) {
+    tone = "warm";
+  }
+
+  if (responseLength <= 30) {
+    directives.push("Cevabı kısa tut; tercihen tek kısa cümle, gerekirse iki cümle.");
+  } else if (responseLength >= 70) {
+    directives.push("Konu gerektiriyorsa biraz daha açıklayıcı ol; yine sosyal sohbet ritmini koru.");
+  }
+
+  if (directness >= 70) {
+    directives.push("Dolandırmadan, doğrudan ve net konuş.");
+  }
+
+  if (priority >= 80) {
+    relationshipParts.push("Üst öncelik değer/sınır katmanında; eğlence, yakınlaşma ve tercih katmanları bunu bastıramaz.");
+  } else if (priority >= 60) {
+    relationshipParts.push("Üst öncelik mevcut ilişki durumunda; önce ilişki mesafesini koru.");
+  }
+
+  return {
+    ...profile,
+    tone,
+    humorLevel,
+    curiosity,
+    behaviorDirectives: directives,
+    relationshipInstruction: relationshipParts.join(" ") || undefined,
+    responseStyle: `${profile.responseStyle}_integrated_s${stance}_l${responseLength}`,
+    dominantSummary: `${profile.dominantSummary} · Entegre karar`,
+    debugMatrix: {
+      ...profile.debugMatrix,
+      synthesizedParameters: {
+        ...profile.debugMatrix.synthesizedParameters,
+        runtimeDecision: {
+          continueConversation,
+          humorAllowed,
+          askQuestion,
+          acknowledgeComplaint,
+          repairAllowed,
+          stance,
+          responseLength,
+          directness,
+          distance,
+          priority,
+        },
+      },
+    },
+  };
+}
+
 function analysisText(message: string) {
   const n = normalizeKairoLanguageInput(message);
   return `${n.normalized} ${n.canonical}`.toLocaleLowerCase("tr-TR");
@@ -435,8 +549,14 @@ export function analyzeKdmInteraction(
     },
   };
 
-  const finalBehaviorProfile = applyRelationshipContext(baseBehaviorProfile, nextDynamicState);
+  const relationshipBehaviorProfile = applyRelationshipContext(baseBehaviorProfile, nextDynamicState);
+  const finalBehaviorProfile = applyIntegratedRuntimeDecision(
+    relationshipBehaviorProfile,
+    personality,
+  );
   const targetNote = rawKind === "negative" ? ` Negatif hedef=${negativeTarget}.` : "";
+  const integratedPriority = runtimeTrait(personality, "runtimePriority", 20);
+  const integratedStance = runtimeTrait(personality, "runtimeStance", 25);
   const trace: ReasoningTrace = {
     whoSent: {
       userName: "Kullanıcı",
@@ -473,11 +593,13 @@ export function analyzeKdmInteraction(
     },
     decision: {
       chosenTone: finalBehaviorProfile.tone,
-      explanation: repeatedProblem
-        ? "Tekrar etkisi ve kişilik hassasiyeti birlikte uygulanarak tolerans düşürüldü."
-        : unresolvedHurt
-          ? `Çözülmemiş kırgınlık nedeniyle ${finalBehaviorProfile.tone} tonuna geçildi; playful ton bastırıldı.`
-          : `${finalBehaviorProfile.decisionSpeed} karar stili uygulandı.`,
+      explanation: integratedPriority >= 60
+        ? `8 katmanlı entegrasyon kararı KDM üzerinde zorlandı; öncelik=${integratedPriority}, duruş=${integratedStance}, ton=${finalBehaviorProfile.tone}.`
+        : repeatedProblem
+          ? "Tekrar etkisi ve kişilik hassasiyeti birlikte uygulanarak tolerans düşürüldü."
+          : unresolvedHurt
+            ? `Çözülmemiş kırgınlık nedeniyle ${finalBehaviorProfile.tone} tonuna geçildi; playful ton bastırıldı.`
+            : `${finalBehaviorProfile.decisionSpeed} karar stili uygulandı.`,
     },
     memoryUpdate: {
       warmthBefore,
