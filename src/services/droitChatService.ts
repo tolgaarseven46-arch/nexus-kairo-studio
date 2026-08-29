@@ -16,6 +16,7 @@ import { applySocialOrientation } from "./socialOrientationEngine";
 import { applyBoundaries } from "./boundaryEngine";
 import { applyExpressionStyle } from "./expressionStyleEngine";
 import { integrateBehaviorLayers } from "./behaviorIntegrationEngine";
+import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 import { saveTestSessionLayerAudit } from "./testSessionLayerAuditService";
 import { auth } from "../lib/firebase";
 
@@ -87,7 +88,7 @@ function readFineTuneProfile(): Record<string, number> {
   }
 }
 
-function classifyAppraisalEvent(message: string): {
+function appraisalEventFromSemantic(event: SemanticEvent): {
   kind: AppraisalEventKind;
   valence: "positive" | "negative" | "neutral";
   negativeLoad: number;
@@ -95,21 +96,21 @@ function classifyAppraisalEvent(message: string): {
   threatLoad: number;
   rewardLoad: number;
 } {
-  const text = message.toLocaleLowerCase("tr-TR");
-  const apology = /(özür|pardon|kusura bakma|hata ettim|yanlış yaptım)/.test(text);
-  const insult = /(aptal|salak|gerizekalı|geri zekalı|mal\b|çirkin|kaşar|orospu|oropu|sürtük|piç|yavşak|şerefsiz|haysiyetsiz|ezik|defol|siktir)/.test(text);
-  const rejection = /(istemiyorum|git başımdan|konuşma benimle|bırak beni|defol|kaybol)/.test(text);
-  const support = /(yanındayım|haklısın|seni anlıyorum|destekliyorum|merak etme)/.test(text);
-  const compliment = /(harika|süper|mükemmel|çok iyisin|seviyorum|teşekkür|sağ ol|iyi ki varsın)/.test(text);
-  const frustration = /(yeter|bıktım|sinir|sinirlen|aynı şeyi|kaç kere|neden anlamıyorsun|niye anlamıyorsun|hala soruyorsun|hâlâ soruyorsun|soru sorma)/.test(text);
+  let kind: AppraisalEventKind = "neutral";
+  if (event.apology) kind = "apology";
+  else if (event.insult) kind = "insult";
+  else if (event.intent === "rejection") kind = "rejection";
+  else if (event.intent === "support") kind = "support";
+  else if (event.intent === "compliment") kind = "compliment";
 
-  if (apology) return { kind: "apology", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.55 };
-  if (insult) return { kind: "insult", valence: "negative", negativeLoad: 1, frustrationLoad: frustration ? 1 : 0.85, threatLoad: 0.7, rewardLoad: 0 };
-  if (rejection) return { kind: "rejection", valence: "negative", negativeLoad: 0.75, frustrationLoad: 0.5, threatLoad: 0.55, rewardLoad: 0 };
-  if (support) return { kind: "support", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.7 };
-  if (compliment) return { kind: "compliment", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.8 };
-  if (frustration) return { kind: "neutral", valence: "negative", negativeLoad: 0.45, frustrationLoad: 0.75, threatLoad: 0.15, rewardLoad: 0 };
-  return { kind: "neutral", valence: "neutral", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0 };
+  return {
+    kind,
+    valence: event.valence,
+    negativeLoad: event.valence === "negative" ? Math.max(event.severity, event.frustration * 0.6) : 0,
+    frustrationLoad: event.frustration || (event.insult ? 0.85 : 0),
+    threatLoad: event.redLine ? 0.8 : event.insult ? 0.7 : Math.max(event.coercion * 0.65, event.manipulation * 0.55),
+    rewardLoad: event.apology ? 0.55 : event.support > 0 ? 0.7 : event.compliment > 0 ? 0.8 : event.repairAttempt ? 0.45 : 0,
+  };
 }
 
 function minutesBetween(iso?: string) {
@@ -119,18 +120,21 @@ function minutesBetween(iso?: string) {
   return Math.max(0, (Date.now() - timestamp) / 60000);
 }
 
-function applyTemperamentBeforeKdm(userMessage: string, dynamicState?: DroitDynamicState): DroitDynamicState | undefined {
+function applyTemperamentBeforeKdm(
+  semanticEvent: SemanticEvent,
+  dynamicState?: DroitDynamicState,
+): DroitDynamicState | undefined {
   if (!dynamicState) return dynamicState;
   const fineTune = readFineTuneProfile();
   const temperament = temperamentFromFineTune(fineTune);
-  const event = classifyAppraisalEvent(userMessage);
+  const event = appraisalEventFromSemantic(semanticEvent);
   const relationship = dynamicState.relationship;
   const interactionCount = Math.max(0, relationship?.interactionCount || 0);
   const firstSeenAt = relationship?.firstSeenAt ? new Date(relationship.firstSeenAt).getTime() : Date.now();
   const relationshipAgeMinutes = Number.isFinite(firstSeenAt) ? Math.max(0, (Date.now() - firstSeenAt) / 60000) : 0;
   const similarEventsFromSource = event.valence === "negative" ? Math.max(0, relationship?.negativeEvents || 0) : event.valence === "positive" ? Math.max(0, relationship?.positiveEvents || 0) : 0;
   const appraisal = appraiseEventV0(
-    { kind: event.kind, sourceId: "active-user", targetIsKaira: true, valence: event.valence },
+    { kind: event.kind, sourceId: "active-user", targetIsKaira: semanticEvent.target === "kaira", valence: event.valence },
     { relationshipAgeMinutes, interactionCount, similarEventsFromSource, similarEventsRecentGlobal: similarEventsFromSource, distinctSourcesRecentGlobal: 1, minutesSinceLastSimilarEvent: event.valence === "negative" ? minutesBetween(relationship?.lastConflictAt) : null },
   );
   const warmth = Math.max(0, Math.min(100, relationship?.warmth ?? 50));
@@ -160,18 +164,21 @@ export const droitChatService = {
     const resolvedSessionId = sessionId?.trim() || freshSessionId(userId);
     const prepStart = performance.now();
     const fineTune = readFineTuneProfile();
-    const temperamentAdjustedState = applyTemperamentBeforeKdm(userMessage, dynamicState);
+    const semanticEvent = interpretSemanticEvent(userMessage);
+    const appraisalEvent = appraisalEventFromSemantic(semanticEvent);
+    const temperamentAdjustedState = applyTemperamentBeforeKdm(semanticEvent, dynamicState);
     const personalityRuntime = applyPersonalityTendencies(personality, fineTune, userMessage);
     const motivationRuntime = applyMotivations(personalityRuntime.personality, fineTune, userMessage);
     const valueRuntime = applyValues(motivationRuntime.personality, fineTune, userMessage);
     const preferenceRuntime = applyPreferences(valueRuntime.personality, fineTune, userMessage);
     const socialRuntime = applySocialOrientation(preferenceRuntime.personality, fineTune, userMessage, temperamentAdjustedState);
-    const boundaryRuntime = applyBoundaries(socialRuntime.personality, fineTune, userMessage, temperamentAdjustedState);
+    const boundaryRuntime = applyBoundaries(socialRuntime.personality, fineTune, userMessage, temperamentAdjustedState, semanticEvent);
     const expressionRuntime = applyExpressionStyle(boundaryRuntime.personality, fineTune, userMessage, temperamentAdjustedState);
     const integrationRuntime = integrateBehaviorLayers({
       personality: expressionRuntime.personality,
       dynamicState: temperamentAdjustedState,
       userMessage,
+      semanticEvent,
       personalityTendency: personalityRuntime.response,
       motivation: motivationRuntime.response,
       values: valueRuntime.response,
@@ -184,10 +191,7 @@ export const droitChatService = {
     const behaviorProfile = computeBehaviorProfile(runtimePersonality, userMessage);
     const clientPrepMs = Math.round(performance.now() - prepStart);
 
-    // Temperament-adjusted state is used for client-side appraisal/arbitration only.
-    // The server KDM receives the canonical pre-turn state and performs the one
-    // authoritative state transition, preventing the same event being applied twice.
-    const payload = { sessionId: resolvedSessionId, userId, userName, userMessage, character: characterInfo, personality: runtimePersonality, behaviorProfile, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory };
+    const payload = { sessionId: resolvedSessionId, userId, userName, userMessage, semanticEvent, character: characterInfo, personality: runtimePersonality, behaviorProfile, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     try {
@@ -203,7 +207,8 @@ export const droitChatService = {
       const serverTotalMs = Number(server.serverTotalMs || 0);
       const timings: KairoTimingMetrics = { clientPrepMs, serverTotalMs, memoryMs: Number(server.memoryMs || 0), kdmMs: Number(server.kdmMs || 0), aiMs: Number(server.aiMs || 0), postProcessMs: Number(server.postProcessMs || 0), networkAndOverheadMs: Math.max(0, totalMs - clientPrepMs - serverTotalMs), totalMs };
       void saveTestSessionLayerAudit(data.sessionId || resolvedSessionId, data.turnId, {
-        appraisalTemperament: { event: classifyAppraisalEvent(userMessage), fineTune: temperamentFromFineTune(fineTune) },
+        semanticEvent,
+        appraisalTemperament: { event: appraisalEvent, fineTune: temperamentFromFineTune(fineTune) },
         personalityTendency: personalityRuntime.response,
         motivation: motivationRuntime.response,
         values: valueRuntime.response,
