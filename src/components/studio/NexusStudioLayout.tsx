@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { StudioTopBar } from "./StudioTopBar";
 import { CharacterTab } from "./tabs/CharacterTab";
 import { MindMapTab } from "./tabs/MindMapTab";
+import { InternalSystemsLabTab } from "./tabs/InternalSystemsLabTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import {
   DroitPersonalityTraits,
@@ -486,6 +487,7 @@ export const NexusStudioLayout: React.FC = () => {
             onClearAllTestData={handleClearAllTestData}
           />
         )}{" "}
+        {activeTab === "IC_SISTEMLER" && <InternalSystemsLabTab />}{" "}
         {activeTab === "AYARLAR" && <SettingsTab />}
       </main>
     </div>
