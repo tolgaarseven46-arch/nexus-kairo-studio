@@ -6,6 +6,8 @@ on:
       - ".github/workflows/apply-language-understanding.yml"
       - "scripts/applyLanguageUnderstandingIntegration.mjs"
       - "server.ts"
+      - "src/services/clientLanguageUnderstanding.ts"
+      - "src/services/droitChatService.ts"
       - "src/services/languageUnderstandingService.ts"
       - "src/services/llmSemanticUnderstandingProvider.ts"
       - "src/services/llmSemanticUnderstandingProvider.test.ts"
@@ -33,14 +35,14 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
-      - name: Commit server integration
+      - name: Commit canonical language integration
         run: |
-          if git diff --quiet -- server.ts; then
-            echo "server.ts already integrated"
+          if git diff --quiet -- server.ts src/services/droitChatService.ts; then
+            echo "canonical language integration already applied"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add server.ts
-          git commit -m "feat(language): wire language understanding into chat"
+          git add server.ts src/services/droitChatService.ts
+          git commit -m "feat(language): make semantic preflight canonical"
           git push
