@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
 import { resolveCanonicalSemanticEvent } from "./src/services/semanticEventAuthority";
+import { applyConversationStateAuthority } from "./src/services/conversationStateAuthority";
 import {
   loadKdmState,
   loadRecentKdmMemory,
@@ -448,16 +449,18 @@ app.post("/api/chat", async (req, res) => {
         effective,
         canonicalSemantic.event,
       ),
+      conversationAuthority = applyConversationStateAuthority(safePersonality, kdm.nextDynamicState),
+      authoritativePersonality = conversationAuthority.personality,
       behaviorProfile = kdm.behaviorProfile,
       speech = computeKairoSpeechIdentity(
-        safePersonality,
+        authoritativePersonality,
         kdm.nextDynamicState,
         kdm.trace,
       ),
       enforcementRules = {
-        continueConversation: runtimeFlag(safePersonality, "runtimeContinueConversation", true),
-        humorAllowed: runtimeFlag(safePersonality, "runtimeHumorAllowed", true),
-        askQuestion: runtimeFlag(safePersonality, "runtimeAskQuestion", true),
+        continueConversation: runtimeFlag(authoritativePersonality, "runtimeContinueConversation", true),
+        humorAllowed: runtimeFlag(authoritativePersonality, "runtimeHumorAllowed", true),
+        askQuestion: runtimeFlag(authoritativePersonality, "runtimeAskQuestion", true),
         emojiLevel: speech.emojiLevel,
         conversationState: kdm.nextDynamicState.relationship?.conversationState,
       },
@@ -467,7 +470,7 @@ app.post("/api/chat", async (req, res) => {
       },
       local = tryLocalKairoReply(
         userMessage,
-        safePersonality,
+        authoritativePersonality,
         kdm.nextDynamicState,
         kdm.trace,
         userId,
