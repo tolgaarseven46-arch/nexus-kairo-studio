@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/apply-language-understanding.yml"
       - "scripts/applyLanguageUnderstandingIntegration.mjs"
+      - "scripts/fixTestLabCanonicalState.mjs"
       - "server.ts"
       - "src/components/studio/tabs/TestLabTab.tsx"
       - "src/services/clientLanguageUnderstanding.ts"
@@ -27,8 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply integration patch
+      - name: Apply language integration patch
         run: node scripts/applyLanguageUnderstandingIntegration.mjs
+      - name: Apply canonical TestLab state patch
+        run: node scripts/fixTestLabCanonicalState.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: TypeScript check
