@@ -10,6 +10,10 @@ import {
   resolveMessageEntities,
   type EntityResolutionResult,
 } from "./entityResolutionEngine";
+import {
+  buildCanonicalWorldEvent,
+  type CanonicalWorldEvent,
+} from "./worldEventEngine";
 
 export interface TurkishMorphToken {
   surface: string;
@@ -57,6 +61,7 @@ export type LanguageUnderstandingSource =
 export interface LanguageUnderstandingResult {
   event: SemanticEvent;
   entityResolution: EntityResolutionResult;
+  worldEvent: CanonicalWorldEvent;
   semanticSource: LanguageUnderstandingSource;
   semanticProvider?: string;
   morphology?: TurkishMorphologyResult;
@@ -76,8 +81,9 @@ export interface LanguageUnderstandingOptions {
  *
  * Downstream KDM/appraisal/relationship layers should consume the returned
  * canonical SemanticEvent instead of re-parsing Turkish independently.
- * Entity resolution is produced alongside that event so the world-model layer
- * can reason about discourse participants without changing KDM math yet.
+ * Entity resolution and a conservative canonical world event are produced
+ * alongside that event so later layers can reason about who did what to whom
+ * without inventing participants when the discourse is ambiguous.
  *
  * Provider priority:
  * 1) already validated incoming semantic event (shared authority)
@@ -92,9 +98,11 @@ export async function understandTurkishMessage(
   const entityResolution = resolveMessageEntities(message, options.context);
 
   if (isSemanticEvent(options.incomingSemanticEvent)) {
+    const event = options.incomingSemanticEvent;
     return {
-      event: options.incomingSemanticEvent,
+      event,
       entityResolution,
+      worldEvent: buildCanonicalWorldEvent(message, event, entityResolution),
       semanticSource: "client_shared",
       warnings: [],
     };
@@ -127,6 +135,7 @@ export async function understandTurkishMessage(
         return {
           event,
           entityResolution,
+          worldEvent: buildCanonicalWorldEvent(message, event, entityResolution),
           semanticSource: "semantic_provider",
           semanticProvider: options.semanticProvider.name,
           morphology,
@@ -147,9 +156,11 @@ export async function understandTurkishMessage(
     }
   }
 
+  const event = interpretSemanticEvent(message);
   return {
-    event: interpretSemanticEvent(message),
+    event,
     entityResolution,
+    worldEvent: buildCanonicalWorldEvent(message, event, entityResolution),
     semanticSource: "fallback_regex",
     morphology,
     morphologyProvider: options.morphologyProvider?.name,
