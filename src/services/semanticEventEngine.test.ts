@@ -108,4 +108,22 @@ describe("semantic event engine", () => {
     expect(event.disrespect).toBeGreaterThan(0);
     expect(event.coercion).toBeGreaterThan(0);
   });
+
+  it("recognizes slang disrespect aimed at Kaira", () => {
+    const event = interpretSemanticEvent("sanane yarrm");
+    expect(event.intent).toBe("insult");
+    expect(event.valence).toBe("negative");
+    expect(event.target).toBe("kaira");
+    expect(event.disrespect).toBeGreaterThan(0);
+  });
+
+  it.each(["soyun", "susma beni eğlendir"])(
+    "recognizes direct imperative commands: %s",
+    (message) => {
+      const event = interpretSemanticEvent(message);
+      expect(event.intent).toBe("command");
+      expect(event.target).toBe("kaira");
+      expect(event.coercion).toBeGreaterThan(0);
+    },
+  );
 });
