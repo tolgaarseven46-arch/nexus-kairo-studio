@@ -36,11 +36,11 @@ if (!server.includes(aiMetadataPatched)) {
   server = server.replace(aiMetadataAnchor, aiMetadataPatched);
 }
 
-// Also expose retrieval in the normal AI response debug payload.
+// Optional: expose retrieval in the normal AI response debug payload too.
+// Do not fail the persistence patch if formatting of that response object changes.
 const aiResponseAnchor = "entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, behaviorContract";
 const aiResponsePatched = "entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, reasons: item.reasons, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), behaviorContract";
-if (!server.includes(aiResponsePatched)) {
-  if (!server.includes(aiResponseAnchor)) throw new Error("AI response worldEvent anchor not found");
+if (!server.includes(aiResponsePatched) && server.includes(aiResponseAnchor)) {
   server = server.replace(aiResponseAnchor, aiResponsePatched);
 }
 
