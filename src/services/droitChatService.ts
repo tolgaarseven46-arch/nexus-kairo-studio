@@ -101,7 +101,7 @@ function classifyAppraisalEvent(message: string): {
   const rejection = /(istemiyorum|git başımdan|konuşma benimle|bırak beni|defol|kaybol)/.test(text);
   const support = /(yanındayım|haklısın|seni anlıyorum|destekliyorum|merak etme)/.test(text);
   const compliment = /(harika|süper|mükemmel|çok iyisin|seviyorum|teşekkür|sağ ol|iyi ki varsın)/.test(text);
-  const frustration = /(yeter|bıktım|sinir|sinirlen|aynı şeyi|kaç kere|neden anlamıyorsun|niye anlamıyorsun|hala soruyorsun|soru sorma)/.test(text);
+  const frustration = /(yeter|bıktım|sinir|sinirlen|aynı şeyi|kaç kere|neden anlamıyorsun|niye anlamıyorsun|hala soruyorsun|hâlâ soruyorsun|soru sorma)/.test(text);
 
   if (apology) return { kind: "apology", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.55 };
   if (insult) return { kind: "insult", valence: "negative", negativeLoad: 1, frustrationLoad: frustration ? 1 : 0.85, threatLoad: 0.7, rewardLoad: 0 };
@@ -183,7 +183,11 @@ export const droitChatService = {
     const runtimePersonality = integrationRuntime.personality;
     const behaviorProfile = computeBehaviorProfile(runtimePersonality, userMessage);
     const clientPrepMs = Math.round(performance.now() - prepStart);
-    const payload = { sessionId: resolvedSessionId, userId, userName, userMessage, character: characterInfo, personality: runtimePersonality, behaviorProfile, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState: temperamentAdjustedState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory };
+
+    // Temperament-adjusted state is used for client-side appraisal/arbitration only.
+    // The server KDM receives the canonical pre-turn state and performs the one
+    // authoritative state transition, preventing the same event being applied twice.
+    const payload = { sessionId: resolvedSessionId, userId, userName, userMessage, character: characterInfo, personality: runtimePersonality, behaviorProfile, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     try {
