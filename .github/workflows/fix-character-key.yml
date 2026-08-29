@@ -1,0 +1,34 @@
+name: Fix Character Key Typing
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-character-key.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch CharacterTab
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/studio/tabs/CharacterTab.tsx')
+          s = p.read_text()
+          old = "}: {\n  label: string;\n  help: string;\n  codeKey: string;\n  value: number;\n  onChange: (value: number) => void;\n}) {"
+          new = "}: {\n  key?: React.Key;\n  label: string;\n  help: string;\n  codeKey: string;\n  value: number;\n  onChange: (value: number) => void;\n}) {"
+          assert old in s
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/components/studio/tabs/CharacterTab.tsx
+          git commit -m "fix(ui): type slider key prop"
+          git push
