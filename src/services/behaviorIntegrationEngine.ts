@@ -89,11 +89,9 @@ export const integrateBehaviorLayers = (
   const relationshipPressure = clamp01(
     s.socialDistancePressure * 0.5 + hurt * 0.3 + conflict * 0.2,
   );
-  const approachPressure = clamp01(
-    m.drives?.approachPressure ?? m.approachPressure ?? 0,
-  );
+  const approachPressure = clamp01(m.approachPressure);
   const withdrawalPressure = clamp01(
-    Math.max(m.drives?.withdrawalPressure ?? m.withdrawalPressure ?? 0, b.distancePressure),
+    Math.max(m.withdrawalPressure, b.distancePressure),
   );
   const engagementPressure = clamp01(p.engagementDrive);
   const humorPressure = clamp01(e.humor.strength * (1 - e.inhibition));
