@@ -1,0 +1,63 @@
+name: Phase3 Contract Enforcement
+on:
+  push:
+    paths: ['.github/workflows/phase3-contract-enforcement.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch enforcement
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/services/kairoResponseConsistency.ts')
+          s=p.read_text()
+          imp="import type { ReasoningTrace } from '../types/nexus';"
+          if "import type { BehaviorContract }" not in s:
+              s=s.replace(imp, imp+"\nimport type { BehaviorContract } from './behaviorContract';",1)
+          if '  behaviorContract?: BehaviorContract;' not in s:
+              s=s.replace('  conversationState?: string;\n}', '  conversationState?: string;\n  behaviorContract?: BehaviorContract;\n}',1)
+          marker='  const emojiLevel = Number.isFinite(rules.emojiLevel) ? Number(rules.emojiLevel) : 100;'
+          if '  const contract = rules.behaviorContract;' not in s:
+              s=s.replace(marker, marker+'\n  const contract = rules.behaviorContract;',1)
+          hard='  const hardClosed = disengaged || !continueConversation;'
+          if 'contract_playfulness_blocked' not in s:
+              gate="""  if (contract) {
+    const lower = normalize(text);
+    const playfulMeaning = hasAny(lower, [/(hahaha|hehe|şaka|takılıyorum|dalga|hızlı onayladın|güldür|komik)/iu]);
+    const affectionMeaning = AFFECTION_MARKER_RE.test(text);
+    const forgivenessMeaning = hasAny(lower, [/(geçti gitti|sorun yok|affettim|tamamen geçti|kapandı gitti)/iu]);
+    const reopeningMeaning = REOPEN_MARKER_RE.test(text) || hasAny(lower, [/(eski halimize|normale dön|barıştık|tamamdır.*devam|hadi kaldığımız yerden)/iu]);
+    if (contract.playfulness === 'forbidden' && playfulMeaning) {
+      text = contract.stance === 'closed' ? fallbackForTrace(trace) : 'şu an şakalaşacak modda değilim';
+      reasons.push('contract_playfulness_blocked');
+    }
+    if (contract.affection === 'forbidden' && affectionMeaning) {
+      text = contract.stance === 'closed' ? fallbackForTrace(trace) : 'şu an o kadar yakın davranmak istemiyorum';
+      reasons.push('contract_affection_blocked');
+    }
+    if (!contract.forgivenessGranted && forgivenessMeaning) {
+      text = 'özrünü duydum ama geçti gitti diyemem henüz';
+      reasons.push('contract_forgiveness_blocked');
+    }
+    if (contract.reopeningCloseness === 'forbidden' && reopeningMeaning) {
+      text = contract.stance === 'closed' ? fallbackForTrace(trace) : 'konuşabiliriz ama aramız hemen normale dönmüş değil';
+      reasons.push('contract_reopening_blocked');
+    }
+  }
+
+"""
+              assert hard in s
+              s=s.replace(hard,gate+hard,1)
+          p.write_text(s)
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/services/kairoResponseConsistency.ts
+          git commit -m 'feat(kdm): enforce semantic behavior contract'
+          git push
