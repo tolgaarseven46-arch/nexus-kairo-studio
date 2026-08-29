@@ -16,6 +16,14 @@ export type SemanticIntent =
   | "support"
   | "compliment"
   | "general_chat";
+export type RelationalAct =
+  | "none"
+  | "reassurance_seek"
+  | "repair_probe"
+  | "reconciliation_attempt"
+  | "challenge"
+  | "mockery"
+  | "closeness_bid";
 
 export interface SemanticEvent {
   raw: string;
@@ -23,6 +31,8 @@ export interface SemanticEvent {
   intent: SemanticIntent;
   valence: SemanticValence;
   target: SemanticTarget;
+  relationalAct: RelationalAct;
+  relationalIntensity: number;
   severity: number;
   insult: boolean;
   redLine: boolean;
@@ -70,6 +80,11 @@ const REPAIR_RE = new RegExp(
   `${word("barışalım|barışak|telafi").source}|düzeltmek istiyorum|bir daha yapmayacağım|beni affet|konuşup çözelim`,
   "u",
 );
+const REASSURANCE_SEEK_RE = /(bana küs(?:medin|tün|müsün|musun)|kızgın mısın|kızdın mı|darıl(?:dın mı|madın)|aramız iyi mi|hala arkadaş mıyız|hâlâ arkadaş mıyız)/u;
+const REPAIR_PROBE_RE = /(affettin mi|özrümü kabul|barıştık mı|düzeldi mi|hala kızgın|hâlâ kızgın)/u;
+const CLOSENESS_BID_RE = /(sarılalım|sarıl bana|öp beni|gel öp|canım benim|hadi barışalım)/u;
+const CHALLENGE_RE = /(ne saçmalıyon|ne saçmalıyorsun|saçmalama|ne diyosun sen|ne diyorsun sen|biçarsin ne lan|biçarsın ne lan)/u;
+const MOCKERY_RE = /(hadi ordan|aynen kanka aynen|çok komiksin|hahaha? ne saçma|dalga mı geçiyorsun)/u;
 const STOP_QUESTIONS_RE = /(soru\s+sorma|sorma artık|sormayı bırak|hala soruyorsun|hâlâ soruyorsun|yine soru|sorgu yapma)/u;
 const STOP_TALKING_RE = /(^|\s)(sus|konuşma|kes artık|yeter konuşma)(\s|$)/u;
 const REJECTION_RE = /(istemiyorum|git başımdan|bırak beni|kaybol|defol|senden hiç hoşlanmıyorum|seni sevmiyorum)/u;
@@ -94,7 +109,9 @@ function inferTarget(
   insult: boolean,
   rejection: boolean,
   directCommand: boolean,
+  relationalAct: RelationalAct,
 ): SemanticTarget {
+  if (relationalAct !== "none") return "kaira";
   if (!negative && !directCommand) return "unknown";
   if (word("kaira|kairo|sen|sana|seni|senden|senin").test(text)) return "kaira";
   if (REPORTING_RE.test(text) && THIRD_PARTY_RE.test(text)) return "third_party";
@@ -117,6 +134,19 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   const insult = redLine || INSULT_RE.test(text);
   const apology = APOLOGY_RE.test(text);
   const repairAttempt = REPAIR_RE.test(text);
+  const reassuranceSeek = REASSURANCE_SEEK_RE.test(text);
+  const repairProbe = REPAIR_PROBE_RE.test(text);
+  const closenessBid = CLOSENESS_BID_RE.test(text);
+  const challenge = CHALLENGE_RE.test(text);
+  const mockery = MOCKERY_RE.test(text);
+  let relationalAct: RelationalAct = "none";
+  if (repairAttempt) relationalAct = "reconciliation_attempt";
+  else if (repairProbe) relationalAct = "repair_probe";
+  else if (reassuranceSeek) relationalAct = "reassurance_seek";
+  else if (closenessBid) relationalAct = "closeness_bid";
+  else if (mockery) relationalAct = "mockery";
+  else if (challenge) relationalAct = "challenge";
+  const relationalIntensity = relationalAct === "none" ? 0 : relationalAct === "mockery" ? 0.65 : relationalAct === "challenge" ? 0.6 : 0.7;
   const stopQuestions = STOP_QUESTIONS_RE.test(text);
   const stopTalking = STOP_TALKING_RE.test(text);
   const rejection = REJECTION_RE.test(text);
@@ -127,13 +157,15 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   const privacyViolation = PRIVACY_RE.test(text) ? 0.9 : 0;
   const support = SUPPORT_RE.test(text) ? 0.8 : 0;
   const compliment = COMPLIMENT_RE.test(text) ? 0.8 : 0;
-  const affection = AFFECTION_RE.test(text) ? 0.7 : 0;
+  const affection = AFFECTION_RE.test(text) ? 0.7 : closenessBid ? 0.45 : 0;
   const confusion = CONFUSION_RE.test(text);
   const frustration = FRUSTRATION_RE.test(text)
     ? 0.75
-    : VENTING_PROFANITY_RE.test(text)
-      ? 0.35
-      : 0;
+    : challenge
+      ? 0.6
+      : VENTING_PROFANITY_RE.test(text)
+        ? 0.35
+        : 0;
   const emotionalShare = EMOTIONAL_SHARE_RE.test(text);
   const emotionalLoad = LOW_MOOD_RE.test(text) ? 0.8 : emotionalShare ? 0.45 : 0;
 
@@ -143,21 +175,23 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
     coercion > 0 ||
     manipulation > 0 ||
     privacyViolation > 0 ||
-    frustration > 0;
-  const target = inferTarget(text, negative, insult, rejection, directCommand);
+    frustration > 0 ||
+    mockery;
+  const target = inferTarget(text, negative, insult, rejection, directCommand, relationalAct);
 
   let intent: SemanticIntent = "general_chat";
   if (apology) intent = "apology";
   else if (repairAttempt) intent = "repair";
   else if (insult) intent = "insult";
-  else if (stopQuestions || stopTalking || confusion || frustration >= 0.7)
+  else if (challenge || mockery || stopQuestions || stopTalking || confusion || frustration >= 0.7)
     intent = "complaint";
   else if (directCommand || coercion > 0) intent = "command";
   else if (rejection) intent = "rejection";
   else if (support > 0) intent = "support";
   else if (compliment > 0) intent = "compliment";
   else if (emotionalShare) intent = "emotional_share";
-  else if (affection > 0) intent = "affection";
+  else if (affection > 0 && !reassuranceSeek && !repairProbe) intent = "affection";
+  else if (reassuranceSeek || repairProbe) intent = "question";
   else if (RECALL_QUESTION_RE.test(text)) intent = "question";
   else if (/[?]/u.test(message) || INFORMATION_REQUEST_RE.test(text))
     intent = "information_request";
@@ -166,13 +200,13 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   else if (/(😂|🤣|😄|😅|:d|haha|hahah|taşak)/iu.test(text)) intent = "banter";
 
   const valence: SemanticValence =
-    apology || repairAttempt || support > 0 || compliment > 0 || affection > 0
+    apology || repairAttempt || support > 0 || compliment > 0 || closenessBid
       ? "positive"
       : negative
         ? "negative"
         : "neutral";
 
-  const disrespect = redLine ? 1 : insult ? 0.9 : 0;
+  const disrespect = redLine ? 1 : insult ? 0.9 : mockery ? 0.35 : 0;
   const severity = redLine
     ? 1
     : clamp01(
@@ -192,6 +226,8 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
     intent,
     valence,
     target,
+    relationalAct,
+    relationalIntensity,
     severity,
     insult,
     redLine,
