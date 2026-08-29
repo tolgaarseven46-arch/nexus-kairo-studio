@@ -20,6 +20,7 @@ import {
   computeTemperamentResponse,
   temperamentFromFineTune,
 } from "./temperamentEngine";
+import { applyPersonalityTendencies } from "./personalityTendencyEngine";
 import { auth } from "../lib/firebase";
 
 export type KairoProvider = "gemini" | "openrouter";
@@ -275,7 +276,14 @@ export const droitChatService = {
     const totalStart = performance.now();
     const userId = resolveConversationUserId(explicitUserId);
     const prepStart = performance.now();
-    const behaviorProfile = computeBehaviorProfile(personality, userMessage);
+    const fineTune = readFineTuneProfile();
+    const personalityRuntime = applyPersonalityTendencies(
+      personality,
+      fineTune,
+      userMessage,
+    );
+    const runtimePersonality = personalityRuntime.personality;
+    const behaviorProfile = computeBehaviorProfile(runtimePersonality, userMessage);
     const temperamentAdjustedState = applyTemperamentBeforeKdm(
       userMessage,
       dynamicState,
@@ -287,8 +295,9 @@ export const droitChatService = {
       userName,
       userMessage,
       character: characterInfo,
-      personality,
+      personality: runtimePersonality,
       behaviorProfile,
+      personalityTendency: personalityRuntime.response,
       dynamicState: temperamentAdjustedState,
       history: history
         .slice(-24)
