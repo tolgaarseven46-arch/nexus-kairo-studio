@@ -1,0 +1,23 @@
+import fs from "node:fs";
+
+const path = "src/components/studio/tabs/TestLabTab.tsx";
+let source = fs.readFileSync(path, "utf8");
+
+const startMarker = "      // Resolve expression";
+const endMarker = "      // Save Compact Diagnostic Data";
+const start = source.indexOf(startMarker);
+const end = source.indexOf(endMarker, start);
+
+if (start === -1 || end === -1 || end <= start) {
+  if (source.includes("const serverState = response.dynamicState ?? dynamicState;")) {
+    console.log("TestLab canonical state integration already applied");
+    process.exit(0);
+  }
+  throw new Error("TestLab canonical state replacement markers not found");
+}
+
+const block = `      // Canonical backend state is the only state authority in Test Lab.\n      const serverState = response.dynamicState ?? dynamicState;\n      const serverTrace = response.reasoningTrace as ReasoningTrace | undefined;\n      const canonicalWarmth =\n        (serverState.relationship as any)?.warmth ??\n        (serverTrace as any)?.relationship?.warmthScore ??\n        userWarmth;\n\n      const newExp: DroitExpressionMode =\n        canonicalEvent?.insult && canonicalEvent.target === 'kaira'\n          ? 'ALERT'\n          : canonicalEvent?.valence === 'positive'\n          ? 'FRIENDLY'\n          : behaviorProfile.tone === 'warm'\n          ? 'FRIENDLY'\n          : behaviorProfile.tone === 'formal'\n          ? 'ANALYTICAL'\n          : 'NEUTRAL';\n\n      onExpressionChange?.(newExp);\n\n      const emotionSnapshotAfter = {\n        calmness: serverState.calmness ?? emotionSnapshotBefore.calmness,\n        stress: serverState.stress ?? emotionSnapshotBefore.stress,\n        happiness: serverState.happiness ?? emotionSnapshotBefore.happiness,\n        anger: serverState.anger ?? emotionSnapshotBefore.anger,\n        confidence: serverState.confidence ?? emotionSnapshotBefore.confidence,\n        surprise: serverState.surprise ?? emotionSnapshotBefore.surprise,\n        sadness: serverState.sadness ?? emotionSnapshotBefore.sadness,\n        statusText: serverState.lastStatus || 'KDM durumu güncellendi',\n        reactionText:\n          serverState.lastEvent?.reactionText ||\n          (canonicalEvent\n            ? \`Semantic: \${canonicalEvent.intent}, hedef=\${canonicalEvent.target}\`\n            : 'KDM yanıtı uygulandı.'),\n      };\n\n      onDynamicStateChange?.(serverState);\n\n      // Add Kairo response to chat\n      const replyTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });\n      const droitMsg: TestMessage = {\n        id: \`kairo-\${Date.now()}\`,\n        sender: 'droit',\n        text: response.reply,\n        timestamp: replyTime,\n      };\n      setTestMessages((prev) => [...prev, droitMsg]);\n\n      setPipelineSteps((prev) =>\n        prev.map((s) => (s.id === 'COMPLETED' ? { ...s, status: 'completed' } : s))\n      );\n      setActiveRunningStep(null);\n\n      setUserWarmth(canonicalWarmth);\n      onUserWarmthChange?.(canonicalWarmth);\n\n      const fallbackTrace: ReasoningTrace = {\n        whoSent: {\n          userName: isNewUserMode ? 'Anonim Ziyaretçi' : 'Test Operatörü',\n          isNewUser: isNewUserMode,\n          recognitionText: isNewUserMode ? 'Yeni kullanıcı' : 'Tanınan test kullanıcısı',\n        },\n        relationship: {\n          warmthScore: canonicalWarmth,\n          warmthLabel: canonicalWarmth >= 70 ? 'Sıcak' : canonicalWarmth >= 40 ? 'Dengeli' : 'Mesafeli',\n          note: 'Backend reasoningTrace bulunamadığı için canonical state ile gösterildi.',\n        },\n        currentMood: {\n          moodText: emotionSnapshotAfter.statusText,\n          reasonText: emotionSnapshotAfter.reactionText,\n        },\n        messageInterpretation: {\n          intent: canonicalIntent,\n          sentiment: canonicalSentiment,\n          explanation: 'Canonical language-understanding sonucu kullanıldı.',\n        },\n        decision: {\n          chosenTone: behaviorProfile.tone || 'balanced',\n          explanation: 'Backend karar izi bulunamadığında yalnızca görüntüleme fallbackidir.',\n        },\n        memoryUpdate: {\n          warmthBefore: userWarmth,\n          warmthAfter: canonicalWarmth,\n          warmthDelta: canonicalWarmth - userWarmth,\n          moodChange: \`\${emotionSnapshotBefore.calmness} → \${emotionSnapshotAfter.calmness}\`,\n          reason: 'Canonical backend state kullanıldı.',\n        },\n      };\n\n      const newTrace = serverTrace ?? fallbackTrace;\n      setReasoningTrace(newTrace);\n      onReasoningTraceChange?.(newTrace);\n\n`;
+
+source = source.slice(0, start) + block + source.slice(end);
+fs.writeFileSync(path, source);
+console.log("TestLab now uses canonical backend dynamicState/reasoningTrace");
