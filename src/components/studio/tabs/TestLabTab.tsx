@@ -748,69 +748,44 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
         prev.map((s) => (s.id === 'KTM_VALIDATION' ? { ...s, status: 'completed' } : s))
       );
 
-      // Resolve expression
+      // Canonical backend state is the only state authority in Test Lab.
+      const serverState = response.dynamicState ?? dynamicState;
+      const serverTrace = response.reasoningTrace as ReasoningTrace | undefined;
+      const canonicalWarmth =
+        (serverState.relationship as any)?.warmth ??
+        (serverTrace as any)?.relationship?.warmthScore ??
+        userWarmth;
+
       const newExp: DroitExpressionMode =
-        detectedIntent.includes('Provokasyon')
+        canonicalEvent?.insult && canonicalEvent.target === 'kaira'
           ? 'ALERT'
-          : detectedIntent.includes('Mizah')
+          : canonicalEvent?.valence === 'positive'
           ? 'FRIENDLY'
-          : detectedIntent.includes('Sistem')
-          ? 'ANALYTICAL'
           : behaviorProfile.tone === 'warm'
           ? 'FRIENDLY'
+          : behaviorProfile.tone === 'formal'
+          ? 'ANALYTICAL'
           : 'NEUTRAL';
 
-      if (onExpressionChange) {
-        onExpressionChange(newExp);
-      }
-
-      // Compute emotion delta
-      const calmnessDelta = detectedIntent.includes('Provokasyon') ? -6 : 4;
-      const stressDelta = detectedIntent.includes('Sistem') ? 10 : -4;
-      const happinessDelta = detectedIntent.includes('Mizah') ? 12 : 2;
-      const angerDelta = detectedIntent.includes('Provokasyon') ? 6 : -3;
-
-      const newCalmness = Math.max(5, Math.min(100, emotionSnapshotBefore.calmness + calmnessDelta));
-      const newStress = Math.max(0, Math.min(100, emotionSnapshotBefore.stress + stressDelta));
-      const newHappiness = Math.max(0, Math.min(100, emotionSnapshotBefore.happiness + happinessDelta));
-      const newAnger = Math.max(0, Math.min(100, emotionSnapshotBefore.anger + angerDelta));
-      const newConfidence = Math.max(10, Math.min(100, emotionSnapshotBefore.confidence + (behaviorProfile.assertiveness > 0.6 ? 2 : 0)));
+      onExpressionChange?.(newExp);
 
       const emotionSnapshotAfter = {
-        calmness: newCalmness,
-        stress: newStress,
-        happiness: newHappiness,
-        anger: newAnger,
-        confidence: newConfidence,
-        surprise: detectedIntent.includes('Provokasyon') ? 18 : 8,
-        sadness: 8,
-        statusText: newExp === 'ALERT' ? 'Tetikte ve kontrollü' : newExp === 'FRIENDLY' ? 'Sıcak ve destekleyici' : 'Sakin ve analitik',
+        calmness: serverState.calmness ?? emotionSnapshotBefore.calmness,
+        stress: serverState.stress ?? emotionSnapshotBefore.stress,
+        happiness: serverState.happiness ?? emotionSnapshotBefore.happiness,
+        anger: serverState.anger ?? emotionSnapshotBefore.anger,
+        confidence: serverState.confidence ?? emotionSnapshotBefore.confidence,
+        surprise: serverState.surprise ?? emotionSnapshotBefore.surprise,
+        sadness: serverState.sadness ?? emotionSnapshotBefore.sadness,
+        statusText: serverState.lastStatus || 'KDM durumu güncellendi',
         reactionText:
-          detectedIntent === 'Duygusal Destek'
-            ? 'Kullanıcının duygusal durumuna odaklanıldı.'
-            : `${behaviorProfile.dominantSummary} profiliyle yanıt üretildi.`,
+          serverState.lastEvent?.reactionText ||
+          (canonicalEvent
+            ? `Semantic: ${canonicalEvent.intent}, hedef=${canonicalEvent.target}`
+            : 'KDM yanıtı uygulandı.'),
       };
 
-      if (onDynamicStateChange) {
-        onDynamicStateChange({
-          ...dynamicState,
-          calmness: newCalmness,
-          stress: newStress,
-          happiness: newHappiness,
-          anger: newAnger,
-          confidence: newConfidence,
-          lastStatus: emotionSnapshotAfter.statusText,
-          lastEvent: {
-            eventTitle: `Test: "${textToSend.slice(0, 24)}..."`,
-            reactionText: response.reply.slice(0, 48) + '...',
-            deltas: [
-              { label: 'Sakinlik', key: 'calmness', value: calmnessDelta },
-              { label: 'Mutluluk', key: 'happiness', value: happinessDelta },
-              { label: 'Stres', key: 'stress', value: stressDelta },
-            ],
-          },
-        });
-      }
+      onDynamicStateChange?.(serverState);
 
       // Add Kairo response to chat
       const replyTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -822,114 +797,50 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
       };
       setTestMessages((prev) => [...prev, droitMsg]);
 
-      // Live Step 8: Tamamlandı
       setPipelineSteps((prev) =>
         prev.map((s) => (s.id === 'COMPLETED' ? { ...s, status: 'completed' } : s))
       );
       setActiveRunningStep(null);
 
-      // Compute Warmth and Reasoning Trace
-      const currentWarmthBefore = userWarmth;
-      let warmthDelta = 0;
-      let warmthReason = '';
+      setUserWarmth(canonicalWarmth);
+      onUserWarmthChange?.(canonicalWarmth);
 
-      if (isNewUserMode) {
-        if (detectedIntent === 'Provokasyon / Çatışma') {
-          warmthDelta = -5;
-          warmthReason = 'Yeni kullanıcı ilk temasında kışkırtıcı / saldırgan bir tutum sergiledi.';
-        } else if (detectedIntent === 'Duygusal Destek') {
-          warmthDelta = +4;
-          warmthReason = 'Yeni kullanıcı ilk temasta dürüst ve savunmasız bir paylaşımda bulundu.';
-        } else if (detectedIntent === 'Mizah & Sosyal') {
-          warmthDelta = +5;
-          warmthReason = 'Yeni kullanıcı ilk temasta pozitif ve yapıcı bir sohbet başlattı.';
-        } else {
-          warmthDelta = +2;
-          warmthReason = 'Yeni kullanıcı nezaketli ve rasyonel bir soru sordu.';
-        }
-      } else {
-        if (detectedIntent === 'Provokasyon / Çatışma') {
-          warmthDelta = -8;
-          warmthReason = 'Kullanıcı kışkırtıcı ve agresif bir ifade kullandı.';
-        } else if (detectedIntent === 'Duygusal Destek') {
-          warmthDelta = +3;
-          warmthReason = 'Kullanıcı saygılı ve samimi bir şekilde duygusal durumunu paylaştı.';
-        } else if (detectedIntent === 'Mizah & Sosyal') {
-          warmthDelta = +4;
-          warmthReason = 'Kullanıcı eğlenceli ve olumlu bir espri/sohbet konusu açtı.';
-        } else {
-          warmthDelta = +1;
-          warmthReason = 'Kullanıcı rasyonel ve doğrudan bir sistem sorgusu gerçekleştirdi.';
-        }
-      }
-
-      const currentWarmthAfter = Math.max(0, Math.min(100, currentWarmthBefore + warmthDelta));
-      setUserWarmth(currentWarmthAfter);
-
-      // Build Human-Readable Reasoning Trace
-      const newTrace: ReasoningTrace = {
+      const fallbackTrace: ReasoningTrace = {
         whoSent: {
           userName: isNewUserMode ? 'Anonim Ziyaretçi' : 'Test Operatörü',
           isNewUser: isNewUserMode,
-          recognitionText: isNewUserMode
-            ? 'Bu kullanıcıyla ilk kez karşılaşıyorum. Veritabanında eşleşen hiçbir kayıt veya geçmiş iz bulunmuyor.'
-            : 'Tanınan kullanıcı (Discord ID: usr_8921). Sistem hafızasında geçmiş oturum kayıtları mevcut.',
+          recognitionText: isNewUserMode ? 'Yeni kullanıcı' : 'Tanınan test kullanıcısı',
         },
         relationship: {
-          warmthScore: currentWarmthBefore,
-          warmthLabel: isNewUserMode
-            ? 'Nötr / Tanımsız'
-            : currentWarmthBefore >= 70
-            ? 'Çok Sıcak & Güvenli'
-            : currentWarmthBefore >= 40
-            ? 'Samimi & Dengeli'
-            : 'Mesafeli / Temkinli',
-          note: isNewUserMode
-            ? 'İlk kez tanışıyoruz, hiçbir kanaatim yok. Tarafsız ve gözlemci bir duruş sergiliyorum.'
-            : `Mevcut warmth skoru ${currentWarmthBefore}/100. Geçmişte yapıcı ve dengeli diyaloglar yürütülmüş.`,
+          warmthScore: canonicalWarmth,
+          warmthLabel: canonicalWarmth >= 70 ? 'Sıcak' : canonicalWarmth >= 40 ? 'Dengeli' : 'Mesafeli',
+          note: 'Backend reasoningTrace bulunamadığı için canonical state ile gösterildi.',
         },
         currentMood: {
-          moodText: emotionSnapshotBefore.calmness > 70 ? 'Sakin ve dengeli' : 'Tetikte ve dikkatli',
-          reasonText:
-            emotionSnapshotBefore.stress > 25
-              ? 'Son sistem olayları ve güvenlik taramaları nedeniyle hafif stres yüklü.'
-              : 'Sistem operasyonel sınırlarında, beklenmedik anomali yok.',
+          moodText: emotionSnapshotAfter.statusText,
+          reasonText: emotionSnapshotAfter.reactionText,
         },
         messageInterpretation: {
-          intent: detectedIntent,
-          sentiment: detectedSentiment,
-          explanation:
-            detectedIntent === 'Duygusal Destek'
-              ? 'Kullanıcı yorgunluk ve stres belirtiyor, empatik bir destek ve rehberlik arıyor.'
-              : detectedIntent === 'Provokasyon / Çatışma'
-              ? 'Kullanıcı sert/kışkırtıcı bir üslup kullandı, sınırları test ediyor.'
-              : detectedIntent === 'Mizah & Sosyal'
-              ? 'Kullanıcı eğlenceli ve rahat bir sosyal etkileşim başlatmak istiyor.'
-              : 'Kullanıcı doğrudan bilgi ve operasyonel sistem durumu sorguluyor.',
+          intent: canonicalIntent,
+          sentiment: canonicalSentiment,
+          explanation: 'Canonical language-understanding sonucu kullanıldı.',
         },
         decision: {
-          chosenTone:
-            behaviorProfile.tone === 'warm'
-              ? 'Sıcak, destekleyici ve samimi'
-              : behaviorProfile.tone === 'formal'
-              ? 'Resmî, mesafeli ve otoriter'
-              : 'Dengeli ve rasyonel',
-          explanation: isNewUserMode
-            ? `Kullanıcıyla ilk kez karşılaştığım için (${currentWarmthBefore} warmth), aşırı samimiyetten kaçınarak nazik, dengeli ve KAIRO'nun özgün kimliğini yansıtan bir ton seçtim.`
-            : `Warmth skoru (${currentWarmthBefore}/100) ${currentWarmthBefore >= 50 ? 'oldukça iyi' : 'orta düzeyde'} ve mevcut ruh halim ${emotionSnapshotAfter.statusText.toLowerCase()}; bu nedenle ${behaviorProfile.dominantSummary} profilini öne çıkararak dengeli ve yapıcı bir ton benimsedim.`,
+          chosenTone: behaviorProfile.tone || 'balanced',
+          explanation: 'Backend karar izi bulunamadığında yalnızca görüntüleme fallbackidir.',
         },
         memoryUpdate: {
-          warmthBefore: currentWarmthBefore,
-          warmthAfter: currentWarmthAfter,
-          warmthDelta,
-          moodChange: `${emotionSnapshotBefore.calmness > 70 ? 'Sakin' : 'Nötr'} → ${emotionSnapshotAfter.statusText}`,
-          reason: warmthReason,
+          warmthBefore: userWarmth,
+          warmthAfter: canonicalWarmth,
+          warmthDelta: canonicalWarmth - userWarmth,
+          moodChange: `${emotionSnapshotBefore.calmness} → ${emotionSnapshotAfter.calmness}`,
+          reason: 'Canonical backend state kullanıldı.',
         },
       };
 
+      const newTrace = serverTrace ?? fallbackTrace;
       setReasoningTrace(newTrace);
       onReasoningTraceChange?.(newTrace);
-      onUserWarmthChange?.(currentWarmthAfter);
 
       // Save Compact Diagnostic Data
       const newAnalysis = {
