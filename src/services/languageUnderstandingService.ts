@@ -6,6 +6,10 @@ import {
   isSemanticEvent,
   type SemanticEventSource,
 } from "./semanticEventAuthority";
+import {
+  resolveMessageEntities,
+  type EntityResolutionResult,
+} from "./entityResolutionEngine";
 
 export interface TurkishMorphToken {
   surface: string;
@@ -52,6 +56,7 @@ export type LanguageUnderstandingSource =
 
 export interface LanguageUnderstandingResult {
   event: SemanticEvent;
+  entityResolution: EntityResolutionResult;
   semanticSource: LanguageUnderstandingSource;
   semanticProvider?: string;
   morphology?: TurkishMorphologyResult;
@@ -71,6 +76,8 @@ export interface LanguageUnderstandingOptions {
  *
  * Downstream KDM/appraisal/relationship layers should consume the returned
  * canonical SemanticEvent instead of re-parsing Turkish independently.
+ * Entity resolution is produced alongside that event so the world-model layer
+ * can reason about discourse participants without changing KDM math yet.
  *
  * Provider priority:
  * 1) already validated incoming semantic event (shared authority)
@@ -82,9 +89,12 @@ export async function understandTurkishMessage(
   message: string,
   options: LanguageUnderstandingOptions = {},
 ): Promise<LanguageUnderstandingResult> {
+  const entityResolution = resolveMessageEntities(message, options.context);
+
   if (isSemanticEvent(options.incomingSemanticEvent)) {
     return {
       event: options.incomingSemanticEvent,
+      entityResolution,
       semanticSource: "client_shared",
       warnings: [],
     };
@@ -116,6 +126,7 @@ export async function understandTurkishMessage(
       if (isSemanticEvent(event)) {
         return {
           event,
+          entityResolution,
           semanticSource: "semantic_provider",
           semanticProvider: options.semanticProvider.name,
           morphology,
@@ -138,6 +149,7 @@ export async function understandTurkishMessage(
 
   return {
     event: interpretSemanticEvent(message),
+    entityResolution,
     semanticSource: "fallback_regex",
     morphology,
     morphologyProvider: options.morphologyProvider?.name,
