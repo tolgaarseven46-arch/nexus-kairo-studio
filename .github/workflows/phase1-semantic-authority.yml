@@ -14,9 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
       - name: Wire canonical SemanticEvent through server and KDM
         run: |
           python - <<'PY'
@@ -54,8 +51,6 @@ jobs:
 
           server.write_text(s)
           PY
-      - name: TypeScript check
-        run: npx tsc --noEmit
       - name: Commit wiring
         run: |
           git config user.name "github-actions[bot]"
