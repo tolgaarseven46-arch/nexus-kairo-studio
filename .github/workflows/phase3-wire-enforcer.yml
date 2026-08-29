@@ -1,0 +1,43 @@
+name: Phase3 Wire Enforcer
+
+on:
+  push:
+    paths:
+      - '.github/workflows/phase3-wire-enforcer.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch server
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('server.ts')
+          s=p.read_text()
+          imp='import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";'
+          if 'behaviorContractEnforcer' not in s:
+              s=s.replace(imp, imp+'\nimport { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";',1)
+          old='const enforced = enforceKairoResponse(local.reply, kdm.trace, enforcementRules),\n        reply = enforced.reply,'
+          new='const baseEnforced = enforceKairoResponse(local.reply, kdm.trace, enforcementRules),\n        contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract),\n        enforced = { reply: contractEnforced.reply, changed: baseEnforced.changed || contractEnforced.changed, reasons: [...baseEnforced.reasons, ...contractEnforced.reasons] },\n        reply = enforced.reply,'
+          if 'contractEnforced = enforceBehaviorContract(baseEnforced.reply' not in s:
+              assert old in s
+              s=s.replace(old,new,1)
+          old2='    const enforced = enforceKairoResponse(reply, kdm.trace, enforcementRules);\n    reply = enforced.reply;'
+          new2='    const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules);\n    const contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract);\n    const enforced = { reply: contractEnforced.reply, changed: baseEnforced.changed || contractEnforced.changed, reasons: [...baseEnforced.reasons, ...contractEnforced.reasons] };\n    reply = enforced.reply;'
+          if 'const contractEnforced = enforceBehaviorContract(baseEnforced.reply' not in s:
+              assert old2 in s
+              s=s.replace(old2,new2,1)
+          p.write_text(s)
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add server.ts
+          git diff --cached --quiet || git commit -m "feat(kdm): wire semantic contract enforcer"
+          git push
