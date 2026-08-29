@@ -1,5 +1,7 @@
 export type NexusTab = 'KARAKTER' | 'TEST' | 'IC_SISTEMLER' | 'AYARLAR';
 
+export type ConversationRelationshipState = 'active' | 'distancing' | 'disengaged' | 'repairing';
+
 export interface RelationshipState {
   firstSeenAt?: string;
   lastInteractionAt?: string;
@@ -21,11 +23,15 @@ export interface RelationshipState {
   repeatedNegativeCount?: number;
   lastNegativePattern?: string;
   lastNegativePatternAt?: string;
+  conversationState?: ConversationRelationshipState;
+  disengagedAt?: string;
+  disengageReason?: string;
+  repairAttempts?: number;
 }
 
 export interface ReasoningTrace {
   whoSent: { userName: string; isNewUser: boolean; recognitionText: string; };
-  relationship: { warmthScore: number; warmthLabel: string; note: string; familiarityDays?: number; interactionCount?: number; toleranceMultiplier?: number; trustScore?: number; conflictScore?: number; hurtScore?: number; repairProgress?: number; repeatedNegativeCount?: number; };
+  relationship: { warmthScore: number; warmthLabel: string; note: string; familiarityDays?: number; interactionCount?: number; toleranceMultiplier?: number; trustScore?: number; conflictScore?: number; hurtScore?: number; repairProgress?: number; repeatedNegativeCount?: number; conversationState?: ConversationRelationshipState; repairAttempts?: number; };
   currentMood: { moodText: string; reasonText: string; };
   messageInterpretation: { intent: string; sentiment: string; explanation: string; };
   decision: { chosenTone: string; explanation: string; };
@@ -66,6 +72,7 @@ export interface TestSessionTurnRecord {
     explanation?: string;
     score?: number;
     decision?: unknown;
+    layerAudit?: unknown;
   };
   activationValues?: {
     calmness?: number;
