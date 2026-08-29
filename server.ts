@@ -446,6 +446,16 @@ function buildEntityGroundingInstruction(entityResolution: any) {
     : "yok";
   return `ENTITY / WORLD GROUNDING:\nKonuşan kişi: ${entityResolution.speaker?.name || "bilinmiyor"}.\nMuhatap: ${entityResolution.addressee?.name || "Kaira"}.\nReferanslar: ${refs}.\nBelirsizlikler: ${ambiguities}.\nKURALLAR: Birinci şahıs (ben/bana/beni) konuşan kişiye, ikinci şahıs (sen/sana/seni) Kaira'ya aittir. Açık isim çözümü mevcut konuşanla aynı kişiye çıkıyorsa bunu otomatik olarak ayrı bir üçüncü şahıs yapma. Belirsizlik varsa kişi/olay ataması UYDURMA; cevabı belirsizliği koruyacak şekilde yaz. Kullanıcının söylemediği "bunu ben söyledim", "şu kişi yaptı" gibi yeni bir kaynak/aktör icat etme.`;
 }
+
+function buildWorldEventInstruction(worldEvent: any) {
+  if (!worldEvent) return "";
+  const actor = worldEvent.actor?.name || worldEvent.actor?.id || "çözülmedi";
+  const target = worldEvent.target?.name || worldEvent.target?.id || "çözülmedi";
+  const ambiguities = Array.isArray(worldEvent.ambiguities) && worldEvent.ambiguities.length
+    ? worldEvent.ambiguities.join(" | ")
+    : "yok";
+  return `CANONICAL WORLD EVENT:\nOlay tipi: ${worldEvent.eventType || "unknown"}.\nActor: ${actor}.\nTarget: ${target}.\nAktarılan söz: ${worldEvent.reportedSpeech ? "evet" : "hayır"}.\nKesinlik: ${Number(worldEvent.certainty ?? 0).toFixed(2)}.\nBelirsizlikler: ${ambiguities}.\nKURAL: Bu olay haritasını kaynak gerçekliği olarak kullan. Actor veya target çözülmemişse kimlik UYDURMA. Kullanıcının söylemediği yeni bir fail, hedef veya olay ekleme.`;
+}
 app.post("/api/chat", async (req, res) => {
   const serverStart = now();
   try {
@@ -645,6 +655,7 @@ app.post("/api/chat", async (req, res) => {
             providerUsed: "local_language",
             speechIdentity: speech,
             entityResolution: languageUnderstanding.entityResolution,
+            worldEvent: languageUnderstanding.worldEvent,
             timings: { memoryMs, kdmMs, aiMs: 0 },
           },
         }).then((t) => {
@@ -672,7 +683,7 @@ app.post("/api/chat", async (req, res) => {
         },
         enforcement: enforced,
         speechIdentity: speech,
-        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
+        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
         consistency,
         dialogue: dialogueAnalysis,
         timings,
@@ -692,10 +703,13 @@ app.post("/api/chat", async (req, res) => {
     const entityGroundingInstruction = buildEntityGroundingInstruction(
       languageUnderstanding.entityResolution,
     );
+    const worldEventInstruction = buildWorldEventInstruction(
+      languageUnderstanding.worldEvent,
+    );
     const relationshipInstruction = behaviorProfile.relationshipInstruction
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
-    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
@@ -888,7 +902,7 @@ app.post("/api/chat", async (req, res) => {
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
+      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
       consistency,
       dialogue: dialogueAnalysis,
       dialogueDecision,
