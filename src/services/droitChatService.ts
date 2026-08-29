@@ -21,6 +21,7 @@ import {
   temperamentFromFineTune,
 } from "./temperamentEngine";
 import { applyPersonalityTendencies } from "./personalityTendencyEngine";
+import { applyMotivations } from "./motivationEngine";
 import { auth } from "../lib/firebase";
 
 export type KairoProvider = "gemini" | "openrouter";
@@ -102,73 +103,24 @@ function classifyAppraisalEvent(message: string): {
   const frustration = /(yeter|bıktım|sinir|sinirlen|aynı şeyi|kaç kere|neden anlamıyorsun|niye anlamıyorsun)/.test(text);
 
   if (apology) {
-    return {
-      kind: "apology",
-      valence: "positive",
-      negativeLoad: 0,
-      frustrationLoad: 0,
-      threatLoad: 0,
-      rewardLoad: 0.55,
-    };
+    return { kind: "apology", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.55 };
   }
   if (insult) {
-    return {
-      kind: "insult",
-      valence: "negative",
-      negativeLoad: 1,
-      frustrationLoad: frustration ? 1 : 0.85,
-      threatLoad: 0.7,
-      rewardLoad: 0,
-    };
+    return { kind: "insult", valence: "negative", negativeLoad: 1, frustrationLoad: frustration ? 1 : 0.85, threatLoad: 0.7, rewardLoad: 0 };
   }
   if (rejection) {
-    return {
-      kind: "rejection",
-      valence: "negative",
-      negativeLoad: 0.75,
-      frustrationLoad: 0.5,
-      threatLoad: 0.55,
-      rewardLoad: 0,
-    };
+    return { kind: "rejection", valence: "negative", negativeLoad: 0.75, frustrationLoad: 0.5, threatLoad: 0.55, rewardLoad: 0 };
   }
   if (support) {
-    return {
-      kind: "support",
-      valence: "positive",
-      negativeLoad: 0,
-      frustrationLoad: 0,
-      threatLoad: 0,
-      rewardLoad: 0.7,
-    };
+    return { kind: "support", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.7 };
   }
   if (compliment) {
-    return {
-      kind: "compliment",
-      valence: "positive",
-      negativeLoad: 0,
-      frustrationLoad: 0,
-      threatLoad: 0,
-      rewardLoad: 0.8,
-    };
+    return { kind: "compliment", valence: "positive", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0.8 };
   }
   if (frustration) {
-    return {
-      kind: "neutral",
-      valence: "negative",
-      negativeLoad: 0.45,
-      frustrationLoad: 0.75,
-      threatLoad: 0.15,
-      rewardLoad: 0,
-    };
+    return { kind: "neutral", valence: "negative", negativeLoad: 0.45, frustrationLoad: 0.75, threatLoad: 0.15, rewardLoad: 0 };
   }
-  return {
-    kind: "neutral",
-    valence: "neutral",
-    negativeLoad: 0,
-    frustrationLoad: 0,
-    threatLoad: 0,
-    rewardLoad: 0,
-  };
+  return { kind: "neutral", valence: "neutral", negativeLoad: 0, frustrationLoad: 0, threatLoad: 0, rewardLoad: 0 };
 }
 
 function minutesBetween(iso?: string) {
@@ -235,8 +187,7 @@ function applyTemperamentBeforeKdm(
     negativeLoad: event.negativeLoad,
     frustrationLoad: event.frustrationLoad,
     threatLoad: event.threatLoad,
-    rewardLoad:
-      event.rewardLoad * (0.65 + appraisal.positivePredictionError * 0.35),
+    rewardLoad: event.rewardLoad * (0.65 + appraisal.positivePredictionError * 0.35),
     noveltyLoad: appraisal.novelty.value,
     repetitionLoad: 1 - appraisal.novelty.value,
     relationshipSafety,
@@ -277,18 +228,26 @@ export const droitChatService = {
     const userId = resolveConversationUserId(explicitUserId);
     const prepStart = performance.now();
     const fineTune = readFineTuneProfile();
+
     const personalityRuntime = applyPersonalityTendencies(
       personality,
       fineTune,
       userMessage,
     );
-    const runtimePersonality = personalityRuntime.personality;
+    const motivationRuntime = applyMotivations(
+      personalityRuntime.personality,
+      fineTune,
+      userMessage,
+    );
+    const runtimePersonality = motivationRuntime.personality;
+
     const behaviorProfile = computeBehaviorProfile(runtimePersonality, userMessage);
     const temperamentAdjustedState = applyTemperamentBeforeKdm(
       userMessage,
       dynamicState,
     );
     const clientPrepMs = Math.round(performance.now() - prepStart);
+
     const payload = {
       sessionId,
       userId,
@@ -298,6 +257,7 @@ export const droitChatService = {
       personality: runtimePersonality,
       behaviorProfile,
       personalityTendency: personalityRuntime.response,
+      motivation: motivationRuntime.response,
       dynamicState: temperamentAdjustedState,
       history: history
         .slice(-24)
@@ -312,6 +272,7 @@ export const droitChatService = {
       provider,
       suppressRecentMemory,
     };
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     try {
@@ -327,15 +288,11 @@ export const droitChatService = {
       }
       const data = await res.json();
       const reply = data.reply || "";
-      const nextDynamicState = data.kdm?.dynamicState as
-        | DroitDynamicState
-        | undefined;
+      const nextDynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined;
       const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
       const consistency =
         (data.consistency as ResponseConsistencyResult | undefined) ??
-        (reasoningTrace
-          ? validateKairoResponse(reply, reasoningTrace)
-          : undefined);
+        (reasoningTrace ? validateKairoResponse(reply, reasoningTrace) : undefined);
       const totalMs = Math.round(performance.now() - totalStart);
       const server = data.timings || {};
       const serverTotalMs = Number(server.serverTotalMs || 0);
@@ -346,10 +303,7 @@ export const droitChatService = {
         kdmMs: Number(server.kdmMs || 0),
         aiMs: Number(server.aiMs || 0),
         postProcessMs: Number(server.postProcessMs || 0),
-        networkAndOverheadMs: Math.max(
-          0,
-          totalMs - clientPrepMs - serverTotalMs,
-        ),
+        networkAndOverheadMs: Math.max(0, totalMs - clientPrepMs - serverTotalMs),
         totalMs,
       };
       return {
@@ -364,10 +318,9 @@ export const droitChatService = {
         turnId: data.turnId,
       };
     } catch (err: any) {
-      if (err?.name === "AbortError")
-        throw new Error(
-          "Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.",
-        );
+      if (err?.name === "AbortError") {
+        throw new Error("Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.");
+      }
       throw err;
     } finally {
       clearTimeout(timeout);
