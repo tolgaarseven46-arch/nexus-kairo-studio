@@ -16,6 +16,8 @@ on:
       - "src/services/droitChatService.ts"
       - "src/services/testSessionLayerAuditService.ts"
       - "src/services/languageUnderstandingService.ts"
+      - "src/services/entityResolutionEngine.ts"
+      - "src/services/entityResolutionEngine.test.ts"
       - "src/services/llmSemanticUnderstandingProvider.ts"
       - "src/services/llmSemanticUnderstandingProvider.test.ts"
       - "src/services/serverLanguageUnderstanding.ts"
