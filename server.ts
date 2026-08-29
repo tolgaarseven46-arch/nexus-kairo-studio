@@ -6,6 +6,7 @@ import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
 import { resolveCanonicalSemanticEvent } from "./src/services/semanticEventAuthority";
 import { applyConversationStateAuthority } from "./src/services/conversationStateAuthority";
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
+import { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";
 import {
   loadKdmState,
   loadRecentKdmMemory,
@@ -500,7 +501,9 @@ app.post("/api/chat", async (req, res) => {
       );
     kdm.trace.whoSent.userName = userName;
     if (local.handled && local.reply) {
-      const enforced = enforceKairoResponse(local.reply, kdm.trace, enforcementRules),
+      const baseEnforced = enforceKairoResponse(local.reply, kdm.trace, enforcementRules),
+        contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract),
+        enforced = { reply: contractEnforced.reply, changed: baseEnforced.changed || contractEnforced.changed, reasons: [...baseEnforced.reasons, ...contractEnforced.reasons] },
         reply = enforced.reply,
         consistency = validateKairoResponse(reply, kdm.trace),
         postStart = now();
@@ -705,7 +708,9 @@ app.post("/api/chat", async (req, res) => {
         }
       }
     }
-    const enforced = enforceKairoResponse(reply, kdm.trace, enforcementRules);
+    const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules);
+    const contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract);
+    const enforced = { reply: contractEnforced.reply, changed: baseEnforced.changed || contractEnforced.changed, reasons: [...baseEnforced.reasons, ...contractEnforced.reasons] };
     reply = enforced.reply;
     const aiMs = Math.round(now() - aiStart);
     const baseConsistency = validateKairoResponse(reply, kdm.trace);
