@@ -60,7 +60,6 @@ const normalize = (message: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-// JS \b ASCII-merkezlidir; Türkçe karakterli kelimelerde güvenilir değildir.
 const word = (source: string) =>
   new RegExp(`(?<![\\p{L}\\p{N}_])(?:${source})(?![\\p{L}\\p{N}_])`, "u");
 
@@ -68,18 +67,9 @@ const THIRD_PARTY_RE = word("mert|müdür|patron|çocuk|adam|kadın|arkadaş(?:�
 const REPORTING_RE = word("dedim|dedi|demiş|söyledim|söyledi|diyor|diyordu|diye");
 const RED_LINE_RE = word("orospu|oropu|orosp[uy]|kaşar|sürtük");
 const DISRESPECT_SLANG_RE = word("yarrak|yarak|yarrağım|yarrağim|yarram|yaram|yarrm|yavrum");
-const INSULT_RE = new RegExp(
-  `${word("aptal|salak|gerizekalı|mal|şerefsiz|haysiyetsiz|ezik|piç|yavşak|köle").source}|${DISRESPECT_SLANG_RE.source}|geri zekalı|siktir|defol|boş konuş|sanane`,
-  "u",
-);
-const APOLOGY_RE = new RegExp(
-  `${word("özür|pardon").source}|kusura bakma|hata ettim|yanlış yaptım|özür dilerim|özür diledim`,
-  "u",
-);
-const REPAIR_RE = new RegExp(
-  `${word("barışalım|barışak|telafi").source}|düzeltmek istiyorum|bir daha yapmayacağım|beni affet|konuşup çözelim`,
-  "u",
-);
+const INSULT_RE = new RegExp(`${word("aptal|salak|gerizekalı|mal|şerefsiz|haysiyetsiz|ezik|piç|yavşak|köle").source}|${DISRESPECT_SLANG_RE.source}|geri zekalı|siktir|defol|boş konuş|sanane`, "u");
+const APOLOGY_RE = new RegExp(`${word("özür|pardon").source}|kusura bakma|hata ettim|yanlış yaptım|özür dilerim|özür diledim`, "u");
+const REPAIR_RE = new RegExp(`${word("barışalım|barışak|telafi").source}|düzeltmek istiyorum|bir daha yapmayacağım|beni affet|konuşup çözelim`, "u");
 const REASSURANCE_SEEK_RE = /(bana küs(?:medin|tün|müsün|musun)|kızgın mısın|kızdın mı|darıl(?:dın mı|madın)|aramız iyi mi|hala arkadaş mıyız|hâlâ arkadaş mıyız)/u;
 const REPAIR_PROBE_RE = /(affettin mi|özrümü kabul|barıştık mı|düzeldi mi|hala kızgın|hâlâ kızgın)/u;
 const CLOSENESS_BID_RE = /(sarılalım|sarıl bana|öp beni|gel öp|canım benim|hadi barışalım)/u;
@@ -103,28 +93,13 @@ const LOW_MOOD_RE = /(moralim.{0,30}bozuk|üzgün|kötü hissed|bunaldım|canım
 const INFORMATION_REQUEST_RE = /(?:^|\s)(neden|niye|nasıl|nedir|ne demek|kim|kime|kimi|hangi|hangisi|nerede|neresi)(?:\s|$|[?.!,])/u;
 const RECALL_QUESTION_RE = /(?:^|\s)(?:neydi|ne yapacaktı)(?:\s|$|[?.!,])|ne\s+yapmayı\s+düşünüyordu|hatırlıyor\s+musun|hatırladın\s+mı/u;
 
-function inferTarget(
-  text: string,
-  negative: boolean,
-  insult: boolean,
-  rejection: boolean,
-  directCommand: boolean,
-  relationalAct: RelationalAct,
-): SemanticTarget {
+function inferTarget(text: string, negative: boolean, insult: boolean, rejection: boolean, directCommand: boolean, relationalAct: RelationalAct): SemanticTarget {
   if (relationalAct !== "none") return "kaira";
   if (!negative && !directCommand) return "unknown";
   if (word("kaira|kairo|sen|sana|seni|senden|senin").test(text)) return "kaira";
   if (REPORTING_RE.test(text) && THIRD_PARTY_RE.test(text)) return "third_party";
   if (THIRD_PARTY_RE.test(text)) return "third_party";
-  if (
-    RED_LINE_RE.test(text) ||
-    insult ||
-    rejection ||
-    STRONG_COERCION_RE.test(text) ||
-    MANIPULATION_RE.test(text) ||
-    directCommand
-  )
-    return "kaira";
+  if (RED_LINE_RE.test(text) || insult || rejection || STRONG_COERCION_RE.test(text) || MANIPULATION_RE.test(text) || directCommand) return "kaira";
   return "event";
 }
 
@@ -159,32 +134,17 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   const compliment = COMPLIMENT_RE.test(text) ? 0.8 : 0;
   const affection = AFFECTION_RE.test(text) ? 0.7 : closenessBid ? 0.45 : 0;
   const confusion = CONFUSION_RE.test(text);
-  const frustration = FRUSTRATION_RE.test(text)
-    ? 0.75
-    : challenge
-      ? 0.6
-      : VENTING_PROFANITY_RE.test(text)
-        ? 0.35
-        : 0;
+  const frustration = FRUSTRATION_RE.test(text) ? 0.75 : challenge ? 0.6 : VENTING_PROFANITY_RE.test(text) ? 0.35 : 0;
   const emotionalShare = EMOTIONAL_SHARE_RE.test(text);
   const emotionalLoad = LOW_MOOD_RE.test(text) ? 0.8 : emotionalShare ? 0.45 : 0;
-
-  const negative =
-    insult ||
-    rejection ||
-    coercion > 0 ||
-    manipulation > 0 ||
-    privacyViolation > 0 ||
-    frustration > 0 ||
-    mockery;
+  const negative = insult || rejection || coercion > 0 || manipulation > 0 || privacyViolation > 0 || frustration > 0 || mockery;
   const target = inferTarget(text, negative, insult, rejection, directCommand, relationalAct);
 
   let intent: SemanticIntent = "general_chat";
   if (apology) intent = "apology";
   else if (repairAttempt) intent = "repair";
   else if (insult) intent = "insult";
-  else if (challenge || mockery || stopQuestions || stopTalking || confusion || frustration >= 0.7)
-    intent = "complaint";
+  else if (challenge || mockery || stopQuestions || stopTalking || confusion || frustration >= 0.7) intent = "complaint";
   else if (directCommand || coercion > 0) intent = "command";
   else if (rejection) intent = "rejection";
   else if (support > 0) intent = "support";
@@ -193,56 +153,23 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   else if (affection > 0 && !reassuranceSeek && !repairProbe) intent = "affection";
   else if (reassuranceSeek || repairProbe) intent = "question";
   else if (RECALL_QUESTION_RE.test(text)) intent = "question";
-  else if (/[?]/u.test(message) || INFORMATION_REQUEST_RE.test(text))
-    intent = "information_request";
-  else if (/^(selam|merhaba|hey|naber|nabr|nasılsın)(?:\s|$)/u.test(text))
-    intent = "greeting";
+  else if (/[?]/u.test(message) || INFORMATION_REQUEST_RE.test(text)) intent = "information_request";
+  else if (/^(selam|merhaba|hey|naber|nabr|nasılsın)(?:\s|$)/u.test(text)) intent = "greeting";
   else if (/(😂|🤣|😄|😅|:d|haha|hahah|taşak)/iu.test(text)) intent = "banter";
 
   const valence: SemanticValence =
-    apology || repairAttempt || support > 0 || compliment > 0 || closenessBid
+    apology || repairAttempt || support > 0 || compliment > 0 || affection > 0
       ? "positive"
       : negative
         ? "negative"
         : "neutral";
 
   const disrespect = redLine ? 1 : insult ? 0.9 : mockery ? 0.35 : 0;
-  const severity = redLine
-    ? 1
-    : clamp01(
-        Math.max(
-          disrespect,
-          coercion * 0.85,
-          manipulation * 0.8,
-          privacyViolation * 0.8,
-          rejection ? 0.65 : 0,
-          frustration * 0.55,
-        ),
-      );
+  const severity = redLine ? 1 : clamp01(Math.max(disrespect, coercion * 0.85, manipulation * 0.8, privacyViolation * 0.8, rejection ? 0.65 : 0, frustration * 0.55));
 
   return {
-    raw: message,
-    normalized: text,
-    intent,
-    valence,
-    target,
-    relationalAct,
-    relationalIntensity,
-    severity,
-    insult,
-    redLine,
-    disrespect,
-    coercion,
-    manipulation,
-    privacyViolation,
-    apology,
-    repairAttempt,
-    stopQuestions,
-    stopTalking,
-    frustration,
-    emotionalLoad,
-    affection,
-    support,
-    compliment,
+    raw: message, normalized: text, intent, valence, target, relationalAct, relationalIntensity, severity,
+    insult, redLine, disrespect, coercion, manipulation, privacyViolation, apology, repairAttempt,
+    stopQuestions, stopTalking, frustration, emotionalLoad, affection, support, compliment,
   };
 }
