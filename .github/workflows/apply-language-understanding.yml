@@ -5,6 +5,15 @@ on:
     paths:
       - ".github/workflows/apply-language-understanding.yml"
       - "scripts/applyLanguageUnderstandingIntegration.mjs"
+      - "server.ts"
+      - "src/services/languageUnderstandingService.ts"
+      - "src/services/llmSemanticUnderstandingProvider.ts"
+      - "src/services/llmSemanticUnderstandingProvider.test.ts"
+      - "src/services/serverLanguageUnderstanding.ts"
+      - "src/services/serverLanguageUnderstanding.test.ts"
+      - "src/services/zemberekMorphologyProvider.ts"
+      - "src/services/zemberekMorphologyProvider.test.ts"
+      - "src/services/languageUnderstandingCases.test.ts"
 
 permissions:
   contents: write
