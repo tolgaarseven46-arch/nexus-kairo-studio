@@ -11,6 +11,7 @@ on:
       - "scripts/applyEntityGroundingToResponse.mjs"
       - "scripts/applyEntityResolutionPersistence.mjs"
       - "scripts/applyWorldEventIntegration.mjs"
+      - "scripts/applyWorldModelEventStore.mjs"
       - "server.ts"
       - "src/components/studio/tabs/TestLabTab.tsx"
       - "src/components/studio/tabs/MindMapTab.tsx"
@@ -24,6 +25,8 @@ on:
       - "src/services/entityResolutionEngine.test.ts"
       - "src/services/worldEventEngine.ts"
       - "src/services/worldEventEngine.test.ts"
+      - "src/services/worldModelEventStore.ts"
+      - "src/services/worldModelEventStore.test.ts"
       - "src/services/llmSemanticUnderstandingProvider.ts"
       - "src/services/llmSemanticUnderstandingProvider.test.ts"
       - "src/services/serverLanguageUnderstanding.ts"
@@ -54,6 +57,8 @@ jobs:
         run: node scripts/applyEntityResolutionPersistence.mjs
       - name: Apply canonical world event integration
         run: node scripts/applyWorldEventIntegration.mjs
+      - name: Persist world model event observations
+        run: node scripts/applyWorldModelEventStore.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: TypeScript check
@@ -71,5 +76,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server.ts src/services/droitChatService.ts src/services/kdmPersistenceService.ts src/types/nexus.ts src/components/studio/tabs/TestLabTab.tsx src/components/studio/tabs/MindMapTab.tsx
-          git commit -m "feat(world-model): persist canonical world events"
+          git commit -m "feat(world-model): persist event observations"
           git push
