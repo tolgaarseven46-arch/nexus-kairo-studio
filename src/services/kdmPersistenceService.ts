@@ -112,6 +112,7 @@ export interface SaveTestSessionTurnPayload {
     speechIdentity?: unknown;
     entityResolution?: unknown;
     worldEvent?: unknown;
+    retrievedWorldEvents?: unknown;
   };
 }
 
@@ -224,6 +225,7 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
       speechIdentity: payload.metadata?.speechIdentity,
       entityResolution: payload.metadata?.entityResolution,
       worldEvent: payload.metadata?.worldEvent,
+      retrievedWorldEvents: payload.metadata?.retrievedWorldEvents,
     },
   };
 
