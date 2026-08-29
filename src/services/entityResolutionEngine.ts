@@ -52,6 +52,22 @@ const SECOND_PERSON = new Set([
   "seninle",
 ]);
 
+const PERSON_CONTEXT_WORDS = new Set([
+  ...FIRST_PERSON,
+  ...SECOND_PERSON,
+  "dedi",
+  "demiş",
+  "demisti",
+  "demişti",
+  "söyledi",
+  "soyledi",
+  "söylemiş",
+  "soylemis",
+  "yazdı",
+  "yazdi",
+  "sordu",
+]);
+
 const normalize = (value: string) =>
   value.toLocaleLowerCase("tr-TR").replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
 
@@ -130,12 +146,19 @@ export function resolveMessageEntities(
       continue;
     }
 
-    // Unknown words at sentence start are capitalized by Turkish orthography,
-    // so capitalization alone is not enough evidence that the token is a person.
-    // Known participant names above are still resolved even at token index 0.
+    const looksLikeProperName = /^[A-ZÇĞİÖŞÜ][a-zçğıöşü]+$/u.test(token);
+    const sentenceInitialPersonContext =
+      tokenIndex === 0 &&
+      tokens
+        .slice(1, 4)
+        .some((nextToken) => PERSON_CONTEXT_WORDS.has(normalize(nextToken)));
+
+    // Sentence-initial capitalization alone is weak evidence ("Mal aldım").
+    // Keep an unknown initial token as a person only when the nearby discourse
+    // structure supports a person reading ("Ayşe bana ...", "Ayşe dedi ...").
     if (
-      tokenIndex > 0 &&
-      /^[A-ZÇĞİÖŞÜ][a-zçğıöşü]+$/u.test(token)
+      looksLikeProperName &&
+      (tokenIndex > 0 || sentenceInitialPersonContext)
     ) {
       namedPeople.add(token);
       references.push({
@@ -143,7 +166,7 @@ export function resolveMessageEntities(
         normalized,
         role: "named_person",
         resolvedName: token,
-        confidence: 0.55,
+        confidence: tokenIndex === 0 ? 0.65 : 0.55,
       });
     }
   }
