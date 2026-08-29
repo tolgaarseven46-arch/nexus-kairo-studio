@@ -13,6 +13,7 @@ on:
       - "scripts/applyWorldEventIntegration.mjs"
       - "scripts/applyWorldModelEventStore.mjs"
       - "scripts/applyWorldEventRetrieval.mjs"
+      - "scripts/applyWorldEventRetrievalAudit.mjs"
       - "server.ts"
       - "src/components/studio/tabs/TestLabTab.tsx"
       - "src/components/studio/tabs/MindMapTab.tsx"
@@ -64,6 +65,8 @@ jobs:
         run: node scripts/applyWorldModelEventStore.mjs
       - name: Apply world event retrieval
         run: node scripts/applyWorldEventRetrieval.mjs
+      - name: Audit world event retrieval in KNT
+        run: node scripts/applyWorldEventRetrievalAudit.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: TypeScript check
@@ -81,5 +84,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server.ts src/services/droitChatService.ts src/services/kdmPersistenceService.ts src/types/nexus.ts src/components/studio/tabs/TestLabTab.tsx src/components/studio/tabs/MindMapTab.tsx
-          git commit -m "feat(world-model): retrieve relevant event memories"
+          git commit -m "feat(knt): audit world event retrieval"
           git push
