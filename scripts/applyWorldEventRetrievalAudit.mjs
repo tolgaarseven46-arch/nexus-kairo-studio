@@ -5,10 +5,11 @@ const persistencePath = "src/services/kdmPersistenceService.ts";
 let server = fs.readFileSync(serverPath, "utf8");
 let persistence = fs.readFileSync(persistencePath, "utf8");
 
-if (!persistence.includes("retrievedWorldEvents?: unknown")) {
-  const anchor = "    worldEvent?: unknown;\n";
-  if (!persistence.includes(anchor)) throw new Error("metadata worldEvent anchor not found");
-  persistence = persistence.replace(anchor, `${anchor}    retrievedWorldEvents?: unknown;\n`);
+const metadataTypeAnchor = "    worldEvent?: unknown;\n  };\n}";
+const metadataTypePatched = "    worldEvent?: unknown;\n    retrievedWorldEvents?: unknown;\n  };\n}";
+if (!persistence.includes(metadataTypePatched)) {
+  if (!persistence.includes(metadataTypeAnchor)) throw new Error("metadata worldEvent type anchor not found");
+  persistence = persistence.replace(metadataTypeAnchor, metadataTypePatched);
 }
 
 if (!persistence.includes("retrievedWorldEvents: payload.metadata?.retrievedWorldEvents")) {
