@@ -431,6 +431,21 @@ function runtimeFlag(personality: DroitPersonalityTraits, key: string, fallback 
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
   return value >= 50;
 }
+function buildEntityGroundingInstruction(entityResolution: any) {
+  if (!entityResolution) return "";
+  const refs = Array.isArray(entityResolution.references)
+    ? entityResolution.references
+        .map((ref: any) => {
+          const resolved = ref.resolvedName || ref.resolvedId || "çözülmedi";
+          return `${ref.surface} => ${resolved} (rol=${ref.role}, güven=${Number(ref.confidence ?? 0).toFixed(2)})`;
+        })
+        .join("; ")
+    : "yok";
+  const ambiguities = Array.isArray(entityResolution.ambiguities) && entityResolution.ambiguities.length
+    ? entityResolution.ambiguities.join(" | ")
+    : "yok";
+  return `ENTITY / WORLD GROUNDING:\nKonuşan kişi: ${entityResolution.speaker?.name || "bilinmiyor"}.\nMuhatap: ${entityResolution.addressee?.name || "Kaira"}.\nReferanslar: ${refs}.\nBelirsizlikler: ${ambiguities}.\nKURALLAR: Birinci şahıs (ben/bana/beni) konuşan kişiye, ikinci şahıs (sen/sana/seni) Kaira'ya aittir. Açık isim çözümü mevcut konuşanla aynı kişiye çıkıyorsa bunu otomatik olarak ayrı bir üçüncü şahıs yapma. Belirsizlik varsa kişi/olay ataması UYDURMA; cevabı belirsizliği koruyacak şekilde yaz. Kullanıcının söylemediği "bunu ben söyledim", "şu kişi yaptı" gibi yeni bir kaynak/aktör icat etme.`;
+}
 app.post("/api/chat", async (req, res) => {
   const serverStart = now();
   try {
@@ -656,7 +671,7 @@ app.post("/api/chat", async (req, res) => {
         },
         enforcement: enforced,
         speechIdentity: speech,
-        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
+        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
         consistency,
         dialogue: dialogueAnalysis,
         timings,
@@ -673,10 +688,13 @@ app.post("/api/chat", async (req, res) => {
       userName,
       userId,
     );
+    const entityGroundingInstruction = buildEntityGroundingInstruction(
+      languageUnderstanding.entityResolution,
+    );
     const relationshipInstruction = behaviorProfile.relationshipInstruction
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
-    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
