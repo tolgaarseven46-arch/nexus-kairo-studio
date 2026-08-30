@@ -132,8 +132,8 @@ describe("behavior integration", () => {
     expect(result.decision.stance).toBe("disengage");
     expect(result.decision.continueConversation).toBe(false);
     expect(result.decision.repairAllowed).toBe(false);
-    expect(result.personality.runtimeContinueConversation).toBe(0);
-    expect(result.personality.runtimePriority).toBe(100);
+    expect(result.decision.continueConversation).toBe(false);
+    expect(result.decision.priority).toBe("boundary");
   });
 
   it("obeys a direct request to stop asking questions without ending the conversation", () => {
@@ -144,7 +144,7 @@ describe("behavior integration", () => {
     expect(result.decision.continueConversation).toBe(true);
     expect(result.decision.askQuestion).toBe(false);
     expect(result.decision.acknowledgeComplaint).toBe(true);
-    expect(result.personality.runtimeAskQuestion).toBe(0);
+    expect(result.decision.askQuestion).toBe(false);
   });
 
   it("does not let a repair attempt instantly erase accumulated relationship damage", () => {

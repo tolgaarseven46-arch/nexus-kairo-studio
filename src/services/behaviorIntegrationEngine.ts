@@ -54,17 +54,6 @@ export interface BehaviorIntegrationResult {
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 const clamp100 = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
 
-const stanceCode: Record<IntegratedBehaviorDecision["stance"], number> = {
-  warm: 0,
-  neutral: 25,
-  firm: 50,
-  distant: 75,
-  disengage: 100,
-};
-const lengthCode: Record<IntegratedBehaviorDecision["responseLength"], number> = { short: 25, medium: 50, long: 75 };
-const priorityCode: Record<IntegratedBehaviorDecision["priority"], number> = {
-  expression: 20, preference: 35, goal: 50, relationship: 65, values: 82, boundary: 100,
-};
 
 const minutesSince = (iso?: string) => {
   if (!iso) return 0;
@@ -183,19 +172,6 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
     patience: clamp100((input.personality.patience ?? 50) * 0.55 + (1 - boundaryPressure) * 25 + b.repairOpenness * 20),
     seriousness: clamp100((input.personality.seriousness ?? 50) * 0.5 + Math.max(boundaryPressure, valuePressure, relationshipPressure) * 50),
     communication: clamp100(responseLength === "short" ? 30 : responseLength === "long" ? 80 : 55),
-    runtimeContinueConversation: decision.continueConversation ? 100 : 0,
-    runtimeHumorAllowed: decision.humorAllowed ? 100 : 0,
-    runtimeAskQuestion: decision.askQuestion ? 100 : 0,
-    runtimeAcknowledgeComplaint: decision.acknowledgeComplaint ? 100 : 0,
-    runtimeRepairAllowed: decision.repairAllowed ? 100 : 0,
-    runtimeStance: stanceCode[decision.stance],
-    runtimeResponseLength: lengthCode[decision.responseLength],
-    runtimeDirectness: clamp100(decision.directness * 100),
-    runtimeWarmth: clamp100(decision.warmth * 100),
-    runtimeDistance: clamp100(decision.distance * 100),
-    runtimePriority: priorityCode[decision.priority],
-    runtimePriorConversationState: priorDisengaged ? 100 : priorRepairing ? 75 : priorConversationState === "distancing" ? 50 : 0,
-    runtimeRepairSignal: repairSignal ? 100 : 0,
   };
 
   return {
