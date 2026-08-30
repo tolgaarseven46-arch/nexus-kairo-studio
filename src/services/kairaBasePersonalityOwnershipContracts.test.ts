@@ -19,6 +19,8 @@ describe("base personality vs per-turn response overlay ownership", () => {
   });
 
   it("uses base personality as the KDM relationship/emotion reducer input", () => {
+    expect(server).toContain("      personality,\n      responsePersonality: incomingResponsePersonality,");
+    expect(server).not.toContain("personality = {},");
     expect(server).toContain("basePersonality = normalizeDroitPersonality(personality)");
     expect(server).toContain("responsePersonality = normalizeDroitPersonality(incomingResponsePersonality ?? basePersonality)");
     expect(server).not.toContain("personality as DroitPersonalityTraits");

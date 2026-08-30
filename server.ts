@@ -481,7 +481,7 @@ app.post("/api/chat", async (req, res) => {
       userName = "Kullanıcı",
       userMessage,
       character = {},
-      personality = {},
+      personality,
       responsePersonality: incomingResponsePersonality,
       history = [],
       dynamicState = defaultDynamicState,
