@@ -12,11 +12,33 @@ export type WorldEventType =
   | "emotional_share"
   | "general";
 
+export type WorldEventPolarity = "positive" | "negative" | "unknown";
+export type WorldEventTemporalRelation = "past" | "present" | "future" | "unspecified";
+
 export interface WorldEventParticipant {
   id?: string;
   name?: string;
   source: "explicit_name" | "first_person" | "second_person" | "semantic_target" | "unknown";
   confidence: number;
+}
+
+/**
+ * V2 proposition identity is deliberately bounded. It is not a generated
+ * sentence; it is the stable semantic key consumed by temporal/contradiction
+ * policy. `key` must therefore be reproducible from canonical participants +
+ * event type and must never depend on retrieval score or LLM wording.
+ */
+export interface WorldEventProposition {
+  key: string;
+  predicate: WorldEventType;
+  actorKey?: string;
+  targetKey?: string;
+}
+
+export interface WorldEventTemporalReference {
+  relation: WorldEventTemporalRelation;
+  marker?: string;
+  asksLatest: boolean;
 }
 
 export interface CanonicalWorldEvent {
@@ -28,10 +50,19 @@ export interface CanonicalWorldEvent {
   certainty: number;
   ambiguities: string[];
   evidence: string[];
+  /** Canonical World Event v2 fields. Optional only for legacy persisted rows. */
+  proposition?: WorldEventProposition;
+  polarity?: WorldEventPolarity;
+  temporal?: WorldEventTemporalReference;
 }
 
 const REPORTING_RE = /\b(?:dedi|demiş|diyor|diyordu|söyledi|söylemiş|söylüyor)\b/iu;
 const EXPLICIT_APOLOGY_ACTION_RE = /\bözür\s+diledi\b/iu;
+const NEGATED_CLAIM_RE = /\b(?:değil(?:di)?|demedi|söylemedi|yapmadı|olmadı|etmedi|istemedi|sevmedi|kızmadı)\b/iu;
+const FUTURE_RE = /\b(?:yarın|sonra|yapacak|edecek|olacak|diyecek|söyleyecek)\b/iu;
+const PRESENT_RE = /\b(?:bugün|şimdi|şu an|halen|hâlen)\b/iu;
+const PAST_RE = /\b(?:dün|önce|geçen|demişti|dedi|söyledi|yaptı|oldu|etti)\b/iu;
+const LATEST_RE = /\ben\s+son\b/iu;
 
 function eventTypeFromSemantic(event: SemanticEvent, message: string): WorldEventType {
   if (event.insult || event.intent === "insult") return "insult";
@@ -43,6 +74,55 @@ function eventTypeFromSemantic(event: SemanticEvent, message: string): WorldEven
   if (event.intent === "rejection") return "rejection";
   if (event.intent === "emotional_share") return "emotional_share";
   return "general";
+}
+
+const participantKey = (participant?: WorldEventParticipant): string | undefined => {
+  if (!participant) return undefined;
+  const value = participant.id || participant.name;
+  return value?.toLocaleLowerCase("tr-TR").trim() || undefined;
+};
+
+export function buildWorldEventProposition(
+  eventType: WorldEventType,
+  actor?: WorldEventParticipant,
+  target?: WorldEventParticipant,
+): WorldEventProposition {
+  const actorKey = participantKey(actor);
+  const targetKey = participantKey(target);
+  return {
+    key: [actorKey || "?", eventType, targetKey || "?"].join("|"),
+    predicate: eventType,
+    ...(actorKey ? { actorKey } : {}),
+    ...(targetKey ? { targetKey } : {}),
+  };
+}
+
+export function detectWorldEventPolarity(message: string): WorldEventPolarity {
+  if (NEGATED_CLAIM_RE.test(message)) return "negative";
+  return message.trim() ? "positive" : "unknown";
+}
+
+export function detectWorldEventTemporalReference(message: string): WorldEventTemporalReference {
+  const text = message.toLocaleLowerCase("tr-TR");
+  let relation: WorldEventTemporalRelation = "unspecified";
+  let marker: string | undefined;
+
+  if (FUTURE_RE.test(text)) {
+    relation = "future";
+    marker = text.match(FUTURE_RE)?.[0];
+  } else if (PRESENT_RE.test(text)) {
+    relation = "present";
+    marker = text.match(PRESENT_RE)?.[0];
+  } else if (PAST_RE.test(text)) {
+    relation = "past";
+    marker = text.match(PAST_RE)?.[0];
+  }
+
+  return {
+    relation,
+    ...(marker ? { marker } : {}),
+    asksLatest: LATEST_RE.test(text),
+  };
 }
 
 const toParticipant = (
@@ -140,15 +220,19 @@ export function buildCanonicalWorldEvent(
     0.25,
     Math.min(1, entities.confidence - unresolvedPenalty - ambiguityPenalty),
   );
+  const eventType = eventTypeFromSemantic(semantic, message);
 
   return {
     raw: message,
-    eventType: eventTypeFromSemantic(semantic, message),
+    eventType,
     actor,
     target,
     reportedSpeech,
     certainty,
     ambiguities: [...new Set(ambiguities)],
     evidence,
+    proposition: buildWorldEventProposition(eventType, actor, target),
+    polarity: detectWorldEventPolarity(message),
+    temporal: detectWorldEventTemporalReference(message),
   };
 }
