@@ -1,0 +1,42 @@
+name: One-time fine-tune profile normalization boundary
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-finetune-profile-normalization-boundary.yml"
+      - "scripts/applyFineTuneProfileNormalizationBoundary.mjs"
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Normalize fine-tune hydration boundaries
+        run: node scripts/applyFineTuneProfileNormalizationBoundary.mjs
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Fine-tune contracts
+        run: npm test -- --run src/services/fineTuneProfileNormalizer.test.ts src/services/personalityTendencyEngine.test.ts src/services/temperamentEngine.test.ts
+      - name: TypeScript check
+        run: npm run lint
+      - name: Full tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit integration
+        run: |
+          if git diff --quiet -- src/services/fineTuneProfileNormalizer.ts src/services/fineTuneProfileNormalizer.test.ts src/services/droitChatService.ts src/components/studio/tabs/CharacterTab.tsx; then
+            echo "fine-tune profile normalization already installed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/fineTuneProfileNormalizer.ts src/services/fineTuneProfileNormalizer.test.ts src/services/droitChatService.ts src/components/studio/tabs/CharacterTab.tsx
+          git commit -m "fix(kaira): normalize persisted fine-tune profiles"
+          git pull --rebase origin main
+          git push origin main
