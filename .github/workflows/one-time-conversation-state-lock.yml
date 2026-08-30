@@ -39,7 +39,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server.ts src/services/kairaStateBehaviorContracts.ts src/services/kairaStateBehaviorContracts.test.ts src/services/kairaStateSequenceContracts.test.ts src/services/kairaPropertyContracts.test.ts src/services/kairaConversationAuthorityNonMutationContracts.test.ts src/services/kairaLegacyRuntimeFlagRemovalContracts.test.ts src/services/conversationStateLock.test.ts
-          if [ -e src/services/conversationStateAuthority.test.ts ]; then git add src/services/conversationStateAuthority.test.ts; fi
+          git add -A -- src/services/conversationStateAuthority.test.ts
           if git diff --cached --quiet; then
             echo "conversation state lock projection already applied"
             exit 0
