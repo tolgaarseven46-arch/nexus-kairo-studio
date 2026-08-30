@@ -354,3 +354,14 @@ Yeni sohbet açıldığında:
 - Fresh GitHub Actions checkout üzerinde architecture contracts, full tests, TypeScript ve production build başarıyla geçti; dolayısıyla eski source'un gizli import/consumer'ı olmadığı doğrulandı.
 - Client `droitChatService` server cevabındaki `conversationAuthority` compatibility metadata'sını KairoChatResponse'a taşımıyor; Test Lab da raw endpoint yerine `droitChatService.sendMessage` kullanıyor.
 - Sonraki adım: server response içindeki eski `conversationAuthority` JSON compatibility adı da gerçek consumer audit'i tamamlanınca kaldırılacak; canonical iç isim `conversationStateLock`.
+
+
+## 33. Conversation authority compatibility name removal — 2026-08-31
+- Server `/api/chat` response artık `kdm.conversationAuthority` legacy compatibility alanını üretmez.
+- Canonical ilişki-state projection iç adı `conversationStateLock`; yalnız `state`, `locked`, `reason` iç seam metadata'sıdır.
+- `droitChatService` bu legacy alanı zaten `KairoChatResponse` içine taşımıyordu; Test Lab ve normal client akışları `droitChatService.sendMessage` üzerinden çalıştığı için tüketici kırılması yoktur.
+- `kairaConversationStateLockContracts.test.ts` server'da `conversationAuthority:` adının yeniden görünmesini yasaklar.
+- `kairaBehaviorProfileAuthorityContracts.test.ts` behavior profile invariant'ı compatibility isminden ayrıştırıldı; iki response yolunda canonical KDM behavior profile dönmeye devam eder.
+- Entegrasyon commit'i: `dd85d0b` (`refactor(kaira): remove conversation authority compatibility name`). State-lock contract, TypeScript, full regression ve production build başarıyla geçti.
+- Geçici compatibility migration workflow/script kaldırıldı.
+- Sonraki audit adayı: `conversationStateLock` projection'ının yalnız state→behavior seam için mi gerekli olduğu, yoksa gereksiz response/persistence/observability serialization'ı kalıp kalmadığı. Koddan doğrulanmadan kaldırılmayacak.
