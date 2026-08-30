@@ -36,10 +36,20 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
   {
     id: "canonical-world-event",
     version: 1,
-    status: "active",
+    status: "superseded",
     ownerLayer: "world-event",
     consumerLayers: ["world-model-store", "retrieval", "appraisal"],
     summary: "A canonical event preserves raw evidence, actor/target semantics, epistemic status and bounded certainty.",
+    revisionReason: "V2 adds bounded proposition identity, polarity and temporal reference so contradiction/temporal consumers do not re-parse raw language.",
+  },
+  {
+    id: "canonical-world-event",
+    version: 2,
+    status: "active",
+    ownerLayer: "world-event",
+    consumerLayers: ["world-model-store", "retrieval", "appraisal", "temporal-evidence", "contradiction-resolution"],
+    summary: "Canonical events preserve V1 evidence semantics and additionally expose stable proposition identity, polarity and bounded temporal reference.",
+    supersedes: "canonical-world-event@1",
   },
   {
     id: "world-model-ownership",
@@ -54,7 +64,7 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     version: 1,
     status: "active",
     ownerLayer: "retrieval",
-    consumerLayers: ["response-generation", "temporal-evidence"],
+    consumerLayers: ["response-generation", "temporal-evidence", "contradiction-resolution"],
     summary: "Recall returns a bounded evidence set, not a generated answer; explicit compared people retain coverage.",
   },
   {
@@ -62,8 +72,16 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     version: 1,
     status: "active",
     ownerLayer: "temporal-evidence",
-    consumerLayers: ["retrieval", "response-generation", "future-contradiction-resolution"],
+    consumerLayers: ["retrieval", "response-generation", "contradiction-resolution"],
     summary: "For latest recall, valid timestamps are authoritative; historical evidence and epistemic status are preserved instead of destructively merged.",
+  },
+  {
+    id: "contradiction-evidence",
+    version: 1,
+    status: "active",
+    ownerLayer: "contradiction-resolution",
+    consumerLayers: ["retrieval", "response-generation"],
+    summary: "Opposite explicit polarities for the same canonical proposition are marked conflicting; source observations remain separate and newest evidence is not promoted to verified truth.",
   },
   {
     id: "relationship-state",
