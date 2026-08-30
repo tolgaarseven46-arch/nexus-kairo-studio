@@ -32,6 +32,7 @@ export interface PlanLifecycleResolution {
   state: PlanLifecycleState;
   latestObservationId?: string;
   planObservationId?: string;
+  generationObservationId?: string;
   evidenceObservationIds: string[];
 }
 
@@ -89,9 +90,10 @@ function isPlanEvidence(event: LifecycleCanonicalWorldEvent): boolean {
 }
 
 /**
- * Derives current plan lifecycle from immutable evidence for one canonical
- * proposition. Newer lifecycle evidence wins, but historical plan evidence is
- * retained and returned for auditability.
+ * Derives the current lifecycle for the newest immutable plan generation of one
+ * canonical proposition. A newer plan/commitment/intention starts a fresh
+ * generation. Lifecycle outcomes that occurred before that generation cannot
+ * close or contaminate the new plan.
  */
 export function resolvePlanLifecycle(
   observations: WorldEventObservation[],
@@ -106,7 +108,21 @@ export function resolvePlanLifecycle(
   }
 
   const plan = matching.find((item) => isPlanEvidence(item.event));
-  const latestSignal = matching.find((item) => {
+  if (!plan) {
+    return {
+      propositionKey,
+      state: "unknown",
+      latestObservationId: matching[0].id,
+      evidenceObservationIds: matching.map((item) => item.id).filter((id): id is string => Boolean(id)),
+    };
+  }
+
+  const planIndex = matching.indexOf(plan);
+  // matching is newest -> oldest. Only rows newer than the newest plan belong
+  // to the current generation's outcome window; the plan itself is included as
+  // the generation anchor.
+  const generation = matching.slice(0, planIndex + 1);
+  const latestSignal = generation.find((item) => {
     const kind = item.event.lifecycle?.kind;
     return Boolean(kind && kind !== "unspecified");
   });
@@ -114,15 +130,16 @@ export function resolvePlanLifecycle(
   const signalState = latestSignal?.event.lifecycle?.kind;
   const state: PlanLifecycleState = signalState && signalState !== "unspecified"
     ? signalState
-    : plan
-      ? "planned"
-      : "unknown";
+    : "planned";
 
   return {
     propositionKey,
     state,
-    latestObservationId: matching[0].id,
-    planObservationId: plan?.id,
-    evidenceObservationIds: matching.map((item) => item.id).filter((id): id is string => Boolean(id)),
+    latestObservationId: generation[0]?.id,
+    planObservationId: plan.id,
+    generationObservationId: plan.id,
+    evidenceObservationIds: generation
+      .map((item) => item.id)
+      .filter((id): id is string => Boolean(id)),
   };
 }
