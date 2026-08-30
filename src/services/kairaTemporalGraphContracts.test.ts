@@ -3,7 +3,9 @@ import type { WorldEventObservation } from "./worldModelEventStore";
 import {
   buildTemporalEventGraph,
   observationsAfter,
+  observationsAfterTransitively,
   observationsBefore,
+  retrieveTemporalChain,
   retrieveTemporalNeighbors,
 } from "./worldEventTemporalGraph";
 
@@ -119,6 +121,78 @@ describe("Kaira temporal event graph contracts", () => {
       .toEqual(["b"]);
     expect(retrieveTemporalNeighbors(observations, "b", "before").map((item) => item.id))
       .toEqual(["a"]);
+  });
+
+  it("traverses A -> B -> C -> D transitively with a bounded depth", () => {
+    const a = observation({
+      id: "a",
+      createdAt: "2026-08-20T12:00:00.000Z",
+      startAt: "2026-08-20T00:00:00.000Z",
+      endAt: "2026-08-20T23:59:59.999Z",
+    });
+    const b = observation({
+      id: "b",
+      createdAt: "2026-08-21T12:00:00.000Z",
+      startAt: "2026-08-21T00:00:00.000Z",
+      endAt: "2026-08-21T23:59:59.999Z",
+      referenceId: "a",
+      direction: "after",
+    });
+    const c = observation({
+      id: "c",
+      createdAt: "2026-08-22T12:00:00.000Z",
+      startAt: "2026-08-22T00:00:00.000Z",
+      endAt: "2026-08-22T23:59:59.999Z",
+      referenceId: "b",
+      direction: "after",
+    });
+    const d = observation({
+      id: "d",
+      createdAt: "2026-08-23T12:00:00.000Z",
+      startAt: "2026-08-23T00:00:00.000Z",
+      endAt: "2026-08-23T23:59:59.999Z",
+      referenceId: "c",
+      direction: "after",
+    });
+    const observations = [d, c, b, a];
+    const graph = buildTemporalEventGraph(observations);
+
+    expect(graph.issues).toEqual([]);
+    expect(observationsAfterTransitively(graph, "a", 2)).toEqual(["b", "c"]);
+    expect(retrieveTemporalChain(observations, "a", "after", 3).map((item) => item.id))
+      .toEqual(["b", "c", "d"]);
+  });
+
+  it("rejects temporal cycles and refuses transitive retrieval", () => {
+    const a = observation({
+      id: "a",
+      createdAt: "2026-08-20T12:00:00.000Z",
+      startAt: "2026-08-20T00:00:00.000Z",
+      referenceId: "c",
+      direction: "after",
+    });
+    const b = observation({
+      id: "b",
+      createdAt: "2026-08-21T12:00:00.000Z",
+      startAt: "2026-08-21T00:00:00.000Z",
+      referenceId: "a",
+      direction: "after",
+    });
+    const c = observation({
+      id: "c",
+      createdAt: "2026-08-22T12:00:00.000Z",
+      startAt: "2026-08-22T00:00:00.000Z",
+      referenceId: "b",
+      direction: "after",
+    });
+    a.event.temporal!.resolved = undefined;
+    b.event.temporal!.resolved = undefined;
+    c.event.temporal!.resolved = undefined;
+
+    const observations = [c, b, a];
+    const graph = buildTemporalEventGraph(observations);
+    expect(graph.issues.map((issue) => issue.invariant)).toContain("temporal_graph.cycle");
+    expect(retrieveTemporalChain(observations, "a", "after", 12)).toEqual([]);
   });
 
   it("reverses the edge when the current event is before the referenced event", () => {
