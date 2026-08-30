@@ -80,6 +80,18 @@ describe("KairaResponsePlan", () => {
     expect(plan.allowQuestion).toBe(true);
   });
 
+  it("does not let HOW-only humor style veto an allowed behavior permission", () => {
+    const contract = buildBehaviorContract(state("active"));
+    const plan = buildKairaResponsePlan(
+      contract,
+      dialogue(),
+      speech({ humorLevel: 0 }),
+    );
+
+    expect(contract.playfulness).toBe("allowed");
+    expect(plan.allowHumor).toBe(true);
+  });
+
   it("hard-closes disengaged state regardless of speech warmth", () => {
     const contract = buildBehaviorContract(state("disengaged", { hurtScore: 80 }));
     const plan = buildKairaResponsePlan(
