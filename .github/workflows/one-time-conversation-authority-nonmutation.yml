@@ -1,0 +1,43 @@
+name: One-time conversation authority nonmutation
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-conversation-authority-nonmutation.yml"
+      - "scripts/applyConversationAuthorityNonMutation.mjs"
+      - "src/services/kairaConversationAuthorityNonMutationContracts.test.ts"
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply non-mutating conversation authority
+        run: node scripts/applyConversationAuthorityNonMutation.mjs
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Non-mutation contract
+        run: npm test -- --run src/services/kairaConversationAuthorityNonMutationContracts.test.ts
+      - name: TypeScript check
+        run: npm run lint
+      - name: Full tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit integration
+        run: |
+          if git diff --quiet -- src/services/conversationStateAuthority.ts src/services/conversationStateAuthority.test.ts src/services/kairaStateBehaviorContracts.ts src/services/kairaStateBehaviorContracts.test.ts; then
+            echo "conversation authority already non-mutating"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/conversationStateAuthority.ts src/services/conversationStateAuthority.test.ts src/services/kairaStateBehaviorContracts.ts src/services/kairaStateBehaviorContracts.test.ts
+          git commit -m "refactor(kaira): make conversation authority non-mutating"
+          git pull --rebase origin main
+          git push origin main
