@@ -47,10 +47,11 @@ export function buildKairaResponsePlan(
     continueConversation &&
     contract.questions === "allowed" &&
     dialogue.allowFollowUpQuestion;
+  // Speech identity is HOW-only: humorLevel shapes expression, but cannot grant
+  // or veto the underlying WHAT/WHETHER permission.
   const allowHumor =
     continueConversation &&
-    contract.playfulness === "allowed" &&
-    speech.humorLevel >= 35;
+    contract.playfulness === "allowed";
   const allowAffection =
     continueConversation && contract.affection === "allowed";
   const allowForgiveness = contract.forgivenessGranted;
