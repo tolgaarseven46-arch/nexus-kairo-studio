@@ -5,9 +5,11 @@ on:
     paths:
       - ".github/workflows/one-time-dialogue-projection.yml"
       - "scripts/applyCanonicalDialogueProjection.mjs"
+      - "scripts/repairCanonicalDialogueProjection.mjs"
       - "src/services/kairaDialogueTurnProjection.ts"
       - "src/services/kairaDialogueTurnProjection.test.ts"
       - "src/services/kairaCurrentTurnDialogueAuthorityContracts.test.ts"
+      - "src/services/kairaSemanticConsumerAuthorityContracts.test.ts"
 
 permissions:
   contents: write
@@ -21,10 +23,12 @@ jobs:
           fetch-depth: 0
       - name: Apply canonical dialogue projection
         run: node scripts/applyCanonicalDialogueProjection.mjs
+      - name: Repair all attribution projection gates
+        run: node scripts/repairCanonicalDialogueProjection.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Authority contracts
-        run: npm test -- --run src/services/kairaCurrentTurnDialogueAuthorityContracts.test.ts src/services/kairaDialogueTurnProjection.test.ts
+        run: npm test -- --run src/services/kairaSemanticConsumerAuthorityContracts.test.ts src/services/kairaCurrentTurnDialogueAuthorityContracts.test.ts src/services/kairaDialogueTurnProjection.test.ts
       - name: TypeScript check
         run: npm run lint
       - name: Full tests
