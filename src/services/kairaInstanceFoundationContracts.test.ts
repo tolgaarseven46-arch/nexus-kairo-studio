@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_KAIRA_INSTANCE_ID,
+  instancePolicy,
+  memoryCacheKey,
   resolveKairaInstanceContext,
+  stateOwnerScope,
+  userMemoryOwnerScope,
   worldModelOwnerScope,
 } from "./kairaInstanceContext";
 import { evaluateKairaKnowledge } from "./kairaEpistemicGate";
@@ -43,13 +47,37 @@ function observation(id: string, instanceId?: string): WorldEventObservation {
 describe("Kaira multi-instance foundation contracts", () => {
   it("keeps legacy reference Kaira on the existing owner scope", () => {
     expect(worldModelOwnerScope("user-1")).toBe("user-1");
+    expect(stateOwnerScope("user-1")).toBe("user-1");
+    expect(userMemoryOwnerScope("user-1")).toBe("user-1");
     expect(resolveKairaInstanceContext().instanceId).toBe(DEFAULT_KAIRA_INSTANCE_ID);
   });
 
-  it("gives different Kaira instances physically separate world-model scopes", () => {
-    expect(worldModelOwnerScope("user-1", "kaira_a")).toBe("user-1__kaira_a");
-    expect(worldModelOwnerScope("user-1", "kaira_b")).toBe("user-1__kaira_b");
-    expect(worldModelOwnerScope("user-1", "kaira_a")).not.toBe(worldModelOwnerScope("user-1", "kaira_b"));
+  it("gives different Kaira instances physically separate persistent scopes", () => {
+    for (const scope of [worldModelOwnerScope, stateOwnerScope, userMemoryOwnerScope, memoryCacheKey]) {
+      expect(scope("user-1", "kaira_a")).toBe("user-1__kaira_a");
+      expect(scope("user-1", "kaira_b")).toBe("user-1__kaira_b");
+      expect(scope("user-1", "kaira_a")).not.toBe(scope("user-1", "kaira_b"));
+    }
+  });
+
+  it("keeps Welcome Kaira intentionally lightweight and non-biographical", () => {
+    expect(instancePolicy("welcome")).toEqual({
+      persistentIdentity: false,
+      persistentAutobiography: false,
+      persistentRelationship: false,
+      persistentUserMemory: false,
+      canConsolidateCoreMemories: false,
+      purpose: "onboarding",
+    });
+  });
+
+  it("allows Individual Kaira to own a durable life", () => {
+    const policy = instancePolicy("individual");
+    expect(policy.persistentIdentity).toBe(true);
+    expect(policy.persistentAutobiography).toBe(true);
+    expect(policy.persistentRelationship).toBe(true);
+    expect(policy.persistentUserMemory).toBe(true);
+    expect(policy.canConsolidateCoreMemories).toBe(true);
   });
 
   it("treats legacy observations without instance id as reference Kaira only", () => {
