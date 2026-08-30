@@ -6,7 +6,7 @@ function row(input: {
   id: string;
   at: string;
   polarity?: "positive" | "negative";
-  modality?: "fact" | "plan";
+  modality?: "plan" | "unspecified";
   lifecycle?: "executed" | "unspecified";
 }): WorldEventObservation {
   return {
@@ -33,7 +33,7 @@ function row(input: {
         actorKey: "ali",
         contentKey: "istifa",
       },
-      modality: { kind: input.modality || "fact", strength: 0.9 },
+      modality: { kind: input.modality || "unspecified", strength: input.modality === "plan" ? 0.9 : 0 },
       lifecycle: {
         kind: input.lifecycle || "unspecified",
         strength: input.lifecycle === "executed" ? 0.9 : 0,
