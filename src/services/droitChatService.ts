@@ -20,6 +20,7 @@ import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngin
 import { saveTestSessionLayerAudit } from "./testSessionLayerAuditService";
 import { auth } from "../lib/firebase";
 import { requestCanonicalLanguageUnderstanding, type ClientLanguageUnderstandingResult } from "./clientLanguageUnderstanding";
+import { resolveKairaInstanceContext, type KairaInstanceType } from "./kairaInstanceContext";
 
 export type KairoProvider = "gemini" | "openrouter";
 export type KairoProviderUsed = KairoProvider | "local_language";
@@ -46,6 +47,8 @@ export interface SendKairoChatOptions {
   userName?: string;
   suppressRecentMemory?: boolean;
   sessionId?: string;
+  kairaInstanceId?: string;
+  kairaInstanceType?: KairaInstanceType;
 }
 
 export interface KairoChatResponse {
@@ -58,6 +61,8 @@ export interface KairoChatResponse {
   timings?: KairoTimingMetrics;
   sessionId?: string;
   turnId?: string;
+  kairaInstanceId?: string;
+  kairaInstanceType?: KairaInstanceType;
   languageUnderstanding?: ClientLanguageUnderstandingResult;
 }
 
@@ -70,10 +75,11 @@ function resolveConversationUserId(explicitUserId?: string) {
   return auth.currentUser?.uid || "anonymous";
 }
 
-function freshSessionId(userId: string) {
+function freshSessionId(userId: string, instanceId: string) {
   const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeInstanceId = instanceId.replace(/[^a-zA-Z0-9_-]/g, "_");
   const random = Math.random().toString(36).slice(2, 8);
-  return `session_${safeUserId}_${Date.now()}_${random}`;
+  return `session_${safeUserId}_${safeInstanceId}_${Date.now()}_${random}`;
 }
 
 const clamp100 = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
@@ -160,10 +166,11 @@ function applyTemperamentBeforeKdm(
 }
 
 export const droitChatService = {
-  async sendMessage({ userMessage, personality, dynamicState, history = [], characterInfo = { name: "KAIRO", roleTitle: "Sunucu Yöneticisi", raceName: "Sentetik Droit" }, provider = "openrouter", userId: explicitUserId, userName = "Kullanıcı", suppressRecentMemory = false, sessionId }: SendKairoChatOptions): Promise<KairoChatResponse> {
+  async sendMessage({ userMessage, personality, dynamicState, history = [], characterInfo = { name: "KAIRO", roleTitle: "Sunucu Yöneticisi", raceName: "Sentetik Droit" }, provider = "openrouter", userId: explicitUserId, userName = "Kullanıcı", suppressRecentMemory = false, sessionId, kairaInstanceId, kairaInstanceType }: SendKairoChatOptions): Promise<KairoChatResponse> {
     const totalStart = performance.now();
     const userId = resolveConversationUserId(explicitUserId);
-    const resolvedSessionId = sessionId?.trim() || freshSessionId(userId);
+    const kairaInstance = resolveKairaInstanceContext({ instanceId: kairaInstanceId, instanceType: kairaInstanceType });
+    const resolvedSessionId = sessionId?.trim() || freshSessionId(userId, kairaInstance.instanceId);
     const prepStart = performance.now();
     const fineTune = readFineTuneProfile();
     let languageUnderstanding: ClientLanguageUnderstandingResult;
@@ -214,7 +221,7 @@ export const droitChatService = {
     const behaviorProfile = computeBehaviorProfile(runtimePersonality, userMessage);
     const clientPrepMs = Math.round(performance.now() - prepStart);
 
-    const payload = { sessionId: resolvedSessionId, userId, userName, userMessage, semanticEvent, character: characterInfo, personality: runtimePersonality, behaviorProfile, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory };
+    const payload = { sessionId: resolvedSessionId, userId, userName, userMessage, semanticEvent, character: characterInfo, personality: runtimePersonality, behaviorProfile, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     try {
@@ -253,7 +260,7 @@ export const droitChatService = {
         rawDynamicStateBefore: dynamicState,
         temperamentAdjustedState,
       });
-      return { reply, profile: behaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId, languageUnderstanding };
+      return { reply, profile: behaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId, kairaInstanceId: data.kairaInstanceId || kairaInstance.instanceId, kairaInstanceType: data.kairaInstanceType || kairaInstance.instanceType, languageUnderstanding };
     } catch (err: any) {
       if (err?.name === "AbortError") throw new Error("Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.");
       throw err;
