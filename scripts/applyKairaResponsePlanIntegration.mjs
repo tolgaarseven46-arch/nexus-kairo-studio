@@ -84,6 +84,21 @@ persistence = persistence.replaceAll(
 );
 fs.writeFileSync('src/services/kdmPersistenceService.ts', persistence);
 
+let nexus = fs.readFileSync('src/types/nexus.ts', 'utf8');
+nexus = replaceOrThrow(
+  nexus,
+  '    worldMemoryGuard?: unknown;\n  };\n}\n\nexport interface TestSessionSummary',
+  '    worldMemoryGuard?: unknown;\n    responsePlan?: unknown;\n  };\n}\n\nexport interface TestSessionSummary',
+  'turn record responsePlan metadata type',
+);
+nexus = replaceOrThrow(
+  nexus,
+  '  lastWorldMemoryGuard?: unknown;\n}',
+  '  lastWorldMemoryGuard?: unknown;\n  lastResponsePlan?: unknown;\n}',
+  'restored responsePlan type',
+);
+fs.writeFileSync('src/types/nexus.ts', nexus);
+
 let chat = fs.readFileSync('src/services/droitChatService.ts', 'utf8');
 chat = replaceOrThrow(
   chat,
