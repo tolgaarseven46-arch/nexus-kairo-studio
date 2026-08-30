@@ -124,6 +124,55 @@ describe("Kaira world event retrieval coordinator contracts", () => {
     );
   });
 
+  it("prioritizes a full proposition anchor over a coarser named event anchor", () => {
+    const toUser = observation({
+      id: "to-user",
+      createdAt: "2026-08-20T10:00:00.000Z",
+    });
+    toUser.event.eventType = "insult";
+    toUser.event.actor = { name: "Ayşe", source: "explicit_name", confidence: 0.95 };
+    toUser.event.target = { id: "current_user", name: "Mert", source: "first_person", confidence: 1 };
+    toUser.event.proposition = {
+      key: "ayşe|insult|current_user",
+      predicate: "insult",
+      actorKey: "ayşe",
+      targetKey: "current_user",
+    };
+
+    const toKaira = observation({
+      id: "to-kaira",
+      createdAt: "2026-08-20T10:30:00.000Z",
+    });
+    toKaira.event.eventType = "insult";
+    toKaira.event.actor = { name: "Ayşe", source: "explicit_name", confidence: 0.95 };
+    toKaira.event.target = { id: "kaira", name: "Kaira", source: "second_person", confidence: 1 };
+    toKaira.event.proposition = {
+      key: "ayşe|insult|kaira",
+      predicate: "insult",
+      actorKey: "ayşe",
+      targetKey: "kaira",
+    };
+
+    const child = observation({
+      id: "child",
+      createdAt: "2026-08-21T10:00:00.000Z",
+      referenceId: "to-user",
+      direction: "after",
+    });
+
+    const result = coordinateWorldEventRetrieval({
+      message: "Ayşe bana salak dedikten sonra ne oldu?",
+      sessionId: "session-1",
+      observations: [child, toKaira, toUser],
+    });
+
+    expect(result.propositionAnchorResolution?.status).toBe("resolved");
+    expect(result.propositionAnchorResolution?.anchorObservationId).toBe("to-user");
+    expect(result.explicitAnchorResolution).toBeUndefined();
+    expect(result.items.map((item) => item.observation.id)).toEqual(["child"]);
+    expect(result.items[0].reasons).toContain("proposition_anchor:to-user");
+  });
+
   it("routes the existing live ranker through graph retrieval for a single session", () => {
     const first = observation({
       id: "a",
