@@ -494,3 +494,13 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `4784dcf` (`fix(kaira): normalize persisted fine-tune profiles`). Targeted contractlar, TypeScript, full regression ve production build başarıyla geçti.
 - Geçici migration workflow/script kaldırıldı.
 - Sonraki audit adayı: CharacterTab'daki LAYERS fine-tune key registry ile her runtime engine'in beklediği key seti karşılaştırılacak; aynı isimde görünmeyen veya UI'da olup hiçbir runtime engine tarafından tüketilmeyen parametre varsa sessiz no-op slider olarak işaretlenecek.
+
+
+## 46. Expression wordplay fine-tune runtime wiring — 2026-08-31
+- `CharacterTab` içinde `expression.humor.wordplay` (`Kelime mizahı`) slider'ı kullanıcıya açıktı ancak `expressionStyleEngine` bu key'i hiç okumuyordu; slider sessiz bir no-op durumundaydı.
+- `ExpressionStyleProfile` artık `wordplay` alanını taşır, `expressionStyleFromFineTune(...)` persisted key'i okur ve humor `dominantMode` union'ı `wordplay` modunu içerir.
+- Wordplay adayı diğer mizah türleriyle aynı context gate/inhibition zincirine katılır. Playful context algısına `kelime oyunu`, `laf oyunu`, `sözcük oyunu` ifadeleri eklendi.
+- `kairaExpressionWordplayFineTuneContracts.test.ts` hem UI key'inin runtime profile'a taşındığını hem diğer mizah türleri kapalıyken wordplay'in gerçek dominant humor mode olabildiğini doğrular.
+- Entegrasyon commit'i: `8a2a1ef` (`fix(kaira): wire wordplay fine-tune into expression runtime`). Targeted wordplay/behavior integration contractları, TypeScript, full regression ve production build başarıyla geçti.
+- Geçici wordplay migration workflow/script kaldırıldı.
+- Sonraki audit: CharacterTab LAYERS registry'nin kalan personality/temperament/motivation/values/preferences/social/boundaries/expression key'leri runtime reader'larla karşılaştırılacak; UI'da olup tüketilmeyen parametreler sessiz no-op olarak kapatılacak.
