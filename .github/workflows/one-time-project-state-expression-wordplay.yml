@@ -1,0 +1,37 @@
+name: One-time project state expression wordplay
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-expression-wordplay.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 46. Expression wordplay fine-tune runtime wiring — 2026-08-31\n- `CharacterTab` içinde `expression.humor.wordplay` (`Kelime mizahı`) slider'ı kullanıcıya açıktı ancak `expressionStyleEngine` bu key'i hiç okumuyordu; slider sessiz bir no-op durumundaydı.\n- `ExpressionStyleProfile` artık `wordplay` alanını taşır, `expressionStyleFromFineTune(...)` persisted key'i okur ve humor `dominantMode` union'ı `wordplay` modunu içerir.\n- Wordplay adayı diğer mizah türleriyle aynı context gate/inhibition zincirine katılır. Playful context algısına `kelime oyunu`, `laf oyunu`, `sözcük oyunu` ifadeleri eklendi.\n- `kairaExpressionWordplayFineTuneContracts.test.ts` hem UI key'inin runtime profile'a taşındığını hem diğer mizah türleri kapalıyken wordplay'in gerçek dominant humor mode olabildiğini doğrular.\n- Entegrasyon commit'i: `8a2a1ef` (`fix(kaira): wire wordplay fine-tune into expression runtime`). Targeted wordplay/behavior integration contractları, TypeScript, full regression ve production build başarıyla geçti.\n- Geçici wordplay migration workflow/script kaldırıldı.\n- Sonraki audit: CharacterTab LAYERS registry'nin kalan personality/temperament/motivation/values/preferences/social/boundaries/expression key'leri runtime reader'larla karşılaştırılacak; UI'da olup tüketilmeyen parametreler sessiz no-op olarak kapatılacak.\n'''
+          if '## 46. Expression wordplay fine-tune runtime wiring — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record expression wordplay fine-tune wiring"
+          git pull --rebase origin main
+          git push origin main
