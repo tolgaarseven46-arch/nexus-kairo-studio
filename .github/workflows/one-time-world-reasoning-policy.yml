@@ -1,0 +1,33 @@
+name: One-time world reasoning policy integration
+
+on:
+  push:
+    paths:
+      - scripts/integrate-world-reasoning-policy.mjs
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply guarded world reasoning policy integration
+        run: node scripts/integrate-world-reasoning-policy.mjs
+      - name: Commit integration
+        run: |
+          if git diff --quiet -- server.ts src/services/kairaContractRegistry.ts; then
+            echo "No world reasoning policy integration changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts src/services/kairaContractRegistry.ts
+          git commit -m "feat(reasoning): integrate bounded world-state policy at runtime"
+          git push origin HEAD:main
