@@ -4,6 +4,8 @@ import {
   detectWorldEventLifecycleSignal,
   resolvePlanLifecycle,
 } from "./worldEventLifecycle";
+import { resolvePlanOutcomeRecall } from "./worldEventOutcomeRecallPolicy";
+import { coordinateWorldEventRetrieval } from "./worldEventRetrievalCoordinator";
 
 function observation(input: {
   id: string;
@@ -90,5 +92,30 @@ describe("Kaira plan lifecycle contracts", () => {
       polarity: "negative",
     });
     expect(resolvePlanLifecycle([refusal], "mert|general|?|resign").state).toBe("unknown");
+  });
+
+  it("resolves a bounded outcome query to one proposition without lexical guessing", () => {
+    const plan = observation({ id: "plan", createdAt: "2026-08-20T10:00:00.000Z", modality: "commitment" });
+    const done = observation({ id: "done", createdAt: "2026-08-21T10:00:00.000Z", lifecycle: "executed" });
+    const recall = resolvePlanOutcomeRecall({ message: "Mert istifa etti mi?", observations: [done, plan] });
+
+    expect(recall.matched).toBe(true);
+    expect(recall.propositionKey).toBe("mert|general|?|resign");
+    expect(recall.resolution?.state).toBe("executed");
+  });
+
+  it("routes outcome recall through lifecycle mode and exposes lifecycle evidence", () => {
+    const plan = observation({ id: "plan", createdAt: "2026-08-20T10:00:00.000Z", modality: "commitment" });
+    const cancelled = observation({ id: "cancelled", createdAt: "2026-08-21T10:00:00.000Z", lifecycle: "cancelled" });
+    const result = coordinateWorldEventRetrieval({
+      message: "Mert istifadan vazgeçti mi?",
+      sessionId: "session-1",
+      observations: [cancelled, plan],
+    });
+
+    expect(result.mode).toBe("plan_outcome");
+    expect(result.planLifecycleResolution?.state).toBe("cancelled");
+    expect(result.items.map((item) => item.observation.id)).toEqual(expect.arrayContaining(["plan", "cancelled"]));
+    expect(result.items.every((item) => item.reasons.includes("plan_lifecycle_evidence"))).toBe(true);
   });
 });
