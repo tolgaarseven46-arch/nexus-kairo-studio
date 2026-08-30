@@ -1,0 +1,37 @@
+name: One-time project state personality persistence
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-personality-persistence.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 41. Personality persistence normalization boundary — 2026-08-31\n- Firestore load mapper daha önce nested/legacy personality alanlarında `typeof value === 'number'` kontrolüyle `NaN` ve 0..100 dışı değerleri de kabul edip UI'a taşıyabiliyordu. Save mapper da flat trait değerlerini canonical normalization olmadan structured Firestore payload'ına yazabiliyordu.\n- `traitsToStructuredPersonality(...)` artık serialization öncesi `normalizeDroitPersonality(traits)` çağırır ve tüm personality değerlerini normalized kaynaktan yazar; `decisionMaking` için kalan ham trait bypass'ı da kapatıldı.\n- `structuredPersonalityToTraits(...)` mapped Firestore verisini UI'a döndürmeden önce canonical normalizer'dan geçirir. Invalid/non-object raw personality fallback'ı da `normalizeDroitPersonality(fallback)` kullanır.\n- Sonuç: eski kirli persisted kayıtlar memory/UI boundary'sinde güvenli hale gelir; yeni invalid/out-of-range/non-finite personality değerleri bu service üzerinden Firestore'a yazılamaz.\n- `kairaPersonalityPersistenceNormalizationContracts.test.ts` load/save normalization ve raw serialization bypass'larının geri gelmemesini doğrular. `kairaPersonalityDefaultSourceContracts.test.ts` import genişlemesine dayanıklı hale getirildi.\n- Entegrasyon commit'i: `3de2a71` (`fix(kaira): normalize personality persistence boundaries`). Targeted persistence/default/normalizer contractları, TypeScript, full regression (`518/518`) ve production build başarıyla geçti.\n- Geçici persistence migration workflow/script kaldırıldı; bölüm 40'ın geçici docs workflow'u da temizlendi.\n- Persisted kirli değerleri load sırasında Firestore'a otomatik geri yazan self-heal davranışı eklenmedi; read path'in gizli write üretmesi için ürün gereksinimi yok.\n- Sonraki audit adayı: `droitBehaviorEngine.ts` içindeki `effectiveEmpathy` normalize 0..1 değer olmasına rağmen `>= 75` eşiğiyle karşılaştırılıyor olabilir; bu branch'in fiilen dead olup olmadığı testlerle doğrulanacak.\n'''
+          if '## 41. Personality persistence normalization boundary — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record personality persistence normalization"
+          git pull --rebase origin main
+          git push origin main
