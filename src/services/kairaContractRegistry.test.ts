@@ -18,6 +18,7 @@ describe("Kaira contract registry", () => {
       "world-model-ownership",
       "world-event-retrieval",
       "temporal-evidence",
+      "contradiction-evidence",
       "relationship-state",
       "state-to-behavior",
       "learned-policy-boundary",
@@ -25,6 +26,15 @@ describe("Kaira contract registry", () => {
     ]) {
       expect(activeContractVersion(id)?.status).toBe("active");
     }
+  });
+
+  it("activates Canonical World Event v2 after explicit semantic revision", () => {
+    expect(activeContractVersion("canonical-world-event")?.version).toBe(2);
+    expect(
+      KAIRA_CONTRACT_REGISTRY.find(
+        (item) => item.id === "canonical-world-event" && item.version === 1,
+      )?.status,
+    ).toBe("superseded");
   });
 
   it("does not allow anonymous contracts without consumers", () => {
