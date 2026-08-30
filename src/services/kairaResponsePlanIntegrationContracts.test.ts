@@ -18,7 +18,7 @@ describe("canonical KairaResponsePlan runtime integration", () => {
 
   it("feeds the same plan to local and AI verbalizers", () => {
     expect(local).toContain("responsePlan?: KairaResponsePlan");
-    expect(server).toMatch(/dialogueDecision\.move,\s*responsePlan,\s*\)/u);
+    expect(server).toMatch(/dialogueDecision\.move,\s*responsePlan,\s*(?:languageUnderstanding\.event,\s*)?\)/u);
     expect(server).toContain("${responsePlanInstruction}\\nKDM:");
   });
 

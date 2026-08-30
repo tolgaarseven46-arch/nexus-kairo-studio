@@ -550,6 +550,7 @@ app.post("/api/chat", async (req, res) => {
       cleanHistory,
       userMessage,
       userName,
+      languageUnderstanding.event,
     );
     const dialogueDecisionInstruction =
       buildDialogueDecisionInstruction(dialogueDecision);
@@ -603,6 +604,7 @@ app.post("/api/chat", async (req, res) => {
         stateUserId,
         dialogueDecision.move,
         responsePlan,
+        languageUnderstanding.event,
       ),
       kdmMs = Math.round(now() - kdmStart),
       validatedMemory = persistentMemory.filter(

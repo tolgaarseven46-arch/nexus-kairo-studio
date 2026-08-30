@@ -1,10 +1,9 @@
 import type { ConversationTurn } from "./kairoConversationGrounding";
 import {
-  analyzeDialogueTurn,
   buildDialogueClaimLedger,
   type DialogueClaim,
 } from "./kairoDialogueChaosEngine";
-import { isLocalEmotionalOpening } from "./kairoEmotionalLanguage";
+import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 
 export type DialogueMove =
   | "grounded_recall"
@@ -33,8 +32,6 @@ export interface DialogueOutputStyle {
   userMessage?: string;
 }
 
-const RECALL_RE =
-  /(ne yapacaktı|ne yapmayı düşünüyordu|az önce ne dedi|ne demişti|ne söylemişti|hatırlıyor musun|kim söylemişti)/i;
 const SPECULATION_RE =
   /\b(büyük ihtimalle|muhtemelen|belki|herhalde|kafamdan|tahminim)\b/i;
 const EMOTIONAL_OVERCARE_RE =
@@ -101,13 +98,17 @@ function supportedClaimsFor(
 
 function isFirstEmotionalOpening(
   history: ConversationTurn[],
-  userMessage: string,
+  event: SemanticEvent,
 ): boolean {
-  if (!isLocalEmotionalOpening(userMessage)) return false;
+  const currentIsOpening = event.socialRoutine === "emotional_opening" || event.intent === "emotional_share";
+  if (!currentIsOpening) return false;
   return !history
     .filter((turn) => turn.sender === "user")
     .slice(-4)
-    .some((turn) => isLocalEmotionalOpening(String(turn.text || "")));
+    .some((turn) => {
+      const previous = interpretSemanticEvent(String(turn.text || ""));
+      return previous.socialRoutine === "emotional_opening" || previous.intent === "emotional_share";
+    });
 }
 
 function isShortAnswerToPreviousKairaTurn(
@@ -127,13 +128,14 @@ export function planDialogueResponse(
   history: ConversationTurn[],
   userMessage: string,
   userName: string,
+  semanticEvent?: SemanticEvent,
 ): DialogueDecisionPlan {
-  const analysis = analyzeDialogueTurn(userMessage);
+  const event = semanticEvent ?? interpretSemanticEvent(userMessage);
   const target = recallTarget(history, userMessage, userName);
   const claims = buildDialogueClaimLedger(history, userMessage, userName);
   const supportedClaims = supportedClaimsFor(claims, target);
 
-  if (analysis.acts.includes("confusion_or_challenge")) {
+  if (event.discourseAct === "confusion_or_challenge") {
     return {
       move: "repair_or_rephrase",
       allowFollowUpQuestion: false,
@@ -158,7 +160,7 @@ export function planDialogueResponse(
     };
   }
 
-  if (RECALL_RE.test(userMessage)) {
+  if (event.discourseAct === "recall_request") {
     return {
       move: "grounded_recall",
       target,
@@ -171,7 +173,7 @@ export function planDialogueResponse(
         : "Sorulan kişi için etkin kayıt yok; reddedilmiş iddiayı canlandırmadan bilinmediğini söyle.",
     };
   }
-  if (isFirstEmotionalOpening(history, userMessage)) {
+  if (isFirstEmotionalOpening(history, event) && !event.adviceRequested) {
     return {
       move: "invite_emotional_context",
       allowFollowUpQuestion: true,
@@ -183,7 +185,7 @@ export function planDialogueResponse(
         "İlk duygusal açılışta yalnızca tek kısa merak tepkisi üret: hmm niye, ne oldu, niye ya veya hayırdır ritmi. İkinci açıklama, metafor ya da yeniden ifade ekleme. Sebep anlatılmadan teselli, tavsiye, lakap, espri veya fiziksel yakınlık üretme; ilişki seviyesini bu turda zorla sergileme.",
     };
   }
-  if (analysis.acts.includes("correction")) {
+  if (event.discourseAct === "correction") {
     return {
       move: "acknowledge_correction",
       allowFollowUpQuestion: false,
@@ -194,7 +196,7 @@ export function planDialogueResponse(
         "Düzeltmeyi kabul et; eski iddiayı savunma veya yeni ayrıntı ekleme.",
     };
   }
-  if (analysis.acts.includes("topic_shift")) {
+  if (event.discourseAct === "topic_shift") {
     return {
       move: "follow_topic_shift",
       allowFollowUpQuestion: false,
@@ -205,7 +207,7 @@ export function planDialogueResponse(
         "Yeni konuya doğal biçimde geç; kapanan konuyu zorla geri getirme.",
     };
   }
-  if (analysis.acts.includes("banter")) {
+  if (event.intent === "banter") {
     return {
       move: "join_banter",
       allowFollowUpQuestion: false,
@@ -217,7 +219,7 @@ export function planDialogueResponse(
         "Kullanıcının kendi şakasına yalnızca tek kısa gündelik tepkiyle katıl. Yeni internet esprisi, oyun metaforu, seçenek sorusu veya emoji ekleme; şakayı kalıcı gerçek ya da plan yapma.",
     };
   }
-  if (analysis.acts.includes("question")) {
+  if (event.intent === "question" || event.intent === "information_request") {
     return {
       move: "answer_or_clarify",
       allowFollowUpQuestion: true,

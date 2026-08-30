@@ -1,5 +1,21 @@
 export type SemanticValence = "positive" | "negative" | "neutral";
 export type SemanticTarget = "kaira" | "third_party" | "event" | "unknown";
+export type SemanticSocialRoutine =
+  | "none"
+  | "greeting"
+  | "how_are_you"
+  | "what_doing"
+  | "thanks"
+  | "agreement"
+  | "goodbye"
+  | "good_night"
+  | "emotional_opening";
+export type SemanticDiscourseAct =
+  | "none"
+  | "correction"
+  | "topic_shift"
+  | "recall_request"
+  | "confusion_or_challenge";
 export type SemanticIntent =
   | "greeting"
   | "question"
@@ -29,6 +45,9 @@ export interface SemanticEvent {
   raw: string;
   normalized: string;
   intent: SemanticIntent;
+  socialRoutine?: SemanticSocialRoutine;
+  discourseAct?: SemanticDiscourseAct;
+  adviceRequested?: boolean;
   valence: SemanticValence;
   target: SemanticTarget;
   relationalAct: RelationalAct;
@@ -91,7 +110,21 @@ const VENTING_PROFANITY_RE = word("amk|aq|mk");
 const EMOTIONAL_SHARE_RE = /(moralim.{0,30}bozuk|üzgünüm|çok mutluyum|mutluyum|bunaldım|canım (?:çok )?sıkkın|kendimi (?:çok )?kötü hissediyorum|kendimi (?:çok )?iyi hissediyorum|kaygılıyım|endişeliyim|yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|moodum düşük|keyfim yerinde değil|içim sıkılıyor)/u;
 const LOW_MOOD_RE = /(moralim.{0,30}bozuk|üzgün|kötü hissed|bunaldım|canım (?:çok )?sıkkın|kaygı|endişe|stres|yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|moodum düşük|keyfim yerinde değil|içim sıkılıyor)/u;
 const INFORMATION_REQUEST_RE = /(?:^|\s)(neden|niye|nasıl|nedir|ne demek|kim|kime|kimi|hangi|hangisi|nerede|neresi)(?:\s|$|[?.!,])/u;
-const RECALL_QUESTION_RE = /(?:^|\s)(?:neydi|ne yapacaktı)(?:\s|$|[?.!,])|ne\s+yapmayı\s+düşünüyordu|hatırlıyor\s+musun|hatırladın\s+mı/u;
+const RECALL_QUESTION_RE = /(?:^|\s)(?:neydi|ne yapacaktı)(?:\s|$|[?.!,])|ne\s+yapmayı\s+düşünüyordu|hatırlıyor\s+musun|hatırladın\s+mı|az önce ne dedi|ne demişti|ne söylemişti|kim söylemişti/u;
+const CORRECTION_RE = /(?:^|\s)(?:yok|hayır|yanlış|değil|değildi|ben değildim|o ben değildim|onu demedim|öyle demedim|demek istemedim|düzelteyim|düzeltiyorum)(?:\s|$|[?.!,])/u;
+const TOPIC_SHIFT_RE = /(?:^|\s)(?:bu arada|neyse|konu dışı|şey diyeceğim|şey dicem|onu boşver|geç onu)(?:\s|$|[?.!,])/u;
+
+function inferSocialRoutine(text: string, intent: SemanticIntent): SemanticSocialRoutine {
+  if (/^(?:selam|merhaba|hey|heyy)(?:\s+(?:kaira|kairo|kanka|aga|lan))?[.!?…]*$/u.test(text)) return "greeting";
+  if (/^(?:naber|nabr|nber|nasılsın)(?:\s+(?:kaira|kairo|kanka|aga|lan))?[.!?…]*$/u.test(text)) return "how_are_you";
+  if (/^(?:ne yapıyorsun|napıyorsun|napıyon|napion|napiyon)(?:\s+(?:kaira|kairo|kanka|aga|lan))?[.!?…]*$/u.test(text)) return "what_doing";
+  if (/^(?:sağol|sağ ol|teşekkürler|teşekkür ederim|eyvallah|thx)[.!?…]*$/u.test(text)) return "thanks";
+  if (/^(?:aynen|evet|he|hıhı|tamam|ok|okey)[.!?…]*$/u.test(text)) return "agreement";
+  if (/^(?:görüşürüz|bb|bay bay|hoşça kal)[.!?…]*$/u.test(text)) return "goodbye";
+  if (/^(?:iyi geceler|ig)[.!?…]*$/u.test(text)) return "good_night";
+  if (intent === "emotional_share") return "emotional_opening";
+  return "none";
+}
 
 function inferTarget(text: string, negative: boolean, insult: boolean, rejection: boolean, directCommand: boolean, relationalAct: RelationalAct): SemanticTarget {
   if (relationalAct !== "none") return "kaira";
@@ -136,6 +169,16 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   const confusion = CONFUSION_RE.test(text);
   const frustration = FRUSTRATION_RE.test(text) ? 0.75 : challenge ? 0.6 : VENTING_PROFANITY_RE.test(text) ? 0.35 : 0;
   const emotionalShare = EMOTIONAL_SHARE_RE.test(text);
+  const adviceRequested = /(?:ne\s+yapmalıyım|ne\s+yapayım|sence\s+ne\s+yap|tavsiye|öner(?:in|i|ir)?|yardım\s+et|akıl\s+ver)/u.test(text);
+  const discourseAct: SemanticDiscourseAct = RECALL_QUESTION_RE.test(text)
+    ? "recall_request"
+    : confusion
+      ? "confusion_or_challenge"
+      : CORRECTION_RE.test(text)
+        ? "correction"
+        : TOPIC_SHIFT_RE.test(text)
+          ? "topic_shift"
+          : "none";
   const emotionalLoad = LOW_MOOD_RE.test(text) ? 0.8 : emotionalShare ? 0.45 : 0;
   const negative = insult || rejection || coercion > 0 || manipulation > 0 || privacyViolation > 0 || frustration > 0 || mockery;
   const target = inferTarget(text, negative, insult, rejection, directCommand, relationalAct);
@@ -157,6 +200,8 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   else if (/^(selam|merhaba|hey|naber|nabr|nasılsın)(?:\s|$)/u.test(text)) intent = "greeting";
   else if (/(😂|🤣|😄|😅|:d|haha|hahah|taşak)/iu.test(text)) intent = "banter";
 
+  const socialRoutine = inferSocialRoutine(text, intent);
+
   const valence: SemanticValence =
     apology || repairAttempt || support > 0 || compliment > 0 || affection > 0
       ? "positive"
@@ -168,7 +213,7 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   const severity = redLine ? 1 : clamp01(Math.max(disrespect, coercion * 0.85, manipulation * 0.8, privacyViolation * 0.8, rejection ? 0.65 : 0, frustration * 0.55));
 
   return {
-    raw: message, normalized: text, intent, valence, target, relationalAct, relationalIntensity, severity,
+    raw: message, normalized: text, intent, socialRoutine, discourseAct, adviceRequested, valence, target, relationalAct, relationalIntensity, severity,
     insult, redLine, disrespect, coercion, manipulation, privacyViolation, apology, repairAttempt,
     stopQuestions, stopTalking, frustration, emotionalLoad, affection, support, compliment,
   };

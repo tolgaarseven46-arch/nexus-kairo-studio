@@ -4,6 +4,8 @@ import {
   type SemanticIntent,
   type SemanticTarget,
   type SemanticValence,
+  type SemanticSocialRoutine,
+  type SemanticDiscourseAct,
 } from "./semanticEventEngine";
 
 export type SemanticEventSource = "client_shared" | "server_recomputed";
@@ -31,6 +33,8 @@ const INTENTS = new Set<SemanticIntent>([
   "general_chat",
 ]);
 
+const SOCIAL_ROUTINES = new Set<SemanticSocialRoutine>(["none", "greeting", "how_are_you", "what_doing", "thanks", "agreement", "goodbye", "good_night", "emotional_opening"]);
+const DISCOURSE_ACTS = new Set<SemanticDiscourseAct>(["none", "correction", "topic_shift", "recall_request", "confusion_or_challenge"]);
 const VALENCES = new Set<SemanticValence>(["positive", "negative", "neutral"]);
 const TARGETS = new Set<SemanticTarget>(["kaira", "third_party", "event", "unknown"]);
 
@@ -52,6 +56,9 @@ export function isSemanticEvent(value: unknown): value is SemanticEvent {
     typeof event.raw === "string" &&
     typeof event.normalized === "string" &&
     INTENTS.has(event.intent as SemanticIntent) &&
+    (event.socialRoutine === undefined || SOCIAL_ROUTINES.has(event.socialRoutine as SemanticSocialRoutine)) &&
+    (event.discourseAct === undefined || DISCOURSE_ACTS.has(event.discourseAct as SemanticDiscourseAct)) &&
+    (event.adviceRequested === undefined || typeof event.adviceRequested === "boolean") &&
     VALENCES.has(event.valence as SemanticValence) &&
     TARGETS.has(event.target as SemanticTarget) &&
     finite01(event.severity) &&

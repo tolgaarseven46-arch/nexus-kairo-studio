@@ -5,7 +5,7 @@ import type {
 } from "../types/nexus";
 import type { DialogueMove } from "./kairoDialogueDecisionEngine";
 import type { KairaResponsePlan } from "./kairaResponsePlan";
-import { classifyLocalEmotionalIntent } from "./kairoEmotionalLanguage";
+import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 import { chooseLanguageReply, learnLanguageReply } from "./kairoLanguageMemory";
 import { normalizeKairoLanguageInput } from "./kairoLanguageNormalizer";
 import { resolveKairoRelationshipLevel } from "./kairoSpeechIdentity";
@@ -29,17 +29,28 @@ export interface LocalLanguageResult {
   normalization?: ReturnType<typeof normalizeKairoLanguageInput>;
 }
 
-function detectIntent(text: string, dialogueMove?: DialogueMove): LocalIntent | null {
-  if (dialogueMove === "invite_emotional_context" && classifyLocalEmotionalIntent(text)) return "emotional_opening";
-  const t = normalizeKairoLanguageInput(text).canonical;
-  if (/^(selam|merhaba|hey|heyy)$/.test(t)) return "greeting";
-  if (/^(naber|nasılsın)$/.test(t)) return "how_are_you";
-  if (t === "ne yapıyorsun") return "what_doing";
-  if (/^(sağol|teşekkürler|eyvallah|thx)$/.test(t)) return "thanks";
-  if (/^(aynen|evet|he|hıhı|tamam|ok|okey)$/.test(t)) return "agreement";
-  if (/^(görüşürüz|bb|bay bay|hoşça kal)$/.test(t)) return "goodbye";
-  if (/^(iyi geceler|ig)$/.test(t)) return "good_night";
-  return null;
+function localIntentFromSemanticEvent(
+  message: string,
+  semanticEvent?: SemanticEvent,
+): LocalIntent | null {
+  const event = semanticEvent ?? interpretSemanticEvent(message);
+  if (event.adviceRequested) return null;
+  switch (event.socialRoutine) {
+    case "greeting": return "greeting";
+    case "how_are_you": return "how_are_you";
+    case "what_doing": return "what_doing";
+    case "thanks": return "thanks";
+    case "agreement": return "agreement";
+    case "goodbye": return "goodbye";
+    case "good_night": return "good_night";
+    case "emotional_opening": return "emotional_opening";
+    default:
+      return event.intent === "emotional_share"
+        ? "emotional_opening"
+        : event.intent === "greeting"
+          ? "greeting"
+          : null;
+  }
 }
 
 const runtimeFlag = (personality: DroitPersonalityTraits, key: string, fallback: boolean) => {
@@ -55,9 +66,10 @@ export function tryLocalKairoReply(
   userId = "anonymous",
   dialogueMove?: DialogueMove,
   responsePlan?: KairaResponsePlan,
+  semanticEvent?: SemanticEvent,
 ): LocalLanguageResult {
   const normalization = normalizeKairoLanguageInput(message);
-  const intent = detectIntent(message, dialogueMove);
+  const intent = localIntentFromSemanticEvent(message, semanticEvent);
   if (!intent) return { handled: false, confidence: 0, source: "ai", normalization };
 
   const continueConversation = responsePlan?.continueConversation

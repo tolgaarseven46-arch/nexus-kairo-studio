@@ -20,6 +20,9 @@ const semanticSchemaExample = {
   raw: "orijinal mesaj",
   normalized: "normalize edilmiş mesaj",
   intent: "general_chat",
+  socialRoutine: "none",
+  discourseAct: "none",
+  adviceRequested: false,
   valence: "neutral",
   target: "unknown",
   relationalAct: "none",
@@ -62,6 +65,9 @@ ${JSON.stringify(semanticSchemaExample)}
 
 ENUM DEĞERLERİ:
 intent = greeting | question | information_request | emotional_share | affection | banter | insult | rejection | apology | repair | complaint | command | support | compliment | general_chat
+socialRoutine = none | greeting | how_are_you | what_doing | thanks | agreement | goodbye | good_night | emotional_opening
+discourseAct = none | correction | topic_shift | recall_request | confusion_or_challenge
+adviceRequested = boolean; kullanıcı açıkça ne yapması gerektiğini/tavsiye/öneri soruyorsa true
 valence = positive | negative | neutral
 target = kaira | third_party | event | unknown
 relationalAct = none | reassurance_seek | repair_probe | reconciliation_attempt | challenge | mockery | closeness_bid
