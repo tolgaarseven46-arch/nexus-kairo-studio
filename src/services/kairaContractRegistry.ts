@@ -251,7 +251,7 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     version: 1,
     status: "active",
     ownerLayer: "behavior-policy",
-    consumerLayers: ["response-generation", "consistency", "future-learned-policy"],
+    consumerLayers: ["response-plan", "consistency", "future-learned-policy"],
     summary: "Behavior permissions cannot reopen a stricter authoritative relationship state.",
   },
   {
@@ -259,8 +259,16 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     version: 1,
     status: "active",
     ownerLayer: "behavior-policy",
-    consumerLayers: ["future-learned-policy", "response-generation", "consistency"],
+    consumerLayers: ["future-learned-policy", "response-plan", "consistency"],
     summary: "A learned policy may only preserve or restrict the authoritative BehaviorContract; it cannot mutate relationship state or reopen forbidden behavior.",
+  },
+  {
+    id: "response-plan",
+    version: 1,
+    status: "active",
+    ownerLayer: "response-plan",
+    consumerLayers: ["local-verbalizer", "llm-verbalizer", "consistency", "observability"],
+    summary: "BehaviorContract permissions, discourse move and HOW-only speech identity are intersected into one bounded response plan. Dialogue and speech may narrow style/shape but can never reopen behavior forbidden by the authoritative social contract.",
   },
   {
     id: "retrieval-to-response",
