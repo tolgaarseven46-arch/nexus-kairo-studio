@@ -23,8 +23,8 @@ describe("canonical SemanticEvent consumer authority", () => {
     expect(gateway.match(/canonicalizeSemanticEvent\(/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("feeds the canonical server event to dialogue planning", () => {
-    expect(server).toMatch(/planDialogueResponse\(\s*cleanHistory,\s*userMessage,\s*userName,\s*languageUnderstanding\.event,\s*\)/u);
+  it("feeds the canonical server event and its single current-turn projection to dialogue planning", () => {
+    expect(server).toMatch(/planDialogueResponse\(\s*cleanHistory,\s*userMessage,\s*userName,\s*languageUnderstanding\.event,\s*dialogueAnalysis,\s*\)/u);
     expect(dialogue).toContain("semanticEvent?: SemanticEvent");
     expect(dialogue).not.toContain("const analysis = analyzeDialogueTurn(userMessage)");
   });
