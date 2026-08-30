@@ -12,7 +12,9 @@ ownership = ownership.replace(
   '    const afterKdm = server.slice(server.indexOf("responseStylePersonality = responsePersonality"));\n    expect(afterKdm).toContain("responseStylePersonality = responsePersonality");\n    expect(afterKdm).toContain("computeKairoSpeechIdentity(\\n        responseStylePersonality,");\n    expect(afterKdm).toContain("tryLocalKairoReply(\\n        userMessage,\\n        responseStylePersonality,");',
   '    const afterKdm = server.slice(server.indexOf("behaviorContract = buildBehaviorContract"));\n    expect(afterKdm).toContain("computeKairoSpeechIdentity(\\n        responsePersonality,");\n    expect(afterKdm).toContain("tryLocalKairoReply(\\n        userMessage,\\n        responsePersonality,");\n    expect(afterKdm).not.toContain("responseStylePersonality");',
 );
-if (ownership.includes('responseStylePersonality')) throw new Error('Ownership contract still depends on responseStylePersonality alias');
+if (ownership.includes('responseStylePersonality = responsePersonality') || ownership.includes('responseStylePersonality,"')) {
+  throw new Error('Ownership contract still requires the responseStylePersonality alias');
+}
 fs.writeFileSync('src/services/kairaBasePersonalityOwnershipContracts.test.ts', ownership);
 
 let appraisal = fs.readFileSync('src/services/kairaWorldStateAppraisalIntegrationContracts.test.ts', 'utf8');
