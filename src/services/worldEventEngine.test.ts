@@ -56,7 +56,7 @@ describe("buildCanonicalWorldEvent", () => {
     const event = buildCanonicalWorldEvent(message, semantic, entities);
 
     expect(event.reportedSpeech).toBe(false);
-    expect(event.eventType).toBe("repair");
+    expect(event.eventType).toBe("apology");
     expect(event.actor).toEqual(
       expect.objectContaining({ name: "Ayşe", source: "explicit_name" }),
     );
