@@ -13,14 +13,16 @@ Kaira geliştirmesinde yeni büyük katman eklemeden önce mevcut veri akışı 
 1. Language Understanding -> `SemanticEvent`
 2. Entity Resolution -> `EntityResolutionResult`
 3. World Event Mapping -> `CanonicalWorldEvent`
-4. World Model Store / Retrieval -> `EvidenceSet` (`RetrievedWorldEvent[]`)
-5. Temporal Evidence Policy -> zaman sıralaması / latest seçimi / evidence preservation
-6. Appraisal / Relationship / Temperament -> `DroitDynamicState`
-7. Conversation State Authority -> authoritative social state
-8. Behavior Policy -> `BehaviorContract`
-9. Response Generation -> natural-language realization
-10. Deterministic Enforcement / Consistency -> delivered response
-11. Contract Audit -> invariant violations
+4. World Model Ownership -> account/session evidence isolation
+5. World Model Store / Retrieval -> `EvidenceSet` (`RetrievedWorldEvent[]`)
+6. Temporal Evidence Policy -> zaman sıralaması / latest seçimi / evidence preservation
+7. Appraisal / Relationship / Temperament -> `DroitDynamicState`
+8. Conversation State Authority -> authoritative social state
+9. Behavior Policy -> `BehaviorContract`
+10. Learned Policy Boundary -> yalnızca kısıtlayıcı proposal
+11. Response Generation -> natural-language realization
+12. Deterministic Enforcement / Consistency -> delivered response
+13. Contract Audit -> invariant violations
 
 Bir katman downstream katmanın işini üstlenmemeli. Ham kullanıcı cümlesi mümkün olduğunca erken canonical temsile indirgenmeli; downstream motorlar aynı anlamı yeniden bağımsız regex/heuristic ile çözmeye çalışmamalı.
 
@@ -42,6 +44,13 @@ Bir katman downstream katmanın işini üstlenmemeli. Ham kullanıcı cümlesi m
 - Participant objeleri Firestore'a `undefined` alan taşımaz.
 - Recall/query mesajları dünya gerçeği olarak persist edilmez.
 - Kullanıcının açık üçüncü şahıs aktarımları (`Ayşe bana özür diledi`) epistemik olarak `reported_claim` kalır; doğrudan Kaira-kullanıcı etkileşimi sayılmaz.
+
+### World Model Ownership
+- Her observation kalıcı bir `userId` ve `sessionId` taşır.
+- Memory ownership event içindeki actor/target isminden türetilmez; persisted owner scope authoritative'dir.
+- Bir kullanıcının retrieval candidate set'ine başka kullanıcıya ait observation giremez.
+- Session filtering ownership'i değiştirmez; yalnızca owner'ın kendi history'sini daraltır.
+- Multi-user world model implementation'ı başlamadan önce bütün retrieval girişleri owner scope üzerinden geçmelidir.
 
 ### Retrieval
 - Retrieval cevap yazmaz; evidence döndürür.
@@ -78,6 +87,13 @@ Bir katman downstream katmanın işini üstlenmemeli. Ham kullanıcı cümlesi m
 - `repairing` durumda kesin affetme ve normal yakınlığa dönüş açılamaz.
 - `distancing` durumda playfulness açılamaz.
 
+### Learned Behavior Policy Boundary
+- Learned model doğrudan `DroitDynamicState`, relationship score veya `conversationState` mutate edemez.
+- Learned proposal authoritative `BehaviorContract`'ı yalnızca aynı seviyede tutabilir veya daha kısıtlayıcı hale getirebilir.
+- `forbidden -> allowed`, `continueConversation=false -> true`, `forgivenessGranted=false -> true`, `short -> medium` relaxation yasaktır.
+- Tamamlanmamış repair, learned proposal tarafından `repaired` yapılamaz.
+- Learned policy yokken de bu seam test edilir; ileride model bağlandığında interface değişmeden kullanılır.
+
 ### Behavior -> Response seam
 - LLM çıktısı BehaviorContract'a aykırıysa deterministik enforcement teslimden önce düzeltir.
 - `disengaged` konuşma generated text üzerinden yeniden açılamaz.
@@ -111,11 +127,13 @@ Bunlar bir invariant'ın örneğidir; yeni mimari kural bu cümlelerin kendisind
 ### 2. Contract/seam testleri
 Producer-consumer sınırları ayrı test edilir:
 - semantic -> entity/world-event
-- world-event -> retrieval
+- world-event -> ownership/store
+- ownership -> retrieval
 - retrieval -> temporal evidence
 - temporal evidence -> response evidence
 - relationship state -> authority
 - authority/state -> behavior contract
+- behavior contract -> learned policy boundary
 - behavior contract -> delivered response
 
 ### 3. State-sequence simulation
@@ -135,6 +153,8 @@ Generated kişi/olay dizilerinde:
 - temporal ordering
 - latest determinism
 - historical evidence preservation
+- cross-user ownership isolation
+- learned-policy relaxation attempts
 
 otomatik zorlanır.
 
@@ -171,5 +191,5 @@ Architecture-contract kapısı kırmızıysa yeni feature ilerletilmez.
 2. Yeni bulunan bug önce mevcut invariant'a bağlanır.
 3. Generated/property-style state ve world-model senaryoları sürekli genişletilir.
 4. Temporal evidence V1 contractı korunur; gerçek contradiction resolution başlamadan önce proposition identity/polarity şeması tasarlanır.
-5. Multi-user world model için actor/target/ownership contract'ı revize edilmeden implementation başlanmaz.
-6. Learned behavior policy gelirse BehaviorContract authoritative ara yüzü korunur; model doğrudan relationship state'i mutate etmez.
+5. Multi-user world model implementation'ı `world-model-ownership` contractı üzerinden yapılır.
+6. Learned behavior policy implementation'ı `learned-policy-boundary` üzerinden yapılır; model doğrudan relationship state'i mutate etmez.
