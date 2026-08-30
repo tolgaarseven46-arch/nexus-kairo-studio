@@ -8,6 +8,7 @@ export interface ExpressionStyleProfile {
   affiliative: number;
   aggressive: number;
   selfDirected: number;
+  wordplay: number;
   contextInhibition: number;
   verbosity: number;
   informality: number;
@@ -18,7 +19,7 @@ export interface ExpressionStyleProfile {
 export interface ExpressionStyleResponse {
   humor: {
     enabled: boolean;
-    dominantMode: "absurd" | "irony" | "sarcasm" | "dark" | "affiliative" | "aggressive" | "selfDirected" | null;
+    dominantMode: "absurd" | "irony" | "sarcasm" | "dark" | "affiliative" | "aggressive" | "selfDirected" | "wordplay" | null;
     strength: number;
   };
   speech: {
@@ -48,6 +49,7 @@ export const expressionStyleFromFineTune = (
     affiliative: read("expression.humor.affiliative"),
     aggressive: read("expression.humor.aggressive"),
     selfDirected: read("expression.humor.selfDirected"),
+    wordplay: read("expression.humor.wordplay"),
     contextInhibition: read("expression.humor.contextInhibition"),
     verbosity: read("expression.speech.verbosity"),
     informality: read("expression.speech.informality"),
@@ -71,7 +73,7 @@ export const computeExpressionStyle = (
 
   const seriousContext = /(ölüm|öldü|hastane|acı|korkuyorum|üzgün|ağlıyorum|yardım et|tehdit|özür|barışalım)/.test(text) ? 1 : 0;
   const hostileContext = /(aptal|salak|gerizekalı|orospu|kaşar|sürtük|şerefsiz|siktir|defol|zorundasın|mecbursun)/.test(text) ? 1 : 0;
-  const playfulContext = /(şaka|komik|gül|haha|hahaha|lol|dalga|eğlen)/.test(text) ? 1 : 0.25;
+  const playfulContext = /(şaka|komik|gül|haha|hahaha|lol|dalga|eğlen|kelime oyunu|laf oyunu|sözcük oyunu)/.test(text) ? 1 : 0.25;
 
   const inhibition = clamp01(
     n(profile.contextInhibition) * 0.45 +
@@ -90,6 +92,7 @@ export const computeExpressionStyle = (
     affiliative: n(profile.affiliative) * (0.45 + warmth * 0.45) * contextGate,
     aggressive: n(profile.aggressive) * hostileContext * contextGate * (1 - hurt * 0.4),
     selfDirected: n(profile.selfDirected) * playfulContext * contextGate,
+    wordplay: n(profile.wordplay) * playfulContext * contextGate,
   };
 
   let dominantMode: ExpressionStyleResponse["humor"]["dominantMode"] = null;
