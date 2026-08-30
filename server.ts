@@ -45,6 +45,7 @@ import {
 import { recordKdmMetric } from "./src/services/kdmMetricsService";
 import { saveWorldEventObservation, loadRecentWorldEventObservations } from "./src/services/worldModelEventStore";
 import { buildWorldEventMemoryInstruction, rankWorldEventObservations, shouldRetrieveWorldEvents } from "./src/services/worldEventRetrieval";
+import { enforceWorldModelRecallResponse, findWorldModelResponseIssues } from "./src/services/worldModelResponseGuard";
 import {
   computeKairoSpeechIdentity,
   speechIdentityPrompt,
@@ -772,6 +773,7 @@ app.post("/api/chat", async (req, res) => {
         dialogueDecision,
         dialogueOutputStyle,
       ),
+      ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
     ];
     let repairAttempts = 0;
     if (groundingIssues.length && now() - aiStart < 24000) {
@@ -802,6 +804,7 @@ app.post("/api/chat", async (req, res) => {
             dialogueDecision,
             dialogueOutputStyle,
           ),
+          ...findWorldModelResponseIssues(repairedReply, retrievedWorldEvents).map((issue) => issue.message),
         ];
         if (repairedIssues.length < groundingIssues.length) {
           reply = repairedReply;
@@ -832,6 +835,7 @@ app.post("/api/chat", async (req, res) => {
             dialogueDecision,
             dialogueOutputStyle,
           ),
+          ...findWorldModelResponseIssues(fallback, retrievedWorldEvents).map((issue) => issue.message),
         ];
         if (fallbackIssues.length < groundingIssues.length) {
           reply = fallback;
@@ -839,9 +843,27 @@ app.post("/api/chat", async (req, res) => {
         }
       }
     }
+    const worldMemoryGuard = enforceWorldModelRecallResponse(reply, retrievedWorldEvents);
+    if (worldMemoryGuard.changed) {
+      reply = worldMemoryGuard.reply;
+      groundingIssues = [
+        ...findKairoGroundingIssues(reply, cleanHistory, userMessage),
+        ...findDialogueAttributionIssues(reply, cleanHistory, userMessage, userName),
+        ...findDialogueDecisionIssues(reply, dialogueDecision, dialogueOutputStyle),
+        ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
+      ];
+    }
     const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules);
     const contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract);
-    const enforced = { reply: contractEnforced.reply, changed: baseEnforced.changed || contractEnforced.changed, reasons: [...baseEnforced.reasons, ...contractEnforced.reasons] };
+    const enforced = {
+      reply: contractEnforced.reply,
+      changed: worldMemoryGuard.changed || baseEnforced.changed || contractEnforced.changed,
+      reasons: [
+        ...baseEnforced.reasons,
+        ...contractEnforced.reasons,
+        ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),
+      ],
+    };
     reply = enforced.reply;
     const aiMs = Math.round(now() - aiStart);
     const baseConsistency = validateKairoResponse(reply, kdm.trace);
