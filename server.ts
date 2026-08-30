@@ -621,9 +621,18 @@ app.post("/api/chat", async (req, res) => {
       );
     kdm.trace.whoSent.userName = userName;
     if (local.handled && local.reply) {
-      const baseEnforced = enforceKairoResponse(local.reply, kdm.trace, enforcementRules),
+      const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents),
+        baseEnforced = enforceKairoResponse(worldMemoryGuard.reply, kdm.trace, enforcementRules),
         contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract),
-        enforced = { reply: contractEnforced.reply, changed: baseEnforced.changed || contractEnforced.changed, reasons: [...baseEnforced.reasons, ...contractEnforced.reasons] },
+        enforced = {
+          reply: contractEnforced.reply,
+          changed: worldMemoryGuard.changed || baseEnforced.changed || contractEnforced.changed,
+          reasons: [
+            ...baseEnforced.reasons,
+            ...contractEnforced.reasons,
+            ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),
+          ],
+        },
         reply = enforced.reply,
         consistency = validateKairoResponse(reply, kdm.trace),
         postStart = now();
@@ -660,6 +669,9 @@ app.post("/api/chat", async (req, res) => {
           },
           providerUsed: "local_language",
           speechIdentity: speech,
+          worldStateAppraisal,
+          worldReasoningPolicy,
+          worldMemoryGuard,
         }),
         saveTestSessionTurn({
           sessionId,
@@ -706,6 +718,7 @@ app.post("/api/chat", async (req, res) => {
             retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, reasons: item.reasons, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })),
             worldStateAppraisal,
             worldReasoningPolicy,
+            worldMemoryGuard,
             timings: { memoryMs, kdmMs, aiMs: 0 },
           },
         }).then((t) => {
@@ -735,7 +748,7 @@ app.post("/api/chat", async (req, res) => {
         },
         enforcement: enforced,
         speechIdentity: speech,
-        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
+        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
         consistency,
         dialogue: dialogueAnalysis,
         timings,
@@ -918,6 +931,9 @@ app.post("/api/chat", async (req, res) => {
         timings: { memoryMs, kdmMs, aiMs, postProcessMs: 0, serverTotalMs: 0 },
         providerUsed: activeAiProviderUsed,
         speechIdentity: speech,
+        worldStateAppraisal,
+        worldReasoningPolicy,
+        worldMemoryGuard,
       }),
       saveTestSessionTurn({
         sessionId,
@@ -964,6 +980,7 @@ app.post("/api/chat", async (req, res) => {
           retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, reasons: item.reasons, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })),
           worldStateAppraisal,
           worldReasoningPolicy,
+          worldMemoryGuard,
           timings: { memoryMs, kdmMs, aiMs },
         },
       }).then((t) => {
@@ -988,7 +1005,7 @@ app.post("/api/chat", async (req, res) => {
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
+      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
       consistency,
       dialogue: dialogueAnalysis,
       dialogueDecision,

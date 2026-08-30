@@ -36,7 +36,7 @@ Karakter üç ana eksende ele alınır:
 - AI sağlayıcıları: OpenRouter ana akışta; Gemini desteği de mevcut.
 - Build: Vite istemci + esbuild sunucu bundle.
 - Vitest test altyapısı mevcut.
-- GitHub Actions üzerinde TypeScript ve production build doğrulaması var; test komutu CI akışına henüz ekli değil.
+- GitHub Actions CI; architecture contracts, testler, TypeScript kontrolü ve production build adımlarını çalıştırıyor.
 
 ## 5. Kişilik ve davranış
 - `droitBehaviorEngine.ts`: kişilik slider'larından davranış profili üretir.
@@ -174,7 +174,7 @@ Gelecekte:
 
 ## 17. Bilinen teknik borçlar / ilk audit bulguları
 - `PROJECT_STATE.md` önceki durumda güncel mimarinin gerisindeydi; bu güncellemeyle snapshot yenilendi.
-- CI `npm run lint` ve `npm run build` çalıştırıyor fakat `npm test` henüz CI'a bağlı değil.
+- CI artık architecture contracts, testler, TypeScript kontrolü ve production build adımlarını birlikte doğruluyor.
 - KDM unit test kapsamı şu an çok küçük (4 test, ağırlıklı response consistency/repair tarafı).
 - `kdmConsistencyEngine.ts` niyet ve sentiment sınıflandırması basit regex tabanlı; yeni normalizer ile tek bir canonical sınıflandırma kaynağına henüz bağlanmış değil.
 - `droitChatService.ts` istemci tarafında ayrıca behavior profile hesaplıyor; sunucuda KDM tekrar davranış profili hesaplıyor. Veri akışı sadeleştirme adayı.
@@ -212,3 +212,12 @@ Yeni sohbet açıldığında:
 - `hiçbiri`, `yok`, `ikisi de`, `olmadı` gibi kısa mesajlar hemen önceki Kaira turu soru/seçenek içeriyorsa bağımsız konu sayılmaz; `follow_previous_answer` hareketiyle önceki mesaja bağlanır ve yeni duygu/sebep uydurulmaz.
 - Emoji bütçesi ve kullanıcıdan gelmeyen hazır internet/oyun metaforu kontrolü tüm AI diyalog hareketlerinin ortak çıktı kapısında çalışır. Emoji tamamen yasak değildir; konuşma kimliği eğilimi yeterliyse tur başına en fazla bir emojiye izin verilir.
 - KDM davranış profili ilişki bağlamıyla tek yerde hesaplanır. Yeni, sıcak-güvenli, gerilimli veya iyileşen ilişki için tek ve çelişmeyen `relationshipInstruction` AI promptuna aktarılır; istemciden gelen ayrı profil ile KDM tonu arasındaki çift karar kaldırılmıştır.
+
+
+## 20. World reasoning / deterministic guard — 2026-08-30
+- Canonical world-memory retrieval sonrası read-only `WorldStateAppraisal` ve `WorldReasoningPolicy` katmanları aktif.
+- Deterministic `worldModelResponseGuard`, grounded kanıt varken hafızayı inkâr etme, çelişkiyi tek tarafa düşürme, reported claim kaynak atfını kaybetme ve gerekli epistemik nitelemeyi kaldırma durumlarını modelden bağımsız olarak engelliyor.
+- Reported claim ile direct interaction ayrımı contract testleriyle kilitli; direct interaction yanlışlıkla kullanıcı kaynaklı bilgi gibi etiketlenmiyor.
+- Guard yalnız AI yolunda değil, Yerel Dil Motoru erken dönüş yolunda da uygulanıyor; world reasoning boundary bütün cevap yollarında bağlayıcı.
+- `worldStateAppraisal`, `worldReasoningPolicy` ve `worldMemoryGuard` KNT trace, test-session metadata ve chat debug/KDM response içinde gözlemlenebilir. Böylece tek turda policy kararı, guard issue listesi ve cevabın değiştirilip değiştirilmediği izlenebilir.
+- CI bu değişiklikleri architecture contracts + tests + TypeScript + production build ile doğrular.
