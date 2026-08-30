@@ -60,6 +60,19 @@ export function enrichWorldEventTemporalAtPersistence(
   };
 }
 
+/**
+ * `previous_event` means the immediately previous observation in the same
+ * session. Never skip an unresolved intervening event to borrow an older time.
+ */
+export function previousResolvedIntervalFromObservations(
+  observations: WorldEventObservation[],
+  sessionId: string,
+): WorldEventResolvedTemporalInterval | undefined {
+  const sorted = [...observations].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const previous = sorted.find((row) => row.sessionId === sessionId);
+  return previous?.event?.temporal?.resolved;
+}
+
 async function loadPreviousResolvedInterval(
   parent: ReturnType<typeof doc>,
   sessionId: string,
@@ -67,13 +80,11 @@ async function loadPreviousResolvedInterval(
   const snapshot = await getDocs(
     query(collection(parent, EVENT_COLLECTION), orderBy("createdAt", "desc"), limit(12)),
   );
-  for (const item of snapshot.docs) {
-    const row = item.data() as Omit<WorldEventObservation, "id">;
-    if (row.sessionId !== sessionId) continue;
-    const resolved = row.event?.temporal?.resolved;
-    if (resolved) return resolved;
-  }
-  return undefined;
+  const observations = snapshot.docs.map((item) => ({
+    id: item.id,
+    ...(item.data() as Omit<WorldEventObservation, "id">),
+  }));
+  return previousResolvedIntervalFromObservations(observations, sessionId);
 }
 
 export async function saveWorldEventObservation(input: {
