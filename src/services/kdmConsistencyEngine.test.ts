@@ -6,6 +6,7 @@ import {
   selectBestConsistency,
 } from "./kdmResponseRepairPolicy";
 import type { DroitDynamicState, DroitPersonalityTraits, ReasoningTrace } from "../types/nexus";
+import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 
 const trace = (tone = "sıcak ve empatik"): ReasoningTrace =>
   ({
@@ -61,6 +62,28 @@ const runtimePersonality = (overrides: Partial<DroitPersonalityTraits> = {}): Dr
   loyalty: 50,
   initiative: 50,
   ...overrides,
+});
+
+const behaviorPolicy = (
+  overrides: Partial<BehaviorPolicyInput["decision"]> = {},
+): BehaviorPolicyInput => ({
+  schemaVersion: "behavior-policy@1",
+  source: "client_behavior_integration",
+  decision: {
+    priority: "expression",
+    continueConversation: true,
+    humorAllowed: true,
+    askQuestion: true,
+    acknowledgeComplaint: false,
+    repairAllowed: true,
+    stance: "neutral",
+    responseLength: "medium",
+    directness: 0.5,
+    warmth: 0.5,
+    distance: 0,
+    explanation: [],
+    ...overrides,
+  },
 });
 
 describe("KDM response consistency gate", () => {
@@ -210,16 +233,18 @@ describe("KDM response consistency gate", () => {
     expect(states.ali.relationship!.hurtScore).toBe(0);
   });
 
-  it("forces no-humor and no-question directives from the integrated runtime decision", () => {
+  it("forces no-humor and no-question directives from the explicit integrated behavior policy", () => {
     const result = analyzeKdmInteraction(
       "tamam",
-      runtimePersonality({
-        runtimeHumorAllowed: 0,
-        runtimeAskQuestion: 0,
-        runtimeStance: 50,
-        runtimePriority: 82,
-      }),
+      runtimePersonality(),
       relationshipState(),
+      undefined,
+      behaviorPolicy({
+        humorAllowed: false,
+        askQuestion: false,
+        stance: "firm",
+        priority: "values",
+      }),
     );
 
     expect(result.behaviorProfile.humorLevel).toBe(0);
@@ -231,15 +256,18 @@ describe("KDM response consistency gate", () => {
   it("forces disengagement as a short boundary response instead of allowing lower layers to reopen chat", () => {
     const result = analyzeKdmInteraction(
       "neyse konuşalım",
-      runtimePersonality({
-        runtimeContinueConversation: 0,
-        runtimeHumorAllowed: 0,
-        runtimeAskQuestion: 0,
-        runtimeStance: 100,
-        runtimeResponseLength: 25,
-        runtimePriority: 100,
-      }),
+      runtimePersonality(),
       relationshipState(),
+      undefined,
+      behaviorPolicy({
+        priority: "boundary",
+        continueConversation: false,
+        humorAllowed: false,
+        askQuestion: false,
+        stance: "disengage",
+        responseLength: "short",
+        distance: 1,
+      }),
     );
 
     expect(result.behaviorProfile.tone).toBe("firm");
