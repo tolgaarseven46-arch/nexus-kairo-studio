@@ -35,8 +35,8 @@ const normalize = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const WORD_TAIL = "[\\p{L}\\p{N}_]*";
-const marker = (roots: string) => new RegExp(`\\b(?:${roots})${WORD_TAIL}\\b`, "iu");
+const marker = (roots: string) =>
+  new RegExp(`(?:^|\\s)(?:${roots})[\\p{L}\\p{N}_]*(?=\\s|$)`, "iu");
 
 const EVENT_TYPE_MARKERS: Partial<Record<WorldEventType, RegExp>> = {
   insult: marker("hakaret|salak|aptal|mal"),
@@ -49,12 +49,15 @@ const EVENT_TYPE_MARKERS: Partial<Record<WorldEventType, RegExp>> = {
   emotional_share: marker("duygu|üzgün|kızgın|kork|mutlu"),
 };
 
+const hasStandaloneToken = (text: string, token: string) =>
+  new RegExp(`(?:^|\\s)${token}(?=\\s|$)`, "iu").test(text);
+
 export function detectExplicitTemporalRelationDirection(
   message: string,
 ): TemporalNeighborDirection | undefined {
   const text = normalize(message);
-  if (/\bsonra\b/iu.test(text)) return "after";
-  if (/\bönce\b/iu.test(text)) return "before";
+  if (hasStandaloneToken(text, "sonra")) return "after";
+  if (hasStandaloneToken(text, "önce")) return "before";
   return undefined;
 }
 
