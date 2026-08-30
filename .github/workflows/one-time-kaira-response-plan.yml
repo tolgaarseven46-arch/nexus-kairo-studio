@@ -1,5 +1,6 @@
 name: One-time Kaira response plan integration
 
+# Temporary migration workflow; remove after a green integration commit.
 on:
   push:
     paths:
