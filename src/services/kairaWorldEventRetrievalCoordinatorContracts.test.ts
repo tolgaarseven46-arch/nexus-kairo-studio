@@ -4,6 +4,10 @@ import {
   coordinateWorldEventRetrieval,
   shouldCoordinateWorldEventRetrieval,
 } from "./worldEventRetrievalCoordinator";
+import {
+  rankWorldEventObservations,
+  shouldRetrieveWorldEvents,
+} from "./worldEventRetrieval";
 
 function observation(input: {
   id: string;
@@ -63,6 +67,7 @@ function observation(input: {
 describe("Kaira world event retrieval coordinator contracts", () => {
   it("activates retrieval for temporal discourse markers", () => {
     expect(shouldCoordinateWorldEventRetrieval("peki sonra ne oldu?")).toBe(true);
+    expect(shouldRetrieveWorldEvents("peki sonra ne oldu?")).toBe(true);
     expect(shouldCoordinateWorldEventRetrieval("Ayşe en son ne dedi?")).toBe(true);
     expect(shouldCoordinateWorldEventRetrieval("naber")).toBe(false);
   });
@@ -117,6 +122,46 @@ describe("Kaira world event retrieval coordinator contracts", () => {
         "direction:before",
       ]),
     );
+  });
+
+  it("routes the existing live ranker through graph retrieval for a single session", () => {
+    const first = observation({
+      id: "a",
+      createdAt: "2026-08-20T10:00:00.000Z",
+    });
+    const second = observation({
+      id: "b",
+      createdAt: "2026-08-21T10:00:00.000Z",
+      referenceId: "a",
+      direction: "after",
+    });
+
+    const result = rankWorldEventObservations(
+      "ondan önce ne oldu?",
+      [second, first],
+      5,
+      "2026-08-30T10:00:00.000Z",
+    );
+
+    expect(result.map((item) => item.observation.id)).toEqual(["a"]);
+    expect(result[0].reasons).toContain("temporal_graph_neighbor");
+  });
+
+  it("refuses to guess a session in the live ranker when multiple sessions are loaded", () => {
+    const current = observation({
+      id: "a",
+      sessionId: "session-a",
+      createdAt: "2026-08-21T10:00:00.000Z",
+      raw: "sonra ne oldu ile alakalı kayıt",
+    });
+    const other = observation({
+      id: "b",
+      sessionId: "session-b",
+      createdAt: "2026-08-20T10:00:00.000Z",
+      raw: "sonra ne oldu ile alakalı başka kayıt",
+    });
+
+    expect(rankWorldEventObservations("peki sonra ne oldu?", [current, other])).toEqual([]);
   });
 
   it("keeps ordinary recall on the existing ranking path", () => {
