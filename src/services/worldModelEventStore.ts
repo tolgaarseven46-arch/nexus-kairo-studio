@@ -5,6 +5,10 @@ import {
   enrichWorldEventModality,
   type ModalCanonicalWorldEvent,
 } from "./worldEventModality";
+import {
+  enrichWorldEventLifecycle,
+  type LifecycleCanonicalWorldEvent,
+} from "./worldEventLifecycle";
 import { resolveTemporalReference } from "./temporalReferenceResolver";
 
 const WORLD_MODEL_COLLECTION = "worldModel";
@@ -21,7 +25,7 @@ export interface WorldEventObservation {
   speakerName?: string;
   kind: WorldEventObservationKind;
   status: WorldEventObservationStatus;
-  event: ModalCanonicalWorldEvent;
+  event: LifecycleCanonicalWorldEvent;
   createdAt: string;
   temporalReferenceObservationId?: string;
 }
@@ -50,10 +54,10 @@ export function classifyWorldEventObservation(
 }
 
 export function enrichWorldEventTemporalAtPersistence(
-  event: ModalCanonicalWorldEvent,
+  event: LifecycleCanonicalWorldEvent,
   createdAt: string,
   referenceInterval?: WorldEventResolvedTemporalInterval,
-): ModalCanonicalWorldEvent {
+): LifecycleCanonicalWorldEvent {
   const resolved = resolveTemporalReference(event.raw, event.temporal, createdAt, referenceInterval);
   if (!event.temporal || !resolved) return event;
   return {
@@ -115,8 +119,9 @@ export async function saveWorldEventObservation(input: {
     ? await loadPreviousTemporalReference(parent, input.sessionId).catch(() => undefined)
     : undefined;
   const referenceInterval = referenceObservation?.event?.temporal?.resolved;
-  const modalEvent = enrichWorldEventModality(input.event);
-  const event = enrichWorldEventTemporalAtPersistence(modalEvent, createdAt, referenceInterval);
+  const modalEvent: ModalCanonicalWorldEvent = enrichWorldEventModality(input.event);
+  const lifecycleEvent = enrichWorldEventLifecycle(modalEvent);
+  const event = enrichWorldEventTemporalAtPersistence(lifecycleEvent, createdAt, referenceInterval);
   const temporalReferenceObservationId =
     event.temporal?.resolved?.source === "referenced_event"
       ? referenceObservation?.id
