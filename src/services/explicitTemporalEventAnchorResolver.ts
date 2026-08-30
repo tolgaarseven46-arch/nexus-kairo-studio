@@ -73,7 +73,7 @@ function queryContainsName(query: string, name: string): boolean {
   return query.includes(name);
 }
 
-function detectMentionedEventType(message: string): WorldEventType | undefined {
+export function detectMentionedWorldEventType(message: string): WorldEventType | undefined {
   const text = normalize(message);
   const matches = (Object.entries(EVENT_TYPE_MARKERS) as Array<[WorldEventType, RegExp]>)
     .filter(([, eventMarker]) => eventMarker.test(text))
@@ -119,7 +119,7 @@ export function resolveExplicitTemporalEventAnchor(input: {
     return matchedNames.some((name) => names.includes(name));
   });
 
-  const matchedEventType = detectMentionedEventType(input.message);
+  const matchedEventType = detectMentionedWorldEventType(input.message);
   if (matchedEventType) {
     const typed = candidates.filter((item) => item.event.eventType === matchedEventType);
     if (typed.length) candidates = typed;
