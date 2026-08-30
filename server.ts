@@ -54,6 +54,13 @@ import {
   hydrateLanguageMemory,
   languageMemorySummary,
 } from "./src/services/kairoLanguageMemory";
+import {
+  instancePolicy,
+  memoryCacheKey,
+  resolveKairaInstanceContext,
+  stateOwnerScope,
+  type KairaInstanceType,
+} from "./src/services/kairaInstanceContext";
 import type {
   DroitDynamicState,
   DroitPersonalityTraits,
@@ -208,13 +215,15 @@ async function generateText(
 
   throw new Error("Yapay zeka anahtarı (GEMINI_API_KEY veya OPENROUTER_API_KEY) bulunamadı.");
 }
-async function getFastRecentMemory(userId: string) {
-  const c = memoryCache.get(userId);
+async function getFastRecentMemory(userId: string, kairaInstanceId: string) {
+  const cacheKey = memoryCacheKey(userId, kairaInstanceId);
+  const c = memoryCache.get(cacheKey);
   if (c && c.expires > Date.now()) return c.items;
-  const loader = loadRecentKdmMemory(6, userId)
+  const scopedUserId = stateOwnerScope(userId, kairaInstanceId);
+  const loader = loadRecentKdmMemory(6, scopedUserId)
     .then(
       (items) => (
-        memoryCache.set(userId, { expires: Date.now() + MEMORY_TTL_MS, items }),
+        memoryCache.set(cacheKey, { expires: Date.now() + MEMORY_TTL_MS, items }),
         items
       ),
     )
@@ -359,25 +368,31 @@ app.get("/api/runtime-info", (_q, r) => {
 });
 app.get("/api/knt/traces", async (q, r) => {
   try {
-    const userId =
-        typeof q.query.userId === "string" ? q.query.userId : "test_user_x",
-      traces = await loadRecentKntTraces(Number(q.query.limit || 20), userId);
-    r.json({ ok: true, userId, count: traces.length, traces });
+    const userId = typeof q.query.userId === "string" ? q.query.userId : "test_user_x";
+    const kairaInstanceId = typeof q.query.kairaInstanceId === "string" ? q.query.kairaInstanceId : undefined;
+    const instance = resolveKairaInstanceContext({ instanceId: kairaInstanceId });
+    const scopedUserId = stateOwnerScope(userId, instance.instanceId);
+    const traces = await loadRecentKntTraces(Number(q.query.limit || 20), scopedUserId);
+    r.json({ ok: true, userId, kairaInstanceId: instance.instanceId, count: traces.length, traces });
   } catch (e: any) {
     r.status(500).json({ ok: false, error: e?.message });
   }
 });
 app.get("/api/kaira/language-memory", async (q, r) => {
-  const userId =
-    typeof q.query.userId === "string" ? q.query.userId : "test_user_x";
-  await hydrateLanguageMemory(userId);
-  r.json({ ok: true, userId, ...languageMemorySummary(userId) });
+  const userId = typeof q.query.userId === "string" ? q.query.userId : "test_user_x";
+  const kairaInstanceId = typeof q.query.kairaInstanceId === "string" ? q.query.kairaInstanceId : undefined;
+  const instance = resolveKairaInstanceContext({ instanceId: kairaInstanceId });
+  const scopedUserId = stateOwnerScope(userId, instance.instanceId);
+  await hydrateLanguageMemory(scopedUserId);
+  r.json({ ok: true, userId, kairaInstanceId: instance.instanceId, ...languageMemorySummary(scopedUserId) });
 });
 app.get("/api/test-sessions/active", async (q, r) => {
   try {
     const userId = typeof q.query.userId === "string" ? q.query.userId : "test_user_x";
-    const session = await loadActiveTestSessionForUser(userId);
-    r.json({ ok: true, session });
+    const kairaInstanceId = typeof q.query.kairaInstanceId === "string" ? q.query.kairaInstanceId : undefined;
+    const instance = resolveKairaInstanceContext({ instanceId: kairaInstanceId });
+    const session = await loadActiveTestSessionForUser(stateOwnerScope(userId, instance.instanceId));
+    r.json({ ok: true, kairaInstanceId: instance.instanceId, session });
   } catch (e: any) {
     r.status(500).json({ ok: false, error: e?.message });
   }
@@ -394,10 +409,11 @@ app.get("/api/test-sessions/:sessionId", async (q, r) => {
 });
 app.post("/api/test-sessions/new", async (q, r) => {
   try {
-    const { userId = "test_user_x" } = q.body || {};
-    const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, "_");
-    const sessionId = `session_${safeUserId}_${Date.now()}`;
-    r.json({ ok: true, sessionId });
+    const { userId = "test_user_x", kairaInstanceId, kairaInstanceType } = q.body || {};
+    const instance = resolveKairaInstanceContext({ instanceId: kairaInstanceId, instanceType: kairaInstanceType as KairaInstanceType | undefined });
+    const safeOwner = stateOwnerScope(String(userId), instance.instanceId).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const sessionId = `session_${safeOwner}_${Date.now()}`;
+    r.json({ ok: true, sessionId, kairaInstanceId: instance.instanceId, kairaInstanceType: instance.instanceType });
   } catch (e: any) {
     r.status(500).json({ ok: false, error: e?.message });
   }
@@ -473,17 +489,24 @@ app.post("/api/chat", async (req, res) => {
       suppressRecentMemory = false,
       semanticEvent: incomingSemanticEvent,
       sessionId: incomingSessionId,
+      kairaInstanceId: incomingKairaInstanceId,
+      kairaInstanceType: incomingKairaInstanceType,
     } = req.body;
     if (!userMessage)
       return res.status(400).json({ error: "userMessage is required" });
+    const kairaInstance = resolveKairaInstanceContext({
+      instanceId: incomingKairaInstanceId,
+      instanceType: incomingKairaInstanceType as KairaInstanceType | undefined,
+    });
+    const kairaPolicy = instancePolicy(kairaInstance.instanceType);
     const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, "_");
-    const sessionId =
-      incomingSessionId?.trim() || `session_${safeUserId}`;
+    const stateUserId = stateOwnerScope(userId, kairaInstance.instanceId);
+    const sessionId = incomingSessionId?.trim() || `session_${stateUserId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
     const cleanHistory = sanitizeKairoChatHistory(history);
-    const retrievedWorldEvents = shouldRetrieveWorldEvents(userMessage)
+    const retrievedWorldEvents = kairaPolicy.persistentWorldModel && shouldRetrieveWorldEvents(userMessage)
       ? rankWorldEventObservations(
           userMessage,
-          await loadRecentWorldEventObservations(userId, 30).catch(() => []),
+          await loadRecentWorldEventObservations(userId, 30, kairaInstance.instanceId).catch(() => []),
           5,
         )
       : [];
@@ -524,9 +547,9 @@ app.post("/api/chat", async (req, res) => {
       buildDialogueDecisionInstruction(dialogueDecision);
     const memoryStart = now();
     const [persistedState, persistentMemory] = await Promise.all([
-      loadKdmState(userId).catch(() => null),
-      suppressRecentMemory ? Promise.resolve([]) : getFastRecentMemory(userId),
-      hydrateLanguageMemory(userId),
+      kairaPolicy.persistentRelationship ? loadKdmState(stateUserId).catch(() => null) : Promise.resolve(null),
+      suppressRecentMemory || !kairaPolicy.persistentUserMemory ? Promise.resolve([]) : getFastRecentMemory(userId, kairaInstance.instanceId),
+      kairaPolicy.persistentUserMemory ? hydrateLanguageMemory(stateUserId) : Promise.resolve(),
     ]);
     const memoryMs = Math.round(now() - memoryStart),
       requestState = normalizeDynamicState(dynamicState),
@@ -567,7 +590,7 @@ app.post("/api/chat", async (req, res) => {
         authoritativePersonality,
         kdm.nextDynamicState,
         kdm.trace,
-        userId,
+        stateUserId,
         dialogueDecision.move,
       ),
       kdmMs = Math.round(now() - kdmStart),
@@ -599,23 +622,24 @@ app.post("/api/chat", async (req, res) => {
         postStart = now();
       let savedTurnId = "";
       await Promise.allSettled([
-        saveWorldEventObservation({
+        kairaPolicy.persistentWorldModel ? saveWorldEventObservation({
           userId,
+          kairaInstanceId: kairaInstance.instanceId,
           sessionId,
           speakerName: userName,
           event: languageUnderstanding.worldEvent,
-        }),
-        saveKdmInteraction({
-          userId,
+        }) : Promise.resolve(),
+        kairaPolicy.persistentRelationship ? saveKdmInteraction({
+          userId: stateUserId,
           dynamicState: kdm.nextDynamicState,
           reasoningTrace: kdm.trace,
           lastUserMessage: userMessage,
           reply,
-          memoryScope: dialogueAnalysis.memoryScope,
+          memoryScope: kairaPolicy.persistentUserMemory ? dialogueAnalysis.memoryScope : "session",
           dialogueAnalysis,
-        }),
+        }) : Promise.resolve(),
         saveKntTrace({
-          userId,
+          userId: stateUserId,
           userMessage,
           reply,
           reasoningTrace: kdm.trace,
@@ -632,7 +656,7 @@ app.post("/api/chat", async (req, res) => {
         }),
         saveTestSessionTurn({
           sessionId,
-          userId,
+          userId: stateUserId,
           userName,
           userMessage,
           assistantReply: reply,
@@ -679,7 +703,7 @@ app.post("/api/chat", async (req, res) => {
           savedTurnId = t.turnId;
         }),
       ]);
-      memoryCache.delete(userId);
+      memoryCache.delete(memoryCacheKey(userId, kairaInstance.instanceId));
       const postProcessMs = Math.round(now() - postStart),
         timings = {
           memoryMs,
@@ -691,12 +715,14 @@ app.post("/api/chat", async (req, res) => {
       res.json({
         sessionId,
         turnId: savedTurnId,
+        kairaInstanceId: kairaInstance.instanceId,
+        kairaInstanceType: kairaInstance.instanceType,
         reply,
         providerUsed: "local_language",
         localLanguage: {
           intent: local.intent,
           confidence: local.confidence,
-          memory: languageMemorySummary(userId),
+          memory: kairaPolicy.persistentUserMemory ? languageMemorySummary(stateUserId) : undefined,
         },
         enforcement: enforced,
         speechIdentity: speech,
@@ -715,7 +741,7 @@ app.post("/api/chat", async (req, res) => {
     );
     const activeParticipantInstruction = buildActiveParticipantInstruction(
       userName,
-      userId,
+      safeUserId,
     );
     const entityGroundingInstruction = buildEntityGroundingInstruction(
       languageUnderstanding.entityResolution,
@@ -829,23 +855,24 @@ app.post("/api/chat", async (req, res) => {
     const postStart = now();
     let savedTurnId = "";
     await Promise.allSettled([
-      saveWorldEventObservation({
+      kairaPolicy.persistentWorldModel ? saveWorldEventObservation({
         userId,
+        kairaInstanceId: kairaInstance.instanceId,
         sessionId,
         speakerName: userName,
         event: languageUnderstanding.worldEvent,
-      }),
-      saveKdmInteraction({
-        userId,
+      }) : Promise.resolve(),
+      kairaPolicy.persistentRelationship ? saveKdmInteraction({
+        userId: stateUserId,
         dynamicState: kdm.nextDynamicState,
         reasoningTrace: kdm.trace,
         lastUserMessage: userMessage,
         reply,
-        memoryScope: dialogueAnalysis.memoryScope,
+        memoryScope: kairaPolicy.persistentUserMemory ? dialogueAnalysis.memoryScope : "session",
         dialogueAnalysis,
-      }),
+      }) : Promise.resolve(),
       recordKdmMetric({
-        userId,
+        userId: stateUserId,
         score: consistency.score,
         accepted: consistency.accepted,
         repaired: repairAttempts > 0 && groundingIssues.length === 0,
@@ -853,7 +880,7 @@ app.post("/api/chat", async (req, res) => {
         issues: consistency.issues,
       }),
       saveKntTrace({
-        userId,
+        userId: stateUserId,
         userMessage,
         reply,
         reasoningTrace: kdm.trace,
@@ -864,7 +891,7 @@ app.post("/api/chat", async (req, res) => {
       }),
       saveTestSessionTurn({
         sessionId,
-        userId,
+        userId: stateUserId,
         userName,
         userMessage,
         assistantReply: reply,
@@ -911,7 +938,7 @@ app.post("/api/chat", async (req, res) => {
         savedTurnId = t.turnId;
       }),
     ]);
-    memoryCache.delete(userId);
+    memoryCache.delete(memoryCacheKey(userId, kairaInstance.instanceId));
     const postProcessMs = Math.round(now() - postStart),
       timings = {
         memoryMs,
@@ -923,6 +950,8 @@ app.post("/api/chat", async (req, res) => {
     res.json({
       sessionId,
       turnId: savedTurnId,
+      kairaInstanceId: kairaInstance.instanceId,
+      kairaInstanceType: kairaInstance.instanceType,
       reply,
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
