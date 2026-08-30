@@ -1,0 +1,37 @@
+name: One-time project state behavior policy
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-behavior-policy.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 27. Explicit 8-layer behavior policy boundary — 2026-08-31\n- Client 8-layer entegrasyon kararları artık KDM'ye personality içindeki gizli `runtime*` anahtarlarından okunmaz; açık ve versiyonlu `behavior-policy@1` girdisi olarak taşınır.\n- `behaviorPolicyInput.ts` schema/source doğrulaması ve numeric clamp uygulayan `normalizeBehaviorPolicyInput(...)` server boundary'sini tanımlar.\n- `droitChatService.ts`, `integrationRuntime.decision` ve pressures çıktısını `createClientBehaviorPolicy(...)` ile açık provenance taşıyan policy nesnesine dönüştürür.\n- Server incoming policy'yi normalize eder ve KDM'ye ayrı parametre olarak verir. KDM `runtimeTrait(personality, runtime*)` yoluyla canlı entegre karar geri kazanımı yapmaz.\n- 8-layer davranış mantığı bu fazda silinmedi; no-humor, no-question, stance, length ve disengage senaryoları explicit policy girdisiyle aynı regression beklentilerini geçer.\n- Relationship reducer repair sinyali canonical SemanticEvent (`apology || repairAttempt`) üzerinden kalır; gizli `runtimeRepairSignal` state geçiş girdisi değildir.\n- Final WHAT/WHETHER otoritesi değişmedi: KDM state/profile değerlendirmesinden sonra `BehaviorContract` ve canonical `KairaResponsePlan` final cevabı sınırlar.\n- `kairaBehaviorPolicyBoundaryContracts.test.ts` kalıcı `test:contracts` architecture suite'ine eklendi; eski decision-layer ve KDM regression testleri explicit policy contract'a taşındı.\n- Entegrasyon commit'i: `e136f17` (`feat(kaira): make behavior policy explicit`). Authority contract, TypeScript, 489 test ve production build başarıyla geçti. Geçici migration workflow/script kaldırıldı.\n- Sonraki audit sınırı: client 8-layer pipeline'ın `humor`, `authority`, `empathy`, `patience`, `seriousness`, `communication` gibi temel personality traitlerini mutate edip KDM relationship reducer'a geri beslemesi. Base personality ile per-turn behavioral overlay birbirinden ayrılmalı.\n'''
+          if '## 27. Explicit 8-layer behavior policy boundary — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record explicit behavior policy boundary"
+          git pull --rebase origin main
+          git push origin main
