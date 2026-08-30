@@ -7,6 +7,8 @@ on:
       - "scripts/applyExplicitBehaviorPolicyBoundary.mjs"
       - "src/services/behaviorPolicyInput.ts"
       - "src/services/kairaBehaviorPolicyBoundaryContracts.test.ts"
+      - "src/services/kairaDecisionLayerArchitectureContracts.test.ts"
+      - "src/services/kdmConsistencyEngine.test.ts"
 
 permissions:
   contents: write
