@@ -1,4 +1,5 @@
 import type { WorldEventObservation } from "./worldModelEventStore";
+import { compareObservationRecency } from "./temporalEvidencePolicy";
 
 export interface RetrievedWorldEvent {
   observation: WorldEventObservation;
@@ -16,6 +17,7 @@ const RECALL_RE = /\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor mus
 const REPORTED_SPEECH_RE = /\b(?:ne demişti|ne dedi|demişti|dedi|söylemişti|söyledi)\b/iu;
 const COMPARISON_RECALL_RE = /\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
 const STORED_QUERY_RE = /[?？]\s*$|\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor musun|hatırladın mı|hakkında ne biliyorsun)\b|\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
+const LATEST_RECALL_RE = /\ben\s+son\b/iu;
 
 export function shouldRetrieveWorldEvents(message: string): boolean {
   const text = normalize(message);
@@ -42,6 +44,7 @@ export function rankWorldEventObservations(
   const normalizedMessage = normalize(message);
   const queryTokens = new Set(tokens(message));
   const asksReportedSpeech = REPORTED_SPEECH_RE.test(normalizedMessage);
+  const asksLatest = LATEST_RECALL_RE.test(normalizedMessage);
   const ranked = observations
     .filter((observation) => !STORED_QUERY_RE.test(normalize(observation.event.raw || "")))
     .map((observation) => {
@@ -103,13 +106,17 @@ export function rankWorldEventObservations(
     : aboveThreshold;
 
   const sorted = relevant.sort((a, b) => {
+    // "En son" is a temporal contract: after entity relevance has bounded the
+    // candidate set, recency is authoritative. Retrieval score must not let an
+    // older lexical match outrank a newer observation for the same recall.
+    if (asksLatest) {
+      const temporal = compareObservationRecency(a.observation, b.observation);
+      if (temporal !== 0) return temporal;
+    }
     if (b.score !== a.score) return b.score - a.score;
-    return Date.parse(b.observation.createdAt) - Date.parse(a.observation.createdAt);
+    return compareObservationRecency(a.observation, b.observation);
   });
 
-  // Old test sessions can leave semantically identical observations behind.
-  // Keep only the best/newest copy so duplicate rows cannot crowd out another
-  // explicitly named person in a comparison query.
   const deduped: RetrievedWorldEvent[] = [];
   const seen = new Set<string>();
   for (const item of sorted) {
@@ -122,9 +129,6 @@ export function rankWorldEventObservations(
   const limit = Math.max(1, Math.min(maxItems, 10));
   if (matchedQueryNames.size <= 1) return deduped.slice(0, limit);
 
-  // Contrastive recall ("Ayşe mi Merve mi ...?") must preserve evidence for
-  // every explicitly matched name instead of letting one person's duplicate
-  // high-scoring rows consume the whole result window.
   const namesInQueryOrder = [...matchedQueryNames].sort((a, b) => {
     const ai = normalizedMessage.indexOf(a);
     const bi = normalizedMessage.indexOf(b);
@@ -155,5 +159,5 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
     return `- #${index + 1} [${epistemic}; ${certainty}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
   });
 
-  return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; çelişkiyi açıkça koru.`;
+  return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır; bu seçim timestamp ile belirlenir, lexical score eski kaydı öne geçiremez.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen veya zaman içinde değişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; kayıtları ayrı kanıtlar olarak koru.`;
 }
