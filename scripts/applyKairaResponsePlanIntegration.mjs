@@ -59,6 +59,21 @@ server = server.replaceAll(
   '            worldMemoryGuard,\n            timings:',
   '            worldMemoryGuard,\n            responsePlan,\n            timings:',
 );
+// AI path uses a different indentation depth than the local path.
+server = server.replace(
+  '        worldMemoryGuard,\n      }),',
+  '        worldMemoryGuard,\n        responsePlan,\n      }),',
+);
+server = server.replace(
+  '          worldMemoryGuard,\n          timings:',
+  '          worldMemoryGuard,\n          responsePlan,\n          timings:',
+);
+server = replaceOrThrow(
+  server,
+  '    const baseConsistency = validateKairoResponse(reply, kdm.trace);\n    const consistency = {\n      ...baseConsistency,\n      accepted: baseConsistency.accepted && groundingIssues.length === 0,\n      score: Math.max(0, baseConsistency.score - groundingIssues.length * 15),\n      issues: [...baseConsistency.issues, ...groundingIssues],\n      warnings: enforced.reasons,\n    };',
+  '    const baseConsistency = validateKairoResponse(reply, kdm.trace);\n    const finalPlanIssues = findKairaResponsePlanIssues(reply, responsePlan);\n    const finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues])];\n    const consistency = {\n      ...baseConsistency,\n      accepted: baseConsistency.accepted && finalIssues.length === 0,\n      score: Math.max(0, baseConsistency.score - finalIssues.length * 15),\n      issues: [...baseConsistency.issues, ...finalIssues],\n      warnings: enforced.reasons,\n    };',
+  'AI final response plan validation',
+);
 server = server.replaceAll(
   'worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, conversationAuthority:',
   'worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, responsePlan, conversationAuthority:',
