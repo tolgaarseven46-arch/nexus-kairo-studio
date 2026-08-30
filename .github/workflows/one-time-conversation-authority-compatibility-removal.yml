@@ -6,6 +6,7 @@ on:
       - ".github/workflows/one-time-conversation-authority-compatibility-removal.yml"
       - "scripts/applyConversationAuthorityCompatibilityRemoval.mjs"
       - "src/services/kairaConversationStateLockContracts.test.ts"
+      - "src/services/kairaBehaviorProfileAuthorityContracts.test.ts"
 
 permissions:
   contents: write
