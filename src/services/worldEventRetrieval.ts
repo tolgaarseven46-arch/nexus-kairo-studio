@@ -7,7 +7,10 @@ import {
   observationPropositionKey,
   resolveContradictionEvidence,
 } from "./worldEventContradictionResolver";
-import { projectWorldModel } from "./worldModelProjection";
+import {
+  projectWorldModel,
+  type WorldModelPropositionState,
+} from "./worldModelProjection";
 import { detectWorldEventTemporalReference } from "./worldEventEngine";
 import { resolveTemporalReference } from "./temporalReferenceResolver";
 import {
@@ -19,6 +22,12 @@ export interface RetrievedWorldEvent {
   observation: WorldEventObservation;
   score: number;
   reasons: string[];
+  /**
+   * Optional canonical state computed before retrieval truncation. Current-state
+   * recall carries this so response generation never rebuilds truth from only
+   * the top-N evidence subset.
+   */
+  projectedState?: WorldModelPropositionState;
 }
 
 const normalize = (value: string) =>
@@ -50,6 +59,10 @@ function observationSignature(item: RetrievedWorldEvent): string {
     item.observation.kind,
     item.observation.status,
   ].join("|");
+}
+
+function projectionKey(observation: WorldEventObservation): string {
+  return `${observationKairaInstanceId(observation)}::${observationPropositionKey(observation)}`;
 }
 
 function intervalsOverlap(
@@ -149,6 +162,9 @@ export function rankWorldEventObservations(
       const reasons: string[] = [];
       let score = 0;
       const event = observation.event;
+      const projectedState = asksCurrentState
+        ? projectionByKey.get(projectionKey(observation))
+        : undefined;
       const names = [event.actor?.name, event.target?.name, observation.speakerName]
         .filter((value): value is string => Boolean(value))
         .map(normalize);
@@ -194,33 +210,29 @@ export function rankWorldEventObservations(
       score += Math.max(0, Math.min(1, event.certainty ?? 0));
 
       if (asksCurrentState) {
-        const propositionKey = observationPropositionKey(observation);
-        const state = projectionByKey.get(
-          `${observationKairaInstanceId(observation)}::${propositionKey}`,
-        );
-        if (state?.evidenceStatus === "conflicting") {
+        if (projectedState?.evidenceStatus === "conflicting") {
           // Current-state queries must keep both sides of a real contradiction
           // visible instead of picking the newest row as synthetic truth.
           score += 4;
           reasons.push("canonical_conflict_evidence");
-        } else if (observation.id && state?.latestEvidenceId === observation.id) {
+        } else if (observation.id && projectedState?.latestEvidenceId === observation.id) {
           // For current-state recall the canonical read-model outranks lexical
           // overlap from stale observations, while historical recall remains
           // evidence-first and unchanged.
           score += 5;
-          reasons.push(`canonical_current_state:${state.assertionState}`);
+          reasons.push(`canonical_current_state:${projectedState.assertionState}`);
         }
         if (
-          state?.lifecycle.state !== "unknown" &&
+          projectedState?.lifecycle.state !== "unknown" &&
           observation.id &&
-          state?.lifecycle.evidenceObservationIds.includes(observation.id)
+          projectedState?.lifecycle.evidenceObservationIds.includes(observation.id)
         ) {
           score += 2;
-          reasons.push(`canonical_lifecycle:${state.lifecycle.state}`);
+          reasons.push(`canonical_lifecycle:${projectedState.lifecycle.state}`);
         }
       }
 
-      return { observation, score, reasons };
+      return { observation, score, reasons, projectedState };
     });
 
   const aboveThreshold = ranked.filter((item) => item.score >= 2);
@@ -280,15 +292,16 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
   const contradictionByKey = new Map(
     contradictionSets.map((set) => [set.propositionKey, set]),
   );
-  const projection = projectWorldModel(observations);
-  const projectionByKey = new Map(
-    projection.map((state) => [
+  const localProjection = projectWorldModel(observations);
+  const localProjectionByKey = new Map(
+    localProjection.map((state) => [
       `${state.kairaInstanceId}::${state.propositionKey}`,
       state,
     ]),
   );
 
-  const lines = items.map(({ observation }, index) => {
+  const lines = items.map((item, index) => {
+    const observation = item.observation;
     const event = observation.event;
     const actor = event.actor?.name || "çözülmedi";
     const target = event.target?.name || "çözülmedi";
@@ -298,10 +311,14 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
     const certainty = observation.status === "grounded" ? "grounded" : "ambiguous";
     const propositionKey = observationPropositionKey(observation);
     const contradiction = contradictionByKey.get(propositionKey);
-    const projectedState = projectionByKey.get(
-      `${observationKairaInstanceId(observation)}::${propositionKey}`,
-    );
-    const conflictLabel = contradiction?.status === "conflicting" ? "; ÇELİŞEN KANIT" : "";
+    // Prefer the full-history projection carried by retrieval. Fallback keeps
+    // this formatter backwards compatible for tests/legacy callers that build
+    // RetrievedWorldEvent objects manually.
+    const projectedState = item.projectedState || localProjectionByKey.get(projectionKey(observation));
+    const conflictLabel =
+      projectedState?.evidenceStatus === "conflicting" || contradiction?.status === "conflicting"
+        ? "; ÇELİŞEN KANIT"
+        : "";
     const polarity = event.polarity ? `; polarity=${event.polarity}` : "";
     const stateLabel = projectedState
       ? `; state=${projectedState.assertionState}; lifecycle=${projectedState.lifecycle.state}`
@@ -312,5 +329,5 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
     return `- #${index + 1} [${epistemic}; ${certainty}${polarity}${stateLabel}${temporal}${conflictLabel}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
   });
 
-  return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- state ve lifecycle alanları immutable kanıtlardan türetilmiş CANONICAL READ-MODEL özetidir; ham kanıtı silmez veya yeni olay yaratmaz.\n- state=conflicting ise en yeni polarity ne olursa olsun proposition'ı doğrulanmış gerçek gibi anlatma.\n- lifecycle=planned/executed/cancelled/postponed/failed yalnızca aynı canonical proposition'ın mevcut plan generation kanıtından gelir; eski generation sonucunu yeni plana taşıma.\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- Çözümlenmiş zaman aralığı varsa kullanıcıdaki temporal ifadeyle eşleşen kanıtlar retrieval tarafından önceden sınırlandırılmıştır; bu zamanı yeniden ham metinden tahmin etme.\n- temporal_graph_neighbor reason'lı kanıtlar yalnızca persisted provenance ile bağlı olaylardır; graph dışında yeni bir önce/sonra ilişkisi UYDURMA.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır; bu seçim timestamp ile belirlenir, lexical score eski kaydı öne geçiremez.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- ÇELİŞEN KANIT etiketi varsa aynı canonical proposition için zıt polarity kayıtları vardır. En yeni kaydı güncel kanıt olarak kullanabilirsin ama onu otomatik doğrulanmış gerçek sayma; gerektiğinde önceki ve sonraki iddiayı ayrı belirt.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen veya zaman içinde değişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; kayıtları ayrı kanıtlar olarak koru.`;
+  return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- state ve lifecycle alanları immutable kanıtlardan türetilmiş CANONICAL READ-MODEL özetidir; ham kanıtı silmez veya yeni olay yaratmaz.\n- Retrieval sonucu projectedState taşıyorsa bu state top-N seçimi ÖNCESİ tam aday kanıt kümesinden hesaplanmıştır; seçilen alt kümeden yeniden yorumlama yapma.\n- state=conflicting ise en yeni polarity ne olursa olsun proposition'ı doğrulanmış gerçek gibi anlatma.\n- lifecycle=planned/executed/cancelled/postponed/failed yalnızca aynı canonical proposition'ın mevcut plan generation kanıtından gelir; eski generation sonucunu yeni plana taşıma.\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- Çözümlenmiş zaman aralığı varsa kullanıcıdaki temporal ifadeyle eşleşen kanıtlar retrieval tarafından önceden sınırlandırılmıştır; bu zamanı yeniden ham metinden tahmin etme.\n- temporal_graph_neighbor reason'lı kanıtlar yalnızca persisted provenance ile bağlı olaylardır; graph dışında yeni bir önce/sonra ilişkisi UYDURMA.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır; bu seçim timestamp ile belirlenir, lexical score eski kaydı öne geçiremez.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- ÇELİŞEN KANIT etiketi varsa aynı canonical proposition için zıt polarity kayıtları vardır. En yeni kaydı güncel kanıt olarak kullanabilirsin ama onu otomatik doğrulanmış gerçek sayma; gerektiğinde önceki ve sonraki iddiayı ayrı belirt.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen veya zaman içinde değişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; kayıtları ayrı kanıtlar olarak koru.`;
 }
