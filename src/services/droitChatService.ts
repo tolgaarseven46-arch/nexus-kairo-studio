@@ -22,6 +22,7 @@ import { saveTestSessionLayerAudit } from "./testSessionLayerAuditService";
 import { auth } from "../lib/firebase";
 import { requestCanonicalLanguageUnderstanding, type ClientLanguageUnderstandingResult } from "./clientLanguageUnderstanding";
 import { resolveKairaInstanceContext, type KairaInstanceType } from "./kairaInstanceContext";
+import { normalizeFineTuneProfile } from "./fineTuneProfileNormalizer";
 
 export type KairoProvider = "gemini" | "openrouter";
 export type KairoProviderUsed = KairoProvider | "local_language";
@@ -94,8 +95,7 @@ function readFineTuneProfile(): Record<string, number> {
   try {
     const raw = window.localStorage.getItem("kairo_character_finetune_v2");
     if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
+    return normalizeFineTuneProfile(JSON.parse(raw));
   } catch {
     return {};
   }

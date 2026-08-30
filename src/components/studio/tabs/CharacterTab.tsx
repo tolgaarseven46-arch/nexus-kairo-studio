@@ -21,6 +21,7 @@ import {
   DroitExpressionId,
   DroitExpressionAsset,
 } from '../../../types/nexus';
+import { normalizeFineTuneProfile } from '../../../services/fineTuneProfileNormalizer';
 import { DroitAvatar } from '../DroitAvatar';
 
 interface CharacterTabProps {
@@ -375,7 +376,7 @@ export const CharacterTab: React.FC<CharacterTabProps> = ({
       const savedIdentity = localStorage.getItem('kairo_identity_v2');
       const savedFineTune = localStorage.getItem('kairo_character_finetune_v2');
       if (savedIdentity) setIdentity({ ...DEFAULT_IDENTITY, ...JSON.parse(savedIdentity) });
-      if (savedFineTune) setFineTune({ ...DEFAULT_PROFILE, ...JSON.parse(savedFineTune) });
+      if (savedFineTune) setFineTune({ ...DEFAULT_PROFILE, ...normalizeFineTuneProfile(JSON.parse(savedFineTune)) });
     } catch {
       // Keep safe defaults when local data is malformed.
     }
