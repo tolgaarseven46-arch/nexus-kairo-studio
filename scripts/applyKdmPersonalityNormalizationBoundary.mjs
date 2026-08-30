@@ -9,6 +9,10 @@ if (!source.includes("from './droitPersonalityNormalizer'")) {
   );
 }
 source = source.replace(
+  '  personality?: DroitPersonalityTraits | null,',
+  '  personality?: Partial<DroitPersonalityTraits> | null,',
+);
+source = source.replace(
   '  const semanticEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage);\n  const baseBehaviorProfile = computeBehaviorProfile(personality || undefined, userMessage);',
   '  const semanticEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage);\n  const normalizedPersonality = normalizeDroitPersonality(personality);\n  const baseBehaviorProfile = computeBehaviorProfile(normalizedPersonality, userMessage);',
 );
@@ -17,6 +21,7 @@ source = source.replace('  const sensitivity = trait(personality, "emotionalSens
 source = source.replace('  const angerTrait = trait(personality, "anger");', '  const angerTrait = trait(normalizedPersonality, "anger");');
 source = source.replace('  const empathy = trait(personality, "empathy");', '  const empathy = trait(normalizedPersonality, "empathy");');
 source = source.replace('  const loyalty = trait(personality, "loyalty");', '  const loyalty = trait(normalizedPersonality, "loyalty");');
+if (!source.includes('personality?: Partial<DroitPersonalityTraits> | null,')) throw new Error('KDM partial personality signature missing');
 if (!source.includes('const normalizedPersonality = normalizeDroitPersonality(personality);')) throw new Error('KDM normalization boundary missing');
 fs.writeFileSync(path, source);
 
