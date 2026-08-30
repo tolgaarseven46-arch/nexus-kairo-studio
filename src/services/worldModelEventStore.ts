@@ -1,6 +1,10 @@
 import { addDoc, collection, doc, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import type { CanonicalWorldEvent, WorldEventResolvedTemporalInterval } from "./worldEventEngine";
+import {
+  enrichWorldEventModality,
+  type ModalCanonicalWorldEvent,
+} from "./worldEventModality";
 import { resolveTemporalReference } from "./temporalReferenceResolver";
 
 const WORLD_MODEL_COLLECTION = "worldModel";
@@ -17,7 +21,7 @@ export interface WorldEventObservation {
   speakerName?: string;
   kind: WorldEventObservationKind;
   status: WorldEventObservationStatus;
-  event: CanonicalWorldEvent;
+  event: ModalCanonicalWorldEvent;
   createdAt: string;
   temporalReferenceObservationId?: string;
 }
@@ -46,10 +50,10 @@ export function classifyWorldEventObservation(
 }
 
 export function enrichWorldEventTemporalAtPersistence(
-  event: CanonicalWorldEvent,
+  event: ModalCanonicalWorldEvent,
   createdAt: string,
   referenceInterval?: WorldEventResolvedTemporalInterval,
-): CanonicalWorldEvent {
+): ModalCanonicalWorldEvent {
   const resolved = resolveTemporalReference(event.raw, event.temporal, createdAt, referenceInterval);
   if (!event.temporal || !resolved) return event;
   return {
@@ -111,7 +115,8 @@ export async function saveWorldEventObservation(input: {
     ? await loadPreviousTemporalReference(parent, input.sessionId).catch(() => undefined)
     : undefined;
   const referenceInterval = referenceObservation?.event?.temporal?.resolved;
-  const event = enrichWorldEventTemporalAtPersistence(input.event, createdAt, referenceInterval);
+  const modalEvent = enrichWorldEventModality(input.event);
+  const event = enrichWorldEventTemporalAtPersistence(modalEvent, createdAt, referenceInterval);
   const temporalReferenceObservationId =
     event.temporal?.resolved?.source === "referenced_event"
       ? referenceObservation?.id
