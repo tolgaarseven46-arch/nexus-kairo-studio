@@ -67,10 +67,20 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
   {
     id: "plan-lifecycle",
     version: 1,
-    status: "active",
+    status: "superseded",
     ownerLayer: "world-event",
     consumerLayers: ["world-model-store", "retrieval", "response-generation"],
     summary: "Immutable plan evidence is resolved with later bounded executed, cancelled, postponed or failed signals; historical evidence is preserved and outcome recall never guesses across multiple propositions.",
+    revisionReason: "V2 introduces plan generations so outcomes from an older plan cannot close or contaminate a newer plan for the same proposition.",
+  },
+  {
+    id: "plan-lifecycle",
+    version: 2,
+    status: "active",
+    ownerLayer: "world-event",
+    consumerLayers: ["world-model-store", "retrieval", "response-generation"],
+    summary: "The newest valid plan/commitment/intention starts a fresh immutable generation; only lifecycle signals newer than that generation anchor may resolve its executed, cancelled, postponed or failed state.",
+    supersedes: "plan-lifecycle@1",
   },
   {
     id: "world-model-ownership",
