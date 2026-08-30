@@ -37,6 +37,7 @@ describe("Kaira contract registry", () => {
       "relationship-state",
       "state-to-behavior",
       "learned-policy-boundary",
+      "response-plan",
       "retrieval-to-response",
     ]) {
       expect(activeContractVersion(id)?.status).toBe("active");
@@ -107,6 +108,15 @@ describe("Kaira contract registry", () => {
     expect(policy?.ownerLayer).toBe("world-reasoning-policy");
     expect(policy?.consumerLayers).toContain("response-generation");
     expect(policy?.consumerLayers).not.toContain("relationship-state");
+  });
+
+  it("registers the response plan as the verbalizer/validator behavior seam", () => {
+    const plan = activeContractVersion("response-plan");
+    expect(plan?.version).toBe(1);
+    expect(plan?.ownerLayer).toBe("response-plan");
+    expect(plan?.consumerLayers).toContain("local-verbalizer");
+    expect(plan?.consumerLayers).toContain("llm-verbalizer");
+    expect(plan?.consumerLayers).toContain("consistency");
   });
 
   it("does not allow anonymous contracts without consumers", () => {
