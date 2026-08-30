@@ -21,20 +21,21 @@ describe("base personality vs per-turn response overlay ownership", () => {
   it("uses base personality as the KDM relationship/emotion reducer input", () => {
     expect(server).toContain("basePersonality = personality as DroitPersonalityTraits");
     expect(server).toContain("responsePersonality = (incomingResponsePersonality || personality) as DroitPersonalityTraits");
-    const kdmCall = between(server, "kdm = analyzeKdmInteraction(", "),\n      conversationAuthority");
+    const kdmCall = between(server, "kdm = analyzeKdmInteraction(", "),\n      conversationStateLock");
     expect(kdmCall).toContain("basePersonality");
     expect(kdmCall).not.toContain("responsePersonality");
   });
 
   it("uses per-turn overlay only after KDM for response HOW shaping", () => {
-    const afterKdm = server.slice(server.indexOf("conversationAuthority = applyConversationStateAuthority"));
-    expect(afterKdm).toContain("applyConversationStateAuthority(responsePersonality, kdm.nextDynamicState)");
-    expect(afterKdm).toContain("computeKairoSpeechIdentity(\n        authoritativePersonality,");
-    expect(afterKdm).toContain("tryLocalKairoReply(\n        userMessage,\n        authoritativePersonality,");
+    const afterKdm = server.slice(server.indexOf("conversationStateLock = projectConversationStateLock"));
+    expect(afterKdm).toContain("conversationStateLock = projectConversationStateLock(kdm.nextDynamicState)");
+    expect(afterKdm).toContain("responseStylePersonality = responsePersonality");
+    expect(afterKdm).toContain("computeKairoSpeechIdentity(\n        responseStylePersonality,");
+    expect(afterKdm).toContain("tryLocalKairoReply(\n        userMessage,\n        responseStylePersonality,");
   });
 
   it("keeps explicit behavior policy as the only per-turn decision input entering KDM", () => {
-    const kdmCall = between(server, "kdm = analyzeKdmInteraction(", "),\n      conversationAuthority");
+    const kdmCall = between(server, "kdm = analyzeKdmInteraction(", "),\n      conversationStateLock");
     expect(kdmCall).toContain("behaviorPolicy");
   });
 });
