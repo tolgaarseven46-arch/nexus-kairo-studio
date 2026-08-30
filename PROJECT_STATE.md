@@ -213,7 +213,6 @@ Yeni sohbet açıldığında:
 - Emoji bütçesi ve kullanıcıdan gelmeyen hazır internet/oyun metaforu kontrolü tüm AI diyalog hareketlerinin ortak çıktı kapısında çalışır. Emoji tamamen yasak değildir; konuşma kimliği eğilimi yeterliyse tur başına en fazla bir emojiye izin verilir.
 - KDM davranış profili ilişki bağlamıyla tek yerde hesaplanır. Yeni, sıcak-güvenli, gerilimli veya iyileşen ilişki için tek ve çelişmeyen `relationshipInstruction` AI promptuna aktarılır; istemciden gelen ayrı profil ile KDM tonu arasındaki çift karar kaldırılmıştır.
 
-
 ## 20. World reasoning / deterministic guard — 2026-08-30
 - Canonical world-memory retrieval sonrası read-only `WorldStateAppraisal` ve `WorldReasoningPolicy` katmanları aktif.
 - Deterministic `worldModelResponseGuard`, grounded kanıt varken hafızayı inkâr etme, çelişkiyi tek tarafa düşürme, reported claim kaynak atfını kaybetme ve gerekli epistemik nitelemeyi kaldırma durumlarını modelden bağımsız olarak engelliyor.
@@ -221,3 +220,15 @@ Yeni sohbet açıldığında:
 - Guard yalnız AI yolunda değil, Yerel Dil Motoru erken dönüş yolunda da uygulanıyor; world reasoning boundary bütün cevap yollarında bağlayıcı.
 - `worldStateAppraisal`, `worldReasoningPolicy` ve `worldMemoryGuard` KNT trace, test-session metadata, chat debug/KDM response ve Studio SON KARAR İZİ/SON TURU KOPYALA raporunda gözlemlenebilir. Böylece tek turda appraisal → policy → guard zinciri, guard issue listesi ve cevabın değiştirilip değiştirilmediği izlenebilir.
 - CI bu değişiklikleri architecture contracts + tests + TypeScript + production build ile doğrular.
+
+## 21. KairaResponsePlan / konuşma kimliği otoritesi — 2026-08-30
+- `BehaviorContract` + `DialogueDecisionPlan` + HOW-only `KairoSpeechIdentity`, tek canonical `KairaResponsePlan` içinde kesiştiriliyor.
+- Plan WHAT/WHETHER davranış otoritesidir. Dialogue yalnız discourse move/shape, speech identity yalnız HOW/style verir; ikisi `BehaviorContract`ın yasakladığını yeniden açamaz.
+- Yerel Dil Motoru ve AI verbalizer aynı `responsePlan`ı tüketiyor.
+- Plan validator initial, repair, fallback, local ve final post-enforcement cevaplarda çalışıyor; eski enforcer katmanlarından sonra da plan yeniden doğrulanıyor.
+- Plan her turda KNT ve test-session metadata'ya persist edilir, hydration ile geri yüklenir ve `droitChatService` üzerinden Studio'ya taşınır.
+- KNT `SON KARAR İZİ` ve `SON TURU KOPYALA` raporunda move, stance, register, ilişki dili, konuşmayı sürdürme, soru/mizah/yakınlık/affetme/yakınlaşma izinleri ve cümle/kelime/emoji bütçeleri görünür.
+- `response-plan@1` contract registry'de aktif ve local verbalizer, LLM verbalizer, consistency ve observability katmanlarının resmi sözleşme sınırıdır.
+- `kairoSpeechIdentity.ts` runtime davranış izinlerinden ayrıldı; artık soru/mizah/affetme/konuşmayı sürdürme kararı üretmez, yalnızca HOW/style belirler.
+- Geçici response-plan migration workflow ve scriptleri kaldırıldı. Eski non-idempotent language-understanding migration workflow'u da kaldırıldı; kalıcı doğrulama otoritesi `.github/workflows/ci.yml`dir.
+- Sonraki büyük mimari sınır: `kairoDialogueDecisionEngine` semantik içeriği yeniden parse etmeyi bırakmalı ve canonical `SemanticEvent` tüketmeli. Aynı fazda Yerel Dil Motoru'ndaki paralel intent parser canonical semantik akışa bağlanmalı; yeni regex ekleme yerine parser consolidation yapılmalı.
