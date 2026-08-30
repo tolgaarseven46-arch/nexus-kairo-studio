@@ -345,3 +345,12 @@ Yeni sohbet açıldığında:
 - `kairaConversationStateLockContracts.test.ts` kalıcı `test:contracts` suite'ine eklendi.
 - Entegrasyon commit'i: `db0ae1a` (`refactor(kaira): reduce conversation authority to state lock`). State-lock contract, TypeScript, 508/508 test ve production build başarıyla geçti. Geçici migration workflow/script kaldırıldı.
 - Sonraki audit adayı: `src/services/conversationStateAuthority.ts` dosyası ve `conversationAuthority` compatibility metadata adı. Repo çapında gerçek consumer bulunmadan dosya/alan kaldırılmayacak.
+
+
+## 32. Retired conversation authority source removal — 2026-08-31
+- `src/services/conversationStateAuthority.ts` artık canlı veya test yolunda tüketilmeyen retired source olarak kaldırıldı.
+- `kairaConversationStateLockContracts.test.ts` legacy source dosyasının yeniden eklenmesini yasaklayan kalıcı invariant içerir.
+- Silme commit'i: `9daf600` (`refactor(kaira): remove retired conversation authority source`).
+- Fresh GitHub Actions checkout üzerinde architecture contracts, full tests, TypeScript ve production build başarıyla geçti; dolayısıyla eski source'un gizli import/consumer'ı olmadığı doğrulandı.
+- Client `droitChatService` server cevabındaki `conversationAuthority` compatibility metadata'sını KairoChatResponse'a taşımıyor; Test Lab da raw endpoint yerine `droitChatService.sendMessage` kullanıyor.
+- Sonraki adım: server response içindeki eski `conversationAuthority` JSON compatibility adı da gerçek consumer audit'i tamamlanınca kaldırılacak; canonical iç isim `conversationStateLock`.
