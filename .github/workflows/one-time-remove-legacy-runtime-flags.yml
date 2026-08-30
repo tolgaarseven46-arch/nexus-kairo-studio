@@ -6,6 +6,9 @@ on:
       - ".github/workflows/one-time-remove-legacy-runtime-flags.yml"
       - "scripts/applyLegacyRuntimeFlagRemoval.mjs"
       - "src/services/kairaLegacyRuntimeFlagRemovalContracts.test.ts"
+      - "src/services/kairaStateBehaviorContracts.ts"
+      - "src/services/kairaStateBehaviorContracts.test.ts"
+      - "src/services/kairaStateSequenceContracts.test.ts"
 
 permissions:
   contents: write
