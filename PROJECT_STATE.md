@@ -322,3 +322,14 @@ Yeni sohbet açıldığında:
 - `kairaLegacyRuntimeFlagRemovalContracts.test.ts` kalıcı `test:contracts` suite'ine eklendi.
 - Entegrasyon commit'i: `8446dde` (`refactor(kaira): remove legacy runtime decision flags`). Runtime-removal contract, TypeScript, 496/496 test ve production build başarıyla geçti. Geçici migration workflow/script kaldırıldı.
 - Sonraki audit adayı: `conversationStateAuthority` artık yalnız HOW humor clamp yaptığı için ayrı bir authority servisi olarak kalmalı mı, yoksa speech identity / response-style projection içine taşınmalı mı? Koddan tüketici ve semantik sınır audit'i yapılmadan kaldırılmayacak.
+
+
+## 30. Conversation state authority non-mutation — 2026-08-31
+- `conversationStateAuthority` artık distancing/repairing/disengaged durumlarında `responsePersonality` üzerinde trait mutasyonu yapmaz. Gelen personality nesnesini aynı referansla döndürür; yalnız `state`, `locked` ve `reason` metadata'sı üretir.
+- Non-active state WHAT/WHETHER kapanışları tek canonical yerde kalır: `BehaviorContract` + `KairaResponsePlan`. Disengaged durumda konuşmayı sürdürme/soru/mizah/yakınlık izinleri personality clamp ile değil plan/contract ile kapatılır.
+- SpeechIdentity HOW-only katmanı dynamic state'i doğrudan görür ve hiçbir izni açamaz; response personality'yi state authority içinde ayrıca kısmanın semantik gerekçesi kalmadı.
+- Canlı local-language yolu canonical `responsePlan` alır; mizah/soru/continue izinlerini oradan uygular.
+- State→behavior seam artık state lock metadata ile canonical BehaviorContract tutarlılığını doğrular; `humor=0` gibi gizli personality mutation invariantı yoktur.
+- `kairaConversationAuthorityNonMutationContracts.test.ts` kalıcı `test:contracts` suite'ine eklendi. Legacy runtime-removal contract da replacement trait mutation'ını yasaklayacak şekilde güncellendi.
+- Entegrasyon commit'i: `fa3f9b0` (`refactor(kaira): make conversation authority non-mutating`). Non-mutation contract, TypeScript, 501/501 test ve production build başarıyla geçti. Geçici migration workflow/script kaldırıldı.
+- Sonraki audit adayı: bu servis artık yalnız state-lock projection ürettiği için `conversationStateAuthority` adı/katmanı sadeleştirilebilir; ancak observability ve response metadata tüketicileri repo çapında doğrulanmadan kaldırılmayacak.
