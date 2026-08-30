@@ -177,7 +177,7 @@ Gelecekte:
 - CI artık architecture contracts, testler, TypeScript kontrolü ve production build adımlarını birlikte doğruluyor.
 - KDM unit test kapsamı şu an çok küçük (4 test, ağırlıklı response consistency/repair tarafı).
 - `kdmConsistencyEngine.ts` niyet ve sentiment sınıflandırması basit regex tabanlı; yeni normalizer ile tek bir canonical sınıflandırma kaynağına henüz bağlanmış değil.
-- `droitChatService.ts` istemci tarafında ayrıca behavior profile hesaplıyor; sunucuda KDM tekrar davranış profili hesaplıyor. Veri akışı sadeleştirme adayı.
+- Behavior profile çift otoritesi 23. bölümde kapatıldı; canlı cevapta tek otorite artık server/KDM `kdm.behaviorProfile`.
 - Response consistency kontrolü mevcut ama sosyal/doğal konuşma kalitesini ölçmek için yetersiz.
 
 ## 18. Sohbet devamlılığı protokolü
@@ -246,3 +246,15 @@ Yeni sohbet açıldığında:
 - `kairaSemanticConsumerAuthorityContracts.test.ts`, `kairaCurrentTurnDialogueAuthorityContracts.test.ts` ve `kairaDialogueTurnProjection.test.ts` kalıcı `test:contracts` architecture suite'ine bağlıdır.
 - Semantic consumer ve current-turn projection migration workflow/scriptleri başarıyla uygulandıktan sonra kaldırıldı; kalıcı çalışma yolu yalnız ürün kodu + `.github/workflows/ci.yml`dir.
 - Entegrasyon commit'i: `f02eec0` (`feat(kaira): unify current-turn dialogue projection`). Entegrasyon workflow'unda authority contracts, TypeScript, full test suite ve production build başarıyla geçti.
+
+
+## 23. KDM behavior profile otoritesi — 2026-08-30
+- Canlı cevap davranış profili için tek otorite server/KDM `kdm.behaviorProfile`dır.
+- `droitChatService.ts` artık `computeBehaviorProfile(runtimePersonality, userMessage)` ile paralel client profili üretmez ve request payload'ına ayrı `behaviorProfile` göndermez.
+- Server hem Yerel Dil Motoru hem AI response yolunda authoritative `behaviorProfile`ı `kdm` response metadata'sında döndürür.
+- Client dönen `data.kdm.behaviorProfile`ı `authoritativeBehaviorProfile` olarak kullanır ve Studio/debug tüketicilerine `profile` alanında aynı nesneyi verir; profil eksikse sessiz fallback yerine hata üretir.
+- Böylece panel/debug profilinin, cevabı gerçekten yöneten KDM profilinden sapması engellendi.
+- Client-side personality/motivation/value/preference/social/boundary/expression hazırlıkları bu fazda kaldırılmadı; yalnız duplicate behavior-profile karar otoritesi kapatıldı. Bunların server ile sınırı ayrı audit konusu olarak kalır.
+- `kairaBehaviorProfileAuthorityContracts.test.ts` kalıcı `test:contracts` architecture suite'ine eklendi.
+- Geçici behavior-profile migration workflow/script başarıyla uygulandıktan sonra kaldırıldı.
+- Entegrasyon commit'i: `17f3600` (`feat(kaira): make KDM behavior profile authoritative`). Migration doğrulamasında contract, TypeScript, full test suite ve production build başarıyla geçti.
