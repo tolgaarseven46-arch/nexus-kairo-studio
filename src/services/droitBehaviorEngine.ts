@@ -4,6 +4,7 @@ import {
   DroitExpressionMode,
   LastEventReaction,
 } from '../types/nexus';
+import { normalizeDroitPersonality } from './droitPersonalityNormalizer';
 
 /**
  * Behavior Layer Profile generated from user-defined personality sliders.
@@ -46,8 +47,8 @@ export function computeBehaviorProfile(
   traits?: Partial<DroitPersonalityTraits> | null,
   userMessage: string = ''
 ): BehaviorLayerProfile {
-  const safeTraits = traits || {};
-  // Extract normalized trait values (0 to 100, default 50)
+  const safeTraits = normalizeDroitPersonality(traits);
+  // Extract canonical normalized trait values (0 to 100, default 50)
   const humor = Number(safeTraits.humor ?? 50);
   const empathy = Number(safeTraits.empathy ?? 50);
   const confidence = Number(safeTraits.selfConfidence ?? (safeTraits as any).confidence ?? 50);
