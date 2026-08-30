@@ -33,11 +33,9 @@ client = replaceRequired(
   '      const canonicalSemanticEvent = (data.kdm?.semanticEvent as SemanticEvent | undefined) ?? semanticEvent;\n      const authoritativeBehaviorProfile = data.kdm?.behaviorProfile as BehaviorLayerProfile | undefined;\n      if (!authoritativeBehaviorProfile) throw new Error("Authoritative behavior profile missing from server response");\n      const semanticSource = languageUnderstanding.semanticSource;',
   'read authoritative server behavior profile',
 );
-client = replaceRequired(
-  client,
-  '        rawDynamicStateBefore: dynamicState,\n        temperamentAdjustedState,',
-  '        rawDynamicStateBefore: dynamicState,\n        temperamentAdjustedState,\n        behaviorProfile: authoritativeBehaviorProfile,',
-  'audit authoritative behavior profile',
+client = client.replace(
+  '        temperamentAdjustedState,\n        behaviorProfile: authoritativeBehaviorProfile,',
+  '        temperamentAdjustedState,',
 );
 client = replaceRequired(
   client,
