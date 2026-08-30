@@ -1,0 +1,37 @@
+name: One-time project state personality request default
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-personality-request-default.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 38. Redundant personality request default removal — 2026-08-31\n- `/api/chat` request destructuring içindeki `personality = {}` default'u kaldırıldı; request alanı artık eksikse `undefined` olarak boundary'de korunur.\n- Runtime davranışı değişmez: canonical `normalizeDroitPersonality(personality)` eksik personality'yi neutral 50 profile dönüştürür. Neutral fallback artık yalnız tek authoritative normalization boundary'sinde oluşur.\n- Böylece transport/request katmanı ile domain normalization ayrıldı; server eksik payload bilgisini erken `{}` ile gizlemez.\n- `kairaBasePersonalityOwnershipContracts.test.ts` `personality = {},` kalıbının geri gelmesini yasaklar ve personality alanının response overlay'den ayrı destructure edildiğini doğrular.\n- Entegrasyon commit'i: `ee2143d` (`refactor(kaira): remove redundant personality request default`). Personality ownership/normalizer contractları, TypeScript, full regression ve production build başarıyla geçti.\n- Geçici migration workflow/script kaldırıldı.\n- Sonraki audit adayı: personality normalizer finite numeric trait'leri koruyor ancak canonical 0..100 slider aralığını clamp etmiyor. Bu davranışın mevcut creator/editor ve behavior engine contract'larıyla uyumu koddan doğrulanmadan değiştirilmeyecek.\n'''
+          if '## 38. Redundant personality request default removal — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record personality request default removal"
+          git pull --rebase origin main
+          git push origin main
