@@ -4,6 +4,7 @@ import {
   buildTemporalEventGraph,
   observationsAfter,
   observationsBefore,
+  retrieveTemporalNeighbors,
 } from "./worldEventTemporalGraph";
 
 function observation(input: {
@@ -96,6 +97,30 @@ describe("Kaira temporal event graph contracts", () => {
     expect(observationsBefore(graph, "b")).toEqual(["a"]);
   });
 
+  it("retrieves graph neighbors only when an explicit anchor id is supplied", () => {
+    const first = observation({
+      id: "a",
+      createdAt: "2026-08-20T12:00:00.000Z",
+      startAt: "2026-08-20T00:00:00.000Z",
+      endAt: "2026-08-20T23:59:59.999Z",
+    });
+    const second = observation({
+      id: "b",
+      createdAt: "2026-08-21T12:00:00.000Z",
+      startAt: "2026-08-21T00:00:00.000Z",
+      endAt: "2026-08-21T23:59:59.999Z",
+      referenceId: "a",
+      direction: "after",
+    });
+    const observations = [second, first];
+
+    expect(retrieveTemporalNeighbors(observations, undefined, "after")).toEqual([]);
+    expect(retrieveTemporalNeighbors(observations, "a", "after").map((item) => item.id))
+      .toEqual(["b"]);
+    expect(retrieveTemporalNeighbors(observations, "b", "before").map((item) => item.id))
+      .toEqual(["a"]);
+  });
+
   it("reverses the edge when the current event is before the referenced event", () => {
     const reference = observation({
       id: "a",
@@ -153,6 +178,11 @@ describe("Kaira temporal event graph contracts", () => {
         "temporal_graph.missing_reference",
       ]),
     );
+    expect(retrieveTemporalNeighbors([
+      crossSessionChild,
+      crossSessionReference,
+      missing,
+    ], "a", "after")).toEqual([]);
   });
 
   it("rejects provenance whose resolved intervals contradict the relation", () => {
