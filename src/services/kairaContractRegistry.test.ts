@@ -31,6 +31,7 @@ describe("Kaira contract registry", () => {
       "proposition-temporal-event-anchor",
       "temporal-evidence",
       "contradiction-evidence",
+      "world-model-projection",
       "relationship-state",
       "state-to-behavior",
       "learned-policy-boundary",
@@ -73,6 +74,12 @@ describe("Kaira contract registry", () => {
         (item) => item.id === "world-model-ownership" && item.version === 1,
       )?.status,
     ).toBe("superseded");
+  });
+
+  it("registers canonical world-model projection as a bounded state seam", () => {
+    const projection = activeContractVersion("world-model-projection");
+    expect(projection?.version).toBe(1);
+    expect(projection?.consumerLayers).toContain("response-generation");
   });
 
   it("does not allow anonymous contracts without consumers", () => {
