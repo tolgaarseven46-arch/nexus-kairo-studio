@@ -1,0 +1,37 @@
+name: One-time project state KDM personality normalization
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-kdm-personality-normalization.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 44. KDM personality normalization ownership — 2026-08-31\n- Exported `analyzeKdmInteraction(...)` server dışında doğrudan çağrılabildiği halde KDM içindeki `trait(...)` helper raw personality alanlarını `typeof value === "number"` ile okuyordu. `NaN` da JavaScript'te number olduğu için direct/legacy KDM çağrısında ilişki ve state matematiğine non-finite değer sızabiliyordu.\n- KDM boundary artık işlem başında `normalizeDroitPersonality(personality)` ile tek bir canonical `normalizedPersonality` üretir. Behavior profile sentezi ile sabır, hassasiyet, öfke, empati ve sadakat ilişki matematiği aynı normalized kaynaktan beslenir.\n- `analyzeKdmInteraction(...)` personality parametre tipi `Partial<DroitPersonalityTraits> | null` olarak genişletildi. Bu, runtime'ın zaten desteklediği neutral-default normalization contract'ını TypeScript imzasıyla hizalar; tam personality çağrıları compatibility olarak aynen geçerlidir.\n- `kairaKdmPersonalityNormalizationBoundaryContracts.test.ts` non-finite direct input altında state/tolerance matematiğinin finite kalmasını ve out-of-range traitlerin canonical behavior input katmanında 0..100'e clamp edilmesini doğrular.\n- İlk test denemesinde final `behaviorProfile.patienceLevel` doğrudan 0 beklenmişti; relationship context'in daha sonra behavior profile'ı bilinçli olarak şekillendirdiği görüldü. Contract bu nedenle normalization'ın gerçek sahiplik katmanı olan `debugMatrix.inputTraits` üzerinden ölçülür.\n- Entegrasyon commit'i: `13c18da` (`fix(kaira): normalize personality at KDM boundary`). Targeted KDM/behavior/normalizer contractları, TypeScript, full regression ve production build başarıyla geçti.\n- Server davranışı semantik olarak değişmez; `/api/chat` zaten normalized base personality geçiriyordu. Değişiklik exported direct/legacy KDM kullanımını güvenli hale getirir.\n- Geçici KDM migration workflow/script ve bölüm 43'ün geçici docs workflow'u kaldırıldı.\n- Sonraki audit adayı koddan belirlenecek; normalization zincirinde artık server, behavior, KDM ve persistence sınırları canonical normalizer ile hizalı.\n'''
+          if '## 44. KDM personality normalization ownership — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record KDM personality normalization"
+          git pull --rebase origin main
+          git push origin main
