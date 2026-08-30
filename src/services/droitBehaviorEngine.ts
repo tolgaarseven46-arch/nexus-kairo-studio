@@ -183,7 +183,7 @@ export function computeBehaviorProfile(
   // Summary String
   const traitsSummaryList: string[] = [];
   if (confidence >= 75) traitsSummaryList.push('Özgüvenli');
-  if (effectiveEmpathy >= 75) traitsSummaryList.push('Yüksek Empati');
+  if (effectiveEmpathy >= 0.75) traitsSummaryList.push('Yüksek Empati');
   if (effectiveHumor >= 0.6) traitsSummaryList.push('Mizahi');
   if (analyticalDepth >= 0.7) traitsSummaryList.push('Analitik');
   if (authority >= 75) traitsSummaryList.push('Otoriter/Lider');
