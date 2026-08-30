@@ -73,6 +73,7 @@ export interface CanonicalWorldEvent {
 const REPORTING_RE = /\b(?:dedi|demiş|diyor|diyordu|söyledi|söylemiş|söylüyor)\b/iu;
 const EXPLICIT_APOLOGY_ACTION_RE = /\bözür\s+diledi\b/iu;
 const NEGATED_CLAIM_RE = /\b(?:değil(?:di)?|demedi|söylemedi|yapmadı|olmadı|etmedi|istemedi|sevmedi|kızmadı)\b/iu;
+const PRODUCTIVE_NEGATION_RE = /(?:^|[^\p{L}\p{N}_])[\p{L}]+(?:ma|me)(?:yacak|yecek|dı|di|du|dü|mış|miş|muş|müş)(?:[^\p{L}\p{N}_]|$)/iu;
 const FUTURE_RE = /\b(?:yarın|sonra|yapacak|edecek|olacak|diyecek|söyleyecek|ertesi)\b/iu;
 const PRESENT_RE = /\b(?:bugün|şimdi|şu an|halen|hâlen)\b/iu;
 const PAST_RE = /\b(?:dün|önce|geçen|demişti|dedi|söyledi|yaptı|oldu|etti)\b/iu;
@@ -105,6 +106,14 @@ const CONTENT_CUES: Partial<Record<WorldEventType, Array<[string, RegExp]>>> = {
   support: [["support", /(?:yanındayım|haklısın|seni\s+anlıyorum|destekliyorum|merak\s+etme)/iu]],
   apology: [["apology", /(?:özür|pardon|kusura\s+bakma)/iu]],
   repair: [["repair", /(?:barış|telafi|beni\s+affet|konuşup\s+çözelim)/iu]],
+  general: [
+    ["resign", /(?:^|[^\p{L}\p{N}_])istifa(?:[^\p{L}\p{N}_]|$)/iu],
+    ["leave_job", /(?:işten|işinden)\s+ayrıl/iu],
+    ["manager_meeting", /(?:(?:müdür|patron)(?:le|la)?\s+görüş|görüş[\p{L}]*\s+(?:müdür|patron)(?:le|la)?)/iu],
+    ["salary_raise", /(?:maaş[\p{L}]*.{0,24}(?:zam|artış)|(?:zam|artış).{0,24}maaş[\p{L}]*)/iu],
+    ["student_status", /(?:^|[^\p{L}\p{N}_])öğrenci(?:yim|ydi|ymiş|yiz|ydi[mn]?|ymişim)?(?:[^\p{L}\p{N}_]|$)/iu],
+    ["go_to_work", /işe\s+git/iu],
+  ],
 };
 
 function eventTypeFromSemantic(event: SemanticEvent, message: string): WorldEventType {
@@ -154,7 +163,7 @@ export function buildWorldEventProposition(
 }
 
 export function detectWorldEventPolarity(message: string): WorldEventPolarity {
-  if (NEGATED_CLAIM_RE.test(message)) return "negative";
+  if (NEGATED_CLAIM_RE.test(message) || PRODUCTIVE_NEGATION_RE.test(message)) return "negative";
   return message.trim() ? "positive" : "unknown";
 }
 
