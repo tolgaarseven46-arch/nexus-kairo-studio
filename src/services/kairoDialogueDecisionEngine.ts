@@ -4,6 +4,8 @@ import {
   type DialogueClaim,
 } from "./kairoDialogueChaosEngine";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
+import { projectSemanticEventToDialogueAnalysis } from "./kairaDialogueTurnProjection";
+import type { DialogueTurnAnalysis } from "./kairoDialogueChaosEngine";
 
 export type DialogueMove =
   | "grounded_recall"
@@ -129,10 +131,12 @@ export function planDialogueResponse(
   userMessage: string,
   userName: string,
   semanticEvent?: SemanticEvent,
+  currentAnalysis?: DialogueTurnAnalysis,
 ): DialogueDecisionPlan {
   const event = semanticEvent ?? interpretSemanticEvent(userMessage);
+  const dialogueAnalysis = currentAnalysis ?? projectSemanticEventToDialogueAnalysis(event);
   const target = recallTarget(history, userMessage, userName);
-  const claims = buildDialogueClaimLedger(history, userMessage, userName);
+  const claims = buildDialogueClaimLedger(history, userMessage, userName, dialogueAnalysis);
   const supportedClaims = supportedClaimsFor(claims, target);
 
   if (event.discourseAct === "confusion_or_challenge") {
@@ -332,6 +336,7 @@ export function buildGroundedDialogueFallback(
   history: ConversationTurn[],
   userMessage: string,
   userName: string,
+  currentAnalysis?: DialogueTurnAnalysis,
 ): string | null {
   if (plan.move === "invite_emotional_context") return "hmm niye";
   if (plan.move === "repair_or_rephrase") return "biraz saçmaladım galiba";
@@ -342,7 +347,7 @@ export function buildGroundedDialogueFallback(
       : "hahah iyiymiş";
   }
   if (plan.move !== "grounded_recall" || !plan.target) return null;
-  const claims = buildDialogueClaimLedger(history, userMessage, userName);
+  const claims = buildDialogueClaimLedger(history, userMessage, userName, currentAnalysis);
   const supported = supportedClaimsFor(claims, plan.target).at(-1);
   if (supported) {
     return supported.status === "uncertain"

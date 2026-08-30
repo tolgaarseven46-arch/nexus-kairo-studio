@@ -33,10 +33,10 @@ import {
   sanitizeKairoChatHistory,
 } from "./src/services/kairoConversationGrounding";
 import {
-  analyzeDialogueTurn,
   buildDialogueBoardInstruction,
   findDialogueAttributionIssues,
 } from "./src/services/kairoDialogueChaosEngine";
+import { projectSemanticEventToDialogueAnalysis } from "./src/services/kairaDialogueTurnProjection";
 import {
   buildDialogueDecisionInstruction,
   buildGroundedDialogueFallback,
@@ -540,17 +540,19 @@ app.post("/api/chat", async (req, res) => {
       event: languageUnderstanding.event,
       source: languageUnderstanding.semanticSource,
     };
-    const dialogueAnalysis = analyzeDialogueTurn(userMessage);
+    const dialogueAnalysis = projectSemanticEventToDialogueAnalysis(languageUnderstanding.event);
     const dialogueInstruction = buildDialogueBoardInstruction(
       cleanHistory,
       userMessage,
       userName,
+      dialogueAnalysis,
     );
     const dialogueDecision = planDialogueResponse(
       cleanHistory,
       userMessage,
       userName,
       languageUnderstanding.event,
+      dialogueAnalysis,
     );
     const dialogueDecisionInstruction =
       buildDialogueDecisionInstruction(dialogueDecision);
@@ -803,6 +805,7 @@ app.post("/api/chat", async (req, res) => {
         cleanHistory,
         userMessage,
         userName,
+        dialogueAnalysis,
       ),
       ...findDialogueDecisionIssues(
         reply,
@@ -835,6 +838,7 @@ app.post("/api/chat", async (req, res) => {
             cleanHistory,
             userMessage,
             userName,
+            dialogueAnalysis,
           ),
           ...findDialogueDecisionIssues(
             repairedReply,
@@ -858,6 +862,7 @@ app.post("/api/chat", async (req, res) => {
         cleanHistory,
         userMessage,
         userName,
+        dialogueAnalysis,
       );
       if (fallback) {
         const fallbackIssues = [
@@ -867,6 +872,7 @@ app.post("/api/chat", async (req, res) => {
             cleanHistory,
             userMessage,
             userName,
+            dialogueAnalysis,
           ),
           ...findDialogueDecisionIssues(
             fallback,
@@ -887,7 +893,7 @@ app.post("/api/chat", async (req, res) => {
       reply = worldMemoryGuard.reply;
       groundingIssues = [
         ...findKairoGroundingIssues(reply, cleanHistory, userMessage),
-        ...findDialogueAttributionIssues(reply, cleanHistory, userMessage, userName),
+        ...findDialogueAttributionIssues(reply, cleanHistory, userMessage, userName, dialogueAnalysis),
         ...findDialogueDecisionIssues(reply, dialogueDecision, dialogueOutputStyle),
         ...findKairaResponsePlanIssues(reply, responsePlan),
       ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),

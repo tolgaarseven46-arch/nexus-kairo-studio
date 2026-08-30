@@ -162,21 +162,22 @@ export function buildDialogueClaimLedger(
   history: ConversationTurn[],
   userMessage: string,
   userName: string,
+  currentAnalysis?: DialogueTurnAnalysis,
 ): DialogueClaim[] {
-  const userTurns = history
+  const userTurns: Array<{ speaker: string; text: string; analysis?: DialogueTurnAnalysis }> = history
     .filter((turn) => turn.sender === "user")
     .map((turn) => ({
       speaker: turn.participantName || "Kullanıcı",
       text: String(turn.text || ""),
     }));
-  const turns = [...userTurns, { speaker: userName, text: userMessage }];
+  const turns = [...userTurns, { speaker: userName, text: userMessage, analysis: currentAnalysis }];
   const participants = Array.from(
     new Set([...userTurns.map((turn) => turn.speaker), userName]),
   ).filter((name) => name !== "Kullanıcı");
   const claims: DialogueClaim[] = [];
 
   for (const turn of turns) {
-    const analysis = analyzeDialogueTurn(turn.text);
+    const analysis = turn.analysis ?? analyzeDialogueTurn(turn.text);
     if (
       analysis.acts.includes("correction") &&
       /\b(?:o\s+)?ben değildim\b/i.test(turn.text)
@@ -223,8 +224,9 @@ export function findDialogueAttributionIssues(
   history: ConversationTurn[],
   userMessage: string,
   userName: string,
+  currentAnalysis?: DialogueTurnAnalysis,
 ): string[] {
-  const ledger = buildDialogueClaimLedger(history, userMessage, userName);
+  const ledger = buildDialogueClaimLedger(history, userMessage, userName, currentAnalysis);
   const participants = Array.from(
     new Set([
       ...history.map((turn) => turn.participantName).filter(Boolean),
@@ -291,6 +293,7 @@ export function buildDialogueBoardInstruction(
   history: ConversationTurn[],
   userMessage: string,
   userName: string,
+  currentAnalysis?: DialogueTurnAnalysis,
 ): string {
   const recentUserTurns = history
     .filter((turn) => turn.sender === "user")
@@ -303,10 +306,10 @@ export function buildDialogueBoardInstruction(
   const current = {
     speaker: userName,
     text: userMessage,
-    analysis: analyzeDialogueTurn(userMessage),
+    analysis: currentAnalysis ?? analyzeDialogueTurn(userMessage),
   };
   const turns = [...recentUserTurns, current];
-  const claimLedger = buildDialogueClaimLedger(history, userMessage, userName);
+  const claimLedger = buildDialogueClaimLedger(history, userMessage, userName, current.analysis);
   const topics = Array.from(
     new Set(turns.flatMap((turn) => turn.analysis.topicTokens)),
   ).slice(-8);
