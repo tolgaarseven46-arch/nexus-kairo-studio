@@ -129,7 +129,7 @@ describe("Kaira discourse temporal anchor contracts", () => {
     });
   });
 
-  it("retrieves graph neighbors only after a resolved discourse anchor", () => {
+  it("retrieves a graph neighbor only after the discourse anchor is resolved", () => {
     const anchor = observation({
       id: "a",
       createdAt: "2026-08-20T10:00:00.000Z",
@@ -142,13 +142,13 @@ describe("Kaira discourse temporal anchor contracts", () => {
     });
 
     const result = retrieveTemporalDiscourseNeighbors({
-      message: "ondan sonra ne oldu?",
+      message: "ondan önce ne oldu?",
       sessionId: "session-1",
       observations: [child, anchor],
     });
 
     expect(result.resolution.status).toBe("resolved");
     expect(result.resolution.anchorObservationId).toBe("b");
-    expect(result.observations).toEqual([]);
+    expect(result.observations.map((item) => item.id)).toEqual(["a"]);
   });
 });
