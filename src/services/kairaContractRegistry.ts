@@ -68,6 +68,14 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     summary: "Recall returns a bounded evidence set, not a generated answer; explicit compared people retain coverage.",
   },
   {
+    id: "temporal-reference-resolution",
+    version: 1,
+    status: "active",
+    ownerLayer: "world-model-store",
+    consumerLayers: ["temporal-evidence", "retrieval", "response-generation"],
+    summary: "Resolvable relative/explicit time expressions are anchored at observation persistence time into bounded intervals; vague references remain unresolved rather than guessed.",
+  },
+  {
     id: "temporal-evidence",
     version: 1,
     status: "active",
