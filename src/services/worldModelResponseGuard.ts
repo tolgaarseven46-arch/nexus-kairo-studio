@@ -1,8 +1,13 @@
 import type { RetrievedWorldEvent } from "./worldEventRetrieval";
 import { appraiseRetrievedWorldState } from "./worldStateAppraisal";
+import { deriveWorldReasoningPolicy } from "./worldReasoningPolicy";
 
 export interface WorldModelResponseIssue {
-  code: "memory_evidence_denied";
+  code:
+    | "memory_evidence_denied"
+    | "conflict_collapsed"
+    | "reported_attribution_lost"
+    | "epistemic_qualifier_lost";
   message: string;
 }
 
@@ -18,35 +23,76 @@ const normalize = (value: string) =>
 
 const HARD_MEMORY_DENIAL_RE = /(?:kayd(?:ım|ı|ımız)?\s+(?:yok|bulunmuyor)|kayıt\s+(?:yok|bulunmuyor)|hatırlamıyorum|hatırlayamadım|hatırlamıyorum\s+ki|böyle\s+bir\s+şey\s+hatırlamıyorum)/iu;
 const SOFT_MEMORY_DENIAL_RE = /(?:bilmiyorum|emin\s+değilim|net\s+değil|hatırladığımdan\s+emin\s+değilim)/iu;
+const CONFLICT_PRESERVED_RE = /(?:çeliş|iki\s+(?:farklı|ayrı)|farklı\s+kayıt|birbiri(?:yle|ne)\s+uym|kesinleştirem|hangisinin\s+doğru|net\s+değil|emin\s+değilim)/iu;
+const REPORTED_ATTRIBUTION_RE = /(?:bana\s+daha\s+önce|sen\s+(?:daha\s+önce\s+)?(?:demiştin|söylemiştin|anlatmıştın|aktarmıştın)|demiştin|söylemiştin|anlatmıştın|aktarmıştın|dediğini|söylediğini|anlattığını|aktardığını|senin\s+(?:anlattığın|söylediğin|aktardığın)|kayda\s+göre|kayıtta)/iu;
+const EPISTEMIC_QUALIFIER_RE = /(?:hatırladığım\s+kadarıyla|bildiğim\s+kadarıyla|kayda\s+göre|kayıtta|bana\s+daha\s+önce|demiştin|söylemiştin|anlatmıştın|aktarmıştın|dediğini|söylediğini|anlattığını|aktardığını|görünüyordu|plan(?:ı|ına)?\s+göre|olacaktı|emin\s+değilim|net\s+değil|çeliş)/iu;
 
 function grounded(items: RetrievedWorldEvent[]) {
   return items.filter((item) => item.observation.status === "grounded");
 }
 
 /**
- * Retrieval is authoritative only about evidence existence, not absolute truth.
- * WorldStateAppraisal is the single bounded authority for evidence/conflict
- * posture. The response guard consumes that appraisal instead of independently
- * reconstructing world truth from raw rows.
+ * Deterministic response boundary for canonical world-memory reasoning.
+ *
+ * The guard derives the same read-only WorldReasoningPolicy used by prompt
+ * generation, so model compliance is not trusted as the only enforcement
+ * mechanism. It never mutates relationship, emotion, personality or dynamic
+ * state; it may only reject/replace the generated world-memory wording.
  */
 export function findWorldModelResponseIssues(
   reply: string,
   items: RetrievedWorldEvent[],
 ): WorldModelResponseIssue[] {
   const appraisal = appraiseRetrievedWorldState(items);
-  if (appraisal.mayClaimNoMemory) return [];
-
+  const policy = deriveWorldReasoningPolicy(appraisal);
   const text = normalize(reply);
-  const conflict = appraisal.truthPosture === "conflicting";
-  const deniesEvidence = HARD_MEMORY_DENIAL_RE.test(text) || (!conflict && SOFT_MEMORY_DENIAL_RE.test(text));
-  if (!deniesEvidence) return [];
+  const issues: WorldModelResponseIssue[] = [];
 
-  return [{
-    code: "memory_evidence_denied",
-    message: conflict
-      ? "Grounded çelişkili world-memory kanıtı mevcut; cevap kayıt/hatıra yokmuş gibi davranamaz. Belirsizlik ifade edilebilir."
-      : "Grounded world-memory kanıtı mevcut; cevap kaydım yok/hatırlamıyorum/bilmiyorum diyemez.",
-  }];
+  if (!appraisal.mayClaimNoMemory) {
+    const conflict = policy.mustPreserveConflict;
+    const deniesEvidence = HARD_MEMORY_DENIAL_RE.test(text) || (!conflict && SOFT_MEMORY_DENIAL_RE.test(text));
+    if (deniesEvidence) {
+      issues.push({
+        code: "memory_evidence_denied",
+        message: conflict
+          ? "Grounded çelişkili world-memory kanıtı mevcut; cevap kayıt/hatıra yokmuş gibi davranamaz. Belirsizlik ifade edilebilir."
+          : "Grounded world-memory kanıtı mevcut; cevap kaydım yok/hatırlamıyorum/bilmiyorum diyemez.",
+      });
+    }
+  }
+
+  if (policy.mustPreserveConflict && !CONFLICT_PRESERVED_RE.test(text)) {
+    issues.push({
+      code: "conflict_collapsed",
+      message: "World reasoning policy çelişkiyi korumayı gerektiriyor; cevap tek tarafı kesin gerçek gibi sunamaz.",
+    });
+  }
+
+  if (
+    policy.mustPreserveReportedAttribution &&
+    policy.mayAnswerFromMemory &&
+    !REPORTED_ATTRIBUTION_RE.test(text) &&
+    !CONFLICT_PRESERVED_RE.test(text)
+  ) {
+    issues.push({
+      code: "reported_attribution_lost",
+      message: "Grounded bilgi reported-claim kökenli; cevap bunun daha önce kullanıcı tarafından aktarıldığını korumalı.",
+    });
+  }
+
+  if (
+    policy.mustQualify &&
+    policy.mayAnswerFromMemory &&
+    !EPISTEMIC_QUALIFIER_RE.test(text) &&
+    !CONFLICT_PRESERVED_RE.test(text)
+  ) {
+    issues.push({
+      code: "epistemic_qualifier_lost",
+      message: "World reasoning policy epistemik niteleme gerektiriyor; cevap kanıtı doğrulanmış dış dünya gerçeğine yükseltemez.",
+    });
+  }
+
+  return issues;
 }
 
 function compactEvidenceText(item: RetrievedWorldEvent): string {
@@ -59,7 +105,8 @@ export function buildWorldModelRecallFallback(items: RetrievedWorldEvent[]): str
   if (!evidence.length) return "";
 
   const appraisal = appraiseRetrievedWorldState(items);
-  if (appraisal.truthPosture === "conflicting") {
+  const policy = deriveWorldReasoningPolicy(appraisal);
+  if (policy.mustPreserveConflict) {
     const distinct = Array.from(
       new Set(evidence.map(compactEvidenceText).filter(Boolean)),
     ).slice(0, 2);
@@ -72,8 +119,11 @@ export function buildWorldModelRecallFallback(items: RetrievedWorldEvent[]): str
   const first = evidence[0];
   const raw = compactEvidenceText(first);
   if (!raw) return "Bununla ilgili önceki konuşmadan bir kaydım var.";
-  if (first.observation.kind === "reported_claim") {
+  if (policy.mustPreserveReportedAttribution || first.observation.kind === "reported_claim") {
     return `Bana daha önce “${raw}” demiştin.`;
+  }
+  if (policy.mustQualify) {
+    return `Hatırladığım kayda göre: “${raw}”.`;
   }
   return `Bunu hatırlıyorum: “${raw}”.`;
 }
@@ -91,6 +141,6 @@ export function enforceWorldModelRecallResponse(
     reply: fallback,
     changed: true,
     issues,
-    reason: "world_model_grounded_evidence_guard",
+    reason: "world_reasoning_policy_guard",
   };
 }
