@@ -8,6 +8,15 @@ export interface KairaInstanceContext {
   instanceType: KairaInstanceType;
 }
 
+export interface KairaInstancePolicy {
+  persistentIdentity: boolean;
+  persistentAutobiography: boolean;
+  persistentRelationship: boolean;
+  persistentUserMemory: boolean;
+  canConsolidateCoreMemories: boolean;
+  purpose: "reference-development" | "onboarding" | "individual-life";
+}
+
 const sanitize = (value?: string) =>
   String(value || "")
     .trim()
@@ -25,13 +34,61 @@ export function resolveKairaInstanceContext(input?: {
   };
 }
 
+export function instancePolicy(type: KairaInstanceType): KairaInstancePolicy {
+  if (type === "welcome") {
+    return {
+      persistentIdentity: false,
+      persistentAutobiography: false,
+      persistentRelationship: false,
+      persistentUserMemory: false,
+      canConsolidateCoreMemories: false,
+      purpose: "onboarding",
+    };
+  }
+  if (type === "individual") {
+    return {
+      persistentIdentity: true,
+      persistentAutobiography: true,
+      persistentRelationship: true,
+      persistentUserMemory: true,
+      canConsolidateCoreMemories: true,
+      purpose: "individual-life",
+    };
+  }
+  return {
+    persistentIdentity: true,
+    persistentAutobiography: true,
+    persistentRelationship: true,
+    persistentUserMemory: true,
+    canConsolidateCoreMemories: true,
+    purpose: "reference-development",
+  };
+}
+
 /**
- * Keeps the current reference Kaira on the legacy user path so existing test
- * data remains readable. New instances receive isolated world-model parents.
+ * Shared partition key for all Kaira-owned persistent state.
+ * The current reference Kaira intentionally stays on the legacy user path so
+ * existing Firestore data remains readable without a migration.
  */
-export function worldModelOwnerScope(userId?: string, instanceId?: string): string {
+export function kairaOwnerScope(userId?: string, instanceId?: string): string {
   const userScope = sanitize(userId) || "anonymous";
   const instance = resolveKairaInstanceContext({ instanceId });
   if (instance.instanceId === DEFAULT_KAIRA_INSTANCE_ID) return userScope;
   return `${userScope}__${instance.instanceId}`;
+}
+
+export function worldModelOwnerScope(userId?: string, instanceId?: string): string {
+  return kairaOwnerScope(userId, instanceId);
+}
+
+export function stateOwnerScope(userId?: string, instanceId?: string): string {
+  return kairaOwnerScope(userId, instanceId);
+}
+
+export function userMemoryOwnerScope(userId?: string, instanceId?: string): string {
+  return kairaOwnerScope(userId, instanceId);
+}
+
+export function memoryCacheKey(userId?: string, instanceId?: string): string {
+  return kairaOwnerScope(userId, instanceId);
 }
