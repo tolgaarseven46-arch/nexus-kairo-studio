@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DroitDynamicState, DroitPersonalityTraits } from "../types/nexus";
 import { analyzeKdmInteraction } from "./kdmConsistencyEngine";
 import { buildBehaviorContract } from "./behaviorContract";
-import { applyConversationStateAuthority } from "./conversationStateAuthority";
+import { projectConversationStateLock } from "./conversationStateLock";
 import { validateStateBehaviorSeam } from "./kairaStateBehaviorContracts";
 import { interpretSemanticEvent } from "./semanticEventEngine";
 import { resolveMessageEntities } from "./entityResolutionEngine";
@@ -109,9 +109,9 @@ describe("Kaira multi-turn architecture invariants", () => {
 
       expect(next.relationship?.interactionCount).toBe(expectedInteractions);
 
-      const authority = applyConversationStateAuthority(personality, next);
+      const stateLock = projectConversationStateLock(next);
       const behavior = buildBehaviorContract(next, result.trace);
-      const report = validateStateBehaviorSeam({ state: next, behavior, authority });
+      const report = validateStateBehaviorSeam({ state: next, behavior, stateLock });
       expect(report.issues, `${message}: ${JSON.stringify(report.issues)}`).toEqual([]);
 
       state = next;
@@ -130,8 +130,8 @@ describe("Kaira multi-turn architecture invariants", () => {
       expect(state.relationship?.conversationState, message).toBe("disengaged");
 
       const behavior = buildBehaviorContract(state, result.trace);
-      const authority = applyConversationStateAuthority(personality, state);
-      expect(validateStateBehaviorSeam({ state, behavior, authority }).accepted).toBe(true);
+      const stateLock = projectConversationStateLock(state);
+      expect(validateStateBehaviorSeam({ state, behavior, stateLock }).accepted).toBe(true);
     }
   });
 
