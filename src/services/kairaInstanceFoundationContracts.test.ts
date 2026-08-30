@@ -64,6 +64,7 @@ describe("Kaira multi-instance foundation contracts", () => {
     expect(instancePolicy("welcome")).toEqual({
       persistentIdentity: false,
       persistentAutobiography: false,
+      persistentWorldModel: false,
       persistentRelationship: false,
       persistentUserMemory: false,
       canConsolidateCoreMemories: false,
@@ -75,6 +76,7 @@ describe("Kaira multi-instance foundation contracts", () => {
     const policy = instancePolicy("individual");
     expect(policy.persistentIdentity).toBe(true);
     expect(policy.persistentAutobiography).toBe(true);
+    expect(policy.persistentWorldModel).toBe(true);
     expect(policy.persistentRelationship).toBe(true);
     expect(policy.persistentUserMemory).toBe(true);
     expect(policy.canConsolidateCoreMemories).toBe(true);
