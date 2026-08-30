@@ -4,6 +4,9 @@ import { analyzeKdmInteraction } from "./kdmConsistencyEngine";
 import { buildBehaviorContract } from "./behaviorContract";
 import { applyConversationStateAuthority } from "./conversationStateAuthority";
 import { validateStateBehaviorSeam } from "./kairaStateBehaviorContracts";
+import { interpretSemanticEvent } from "./semanticEventEngine";
+import { resolveMessageEntities } from "./entityResolutionEngine";
+import { groundSemanticEventForAppraisal } from "./languageUnderstandingService";
 
 const personality: DroitPersonalityTraits = {
   anger: 55,
@@ -53,6 +56,24 @@ const initialState = (): DroitDynamicState => ({
   },
 });
 
+function canonicalSemantic(message: string) {
+  const semantic = interpretSemanticEvent(message);
+  const entities = resolveMessageEntities(message, {
+    userName: "Mert",
+    characterName: "KAIRO",
+  });
+  return groundSemanticEventForAppraisal(message, semantic, entities).event;
+}
+
+function analyze(message: string, state: DroitDynamicState) {
+  return analyzeKdmInteraction(
+    message,
+    personality,
+    state,
+    canonicalSemantic(message),
+  );
+}
+
 const messages = [
   "naber kaira",
   "bugün hava baya sıcak",
@@ -82,7 +103,7 @@ describe("Kaira multi-turn architecture invariants", () => {
     let expectedInteractions = state.relationship?.interactionCount ?? 0;
 
     for (const message of messages) {
-      const result = analyzeKdmInteraction(message, personality, state);
+      const result = analyze(message, state);
       const next = result.nextDynamicState;
       expectedInteractions += 1;
 
@@ -99,12 +120,12 @@ describe("Kaira multi-turn architecture invariants", () => {
 
   it("never lets a severe disengagement silently reopen on neutral turns", () => {
     let state = initialState();
-    const severe = analyzeKdmInteraction("seni oropu", personality, state);
+    const severe = analyze("seni oropu", state);
     state = severe.nextDynamicState;
     expect(state.relationship?.conversationState).toBe("disengaged");
 
     for (const message of ["tamam", "neyse", "bugün hava sıcak", "konuşalım"] as const) {
-      const result = analyzeKdmInteraction(message, personality, state);
+      const result = analyze(message, state);
       state = result.nextDynamicState;
       expect(state.relationship?.conversationState, message).toBe("disengaged");
 
@@ -123,11 +144,43 @@ describe("Kaira multi-turn architecture invariants", () => {
       "Ayşe bana salak dedi",
       "patron bugün çok saçmaladı",
     ] as const) {
-      state = analyzeKdmInteraction(message, personality, state).nextDynamicState;
+      state = analyze(message, state).nextDynamicState;
     }
 
     expect(state.relationship?.negativeEvents).toBe(before.negativeEvents);
     expect(state.relationship?.hurtScore).toBe(before.hurtScore);
     expect(state.relationship?.conflictScore).toBe(before.conflictScore);
+  });
+
+  it("keeps a third-party apology in the world model without repairing Kaira-user relationship", () => {
+    const state = initialState();
+    const semantic = interpretSemanticEvent("Ayşe bana özür diledi");
+    const entities = resolveMessageEntities("Ayşe bana özür diledi", {
+      userName: "Mert",
+      characterName: "KAIRO",
+    });
+    const grounded = groundSemanticEventForAppraisal(
+      "Ayşe bana özür diledi",
+      semantic,
+      entities,
+    );
+
+    expect(grounded.worldEvent.eventType).toBe("apology");
+    expect(grounded.worldEvent.actor?.name).toBe("Ayşe");
+    expect(grounded.event.relationshipScope).toBe("third_party");
+    expect(grounded.event.valence).toBe("neutral");
+    expect(grounded.event.apology).toBe(false);
+
+    const next = analyzeKdmInteraction(
+      "Ayşe bana özür diledi",
+      personality,
+      state,
+      grounded.event,
+    ).nextDynamicState;
+
+    expect(next.relationship?.warmth).toBe(state.relationship?.warmth);
+    expect(next.relationship?.trust).toBe(state.relationship?.trust);
+    expect(next.relationship?.repairProgress).toBe(state.relationship?.repairProgress);
+    expect(next.relationship?.positiveEvents).toBe(state.relationship?.positiveEvents);
   });
 });
