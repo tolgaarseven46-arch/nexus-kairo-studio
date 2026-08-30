@@ -29,6 +29,7 @@ const observation = (overrides: Partial<WorldEventObservation> = {}): WorldEvent
 describe("world event retrieval", () => {
   it("only activates for recall-like queries", () => {
     expect(shouldRetrieveWorldEvents("Ayşe dün bana ne demişti?")).toBe(true);
+    expect(shouldRetrieveWorldEvents("Ayşe mi Merve mi bana salak demişti?")).toBe(true);
     expect(shouldRetrieveWorldEvents("naber")).toBe(false);
   });
 
@@ -65,6 +66,32 @@ describe("world event retrieval", () => {
     expect(ranked[0]?.observation.kind).toBe("reported_claim");
     expect(ranked[0]?.observation.event.actor?.name).toBe("Ayşe");
     expect(ranked[0]?.reasons).toContain("name:ayşe");
+  });
+
+  it("filters legacy recall questions that were accidentally stored as world events", () => {
+    const pollutedQuestion = observation({
+      createdAt: "2026-08-29T22:00:00.000Z",
+      event: {
+        ...observation().event,
+        raw: "Ayşe bana ne demişti?",
+        eventType: "general",
+      },
+    });
+    const actualEvent = observation({
+      createdAt: "2026-08-29T21:00:00.000Z",
+      event: {
+        ...observation().event,
+        raw: "Ayşe bana yine salak dedi",
+      },
+    });
+
+    const ranked = rankWorldEventObservations(
+      "Ayşe en son bana ne demişti?",
+      [pollutedQuestion, actualEvent],
+    );
+
+    expect(ranked[0]?.observation.event.raw).toBe("Ayşe bana yine salak dedi");
+    expect(ranked.some((item) => item.observation.event.raw.endsWith("?"))).toBe(false);
   });
 
   it("prefers the newest event when the same person has multiple equally relevant claims", () => {
