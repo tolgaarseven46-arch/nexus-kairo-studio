@@ -35,15 +35,18 @@ const normalize = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const WORD_TAIL = "[\\p{L}\\p{N}_]*";
+const marker = (roots: string) => new RegExp(`\\b(?:${roots})${WORD_TAIL}\\b`, "iu");
+
 const EVENT_TYPE_MARKERS: Partial<Record<WorldEventType, RegExp>> = {
-  insult: /\b(?:hakaret|salak|aptal|mal)\w*\b/iu,
-  support: /\b(?:destek|yanında|yardım)\w*\b/iu,
-  compliment: /\b(?:iltifat|övg|övd|güzel)\w*\b/iu,
-  apology: /\b(?:özür|özr|af)\w*\b/iu,
-  repair: /\b(?:barış|telafi|düzelt)\w*\b/iu,
-  command: /\b(?:emir|komut)\w*\b/iu,
-  rejection: /\b(?:redd|ret|istemedi|hayır)\w*\b/iu,
-  emotional_share: /\b(?:duygu|üzgün|kızgın|kork|mutlu)\w*\b/iu,
+  insult: marker("hakaret|salak|aptal|mal"),
+  support: marker("destek|yanında|yardım"),
+  compliment: marker("iltifat|övg|övd|güzel"),
+  apology: marker("özür|özr|af"),
+  repair: marker("barış|telafi|düzelt"),
+  command: marker("emir|komut"),
+  rejection: marker("redd|ret|istemedi|hayır"),
+  emotional_share: marker("duygu|üzgün|kızgın|kork|mutlu"),
 };
 
 export function detectExplicitTemporalRelationDirection(
@@ -70,7 +73,7 @@ function queryContainsName(query: string, name: string): boolean {
 function detectMentionedEventType(message: string): WorldEventType | undefined {
   const text = normalize(message);
   const matches = (Object.entries(EVENT_TYPE_MARKERS) as Array<[WorldEventType, RegExp]>)
-    .filter(([, marker]) => marker.test(text))
+    .filter(([, eventMarker]) => eventMarker.test(text))
     .map(([eventType]) => eventType);
   return matches.length === 1 ? matches[0] : undefined;
 }
