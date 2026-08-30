@@ -287,3 +287,16 @@ Yeni sohbet açıldığında:
 - `kairaTemperamentBeforeKdmContracts.test.ts` kalıcı `test:contracts` architecture suite'ine eklendi.
 - Entegrasyon commit'i: `2260223` (`fix(kaira): hand temperament state into KDM`). Migration workflow'unda contract, TypeScript, full test suite ve production build başarıyla geçti; geçici workflow sonrasında kaldırıldı.
 - Bir sonraki büyük audit sınırı: legacy client `behaviorIntegrationEngine` kararlarının KDM `behaviorProfile` ve relationship state transition'larına doğrudan girmesi. Bu katman sökülmeden önce base personality / integrated policy ownership contract'ı açıkça ayrıştırılmalı.
+
+
+## 27. Explicit 8-layer behavior policy boundary — 2026-08-31
+- Client 8-layer entegrasyon kararları artık KDM'ye personality içindeki gizli `runtime*` anahtarlarından okunmaz; açık ve versiyonlu `behavior-policy@1` girdisi olarak taşınır.
+- `behaviorPolicyInput.ts` schema/source doğrulaması ve numeric clamp uygulayan `normalizeBehaviorPolicyInput(...)` server boundary'sini tanımlar.
+- `droitChatService.ts`, `integrationRuntime.decision` ve pressures çıktısını `createClientBehaviorPolicy(...)` ile açık provenance taşıyan policy nesnesine dönüştürür.
+- Server incoming policy'yi normalize eder ve KDM'ye ayrı parametre olarak verir. KDM `runtimeTrait(personality, runtime*)` yoluyla canlı entegre karar geri kazanımı yapmaz.
+- 8-layer davranış mantığı bu fazda silinmedi; no-humor, no-question, stance, length ve disengage senaryoları explicit policy girdisiyle aynı regression beklentilerini geçer.
+- Relationship reducer repair sinyali canonical SemanticEvent (`apology || repairAttempt`) üzerinden kalır; gizli `runtimeRepairSignal` state geçiş girdisi değildir.
+- Final WHAT/WHETHER otoritesi değişmedi: KDM state/profile değerlendirmesinden sonra `BehaviorContract` ve canonical `KairaResponsePlan` final cevabı sınırlar.
+- `kairaBehaviorPolicyBoundaryContracts.test.ts` kalıcı `test:contracts` architecture suite'ine eklendi; eski decision-layer ve KDM regression testleri explicit policy contract'a taşındı.
+- Entegrasyon commit'i: `e136f17` (`feat(kaira): make behavior policy explicit`). Authority contract, TypeScript, 489 test ve production build başarıyla geçti. Geçici migration workflow/script kaldırıldı.
+- Sonraki audit sınırı: client 8-layer pipeline'ın `humor`, `authority`, `empathy`, `patience`, `seriousness`, `communication` gibi temel personality traitlerini mutate edip KDM relationship reducer'a geri beslemesi. Base personality ile per-turn behavioral overlay birbirinden ayrılmalı.
