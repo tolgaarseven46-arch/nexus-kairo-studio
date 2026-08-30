@@ -300,3 +300,14 @@ Yeni sohbet açıldığında:
 - `kairaBehaviorPolicyBoundaryContracts.test.ts` kalıcı `test:contracts` architecture suite'ine eklendi; eski decision-layer ve KDM regression testleri explicit policy contract'a taşındı.
 - Entegrasyon commit'i: `e136f17` (`feat(kaira): make behavior policy explicit`). Authority contract, TypeScript, 489 test ve production build başarıyla geçti. Geçici migration workflow/script kaldırıldı.
 - Sonraki audit sınırı: client 8-layer pipeline'ın `humor`, `authority`, `empathy`, `patience`, `seriousness`, `communication` gibi temel personality traitlerini mutate edip KDM relationship reducer'a geri beslemesi. Base personality ile per-turn behavioral overlay birbirinden ayrılmalı.
+
+
+## 28. Base personality / per-turn response overlay ownership — 2026-08-31
+- Client payload artık iki ayrı kişilik rolü taşır: `personality` kalıcı/base karakter traitleri, `responsePersonality` ise 8-layer pipeline'ın o tur için ürettiği response-style overlay'dir.
+- Authoritative KDM relationship/emotion reducer yalnız `basePersonality` ile çalışır. Tur içi `empathy`, `patience`, `humor`, `authority`, `seriousness`, `communication` modifikasyonları aynı turun kalıcı ilişki/duygu fiziğine geri beslenmez.
+- Explicit `behavior-policy@1`, KDM'ye girebilen ayrı per-turn karar input'u olmaya devam eder; provenance görünürdür.
+- KDM state transition tamamlandıktan sonra `responsePersonality`, `applyConversationStateAuthority(...)` ve speech/local response HOW üretimi için kullanılabilir. Böylece davranış stili korunurken kalıcı kişilik otoritesi ayrılmıştır.
+- Client tarafındaki layer engine'ler bu fazda silinmedi; response overlay ve test audit üretmeye devam eder.
+- `kairaBasePersonalityOwnershipContracts.test.ts` kalıcı `test:contracts` suite'ine eklendi.
+- Entegrasyon commit'i: `593c838` (`feat(kaira): separate base personality from response overlay`). Ownership contract, TypeScript, full test suite ve production build başarıyla geçti; geçici migration workflow/script kaldırıldı.
+- Sonraki audit sınırı: eski `runtime*` alanlarının KDM ve final ResponsePlan otoritelerinden ayrıldıktan sonra hâlâ gerçek runtime tüketicisi olup olmadığı. Kullanılmayan compatibility alanları temizlenmeden önce repo çapında tüketici audit'i yapılmalı.
