@@ -461,3 +461,13 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `aa5628e` (`fix(kaira): align empathy summary threshold scale`). Targeted regression, TypeScript, full regression ve production build başarıyla geçti.
 - Bölüm 41'in geçici docs workflow'u ve bu düzeltmenin geçici migration workflow/scripti kaldırıldı.
 - Sonraki audit adayı: `computeBehaviorProfile(...)` direct/legacy kullanımda raw trait değerlerini kendi içinde `Number(...)` ile okuyup canonical normalizer kullanmıyor. Server boundary normalize olsa da bu fonksiyon başka call-site'lardan doğrudan çağrılabiliyor; behavior engine boundary'nin canonical personality normalization sahipliğine geçirilip geçirilmeyeceği koddan doğrulanacak.
+
+
+## 43. Behavior personality normalization ownership — 2026-08-31
+- Server `/api/chat` personality boundary zaten `normalizeDroitPersonality(...)` kullanıyordu; ancak exported `computeBehaviorProfile(...)` doğrudan/legacy çağrılarda raw trait değerlerini kendi içinde `Number(...)` ile okuyordu. Bu nedenle server dışı çağrılarda out-of-range veya non-finite personality değerleri behavior sentezine sızabiliyordu.
+- `droitBehaviorEngine.computeBehaviorProfile(...)` artık girişte lightweight canonical `normalizeDroitPersonality(traits)` kullanır. Eksik traitler neutral 50'ye tamamlanır, canonical/legacy personality alias değerleri 0..100'e clamp edilir ve `NaN`/`Infinity` kabul edilmez.
+- Server davranışı semantik olarak değişmez; server zaten normalize edilmiş base personality geçiriyordu. Değişiklik direct/legacy behavior çağrılarını aynı canonical contract'a getirir.
+- `kairaBehaviorPersonalityNormalizationBoundaryContracts.test.ts` direct çağrıda 150/-20 clamp'ini ve `NaN`/`Infinity` → neutral 50 fallback'ını doğrular. Empathy summary threshold contract ve normalizer contract ile birlikte targeted zincirde geçti.
+- Entegrasyon commit'i: `f5aed8e` (`fix(kaira): normalize personality at behavior boundary`). Targeted contractlar, TypeScript, full regression ve production build başarıyla geçti.
+- Geçici migration workflow/script kaldırıldı.
+- Sonraki audit adayı: `analyzeKdmInteraction(...)` exported boundary içinde `trait(...)` helper raw personality üzerinde `typeof number` + clamp kullanıyor; `NaN` bir number olduğu için direct KDM çağrısında ilişki/state matematiğine non-finite değer sızma ihtimali ayrıca doğrulanacak.
