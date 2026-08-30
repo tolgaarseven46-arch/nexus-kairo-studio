@@ -20,11 +20,21 @@ describe("canonical KairaResponsePlan runtime integration", () => {
     expect(server).toContain("${responsePlanInstruction}\\nKDM:");
   });
 
-  it("validates initial, repair, fallback and local outputs against the plan", () => {
-    expect(server.match(/findKairaResponsePlanIssues\(/g)?.length).toBeGreaterThanOrEqual(4);
+  it("validates initial, repair, fallback, local and final post-enforcement outputs", () => {
+    expect(server.match(/findKairaResponsePlanIssues\(/g)?.length).toBeGreaterThanOrEqual(5);
     expect(server).toContain("findKairaResponsePlanIssues(repairedReply, responsePlan)");
     expect(server).toContain("findKairaResponsePlanIssues(fallback, responsePlan)");
     expect(server).toContain("localPlanIssues = findKairaResponsePlanIssues(reply, responsePlan)");
+    expect(server).toContain("finalPlanIssues = findKairaResponsePlanIssues(reply, responsePlan)");
+    expect(server).toContain("finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues])]");
+  });
+
+  it("persists response-plan observability in both local and AI paths", () => {
+    const kntPlanWrites = server.match(/worldMemoryGuard,\s*responsePlan,\s*\}\),/gu)?.length ?? 0;
+    const turnMetadataPlanWrites = server.match(/worldMemoryGuard,\s*responsePlan,\s*timings:/gu)?.length ?? 0;
+
+    expect(kntPlanWrites).toBeGreaterThanOrEqual(2);
+    expect(turnMetadataPlanWrites).toBeGreaterThanOrEqual(2);
   });
 
   it("persists, hydrates and exposes the response plan per turn", () => {
