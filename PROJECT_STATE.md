@@ -231,4 +231,18 @@ Yeni sohbet açıldığında:
 - `response-plan@1` contract registry'de aktif ve local verbalizer, LLM verbalizer, consistency ve observability katmanlarının resmi sözleşme sınırıdır.
 - `kairoSpeechIdentity.ts` runtime davranış izinlerinden ayrıldı; artık soru/mizah/affetme/konuşmayı sürdürme kararı üretmez, yalnızca HOW/style belirler.
 - Geçici response-plan migration workflow ve scriptleri kaldırıldı. Eski non-idempotent language-understanding migration workflow'u da kaldırıldı; kalıcı doğrulama otoritesi `.github/workflows/ci.yml`dir.
-- Sonraki büyük mimari sınır: `kairoDialogueDecisionEngine` semantik içeriği yeniden parse etmeyi bırakmalı ve canonical `SemanticEvent` tüketmeli. Aynı fazda Yerel Dil Motoru'ndaki paralel intent parser canonical semantik akışa bağlanmalı; yeni regex ekleme yerine parser consolidation yapılmalı.
+- Bu fazdan sonra açılan semantic-consumer consolidation işi 22. bölümde tamamlanmış olarak kayıtlıdır.
+
+## 22. Canonical SemanticEvent / current-turn semantik otoritesi — 2026-08-30
+- `LanguageUnderstandingResult.event`, mevcut kullanıcı turu için tek canonical semantik otoritedir. Dialogue planner, Yerel Dil Motoru ve current-turn dialogue projection bağımsız intent parser üretmez.
+- `SemanticEvent` consumer-facing `socialRoutine`, `discourseAct` ve `adviceRequested` facet'lerini taşır. Selamlama/hal-hatır/gündelik rutin, düzeltme/konu değişimi/recall/confusion ve açık tavsiye isteği bu boundary'de temsil edilir.
+- `semanticEventCanonicalizer.ts`, eski istemci veya semantic provider yeni optional facet'leri göndermediğinde eksikleri yalnızca language-understanding trust boundary'sinde bir kez tamamlar. Downstream consumer'ların eksik alanı kendi regex'iyle yeniden yorumlaması yasaktır.
+- `kairoDialogueDecisionEngine.ts` canonical `SemanticEvent` tüketir; current-turn için `analyzeDialogueTurn(userMessage)` ile ikinci semantik yorum yapmaz.
+- `kairoLocalLanguageEngine.ts` içindeki paralel `detectIntent()` kaldırıldı. Local verbalizer canonical event'i `localIntentFromSemanticEvent` ile dar cevap rutinine map eder; `adviceRequested=true` ise local erken dönüş yapılmaz ve kontrollü AI yolu korunur.
+- `kairaDialogueTurnProjection.ts`, canonical `SemanticEvent`ten current-turn `DialogueTurnAnalysis`ı bir kez üretir. Semantik/discourse acts event'ten gelir; uncertainty/noise/absurdity/durable-memory candidacy/topic token kontrolleri yalnız epistemik ve storage hint olarak tutulur.
+- Aynı current-turn `dialogueAnalysis` nesnesi dialogue board, dialogue planner, claim ledger, attribution validation, grounded fallback, repair/fallback validation, memory scope/fact confidence ve world-guard revalidation yollarına taşınır.
+- `kairoDialogueChaosEngine.ts` içindeki legacy `analyzeDialogueTurn` yalnız geçmişte projection metadata'sı olmayan historical turns veya doğrudan/geriye uyumlu çağrı fallback'i olarak kalabilir; canlı current turn semantik otoritesi değildir.
+- Açık tavsiye regression'ı (`moralim bozuk, ne yapmalıyım?`) merkezi `adviceRequested` facet'iyle çözüldü; consumer'a özel kaçak regex eklenmedi.
+- `kairaSemanticConsumerAuthorityContracts.test.ts`, `kairaCurrentTurnDialogueAuthorityContracts.test.ts` ve `kairaDialogueTurnProjection.test.ts` kalıcı `test:contracts` architecture suite'ine bağlıdır.
+- Semantic consumer ve current-turn projection migration workflow/scriptleri başarıyla uygulandıktan sonra kaldırıldı; kalıcı çalışma yolu yalnız ürün kodu + `.github/workflows/ci.yml`dir.
+- Entegrasyon commit'i: `f02eec0` (`feat(kaira): unify current-turn dialogue projection`). Entegrasyon workflow'unda authority contracts, TypeScript, full test suite ve production build başarıyla geçti.
