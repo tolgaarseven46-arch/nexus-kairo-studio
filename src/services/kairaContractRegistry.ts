@@ -95,6 +95,14 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     summary: "Explicit before/after discourse continuations may use only the unique latest persisted observation in the same session as an implicit anchor; ambiguity or missing provenance yields no guessed anchor.",
   },
   {
+    id: "explicit-temporal-event-anchor",
+    version: 1,
+    status: "active",
+    ownerLayer: "discourse-context",
+    consumerLayers: ["temporal-event-graph", "retrieval", "response-generation"],
+    summary: "Named temporal questions resolve an anchor only from same-session canonical participant names plus bounded canonical event-type markers; multiple matching events remain ambiguous instead of being broken by recency.",
+  },
+  {
     id: "temporal-evidence",
     version: 1,
     status: "active",
