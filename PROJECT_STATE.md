@@ -311,3 +311,14 @@ Yeni sohbet açıldığında:
 - `kairaBasePersonalityOwnershipContracts.test.ts` kalıcı `test:contracts` suite'ine eklendi.
 - Entegrasyon commit'i: `593c838` (`feat(kaira): separate base personality from response overlay`). Ownership contract, TypeScript, full test suite ve production build başarıyla geçti; geçici migration workflow/script kaldırıldı.
 - Sonraki audit sınırı: eski `runtime*` alanlarının KDM ve final ResponsePlan otoritelerinden ayrıldıktan sonra hâlâ gerçek runtime tüketicisi olup olmadığı. Kullanılmayan compatibility alanları temizlenmeden önce repo çapında tüketici audit'i yapılmalı.
+
+
+## 29. Legacy runtime decision flag removal — 2026-08-31
+- `runtimeContinueConversation`, `runtimeHumorAllowed`, `runtimeAskQuestion`, `runtimeAcknowledgeComplaint`, `runtimeRepairAllowed`, `runtimeStance`, `runtimeResponseLength`, `runtimeDirectness`, `runtimeWarmth`, `runtimeDistance`, `runtimePriority`, `runtimePriorConversationState` ve `runtimeRepairSignal` artık response personality içine encode edilmez.
+- 8-layer WHAT/WHETHER çıktıları explicit `behavior-policy@1` içinde yaşar; final cevap izinleri canonical `BehaviorContract` + `KairaResponsePlan` tarafından belirlenir.
+- `conversationStateAuthority` artık ölü runtime bayrakları üretmez. Non-active state'lerde yalnız gerçek HOW overlay'i olan `humor` üzerinde deterministic clamp uygular: distancing maksimum 20, repairing/disengaged 0.
+- State→behavior seam validator eski `authority.disengaged_runtime_lock` invariant'ından çıkarıldı. Disengaged kapanışı artık state/BehaviorContract üzerinden (`continueConversation=false`, soru/mizah/yakınlık forbidden), authority kilidi ve HOW `humor=0` ile doğrulanır.
+- `behaviorIntegrationEngine.test.ts`, `conversationStateAuthority.test.ts`, `kairaStateBehaviorContracts.test.ts` ve multi-turn seam regressionları yeni authority modeline taşındı.
+- `kairaLegacyRuntimeFlagRemovalContracts.test.ts` kalıcı `test:contracts` suite'ine eklendi.
+- Entegrasyon commit'i: `8446dde` (`refactor(kaira): remove legacy runtime decision flags`). Runtime-removal contract, TypeScript, 496/496 test ve production build başarıyla geçti. Geçici migration workflow/script kaldırıldı.
+- Sonraki audit adayı: `conversationStateAuthority` artık yalnız HOW humor clamp yaptığı için ayrı bir authority servisi olarak kalmalı mı, yoksa speech identity / response-style projection içine taşınmalı mı? Koddan tüketici ve semantik sınır audit'i yapılmadan kaldırılmayacak.
