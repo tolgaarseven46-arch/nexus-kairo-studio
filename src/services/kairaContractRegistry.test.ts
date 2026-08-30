@@ -19,6 +19,7 @@ describe("Kaira contract registry", () => {
       "world-event-retrieval",
       "temporal-reference-resolution",
       "relative-temporal-reference",
+      "temporal-event-graph",
       "temporal-evidence",
       "contradiction-evidence",
       "relationship-state",
