@@ -1,8 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { detectWorldEventTemporalReference } from "./worldEventEngine";
+import { detectWorldEventTemporalReference, type CanonicalWorldEvent } from "./worldEventEngine";
 import { resolveTemporalReference } from "./temporalReferenceResolver";
+import { validateWorldEventContract } from "./kairaArchitectureContracts";
 
 const ANCHOR = "2026-08-30T02:00:00.000Z";
+
+function baseEvent(raw: string): CanonicalWorldEvent {
+  return {
+    raw,
+    eventType: "general",
+    reportedSpeech: false,
+    certainty: 0.9,
+    ambiguities: [],
+    evidence: [],
+    proposition: { key: "current_user|general|?", predicate: "general", actorKey: "current_user" },
+    polarity: "positive",
+    temporal: detectWorldEventTemporalReference(raw),
+  };
+}
 
 describe("Kaira relative temporal contracts", () => {
   it("resolves measurable hour offsets against observation time", () => {
@@ -69,5 +84,30 @@ describe("Kaira relative temporal contracts", () => {
       marker: "ondan sonra",
     });
     expect(resolveTemporalReference("Ondan sonra Ayşe gitti", temporal, ANCHOR)).toBeUndefined();
+  });
+
+  it("accepts new canonical relative offset enums", () => {
+    const raw = "Ayşe 3 saat önce aradı";
+    const event = baseEvent(raw);
+    const resolved = resolveTemporalReference(raw, event.temporal, ANCHOR);
+    event.temporal = { ...event.temporal!, resolved };
+    expect(validateWorldEventContract(raw, event).issues).toEqual([]);
+  });
+
+  it("rejects malformed temporal dependency pairs", () => {
+    const raw = "Ondan sonra Ayşe gitti";
+    const event = baseEvent(raw);
+    event.temporal = {
+      relation: "future",
+      asksLatest: false,
+      dependency: {
+        anchor: "previous_event",
+        direction: "after",
+        offsetAmount: 2,
+        marker: "ondan sonra",
+      },
+    };
+    expect(validateWorldEventContract(raw, event).issues.map((issue) => issue.invariant))
+      .toContain("world_event.v2_temporal_dependency");
   });
 });
