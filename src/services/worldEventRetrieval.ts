@@ -6,6 +6,10 @@ import {
 } from "./worldEventContradictionResolver";
 import { detectWorldEventTemporalReference } from "./worldEventEngine";
 import { resolveTemporalReference } from "./temporalReferenceResolver";
+import {
+  detectTemporalDiscourseDirection,
+  retrieveTemporalDiscourseNeighbors,
+} from "./discourseTemporalAnchorResolver";
 
 export interface RetrievedWorldEvent {
   observation: WorldEventObservation;
@@ -26,6 +30,7 @@ const STORED_QUERY_RE = /[?？]\s*$|\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu
 const LATEST_RECALL_RE = /\ben\s+son\b/iu;
 
 export function shouldRetrieveWorldEvents(message: string): boolean {
+  if (detectTemporalDiscourseDirection(message)) return true;
   const text = normalize(message);
   if (RECALL_RE.test(text) || COMPARISON_RECALL_RE.test(text)) return true;
   return /\b(?:dün|bugün|yarın|geçen|önceki|daha önce|hatırla|hatırlat|\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4})\b/iu.test(text);
@@ -75,12 +80,50 @@ function temporalQueryCandidates(
   return { observations: matching, temporalMatched: new Set(matching) };
 }
 
+function temporalDiscourseResults(
+  message: string,
+  observations: WorldEventObservation[],
+  maxItems: number,
+): RetrievedWorldEvent[] | undefined {
+  const direction = detectTemporalDiscourseDirection(message);
+  if (!direction) return undefined;
+
+  const sessionIds = Array.from(
+    new Set(observations.map((item) => item.sessionId).filter(Boolean)),
+  );
+  // The current server call historically did not pass sessionId into this seam.
+  // We therefore allow implicit discourse resolution only when the loaded
+  // evidence is already single-session. Multiple sessions => no guess.
+  if (sessionIds.length !== 1) return [];
+
+  const result = retrieveTemporalDiscourseNeighbors({
+    message,
+    sessionId: sessionIds[0],
+    observations,
+  });
+  if (result.resolution.status !== "resolved") return [];
+
+  const limit = Math.max(1, Math.min(maxItems, 10));
+  return result.observations.slice(0, limit).map((observation) => ({
+    observation,
+    score: 100,
+    reasons: [
+      "temporal_graph_neighbor",
+      `discourse_anchor:${result.resolution.anchorObservationId || "unresolved"}`,
+      `direction:${direction}`,
+    ],
+  }));
+}
+
 export function rankWorldEventObservations(
   message: string,
   observations: WorldEventObservation[],
   maxItems = 5,
   queryAnchorAt = new Date().toISOString(),
 ): RetrievedWorldEvent[] {
+  const discourseResults = temporalDiscourseResults(message, observations, maxItems);
+  if (discourseResults !== undefined) return discourseResults;
+
   const normalizedMessage = normalize(message);
   const queryTokens = new Set(tokens(message));
   const asksReportedSpeech = REPORTED_SPEECH_RE.test(normalizedMessage);
@@ -213,5 +256,5 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
     return `- #${index + 1} [${epistemic}; ${certainty}${polarity}${temporal}${conflictLabel}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
   });
 
-  return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- Çözümlenmiş zaman aralığı varsa kullanıcıdaki temporal ifadeyle eşleşen kanıtlar retrieval tarafından önceden sınırlandırılmıştır; bu zamanı yeniden ham metinden tahmin etme.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır; bu seçim timestamp ile belirlenir, lexical score eski kaydı öne geçiremez.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- ÇELİŞEN KANIT etiketi varsa aynı canonical proposition için zıt polarity kayıtları vardır. En yeni kaydı güncel kanıt olarak kullanabilirsin ama onu otomatik doğrulanmış gerçek sayma; gerektiğinde önceki ve sonraki iddiayı ayrı belirt.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen veya zaman içinde değişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; kayıtları ayrı kanıtlar olarak koru.`;
+  return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- Çözümlenmiş zaman aralığı varsa kullanıcıdaki temporal ifadeyle eşleşen kanıtlar retrieval tarafından önceden sınırlandırılmıştır; bu zamanı yeniden ham metinden tahmin etme.\n- temporal_graph_neighbor reason'lı kanıtlar yalnızca persisted provenance ile bağlı olaylardır; graph dışında yeni bir önce/sonra ilişkisi UYDURMA.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır; bu seçim timestamp ile belirlenir, lexical score eski kaydı öne geçiremez.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- ÇELİŞEN KANIT etiketi varsa aynı canonical proposition için zıt polarity kayıtları vardır. En yeni kaydı güncel kanıt olarak kullanabilirsin ama onu otomatik doğrulanmış gerçek sayma; gerektiğinde önceki ve sonraki iddiayı ayrı belirt.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen veya zaman içinde değişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; kayıtları ayrı kanıtlar olarak koru.`;
 }
