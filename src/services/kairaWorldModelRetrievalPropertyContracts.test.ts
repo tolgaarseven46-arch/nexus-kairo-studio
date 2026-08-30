@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { interpretSemanticEvent } from "./semanticEventEngine";
 import { resolveMessageEntities } from "./entityResolutionEngine";
-import { buildCanonicalWorldEvent } from "./worldEventEngine";
+import {
+  buildCanonicalWorldEvent,
+  type WorldEventType,
+} from "./worldEventEngine";
 import {
   classifyWorldEventObservation,
   type WorldEventObservation,
@@ -22,7 +25,7 @@ const CLAIMS = [
   { text: "aptal dedi", eventType: "insult" },
   { text: "iyi adamsın dedi", eventType: "general" },
   { text: "özür diledi", eventType: "apology" },
-] as const;
+] as const satisfies ReadonlyArray<{ text: string; eventType: WorldEventType }>;
 
 function lcg(seed: number) {
   let value = seed >>> 0;
@@ -48,7 +51,7 @@ function observation(input: {
   raw: string;
   actor: string;
   createdAt: string;
-  eventType?: string;
+  eventType?: WorldEventType;
   status?: "grounded" | "ambiguous";
 }): WorldEventObservation {
   return {
@@ -121,7 +124,6 @@ describe("Kaira world-model/retrieval property contracts", () => {
         }));
       }
 
-      // Ensure the focus person always has at least one grounded fact.
       observations.push(observation({
         raw: `${focus} bana salak dedi`,
         actor: focus,
@@ -129,7 +131,6 @@ describe("Kaira world-model/retrieval property contracts", () => {
         createdAt: iso(40),
       }));
 
-      // Add legacy polluted query rows; retrieval must never return them.
       observations.push(observation({
         raw: `${focus} bana ne demişti?`,
         actor: focus,
