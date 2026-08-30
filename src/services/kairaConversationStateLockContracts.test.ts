@@ -38,8 +38,9 @@ describe("pure conversation state lock projection", () => {
     expect(fs.existsSync(legacyAuthorityPath)).toBe(false);
   });
 
-  it("uses responsePersonality directly after KDM instead of passing it through a fake authority", () => {
-    expect(server).toContain("conversationStateLock = projectConversationStateLock(kdm.nextDynamicState)");
+  it("keeps the pure state-lock projection out of the live server response path", () => {
+    expect(server).not.toContain("projectConversationStateLock");
+    expect(server).not.toContain("conversationStateLock =");
     expect(server).toContain("responseStylePersonality = responsePersonality");
     expect(server).not.toContain("applyConversationStateAuthority");
     expect(server).not.toContain("authoritativePersonality");

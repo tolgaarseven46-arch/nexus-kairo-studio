@@ -5,7 +5,6 @@ import { GoogleGenAI } from "@google/genai";
 import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
 import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
 import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
-import { projectConversationStateLock } from "./src/services/conversationStateLock";
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
 import { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";
 import { buildKairaResponsePlan, findKairaResponsePlanIssues, kairaResponsePlanInstruction } from "./src/services/kairaResponsePlan";
@@ -576,7 +575,6 @@ app.post("/api/chat", async (req, res) => {
         canonicalSemantic.event,
         behaviorPolicy,
       ),
-      conversationStateLock = projectConversationStateLock(kdm.nextDynamicState),
       responseStylePersonality = responsePersonality,
       behaviorContract = buildBehaviorContract(kdm.nextDynamicState, kdm.trace),
       behaviorProfile = kdm.behaviorProfile,
