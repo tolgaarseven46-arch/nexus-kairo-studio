@@ -44,4 +44,24 @@ describe("buildCanonicalWorldEvent", () => {
     expect(event.ambiguities.length).toBeGreaterThan(0);
     expect(event.certainty).toBeLessThan(0.8);
   });
+
+  it("resolves a named third-party actor for non-speech actions aimed at first person", () => {
+    const message = "Ayşe bana özür diledi";
+    const semantic = interpretSemanticEvent(message);
+    const entities = resolveMessageEntities(message, {
+      userName: "Mert",
+      characterName: "Kaira",
+    });
+
+    const event = buildCanonicalWorldEvent(message, semantic, entities);
+
+    expect(event.reportedSpeech).toBe(false);
+    expect(event.eventType).toBe("repair");
+    expect(event.actor).toEqual(
+      expect.objectContaining({ name: "Ayşe", source: "explicit_name" }),
+    );
+    expect(event.target).toEqual(
+      expect.objectContaining({ id: "current_user", name: "Mert" }),
+    );
+  });
 });
