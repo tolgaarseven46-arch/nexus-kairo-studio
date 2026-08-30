@@ -19,6 +19,7 @@ export interface WorldEventObservation {
   status: WorldEventObservationStatus;
   event: CanonicalWorldEvent;
   createdAt: string;
+  temporalReferenceObservationId?: string;
 }
 
 const scope = (value?: string) =>
@@ -64,19 +65,25 @@ export function enrichWorldEventTemporalAtPersistence(
  * `previous_event` means the immediately previous observation in the same
  * session. Never skip an unresolved intervening event to borrow an older time.
  */
+export function previousTemporalReferenceObservation(
+  observations: WorldEventObservation[],
+  sessionId: string,
+): WorldEventObservation | undefined {
+  const sorted = [...observations].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  return sorted.find((row) => row.sessionId === sessionId);
+}
+
 export function previousResolvedIntervalFromObservations(
   observations: WorldEventObservation[],
   sessionId: string,
 ): WorldEventResolvedTemporalInterval | undefined {
-  const sorted = [...observations].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  const previous = sorted.find((row) => row.sessionId === sessionId);
-  return previous?.event?.temporal?.resolved;
+  return previousTemporalReferenceObservation(observations, sessionId)?.event?.temporal?.resolved;
 }
 
-async function loadPreviousResolvedInterval(
+async function loadPreviousTemporalReference(
   parent: ReturnType<typeof doc>,
   sessionId: string,
-): Promise<WorldEventResolvedTemporalInterval | undefined> {
+): Promise<WorldEventObservation | undefined> {
   const snapshot = await getDocs(
     query(collection(parent, EVENT_COLLECTION), orderBy("createdAt", "desc"), limit(12)),
   );
@@ -84,7 +91,7 @@ async function loadPreviousResolvedInterval(
     id: item.id,
     ...(item.data() as Omit<WorldEventObservation, "id">),
   }));
-  return previousResolvedIntervalFromObservations(observations, sessionId);
+  return previousTemporalReferenceObservation(observations, sessionId);
 }
 
 export async function saveWorldEventObservation(input: {
@@ -100,10 +107,15 @@ export async function saveWorldEventObservation(input: {
   const userId = scope(input.userId);
   const parent = doc(db, WORLD_MODEL_COLLECTION, userId);
   const needsPreviousEvent = input.event.temporal?.dependency?.anchor === "previous_event";
-  const referenceInterval = needsPreviousEvent
-    ? await loadPreviousResolvedInterval(parent, input.sessionId).catch(() => undefined)
+  const referenceObservation = needsPreviousEvent
+    ? await loadPreviousTemporalReference(parent, input.sessionId).catch(() => undefined)
     : undefined;
+  const referenceInterval = referenceObservation?.event?.temporal?.resolved;
   const event = enrichWorldEventTemporalAtPersistence(input.event, createdAt, referenceInterval);
+  const temporalReferenceObservationId =
+    event.temporal?.resolved?.source === "referenced_event"
+      ? referenceObservation?.id
+      : undefined;
 
   await addDoc(collection(parent, EVENT_COLLECTION), {
     userId,
@@ -113,6 +125,7 @@ export async function saveWorldEventObservation(input: {
     status: classification.status,
     event,
     createdAt,
+    ...(temporalReferenceObservationId ? { temporalReferenceObservationId } : {}),
   });
 }
 
