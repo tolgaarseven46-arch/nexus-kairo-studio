@@ -12,6 +12,7 @@ import { hasLocalLowMoodExpression } from "./kairoEmotionalLanguage";
 import { isConfusionOrChallenge } from "./kairoDialogueChaosEngine";
 import { applyRelationshipContext } from "./relationshipBehaviorService";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
+import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 
 export interface KdmAnalysisResult {
   trace: ReasoningTrace;
@@ -31,31 +32,44 @@ const trait = (
   fallback = 50,
 ) => clamp(typeof p?.[key] === "number" ? p[key]! : fallback);
 
-function runtimeTrait(
-  p: DroitPersonalityTraits | null | undefined,
-  key: string,
-  fallback: number,
-) {
-  const value = p?.[key];
-  return typeof value === "number" && Number.isFinite(value)
-    ? clamp(value)
-    : fallback;
+function behaviorPolicyStanceCode(value?: BehaviorPolicyInput["decision"]["stance"]): number {
+  if (value === "warm") return 0;
+  if (value === "firm") return 50;
+  if (value === "distant") return 75;
+  if (value === "disengage") return 100;
+  return 25;
 }
 
-function applyIntegratedRuntimeDecision(
+function behaviorPolicyLengthCode(value?: BehaviorPolicyInput["decision"]["responseLength"]): number {
+  if (value === "short") return 25;
+  if (value === "long") return 75;
+  return 50;
+}
+
+function behaviorPolicyPriorityCode(value?: BehaviorPolicyInput["decision"]["priority"]): number {
+  if (value === "boundary") return 100;
+  if (value === "values") return 82;
+  if (value === "relationship") return 65;
+  if (value === "goal") return 50;
+  if (value === "preference") return 35;
+  return 20;
+}
+
+function applyIntegratedBehaviorPolicy(
   profile: BehaviorLayerProfile,
-  personality?: DroitPersonalityTraits | null,
+  behaviorPolicy?: BehaviorPolicyInput | null,
 ): BehaviorLayerProfile {
-  const continueConversation = runtimeTrait(personality, "runtimeContinueConversation", 100) >= 50;
-  const humorAllowed = runtimeTrait(personality, "runtimeHumorAllowed", 100) >= 50;
-  const askQuestion = runtimeTrait(personality, "runtimeAskQuestion", 100) >= 50;
-  const acknowledgeComplaint = runtimeTrait(personality, "runtimeAcknowledgeComplaint", 0) >= 50;
-  const repairAllowed = runtimeTrait(personality, "runtimeRepairAllowed", 100) >= 50;
-  const stance = runtimeTrait(personality, "runtimeStance", 25);
-  const responseLength = runtimeTrait(personality, "runtimeResponseLength", 50);
-  const directness = runtimeTrait(personality, "runtimeDirectness", 50);
-  const distance = runtimeTrait(personality, "runtimeDistance", 0);
-  const priority = runtimeTrait(personality, "runtimePriority", 20);
+  const decision = behaviorPolicy?.decision;
+  const continueConversation = decision?.continueConversation ?? true;
+  const humorAllowed = decision?.humorAllowed ?? true;
+  const askQuestion = decision?.askQuestion ?? true;
+  const acknowledgeComplaint = decision?.acknowledgeComplaint ?? false;
+  const repairAllowed = decision?.repairAllowed ?? true;
+  const stance = behaviorPolicyStanceCode(decision?.stance);
+  const responseLength = behaviorPolicyLengthCode(decision?.responseLength);
+  const directness = Math.round((decision?.directness ?? 0.5) * 100);
+  const distance = Math.round((decision?.distance ?? 0) * 100);
+  const priority = behaviorPolicyPriorityCode(decision?.priority);
 
   const directives = [...profile.behaviorDirectives];
   const relationshipParts = profile.relationshipInstruction
@@ -121,12 +135,12 @@ function applyIntegratedRuntimeDecision(
     behaviorDirectives: directives,
     relationshipInstruction: relationshipParts.join(" ") || undefined,
     responseStyle: `${profile.responseStyle}_integrated_s${stance}_l${responseLength}`,
-    dominantSummary: `${profile.dominantSummary} · Entegre karar`,
+    dominantSummary: `${profile.dominantSummary} · Entegre policy`,
     debugMatrix: {
       ...profile.debugMatrix,
       synthesizedParameters: {
         ...profile.debugMatrix.synthesizedParameters,
-        runtimeDecision: {
+        behaviorPolicyDecision: {
           continueConversation,
           humorAllowed,
           askQuestion,
@@ -267,6 +281,7 @@ export function analyzeKdmInteraction(
   personality?: DroitPersonalityTraits | null,
   currentDynamicState?: DroitDynamicState | null,
   canonicalSemanticEvent?: SemanticEvent | null,
+  behaviorPolicy?: BehaviorPolicyInput | null,
 ): KdmAnalysisResult {
   const state: DroitDynamicState = {
     ...DEFAULT_DYNAMIC_STATE,
@@ -325,11 +340,13 @@ export function analyzeKdmInteraction(
   const baseRepair = clamp(relationship.repairProgress ?? 0);
   const priorConversationState = relationship.conversationState ?? "active";
   const priorRepairAttempts = Math.max(0, relationship.repairAttempts ?? 0);
-  const runtimeContinueConversation = runtimeTrait(personality, "runtimeContinueConversation", 100) >= 50;
-  const runtimeStance = runtimeTrait(personality, "runtimeStance", 25);
-  const runtimePriority = runtimeTrait(personality, "runtimePriority", 20);
-  const runtimeRepairSignal = runtimeTrait(personality, "runtimeRepairSignal", 0) >= 50;
-  const requestedDisengage = !runtimeContinueConversation && runtimeStance >= 90 && runtimePriority >= 80;
+  const integratedDecision = behaviorPolicy?.decision;
+  const integratedPriority = behaviorPolicyPriorityCode(integratedDecision?.priority);
+  const integratedStance = behaviorPolicyStanceCode(integratedDecision?.stance);
+  const requestedDisengage =
+    integratedDecision?.continueConversation === false &&
+    integratedDecision.stance === "disengage" &&
+    integratedPriority >= 80;
 
   const passiveHealingDays = relationship.lastConflictAt && Number.isFinite(new Date(relationship.lastConflictAt).getTime())
     ? Math.max(0, Math.floor((Date.now() - new Date(relationship.lastConflictAt).getTime()) / 86400000))
@@ -355,7 +372,7 @@ export function analyzeKdmInteraction(
   const targetsKaira = rawKind === "negative" && negativeTarget === "kaira";
   const kind: EventKind = rawKind === "negative" && !targetsKaira ? "neutral" : rawKind;
   const apology = semanticEvent.apology;
-  const repairSignal = apology || semanticEvent.repairAttempt || runtimeRepairSignal;
+  const repairSignal = apology || semanticEvent.repairAttempt;
   const pattern = kind === "negative" ? semanticPattern(semanticEvent) : null;
   const samePattern = !!pattern && relationship.lastNegativePattern === pattern;
   const priorRepeatCount = Math.max(0, relationship.repeatedNegativeCount || 0);
@@ -569,10 +586,8 @@ export function analyzeKdmInteraction(
   };
 
   const relationshipBehaviorProfile = applyRelationshipContext(baseBehaviorProfile, nextDynamicState);
-  const finalBehaviorProfile = applyIntegratedRuntimeDecision(relationshipBehaviorProfile, personality);
+  const finalBehaviorProfile = applyIntegratedBehaviorPolicy(relationshipBehaviorProfile, behaviorPolicy);
   const targetNote = rawKind === "negative" ? ` Negatif hedef=${negativeTarget}.` : "";
-  const integratedPriority = runtimeTrait(personality, "runtimePriority", 20);
-  const integratedStance = runtimeTrait(personality, "runtimeStance", 25);
   const trace: ReasoningTrace = {
     whoSent: {
       userName: "Kullanıcı",
@@ -615,8 +630,8 @@ export function analyzeKdmInteraction(
     },
     decision: {
       chosenTone: finalBehaviorProfile.tone,
-      explanation: integratedPriority >= 60
-        ? `8 katmanlı entegrasyon kararı KDM üzerinde zorlandı; öncelik=${integratedPriority}, duruş=${integratedStance}, ton=${finalBehaviorProfile.tone}.`
+      explanation: behaviorPolicy && integratedPriority >= 60
+        ? `Açık ${behaviorPolicy.schemaVersion} girdisi KDM profilinde değerlendirildi; kaynak=${behaviorPolicy.source}, öncelik=${integratedDecision?.priority ?? "expression"}, duruş=${integratedDecision?.stance ?? "neutral"}, ton=${finalBehaviorProfile.tone}.`
         : repeatedProblem
           ? "Tekrar etkisi ve kişilik hassasiyeti birlikte uygulanarak tolerans düşürüldü."
           : unresolvedHurt

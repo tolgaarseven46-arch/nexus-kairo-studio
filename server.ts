@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
+import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
 import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
 import { applyConversationStateAuthority } from "./src/services/conversationStateAuthority";
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
@@ -487,6 +488,7 @@ app.post("/api/chat", async (req, res) => {
       provider = "openrouter",
       suppressRecentMemory = false,
       semanticEvent: incomingSemanticEvent,
+      behaviorPolicy: incomingBehaviorPolicy,
       sessionId: incomingSessionId,
       kairaInstanceId: incomingKairaInstanceId,
       kairaInstanceType: incomingKairaInstanceType,
@@ -563,12 +565,14 @@ app.post("/api/chat", async (req, res) => {
         ? requestState
         : normalizeDynamicState(persistedState ?? dynamicState),
       safePersonality = personality as DroitPersonalityTraits,
+      behaviorPolicy = normalizeBehaviorPolicyInput(incomingBehaviorPolicy),
       kdmStart = now(),
       kdm = analyzeKdmInteraction(
         userMessage,
         safePersonality,
         effective,
         canonicalSemantic.event,
+        behaviorPolicy,
       ),
       conversationAuthority = applyConversationStateAuthority(safePersonality, kdm.nextDynamicState),
       authoritativePersonality = conversationAuthority.personality,

@@ -16,6 +16,7 @@ import { applySocialOrientation } from "./socialOrientationEngine";
 import { applyBoundaries } from "./boundaryEngine";
 import { applyExpressionStyle } from "./expressionStyleEngine";
 import { integrateBehaviorLayers } from "./behaviorIntegrationEngine";
+import { createClientBehaviorPolicy } from "./behaviorPolicyInput";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 import { saveTestSessionLayerAudit } from "./testSessionLayerAuditService";
 import { auth } from "../lib/firebase";
@@ -222,9 +223,13 @@ export const droitChatService = {
       expression: expressionRuntime.response,
     });
     const runtimePersonality = integrationRuntime.personality;
+    const behaviorPolicy = createClientBehaviorPolicy(
+      integrationRuntime.decision,
+      integrationRuntime.pressures,
+    );
     const clientPrepMs = Math.round(performance.now() - prepStart);
 
-    const payload = { sessionId: resolvedSessionId, userId, userName, userMessage, semanticEvent, character: characterInfo, personality: runtimePersonality, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState: temperamentAdjustedState ?? dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
+    const payload = { sessionId: resolvedSessionId, userId, userName, userMessage, semanticEvent, character: characterInfo, personality: runtimePersonality, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorPolicy, dynamicState: temperamentAdjustedState ?? dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     try {
