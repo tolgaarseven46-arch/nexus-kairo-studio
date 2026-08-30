@@ -45,6 +45,7 @@ const normalize = (value: string) =>
     .trim();
 
 const FIRST_PERSON_TARGET_RE = /(?:^|\s)(?:bana|beni|benim|ben)(?=\s|$)/iu;
+const NEGATED_TEMPORAL_ANCHOR_RE = /(?:^|\s)(?:demed|söylemed|yapmad|olmad|etmed|istemed|sevmed|kızmad)[\p{L}\p{N}_]*(?=\s|$)/iu;
 
 function actorName(observation: WorldEventObservation): string | undefined {
   const name = observation.event.actor?.name;
@@ -54,6 +55,15 @@ function actorName(observation: WorldEventObservation): string | undefined {
 function isFirstPersonTarget(observation: WorldEventObservation): boolean {
   const target = observation.event.target;
   return target?.id === "current_user" || target?.source === "first_person";
+}
+
+function detectTemporalAnchorPolarity(message: string): WorldEventPolarity {
+  const text = normalize(message);
+  // Turkish temporal subordination changes surface forms (e.g. "demedikten").
+  // Keep this resolver bounded to explicit negative verb stems instead of
+  // treating the whole follow-up question as a fresh positive proposition.
+  if (NEGATED_TEMPORAL_ANCHOR_RE.test(text)) return "negative";
+  return detectWorldEventPolarity(message);
 }
 
 /**
@@ -101,7 +111,7 @@ export function resolvePropositionTemporalEventAnchor(input: {
   }
 
   const firstPersonTarget = FIRST_PERSON_TARGET_RE.test(query);
-  const matchedPolarity = detectWorldEventPolarity(input.message);
+  const matchedPolarity = detectTemporalAnchorPolarity(input.message);
   let candidates = sameSession.filter(
     (item) =>
       actorName(item) === matchedActorNames[0] &&
