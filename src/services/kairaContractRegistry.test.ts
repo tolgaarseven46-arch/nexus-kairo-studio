@@ -15,6 +15,7 @@ describe("Kaira contract registry", () => {
       "semantic-event",
       "entity-resolution",
       "canonical-world-event",
+      "event-modality",
       "world-model-ownership",
       "world-event-retrieval",
       "temporal-reference-resolution",
@@ -45,6 +46,10 @@ describe("Kaira contract registry", () => {
 
   it("activates proposition temporal anchor v2 with content identity", () => {
     expect(activeContractVersion("proposition-temporal-event-anchor")?.version).toBe(2);
+  });
+
+  it("registers bounded modality semantics", () => {
+    expect(activeContractVersion("event-modality")?.version).toBe(1);
   });
 
   it("does not allow anonymous contracts without consumers", () => {
