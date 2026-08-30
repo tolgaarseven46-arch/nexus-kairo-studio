@@ -67,9 +67,53 @@ describe("world event retrieval", () => {
     expect(ranked[0]?.reasons).toContain("name:ayşe");
   });
 
-  it("preserves reported claim epistemics in prompt", () => {
+  it("prefers the newest event when the same person has multiple equally relevant claims", () => {
+    const older = observation({ createdAt: "2026-08-29T20:00:00.000Z" });
+    const newer = observation({
+      createdAt: "2026-08-29T21:00:00.000Z",
+      event: { ...observation().event, raw: "Ayşe bana özür dilerim dedi", eventType: "apology" },
+    });
+
+    const ranked = rankWorldEventObservations("Ayşe bana ne demişti?", [older, newer]);
+    expect(ranked[0]?.observation.event.raw).toBe("Ayşe bana özür dilerim dedi");
+  });
+
+  it("retrieves two explicitly named people without unrelated noise", () => {
+    const ayse = observation();
+    const merve = observation({
+      event: { ...observation().event, raw: "Merve bana aptal dedi", actor: { name: "Merve", source: "explicit_name", confidence: 0.95 } },
+    });
+    const ali = observation({
+      event: { ...observation().event, raw: "Ali bana destek oldu", actor: { name: "Ali", source: "explicit_name", confidence: 0.95 }, eventType: "support" },
+    });
+
+    const ranked = rankWorldEventObservations("Ayşe mi Merve mi bana bir şey demişti?", [ali, merve, ayse]);
+    const names = ranked.map((item) => item.observation.event.actor?.name);
+    expect(names).toContain("Ayşe");
+    expect(names).toContain("Merve");
+    expect(names).not.toContain("Ali");
+  });
+
+  it("keeps conflicting claims separate and orders the newest first", () => {
+    const older = observation({
+      createdAt: "2026-08-29T20:00:00.000Z",
+      event: { ...observation().event, raw: "Ayşe bana salak dedi", eventType: "insult" },
+    });
+    const newer = observation({
+      createdAt: "2026-08-29T21:00:00.000Z",
+      event: { ...observation().event, raw: "Ayşe bana salak demediğini söyledi", eventType: "general" },
+    });
+
+    const ranked = rankWorldEventObservations("Ayşe bana ne demişti?", [older, newer]);
+    expect(ranked).toHaveLength(2);
+    expect(ranked[0]?.observation.event.raw).toBe("Ayşe bana salak demediğini söyledi");
+    expect(ranked[1]?.observation.event.raw).toBe("Ayşe bana salak dedi");
+  });
+
+  it("preserves reported claim epistemics and contradiction policy in prompt", () => {
     const text = buildWorldEventMemoryInstruction([{ observation: observation(), score: 8, reasons: ["name:ayşe"] }]);
     expect(text).toContain("KULLANICININ AKTARDIĞI İDDİA");
     expect(text).toContain("doğrulanmış dünya gerçeği gibi anlatma");
+    expect(text).toContain("çelişen kayıtlar");
   });
 });
