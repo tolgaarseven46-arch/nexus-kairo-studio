@@ -1,0 +1,37 @@
+name: One-time project state runtime flags
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-runtime-flags.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 29. Legacy runtime decision flag removal — 2026-08-31\n- `runtimeContinueConversation`, `runtimeHumorAllowed`, `runtimeAskQuestion`, `runtimeAcknowledgeComplaint`, `runtimeRepairAllowed`, `runtimeStance`, `runtimeResponseLength`, `runtimeDirectness`, `runtimeWarmth`, `runtimeDistance`, `runtimePriority`, `runtimePriorConversationState` ve `runtimeRepairSignal` artık response personality içine encode edilmez.\n- 8-layer WHAT/WHETHER çıktıları explicit `behavior-policy@1` içinde yaşar; final cevap izinleri canonical `BehaviorContract` + `KairaResponsePlan` tarafından belirlenir.\n- `conversationStateAuthority` artık ölü runtime bayrakları üretmez. Non-active state'lerde yalnız gerçek HOW overlay'i olan `humor` üzerinde deterministic clamp uygular: distancing maksimum 20, repairing/disengaged 0.\n- State→behavior seam validator eski `authority.disengaged_runtime_lock` invariant'ından çıkarıldı. Disengaged kapanışı artık state/BehaviorContract üzerinden (`continueConversation=false`, soru/mizah/yakınlık forbidden), authority kilidi ve HOW `humor=0` ile doğrulanır.\n- `behaviorIntegrationEngine.test.ts`, `conversationStateAuthority.test.ts`, `kairaStateBehaviorContracts.test.ts` ve multi-turn seam regressionları yeni authority modeline taşındı.\n- `kairaLegacyRuntimeFlagRemovalContracts.test.ts` kalıcı `test:contracts` suite'ine eklendi.\n- Entegrasyon commit'i: `8446dde` (`refactor(kaira): remove legacy runtime decision flags`). Runtime-removal contract, TypeScript, 496/496 test ve production build başarıyla geçti. Geçici migration workflow/script kaldırıldı.\n- Sonraki audit adayı: `conversationStateAuthority` artık yalnız HOW humor clamp yaptığı için ayrı bir authority servisi olarak kalmalı mı, yoksa speech identity / response-style projection içine taşınmalı mı? Koddan tüketici ve semantik sınır audit'i yapılmadan kaldırılmayacak.\n'''
+          if '## 29. Legacy runtime decision flag removal — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record legacy runtime flag removal"
+          git pull --rebase origin main
+          git push origin main
