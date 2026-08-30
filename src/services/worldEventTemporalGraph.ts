@@ -16,7 +16,8 @@ export interface TemporalGraphIssue {
     | "temporal_graph.self_reference"
     | "temporal_graph.missing_reference"
     | "temporal_graph.cross_session_reference"
-    | "temporal_graph.interval_order";
+    | "temporal_graph.interval_order"
+    | "temporal_graph.cycle";
   observationId?: string;
   referenceObservationId?: string;
   message: string;
@@ -40,6 +41,44 @@ function observationsById(
     if (item.id) byId.set(item.id, item);
   }
   return byId;
+}
+
+function findCycle(edges: TemporalGraphEdge[]): string[] | undefined {
+  const adjacency = new Map<string, string[]>();
+  for (const edge of edges) {
+    const list = adjacency.get(edge.sourceObservationId) || [];
+    list.push(edge.targetObservationId);
+    adjacency.set(edge.sourceObservationId, list);
+  }
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const stack: string[] = [];
+
+  const walk = (node: string): string[] | undefined => {
+    if (visiting.has(node)) {
+      const start = stack.indexOf(node);
+      return start >= 0 ? [...stack.slice(start), node] : [node, node];
+    }
+    if (visited.has(node)) return undefined;
+
+    visiting.add(node);
+    stack.push(node);
+    for (const next of adjacency.get(node) || []) {
+      const cycle = walk(next);
+      if (cycle) return cycle;
+    }
+    stack.pop();
+    visiting.delete(node);
+    visited.add(node);
+    return undefined;
+  };
+
+  for (const node of adjacency.keys()) {
+    const cycle = walk(node);
+    if (cycle) return cycle;
+  }
+  return undefined;
 }
 
 /**
@@ -130,6 +169,18 @@ export function buildTemporalEventGraph(
     edges.push(edge);
   }
 
+  if (!issues.length) {
+    const cycle = findCycle(edges);
+    if (cycle) {
+      issues.push({
+        invariant: "temporal_graph.cycle",
+        observationId: cycle[0],
+        referenceObservationId: cycle[cycle.length - 1],
+        message: `Temporal graph cycle içeriyor: ${cycle.join(" -> ")}`,
+      });
+    }
+  }
+
   return { edges, issues };
 }
 
@@ -159,10 +210,57 @@ export function observationsBefore(
     .map((edge) => edge.sourceObservationId);
 }
 
+function traverseTemporalGraph(
+  graph: TemporalEventGraph,
+  anchorObservationId: string,
+  direction: TemporalNeighborDirection,
+  maxDepth: number,
+): string[] {
+  const depthLimit = Math.max(1, Math.min(maxDepth, 12));
+  const visited = new Set<string>([anchorObservationId]);
+  const result: string[] = [];
+  let frontier = [anchorObservationId];
+
+  for (let depth = 0; depth < depthLimit && frontier.length; depth += 1) {
+    const nextFrontier: string[] = [];
+    for (const node of frontier) {
+      const neighbors = direction === "after"
+        ? observationsAfter(graph, node)
+        : observationsBefore(graph, node);
+      for (const neighbor of neighbors) {
+        if (visited.has(neighbor)) continue;
+        visited.add(neighbor);
+        result.push(neighbor);
+        nextFrontier.push(neighbor);
+      }
+    }
+    frontier = nextFrontier;
+  }
+
+  return result;
+}
+
+export function observationsAfterTransitively(
+  graph: TemporalEventGraph,
+  anchorObservationId: string,
+  maxDepth = 4,
+): string[] {
+  if (graph.issues.length) return [];
+  return traverseTemporalGraph(graph, anchorObservationId, "after", maxDepth);
+}
+
+export function observationsBeforeTransitively(
+  graph: TemporalEventGraph,
+  anchorObservationId: string,
+  maxDepth = 4,
+): string[] {
+  if (graph.issues.length) return [];
+  return traverseTemporalGraph(graph, anchorObservationId, "before", maxDepth);
+}
+
 /**
- * Retrieval seam for event-chain queries. The caller must supply an explicit
- * anchor observation id that was resolved by a higher discourse/context layer.
- * No "latest event" or lexical guess is performed here.
+ * Retrieval seam for direct event-chain queries. The caller must supply an
+ * explicit anchor observation id that was resolved by a higher discourse layer.
  */
 export function retrieveTemporalNeighbors(
   observations: WorldEventObservation[],
@@ -181,6 +279,32 @@ export function retrieveTemporalNeighbors(
   const byId = observationsById(observations);
   const result: WorldEventObservation[] = [];
   for (const id of neighborIds) {
+    const item = byId.get(id);
+    if (item) result.push(item);
+  }
+  return result;
+}
+
+/**
+ * Bounded transitive retrieval for timeline questions. Depth is hard-capped at
+ * 12 and a graph with any invariant issue (including cycles) yields no chain.
+ */
+export function retrieveTemporalChain(
+  observations: WorldEventObservation[],
+  anchorObservationId: string | undefined,
+  direction: TemporalNeighborDirection,
+  maxDepth = 4,
+): WorldEventObservation[] {
+  if (!anchorObservationId) return [];
+  const graph = buildTemporalEventGraph(observations);
+  if (graph.issues.length) return [];
+
+  const ids = direction === "after"
+    ? observationsAfterTransitively(graph, anchorObservationId, maxDepth)
+    : observationsBeforeTransitively(graph, anchorObservationId, maxDepth);
+  const byId = observationsById(observations);
+  const result: WorldEventObservation[] = [];
+  for (const id of ids) {
     const item = byId.get(id);
     if (item) result.push(item);
   }
