@@ -269,3 +269,21 @@ Yeni sohbet açıldığında:
 - `kairaResponsePlanFinalAuthorityContracts.test.ts` kalıcı `test:contracts` architecture suite'ine eklendi.
 - Geçici response-plan final-authority migration workflow/script başarıyla uygulandıktan sonra kaldırıldı.
 - Entegrasyon commit'i: `f0c956f` (`feat(kaira): make response plan final behavior authority`). Entegrasyon workflow'unda authority contract, TypeScript, full test suite ve production build başarıyla geçti.
+
+
+## 25. HOW-only konuşma kimliği / mizah izni sınırı — 2026-08-30
+- `KairoSpeechIdentity` HOW-only sözleşmesine uygun hale getirildi: `speech.humorLevel` artık `allowHumor` iznini açamaz veya kapatamaz.
+- Canonical mizah izni `continueConversation && BehaviorContract.playfulness === "allowed"` üzerinden belirlenir.
+- `humorLevel` yalnızca izin verilmiş mizahın stil/eğilim/şiddet bilgisidir; WHAT/WHETHER otoritesi değildir.
+- `kairaResponsePlan.test.ts` regression testi active contract + `humorLevel=0` durumunda `plan.allowHumor=true` bekler. Distancing/repairing/disengaged contractları mizahı deterministic olarak bloklamaya devam eder.
+- Düzeltme commit'i: `75147a3` (`fix(kaira): keep humor permission out of HOW-only speech`). Normal CI architecture contracts + tests + TypeScript + production build ile başarıyla geçti.
+- Emoji bütçesi ayrı bir HOW nicelik sınırı olarak ayrıca audit edilecektir; bu fazda mekanik olarak değiştirilmedi.
+
+
+## 26. Temperament → KDM current-state handoff — 2026-08-30
+- Client `applyTemperamentBeforeKdm(...)` ile hesapladığı `temperamentAdjustedState`i alt davranış katmanlarında kullanırken server KDM'ye ham `dynamicState` gönderiyordu; aynı tur iki farklı current-state üzerinden ilerliyordu.
+- Chat payload artık `dynamicState: temperamentAdjustedState ?? dynamicState` gönderir. Böylece client'taki “KDM öncesi temperament” state'i ile authoritative server KDM'nin başlangıç state'i aynı nesnel durumu temsil eder.
+- Raw state ve adjusted state test-session layer audit içinde ayrı ayrı tutulmaya devam eder; gözlemlenebilirlik kaybolmadı.
+- `kairaTemperamentBeforeKdmContracts.test.ts` kalıcı `test:contracts` architecture suite'ine eklendi.
+- Entegrasyon commit'i: `2260223` (`fix(kaira): hand temperament state into KDM`). Migration workflow'unda contract, TypeScript, full test suite ve production build başarıyla geçti; geçici workflow sonrasında kaldırıldı.
+- Bir sonraki büyük audit sınırı: legacy client `behaviorIntegrationEngine` kararlarının KDM `behaviorProfile` ve relationship state transition'larına doğrudan girmesi. Bu katman sökülmeden önce base personality / integrated policy ownership contract'ı açıkça ayrıştırılmalı.
