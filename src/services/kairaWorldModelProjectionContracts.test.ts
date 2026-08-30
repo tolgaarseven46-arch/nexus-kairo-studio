@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WorldEventObservation } from "./worldModelEventStore";
+import type { WorldEventModalityKind } from "./worldEventModality";
 import {
   projectWorldModel,
   validateWorldModelProjection,
@@ -11,7 +12,7 @@ function observation(input: {
   propositionKey?: string;
   polarity?: "positive" | "negative" | "unknown";
   kairaInstanceId?: string;
-  modality?: "fact" | "intention" | "plan" | "commitment" | "possibility" | "desire" | "refusal" | "unknown";
+  modality?: WorldEventModalityKind;
   lifecycle?: "executed" | "cancelled" | "postponed" | "failed" | "unspecified";
 }): WorldEventObservation {
   const propositionKey = input.propositionKey || "ali|general|?|istifa";
@@ -39,8 +40,8 @@ function observation(input: {
         contentKey: "istifa",
       },
       modality: {
-        kind: input.modality || "fact",
-        strength: 0.9,
+        kind: input.modality || "unspecified",
+        strength: input.modality && input.modality !== "unspecified" ? 0.9 : 0,
       },
       lifecycle: {
         kind: input.lifecycle || "unspecified",
@@ -99,7 +100,7 @@ describe("canonical world-model projection contracts", () => {
       observation({
         id: "done",
         at: "2026-08-30T10:05:00.000Z",
-        modality: "fact",
+        modality: "unspecified",
         lifecycle: "executed",
       }),
     ];
