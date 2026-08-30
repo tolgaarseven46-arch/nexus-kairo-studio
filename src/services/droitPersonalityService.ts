@@ -9,7 +9,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { NEUTRAL_DROIT_PERSONALITY } from './droitPersonalityNormalizer';
+import { NEUTRAL_DROIT_PERSONALITY, normalizeDroitPersonality } from './droitPersonalityNormalizer';
 import {
   DroitPersonalityTraits,
   StructuredDroitPersonality,
@@ -31,37 +31,38 @@ export const DEFAULT_PERSONALITY_TRAITS: DroitPersonalityTraits = { ...NEUTRAL_D
 export function traitsToStructuredPersonality(
   traits: DroitPersonalityTraits
 ): StructuredDroitPersonality {
+  const normalized = normalizeDroitPersonality(traits);
   return {
     emotional: {
-      anger: Number(traits.anger ?? 50),
-      patience: Number(traits.patience ?? 50),
-      empathy: Number(traits.empathy ?? 50),
-      sensitivity: Number(traits.emotionalSensitivity ?? traits.sensitivity ?? 50),
+      anger: Number(normalized.anger ?? 50),
+      patience: Number(normalized.patience ?? 50),
+      empathy: Number(normalized.empathy ?? 50),
+      sensitivity: Number(normalized.emotionalSensitivity ?? normalized.sensitivity ?? 50),
     },
     social: {
-      socialIntelligence: Number(traits.socialIntelligence ?? 50),
-      confidence: Number(traits.selfConfidence ?? traits.confidence ?? 50),
-      humor: Number(traits.humor ?? 50),
-      communication: Number(traits.communication ?? 50),
-      charisma: Number(traits.charisma ?? 50),
+      socialIntelligence: Number(normalized.socialIntelligence ?? 50),
+      confidence: Number(normalized.selfConfidence ?? normalized.confidence ?? 50),
+      humor: Number(normalized.humor ?? 50),
+      communication: Number(normalized.communication ?? 50),
+      charisma: Number(normalized.charisma ?? 50),
     },
     cognitive: {
-      curiosity: Number(traits.curiosity ?? 50),
+      curiosity: Number(normalized.curiosity ?? 50),
       analyticalThinking: Number(
-        traits.analyticalThinking ?? traits.analytical ?? 50
+        normalized.analyticalThinking ?? normalized.analytical ?? 50
       ),
-      creativity: Number(traits.creativity ?? 50),
+      creativity: Number(normalized.creativity ?? 50),
       decisionMaking: Number(
-        traits.decisionMaking ?? traits.decisiveness ?? 50
+        normalized.decisionMaking ?? normalized.decisiveness ?? 50
       ),
-      attention: Number(traits.attention ?? 50),
+      attention: Number(normalized.attention ?? 50),
     },
     character: {
-      authority: Number(traits.authority ?? 50),
-      courage: Number(traits.courage ?? 50),
-      seriousness: Number(traits.seriousness ?? 50),
-      loyalty: Number(traits.loyalty ?? 50),
-      initiative: Number(traits.initiative ?? 50),
+      authority: Number(normalized.authority ?? 50),
+      courage: Number(normalized.courage ?? 50),
+      seriousness: Number(normalized.seriousness ?? 50),
+      loyalty: Number(normalized.loyalty ?? 50),
+      initiative: Number(normalized.initiative ?? 50),
     },
   };
 }
@@ -74,7 +75,7 @@ export function structuredPersonalityToTraits(
   fallback: DroitPersonalityTraits = DEFAULT_PERSONALITY_TRAITS
 ): DroitPersonalityTraits {
   if (!rawPersonality || typeof rawPersonality !== 'object') {
-    return { ...fallback };
+    return normalizeDroitPersonality(fallback);
   }
 
   // Check if it's already in the 4-category nested structure
@@ -83,7 +84,7 @@ export function structuredPersonalityToTraits(
   const cog = rawPersonality.cognitive || {};
   const cha = rawPersonality.character || {};
 
-  return {
+  return normalizeDroitPersonality({
     // DUYGUSAL
     anger: typeof emo.anger === 'number' ? emo.anger : (rawPersonality.anger ?? fallback.anger),
     patience: typeof emo.patience === 'number' ? emo.patience : (rawPersonality.patience ?? fallback.patience),
@@ -155,7 +156,7 @@ export function structuredPersonalityToTraits(
       typeof cha.initiative === 'number'
         ? cha.initiative
         : (rawPersonality.initiative ?? fallback.initiative),
-  };
+  });
 }
 
 export const droitPersonalityService = {

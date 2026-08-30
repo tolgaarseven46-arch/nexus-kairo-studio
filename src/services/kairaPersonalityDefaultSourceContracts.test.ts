@@ -13,7 +13,7 @@ describe("canonical personality default source", () => {
   });
 
   it("derives persistence defaults from the canonical neutral profile instead of duplicating the trait list", () => {
-    expect(service).toContain("import { NEUTRAL_DROIT_PERSONALITY } from './droitPersonalityNormalizer';");
+    expect(service).toMatch(/import \{[^}]*NEUTRAL_DROIT_PERSONALITY[^}]*\} from '\.\/droitPersonalityNormalizer';/);
     expect(service).toContain("DEFAULT_PERSONALITY_TRAITS: DroitPersonalityTraits = { ...NEUTRAL_DROIT_PERSONALITY }");
     expect(service).not.toMatch(/DEFAULT_PERSONALITY_TRAITS: DroitPersonalityTraits = \{\s*\/\/ DUYGUSAL/);
   });
