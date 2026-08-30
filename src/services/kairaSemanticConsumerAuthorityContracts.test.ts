@@ -5,15 +5,22 @@ import path from "node:path";
 const read = (file: string) => fs.readFileSync(path.resolve(process.cwd(), file), "utf8");
 const server = read("server.ts");
 const semantic = read("src/services/semanticEventEngine.ts");
+const gateway = read("src/services/languageUnderstandingService.ts");
 const dialogue = read("src/services/kairoDialogueDecisionEngine.ts");
 const local = read("src/services/kairoLocalLanguageEngine.ts");
 
 describe("canonical SemanticEvent consumer authority", () => {
-  it("carries social routine and discourse act on the canonical semantic event", () => {
+  it("carries social routine, discourse act and explicit advice on the canonical semantic event", () => {
     expect(semantic).toContain("export type SemanticSocialRoutine");
     expect(semantic).toContain("export type SemanticDiscourseAct");
     expect(semantic).toContain("socialRoutine?: SemanticSocialRoutine");
     expect(semantic).toContain("discourseAct?: SemanticDiscourseAct");
+    expect(semantic).toContain("adviceRequested?: boolean");
+  });
+
+  it("completes optional consumer facets at the language-understanding boundary", () => {
+    expect(gateway).toContain('import { canonicalizeSemanticEvent } from "./semanticEventCanonicalizer"');
+    expect(gateway.match(/canonicalizeSemanticEvent\(/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
   it("feeds the canonical server event to dialogue planning", () => {
