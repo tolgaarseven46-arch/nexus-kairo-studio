@@ -1,4 +1,5 @@
 import type { RetrievedWorldEvent } from "./worldEventRetrieval";
+import { resolveContradictionEvidence } from "./worldEventContradictionResolver";
 
 export interface WorldModelResponseIssue {
   code: "memory_evidence_denied";
@@ -23,11 +24,16 @@ function grounded(items: RetrievedWorldEvent[]) {
 }
 
 function hasConflict(items: RetrievedWorldEvent[]) {
-  return items.some(
-    (item) =>
-      item.projectedState?.evidenceStatus === "conflicting" ||
-      item.reasons.includes("canonical_conflict_evidence"),
-  );
+  if (
+    items.some(
+      (item) =>
+        item.projectedState?.evidenceStatus === "conflicting" ||
+        item.reasons.includes("canonical_conflict_evidence"),
+    )
+  ) return true;
+
+  return resolveContradictionEvidence(items.map((item) => item.observation))
+    .some((set) => set.status === "conflicting");
 }
 
 /**
