@@ -33,7 +33,7 @@ function observation(input: {
       ambiguities: [],
       evidence: [],
       proposition: {
-        key: `${input.id}|general|?`,
+        key: `${input.id}|general|?|?`,
         predicate: "general",
         actorKey: input.id,
       },
@@ -73,16 +73,8 @@ describe("Kaira world event retrieval coordinator contracts", () => {
   });
 
   it("uses temporal graph mode and never lexical fallback for discourse queries", () => {
-    const latest = observation({
-      id: "latest",
-      createdAt: "2026-08-21T10:00:00.000Z",
-      raw: "Merve bana çok önemli bir şey söyledi",
-    });
-    const unrelatedLexical = observation({
-      id: "old",
-      createdAt: "2026-08-20T10:00:00.000Z",
-      raw: "sonra ne oldu diye konuşmuştuk",
-    });
+    const latest = observation({ id: "latest", createdAt: "2026-08-21T10:00:00.000Z", raw: "Merve bana çok önemli bir şey söyledi" });
+    const unrelatedLexical = observation({ id: "old", createdAt: "2026-08-20T10:00:00.000Z", raw: "sonra ne oldu diye konuşmuştuk" });
 
     const result = coordinateWorldEventRetrieval({
       message: "peki sonra ne oldu?",
@@ -96,16 +88,8 @@ describe("Kaira world event retrieval coordinator contracts", () => {
   });
 
   it("returns graph evidence with explicit provenance reasons", () => {
-    const first = observation({
-      id: "a",
-      createdAt: "2026-08-20T10:00:00.000Z",
-    });
-    const second = observation({
-      id: "b",
-      createdAt: "2026-08-21T10:00:00.000Z",
-      referenceId: "a",
-      direction: "after",
-    });
+    const first = observation({ id: "a", createdAt: "2026-08-20T10:00:00.000Z" });
+    const second = observation({ id: "b", createdAt: "2026-08-21T10:00:00.000Z", referenceId: "a", direction: "after" });
 
     const result = coordinateWorldEventRetrieval({
       message: "ondan önce ne oldu?",
@@ -115,50 +99,35 @@ describe("Kaira world event retrieval coordinator contracts", () => {
 
     expect(result.mode).toBe("temporal_graph");
     expect(result.items.map((item) => item.observation.id)).toEqual(["a"]);
-    expect(result.items[0].reasons).toEqual(
-      expect.arrayContaining([
-        "temporal_graph_neighbor",
-        "discourse_anchor:b",
-        "direction:before",
-      ]),
-    );
+    expect(result.items[0].reasons).toEqual(expect.arrayContaining(["temporal_graph_neighbor", "discourse_anchor:b", "direction:before"]));
   });
 
   it("prioritizes a full proposition anchor over a coarser named event anchor", () => {
-    const toUser = observation({
-      id: "to-user",
-      createdAt: "2026-08-20T10:00:00.000Z",
-    });
+    const toUser = observation({ id: "to-user", createdAt: "2026-08-20T10:00:00.000Z" });
     toUser.event.eventType = "insult";
     toUser.event.actor = { name: "Ayşe", source: "explicit_name", confidence: 0.95 };
     toUser.event.target = { id: "current_user", name: "Mert", source: "first_person", confidence: 1 };
     toUser.event.proposition = {
-      key: "ayşe|insult|current_user",
+      key: "ayşe|insult|current_user|salak",
       predicate: "insult",
       actorKey: "ayşe",
       targetKey: "current_user",
+      contentKey: "salak",
     };
 
-    const toKaira = observation({
-      id: "to-kaira",
-      createdAt: "2026-08-20T10:30:00.000Z",
-    });
+    const toKaira = observation({ id: "to-kaira", createdAt: "2026-08-20T10:30:00.000Z" });
     toKaira.event.eventType = "insult";
     toKaira.event.actor = { name: "Ayşe", source: "explicit_name", confidence: 0.95 };
     toKaira.event.target = { id: "kaira", name: "Kaira", source: "second_person", confidence: 1 };
     toKaira.event.proposition = {
-      key: "ayşe|insult|kaira",
+      key: "ayşe|insult|kaira|salak",
       predicate: "insult",
       actorKey: "ayşe",
       targetKey: "kaira",
+      contentKey: "salak",
     };
 
-    const child = observation({
-      id: "child",
-      createdAt: "2026-08-21T10:00:00.000Z",
-      referenceId: "to-user",
-      direction: "after",
-    });
+    const child = observation({ id: "child", createdAt: "2026-08-21T10:00:00.000Z", referenceId: "to-user", direction: "after" });
 
     const result = coordinateWorldEventRetrieval({
       message: "Ayşe bana salak dedikten sonra ne oldu?",
@@ -174,56 +143,25 @@ describe("Kaira world event retrieval coordinator contracts", () => {
   });
 
   it("routes the existing live ranker through graph retrieval for a single session", () => {
-    const first = observation({
-      id: "a",
-      createdAt: "2026-08-20T10:00:00.000Z",
-    });
-    const second = observation({
-      id: "b",
-      createdAt: "2026-08-21T10:00:00.000Z",
-      referenceId: "a",
-      direction: "after",
-    });
+    const first = observation({ id: "a", createdAt: "2026-08-20T10:00:00.000Z" });
+    const second = observation({ id: "b", createdAt: "2026-08-21T10:00:00.000Z", referenceId: "a", direction: "after" });
 
-    const result = rankWorldEventObservations(
-      "ondan önce ne oldu?",
-      [second, first],
-      5,
-      "2026-08-30T10:00:00.000Z",
-    );
+    const result = rankWorldEventObservations("ondan önce ne oldu?", [second, first], 5, "2026-08-30T10:00:00.000Z");
 
     expect(result.map((item) => item.observation.id)).toEqual(["a"]);
     expect(result[0].reasons).toContain("temporal_graph_neighbor");
   });
 
   it("refuses to guess a session in the live ranker when multiple sessions are loaded", () => {
-    const current = observation({
-      id: "a",
-      sessionId: "session-a",
-      createdAt: "2026-08-21T10:00:00.000Z",
-      raw: "sonra ne oldu ile alakalı kayıt",
-    });
-    const other = observation({
-      id: "b",
-      sessionId: "session-b",
-      createdAt: "2026-08-20T10:00:00.000Z",
-      raw: "sonra ne oldu ile alakalı başka kayıt",
-    });
+    const current = observation({ id: "a", sessionId: "session-a", createdAt: "2026-08-21T10:00:00.000Z", raw: "sonra ne oldu ile alakalı kayıt" });
+    const other = observation({ id: "b", sessionId: "session-b", createdAt: "2026-08-20T10:00:00.000Z", raw: "sonra ne oldu ile alakalı başka kayıt" });
 
     expect(rankWorldEventObservations("peki sonra ne oldu?", [current, other])).toEqual([]);
   });
 
   it("keeps ordinary recall on the existing ranking path", () => {
-    const item = observation({
-      id: "a",
-      createdAt: "2026-08-20T10:00:00.000Z",
-      raw: "Ayşe bana salak dedi",
-    });
-    item.event.actor = {
-      name: "Ayşe",
-      source: "explicit_name",
-      confidence: 0.95,
-    };
+    const item = observation({ id: "a", createdAt: "2026-08-20T10:00:00.000Z", raw: "Ayşe bana salak dedi" });
+    item.event.actor = { name: "Ayşe", source: "explicit_name", confidence: 0.95 };
 
     const result = coordinateWorldEventRetrieval({
       message: "Ayşe ne dedi?",
