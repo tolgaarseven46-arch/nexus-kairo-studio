@@ -10,6 +10,10 @@ const kdm = fs.readFileSync(
   path.resolve(process.cwd(), "src/services/kdmConsistencyEngine.ts"),
   "utf8",
 );
+const policy = fs.readFileSync(
+  path.resolve(process.cwd(), "src/services/behaviorPolicyInput.ts"),
+  "utf8",
+);
 
 describe("KAIRA decision-layer architecture contracts", () => {
   it("reads dynamic relationship/emotion state as guidance input", () => {
@@ -20,21 +24,22 @@ describe("KAIRA decision-layer architecture contracts", () => {
     expect(integration).toContain("const stress = clamp01((input.dynamicState?.stress ?? 0) / 100)");
   });
 
-  it("produces behavioral runtime guidance instead of a second dynamic state", () => {
-    expect(integration).toContain("runtimeContinueConversation: decision.continueConversation ? 100 : 0");
-    expect(integration).toContain("runtimeHumorAllowed: decision.humorAllowed ? 100 : 0");
-    expect(integration).toContain("runtimeAskQuestion: decision.askQuestion ? 100 : 0");
-    expect(integration).toContain("runtimeStance: stanceCode[decision.stance]");
-    expect(integration).toContain("runtimePriority: priorityCode[decision.priority]");
+  it("produces behavioral guidance instead of a second dynamic state", () => {
+    expect(integration).toContain("const decision: IntegratedBehaviorDecision = {");
+    expect(integration).toContain("continueConversation: !disengage");
+    expect(integration).toContain("humorAllowed,");
+    expect(integration).toContain("askQuestion,");
     expect(integration).not.toContain("nextDynamicState:");
   });
 
-  it("feeds those runtime decisions back into KDM behavior enforcement", () => {
-    expect(kdm).toContain('runtimeTrait(personality, "runtimeContinueConversation", 100)');
-    expect(kdm).toContain('runtimeTrait(personality, "runtimeStance", 25)');
-    expect(kdm).toContain('runtimeTrait(personality, "runtimePriority", 20)');
-    expect(kdm).toContain('runtimeTrait(personality, "runtimeRepairSignal", 0)');
-    expect(kdm).toContain("applyIntegratedRuntimeDecision");
+  it("feeds integrated decisions into KDM through the explicit behavior policy boundary", () => {
+    expect(policy).toContain('BEHAVIOR_POLICY_SCHEMA_VERSION = "behavior-policy@1"');
+    expect(kdm).toContain('import type { BehaviorPolicyInput } from "./behaviorPolicyInput"');
+    expect(kdm).toContain("behaviorPolicy?: BehaviorPolicyInput | null");
+    expect(kdm).toContain("const integratedDecision = behaviorPolicy?.decision");
+    expect(kdm).toContain("applyIntegratedBehaviorPolicy");
+    expect(kdm).not.toContain("applyIntegratedRuntimeDecision");
+    expect(kdm).not.toContain('runtimeTrait(personality, "runtimeContinueConversation"');
   });
 
   it("keeps decision priority ordered so boundaries can override softer layers", () => {
