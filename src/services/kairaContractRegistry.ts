@@ -87,6 +87,14 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     summary: "Persisted temporal provenance forms auditable same-session before/after edges; missing, cross-session, self-referential or interval-inconsistent links are rejected instead of inferred.",
   },
   {
+    id: "discourse-temporal-anchor",
+    version: 1,
+    status: "active",
+    ownerLayer: "discourse-context",
+    consumerLayers: ["temporal-event-graph", "retrieval", "response-generation"],
+    summary: "Explicit before/after discourse continuations may use only the unique latest persisted observation in the same session as an implicit anchor; ambiguity or missing provenance yields no guessed anchor.",
+  },
+  {
     id: "temporal-evidence",
     version: 1,
     status: "active",
