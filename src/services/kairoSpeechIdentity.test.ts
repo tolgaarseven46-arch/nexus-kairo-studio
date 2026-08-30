@@ -77,11 +77,12 @@ describe("Kaira written speech identity", () => {
 
     expect(newcomer.slangLevel).toBeLessThan(closest.slangLevel);
     expect(speechIdentityPrompt(newcomer)).toContain(
-      "küfür, aşağılayıcı hitap ve aşırı samimi lakap kullanma",
+      "aşırı samimi lakap ve sert küfür kullanma",
     );
     expect(speechIdentityPrompt(closest)).toContain(
-      "sert küfür yine otomatik değildir",
+      "sert küfrü otomatik üretme",
     );
+    expect(speechIdentityPrompt(newcomer)).toContain("HOW ONLY");
   });
 
   it("does not call a new user kanka in local replies", () => {
@@ -97,14 +98,16 @@ describe("Kaira written speech identity", () => {
     expect(result.reply).not.toMatch(/kanka|bebi[şs]|mal|aq|amk/i);
   });
 
-  it("keeps emoji usage deliberately low", () => {
+  it("keeps emoji style deliberately low without granting emoji permission", () => {
     const identity = computeKairoSpeechIdentity(
       { ...DEFAULT_PERSONALITY_TRAITS, humor: 100 },
       state(80, 90, 85, 85),
       trace(),
     );
+    const prompt = speechIdentityPrompt(identity);
 
     expect(identity.emojiLevel).toBeLessThanOrEqual(20);
-    expect(speechIdentityPrompt(identity)).toContain("Emoji seyrek olsun");
+    expect(prompt).toContain("seyrek kullan");
+    expect(prompt).toContain("davranış planı izin verirse");
   });
 });
