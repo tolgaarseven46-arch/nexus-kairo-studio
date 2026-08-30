@@ -18,6 +18,7 @@ describe("Kaira contract registry", () => {
       "world-model-ownership",
       "world-event-retrieval",
       "temporal-reference-resolution",
+      "relative-temporal-reference",
       "temporal-evidence",
       "contradiction-evidence",
       "relationship-state",
