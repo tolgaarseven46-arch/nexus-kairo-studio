@@ -452,3 +452,12 @@ Yeni sohbet açıldığında:
 - Geçici persistence migration workflow/script kaldırıldı; bölüm 40'ın geçici docs workflow'u da temizlendi.
 - Persisted kirli değerleri load sırasında Firestore'a otomatik geri yazan self-heal davranışı eklenmedi; read path'in gizli write üretmesi için ürün gereksinimi yok.
 - Sonraki audit adayı: `droitBehaviorEngine.ts` içindeki `effectiveEmpathy` normalize 0..1 değer olmasına rağmen `>= 75` eşiğiyle karşılaştırılıyor olabilir; bu branch'in fiilen dead olup olmadığı testlerle doğrulanacak.
+
+
+## 42. Behavior empathy summary threshold scale fix — 2026-08-31
+- `droitBehaviorEngine.computeBehaviorProfile(...)` içinde `effectiveEmpathy = empathy / 100` ile 0..1 ölçeğine normalize ediliyor, fakat `dominantSummary` üretiminde `effectiveEmpathy >= 75` kontrolü kullanılıyordu. Bu koşul hiçbir zaman true olamayacağı için `Yüksek Empati` summary etiketi dead durumdaydı.
+- Summary eşiği diğer normalized behavior eşikleriyle aynı ölçeğe getirildi: `effectiveEmpathy >= 0.75`. Tone ve empathy directive eşikleri zaten 0..1 ölçeğindeydi; onlara dokunulmadı.
+- `kairaBehaviorEmpathySummaryThresholdContracts.test.ts` sınırı davranış seviyesinde doğrular: empathy 75 → `empathyLevel = 0.75` ve `Yüksek Empati` etiketi var; empathy 74 → etiket yok.
+- Entegrasyon commit'i: `aa5628e` (`fix(kaira): align empathy summary threshold scale`). Targeted regression, TypeScript, full regression ve production build başarıyla geçti.
+- Bölüm 41'in geçici docs workflow'u ve bu düzeltmenin geçici migration workflow/scripti kaldırıldı.
+- Sonraki audit adayı: `computeBehaviorProfile(...)` direct/legacy kullanımda raw trait değerlerini kendi içinde `Number(...)` ile okuyup canonical normalizer kullanmıyor. Server boundary normalize olsa da bu fonksiyon başka call-site'lardan doğrudan çağrılabiliyor; behavior engine boundary'nin canonical personality normalization sahipliğine geçirilip geçirilmeyeceği koddan doğrulanacak.
