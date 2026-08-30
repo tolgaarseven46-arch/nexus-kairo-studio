@@ -42,6 +42,14 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     summary: "A canonical event preserves raw evidence, actor/target semantics, epistemic status and bounded certainty.",
   },
   {
+    id: "world-model-ownership",
+    version: 1,
+    status: "active",
+    ownerLayer: "world-model-store",
+    consumerLayers: ["retrieval", "future-multi-user-world-model"],
+    summary: "Memory ownership is determined by persisted user scope, never by participant names inside an event; cross-user evidence is isolated before retrieval.",
+  },
+  {
     id: "world-event-retrieval",
     version: 1,
     status: "active",
@@ -70,8 +78,16 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     version: 1,
     status: "active",
     ownerLayer: "behavior-policy",
-    consumerLayers: ["response-generation", "consistency"],
+    consumerLayers: ["response-generation", "consistency", "future-learned-policy"],
     summary: "Behavior permissions cannot reopen a stricter authoritative relationship state.",
+  },
+  {
+    id: "learned-policy-boundary",
+    version: 1,
+    status: "active",
+    ownerLayer: "behavior-policy",
+    consumerLayers: ["future-learned-policy", "response-generation", "consistency"],
+    summary: "A learned policy may only preserve or restrict the authoritative BehaviorContract; it cannot mutate relationship state or reopen forbidden behavior.",
   },
   {
     id: "retrieval-to-response",
