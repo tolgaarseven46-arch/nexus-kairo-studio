@@ -10,14 +10,14 @@ function observation(input: {
   createdAt: string;
   actor: string;
   target: "current_user" | "kaira";
-  eventType?: "insult" | "apology";
+  eventType?: "insult" | "apology" | "general";
   polarity?: "positive" | "negative";
   contentKey?: string;
   referenceId?: string;
   direction?: "before" | "after";
 }): WorldEventObservation {
   const eventType = input.eventType || "insult";
-  const contentKey = input.contentKey || (eventType === "insult" ? "salak" : "apology");
+  const contentKey = input.contentKey || (eventType === "insult" ? "salak" : eventType === "apology" ? "apology" : "unknown_general");
   return {
     id: input.id,
     userId: "user-1",
@@ -116,6 +116,36 @@ describe("Kaira proposition temporal anchor contracts", () => {
     expect(result.status).toBe("resolved");
     expect(result.anchorObservationId).toBe("aptal");
     expect(result.matchedContentKey).toBe("aptal");
+  });
+
+  it("uses bounded general content to disambiguate general event anchors", () => {
+    const resign = observation({
+      id: "resign",
+      createdAt: "2026-08-20T10:00:00.000Z",
+      actor: "Mert",
+      target: "kaira",
+      eventType: "general",
+      contentKey: "resign",
+    });
+    const meeting = observation({
+      id: "meeting",
+      createdAt: "2026-08-20T11:00:00.000Z",
+      actor: "Mert",
+      target: "kaira",
+      eventType: "general",
+      contentKey: "manager_meeting",
+    });
+
+    const result = resolvePropositionTemporalEventAnchor({
+      message: "Mert istifa ettikten sonra ne oldu?",
+      sessionId: "session-1",
+      observations: [meeting, resign],
+    });
+
+    expect(result.status).toBe("resolved");
+    expect(result.anchorObservationId).toBe("resign");
+    expect(result.matchedEventType).toBe("general");
+    expect(result.matchedContentKey).toBe("resign");
   });
 
   it("preserves ambiguity when the same full proposition occurs more than once", () => {
