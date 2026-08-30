@@ -4,9 +4,18 @@ import { appraiseRetrievedWorldState, buildWorldStateAppraisalInstruction } from
 import type { WorldEventObservation } from "./worldModelEventStore";
 import type { WorldModelPropositionState } from "./worldModelProjection";
 
-function observation(kind: "reported_claim" | "direct_interaction", status: "grounded" | "ambiguous" = "grounded"): WorldEventObservation {
+function observation(input: {
+  kind?: "reported_claim" | "direct_interaction";
+  status?: "grounded" | "ambiguous";
+  polarity?: "positive" | "negative";
+  id?: string;
+  raw?: string;
+} = {}): WorldEventObservation {
+  const kind = input.kind || "reported_claim";
+  const status = input.status || "grounded";
+  const polarity = input.polarity || "positive";
   return {
-    id: `${kind}-${status}`,
+    id: input.id || `${kind}-${status}-${polarity}`,
     userId: "u",
     kairaInstanceId: "kaira_a",
     sessionId: "s",
@@ -15,7 +24,7 @@ function observation(kind: "reported_claim" | "direct_interaction", status: "gro
     status,
     createdAt: "2026-08-30T08:00:00.000Z",
     event: {
-      raw: "Ali istifa edecek",
+      raw: input.raw || (polarity === "negative" ? "Ali istifa etmeyecek" : "Ali istifa edecek"),
       eventType: "general",
       actor: { name: "Ali", source: "explicit_name", confidence: 0.95 },
       target: { name: "Mert", source: "first_person", confidence: 1 },
@@ -23,7 +32,7 @@ function observation(kind: "reported_claim" | "direct_interaction", status: "gro
       certainty: 0.9,
       ambiguities: [],
       evidence: [],
-      polarity: "positive",
+      polarity,
       temporal: { relation: "future", asksLatest: false },
       proposition: {
         key: "ali|general|mert|istifa",
@@ -44,15 +53,15 @@ function state(input: Partial<WorldModelPropositionState> = {}): WorldModelPropo
     propositionKey: "ali|general|mert|istifa",
     assertionState: "affirmed",
     evidenceStatus: "consistent",
-    latestEvidenceId: "reported_claim-grounded",
+    latestEvidenceId: "reported_claim-grounded-positive",
     latestEvidenceAt: "2026-08-30T08:00:00.000Z",
     latestEvidencePolarity: "positive",
     latestEvidenceCertainty: 0.9,
-    evidenceObservationIds: ["reported_claim-grounded"],
+    evidenceObservationIds: ["reported_claim-grounded-positive"],
     lifecycle: {
       propositionKey: "ali|general|mert|istifa",
       state: "planned",
-      evidenceObservationIds: ["reported_claim-grounded"],
+      evidenceObservationIds: ["reported_claim-grounded-positive"],
     },
     ...input,
   };
@@ -61,11 +70,14 @@ function state(input: Partial<WorldModelPropositionState> = {}): WorldModelPropo
 function retrieved(input: {
   kind?: "reported_claim" | "direct_interaction";
   status?: "grounded" | "ambiguous";
+  polarity?: "positive" | "negative";
+  id?: string;
+  raw?: string;
   projectedState?: WorldModelPropositionState;
   reasons?: string[];
 } = {}): RetrievedWorldEvent {
   return {
-    observation: observation(input.kind || "reported_claim", input.status || "grounded"),
+    observation: observation(input),
     score: 10,
     reasons: input.reasons || ["grounded"],
     projectedState: input.projectedState,
@@ -86,7 +98,7 @@ describe("world-state appraisal contract", () => {
     expect(appraisal.readOnly).toBe(true);
   });
 
-  it("preserves canonical conflict instead of choosing a winner", () => {
+  it("preserves canonical projection conflict instead of choosing a winner", () => {
     const conflicting = state({
       assertionState: "conflicting",
       evidenceStatus: "conflicting",
@@ -98,6 +110,17 @@ describe("world-state appraisal contract", () => {
     expect(appraisal.truthPosture).toBe("conflicting");
     expect(appraisal.requiresEpistemicQualifier).toBe(true);
     expect(appraisal.mayPromoteToVerifiedTruth).toBe(false);
+  });
+
+  it("detects historical contradiction even when retrieval carries no projected state", () => {
+    const appraisal = appraiseRetrievedWorldState([
+      retrieved({ id: "yes", polarity: "positive", raw: "Ali istifa edecek" }),
+      retrieved({ id: "no", polarity: "negative", raw: "Ali istifa etmeyecek" }),
+    ]);
+
+    expect(appraisal.assertionStates).toEqual([]);
+    expect(appraisal.truthPosture).toBe("conflicting");
+    expect(appraisal.requiresEpistemicQualifier).toBe(true);
   });
 
   it("does not pretend ambiguous-only evidence is grounded memory", () => {
