@@ -4,6 +4,7 @@ import type { CanonicalWorldEvent } from "./worldEventEngine";
 
 const WORLD_MODEL_COLLECTION = "worldModel";
 const EVENT_COLLECTION = "events";
+const QUESTION_LIKE_RE = /[?？]\s*$|\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor musun|hatırladın mı|hakkında ne biliyorsun)\b|\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
 
 export type WorldEventObservationKind = "direct_interaction" | "reported_claim";
 export type WorldEventObservationStatus = "grounded" | "ambiguous";
@@ -34,12 +35,13 @@ export function classifyWorldEventObservation(
       ? "grounded"
       : "ambiguous";
 
-  // Low-confidence generic chatter has little world-model value. Preserve
-  // meaningful or participant-linked observations, including ambiguous claims,
-  // but never promote them to grounded facts here.
+  // Questions/recall prompts are evidence requests, not world facts. Never persist
+  // them as observations; otherwise later retrieval can rank the question itself
+  // above the event it was asking about.
+  const isQuestionLike = QUESTION_LIKE_RE.test(event.raw || "");
   const hasParticipant = Boolean(event.actor || event.target);
   const meaningfulType = event.eventType !== "general";
-  const persist = event.certainty >= 0.45 && (meaningfulType || hasParticipant);
+  const persist = !isQuestionLike && event.certainty >= 0.45 && (meaningfulType || hasParticipant);
 
   return { persist, kind, status };
 }
