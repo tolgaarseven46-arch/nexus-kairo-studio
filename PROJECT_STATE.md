@@ -375,3 +375,13 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `7bde253` (`refactor(kaira): keep conversation state lock out of runtime path`). State-lock contract, TypeScript, full regression ve production build başarıyla geçti.
 - Geçici migration workflow/script kaldırıldı.
 - Sonraki audit adayı: `responseStylePersonality = responsePersonality` alias'ı yalnız isimlendirme passthrough'u mu, yoksa ayrı bir ownership boundary olarak testlerde anlam taşıyor mu? Koddan doğrulanmadan sadeleştirilmeyecek.
+
+
+## 35. Response style personality passthrough alias removal — 2026-08-31
+- Canlı `server.ts` içindeki `responseStylePersonality = responsePersonality` passthrough alias'ı kaldırıldı; bu değişken hiçbir transform veya policy uygulamıyor, yalnız aynı referansı yeniden adlandırıyordu.
+- HOW katmanı tüketicileri (`computeKairoSpeechIdentity`, `tryLocalKairoReply`) artık doğrudan `responsePersonality` kullanır.
+- KDM relationship/emotion reducer girdisi değişmedi: `analyzeKdmInteraction(...)` yalnız `basePersonality` kullanır; per-turn response overlay KDM'e girmez.
+- Base personality ownership, world-state appraisal ve conversation-state-lock architecture contract markerları gerçek runtime sınırlarına göre güncellendi.
+- Entegrasyon commit'i: `d1786f1` (`refactor(kaira): remove response style personality alias`). Ownership contract, TypeScript, full regression ve production build başarıyla geçti.
+- Geçici alias-removal workflow/script kaldırıldı.
+- Sonraki audit adayı: `responsePersonality = (incomingResponsePersonality || personality)` fallback'ı bilinçli backward compatibility mi, yoksa sessiz/implicit API davranışı mı? Client/server contract ve call-site'lar koddan doğrulanmadan değiştirilmeyecek.
