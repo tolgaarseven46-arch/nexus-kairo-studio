@@ -29,6 +29,7 @@ export interface WorldEventProposition {
   predicate: WorldEventType;
   actorKey?: string;
   targetKey?: string;
+  contentKey?: string;
 }
 
 export interface WorldEventResolvedTemporalInterval {
@@ -90,6 +91,22 @@ const NUMBER_WORDS: Record<string, number> = {
 };
 const OFFSET_RE = /\b(\d+|bir|iki|üç|dört|dort|beş|bes|altı|alti|yedi)\s+(dakika|saat|gün|hafta)\s+(önce|sonra)\b/iu;
 
+const CONTENT_CUES: Partial<Record<WorldEventType, Array<[string, RegExp]>>> = {
+  insult: [
+    ["aptal", /(?:^|[^\p{L}\p{N}_])aptal(?:[^\p{L}\p{N}_]|$)/iu],
+    ["salak", /(?:^|[^\p{L}\p{N}_])salak(?:[^\p{L}\p{N}_]|$)/iu],
+    ["gerizekalı", /(?:^|[^\p{L}\p{N}_])(?:gerizekalı|geri\s+zekalı)(?:[^\p{L}\p{N}_]|$)/iu],
+    ["mal", /(?:^|[^\p{L}\p{N}_])mal(?:[^\p{L}\p{N}_]|$)/iu],
+    ["şerefsiz", /(?:^|[^\p{L}\p{N}_])şerefsiz(?:[^\p{L}\p{N}_]|$)/iu],
+    ["ezik", /(?:^|[^\p{L}\p{N}_])ezik(?:[^\p{L}\p{N}_]|$)/iu],
+    ["piç", /(?:^|[^\p{L}\p{N}_])piç(?:[^\p{L}\p{N}_]|$)/iu],
+    ["yavşak", /(?:^|[^\p{L}\p{N}_])yavşak(?:[^\p{L}\p{N}_]|$)/iu],
+  ],
+  support: [["support", /(?:yanındayım|haklısın|seni\s+anlıyorum|destekliyorum|merak\s+etme)/iu]],
+  apology: [["apology", /(?:özür|pardon|kusura\s+bakma)/iu]],
+  repair: [["repair", /(?:barış|telafi|beni\s+affet|konuşup\s+çözelim)/iu]],
+};
+
 function eventTypeFromSemantic(event: SemanticEvent, message: string): WorldEventType {
   if (event.insult || event.intent === "insult") return "insult";
   if (event.intent === "support") return "support";
@@ -108,18 +125,31 @@ const participantKey = (participant?: WorldEventParticipant): string | undefined
   return value?.toLocaleLowerCase("tr-TR").trim() || undefined;
 };
 
+export function detectWorldEventContentKey(
+  eventType: WorldEventType,
+  message: string,
+): string | undefined {
+  for (const [key, pattern] of CONTENT_CUES[eventType] || []) {
+    if (pattern.test(message)) return key;
+  }
+  return undefined;
+}
+
 export function buildWorldEventProposition(
   eventType: WorldEventType,
   actor?: WorldEventParticipant,
   target?: WorldEventParticipant,
+  contentKey?: string,
 ): WorldEventProposition {
   const actorKey = participantKey(actor);
   const targetKey = participantKey(target);
+  const normalizedContentKey = contentKey?.toLocaleLowerCase("tr-TR").trim() || undefined;
   return {
-    key: [actorKey || "?", eventType, targetKey || "?"].join("|"),
+    key: [actorKey || "?", eventType, targetKey || "?", normalizedContentKey || "?"].join("|"),
     predicate: eventType,
     ...(actorKey ? { actorKey } : {}),
     ...(targetKey ? { targetKey } : {}),
+    ...(normalizedContentKey ? { contentKey: normalizedContentKey } : {}),
   };
 }
 
@@ -279,6 +309,7 @@ export function buildCanonicalWorldEvent(
     Math.min(1, entities.confidence - unresolvedPenalty - ambiguityPenalty),
   );
   const eventType = eventTypeFromSemantic(semantic, message);
+  const contentKey = detectWorldEventContentKey(eventType, message);
 
   return {
     raw: message,
@@ -289,7 +320,7 @@ export function buildCanonicalWorldEvent(
     certainty,
     ambiguities: [...new Set(ambiguities)],
     evidence,
-    proposition: buildWorldEventProposition(eventType, actor, target),
+    proposition: buildWorldEventProposition(eventType, actor, target, contentKey),
     polarity: detectWorldEventPolarity(message),
     temporal: detectWorldEventTemporalReference(message),
   };
