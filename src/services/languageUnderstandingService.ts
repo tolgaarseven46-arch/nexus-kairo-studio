@@ -93,7 +93,13 @@ export interface LanguageUnderstandingOptions {
  * relationship appraisal, a user reporting an event about Ayşe/Merve must not
  * be treated as if the user performed that act toward Kaira. Entity/world-event
  * grounding therefore adds a conservative relationshipScope to the canonical
- * semantic event. Downstream KDM consumes this scope instead of re-parsing names.
+ * semantic event. Downstream KDM consumes this projection instead of re-parsing
+ * arbitrary person names.
+ *
+ * For explicit third-party positive acts (for example "Ayşe bana özür diledi")
+ * the world event preserves the apology, while the appraisal projection removes
+ * Kaira-user repair/reward signals. This keeps world truth and relationship
+ * impact as separate contracts.
  */
 export function groundSemanticEventForAppraisal(
   message: string,
@@ -117,9 +123,7 @@ export function groundSemanticEventForAppraisal(
 
   if (explicitThirdPartyActor || explicitThirdPartyTarget || event.target === "third_party") {
     relationshipScope = "third_party";
-  } else if (
-    actorId === "current_user" && targetId === "kaira"
-  ) {
+  } else if (actorId === "current_user" && targetId === "kaira") {
     relationshipScope = "kaira_user";
   } else if (
     event.target === "kaira" && entityResolution.namedPeople.length === 0
@@ -129,17 +133,32 @@ export function groundSemanticEventForAppraisal(
     relationshipScope = "event";
   }
 
-  return {
-    event: { ...event, relationshipScope },
-    worldEvent,
+  let appraisalEvent: AppraisalSemanticEvent = {
+    ...event,
+    target: relationshipScope === "third_party" ? "third_party" : event.target,
+    relationshipScope,
   };
+
+  if (relationshipScope === "third_party" && event.valence === "positive") {
+    appraisalEvent = {
+      ...appraisalEvent,
+      valence: "neutral",
+      apology: false,
+      repairAttempt: false,
+      support: 0,
+      compliment: 0,
+      affection: 0,
+    };
+  }
+
+  return { event: appraisalEvent, worldEvent };
 }
 
 /**
  * Single language-understanding gateway for Kaira.
  *
  * Downstream KDM/appraisal/relationship layers should consume the returned
- * canonical SemanticEvent instead of re-parsing Turkish independently.
+ * canonical appraisal event instead of re-parsing Turkish independently.
  * Entity resolution and a conservative canonical world event are produced
  * alongside that event so later layers can reason about who did what to whom
  * without inventing participants when the discourse is ambiguous.
