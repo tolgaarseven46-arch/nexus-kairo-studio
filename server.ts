@@ -905,11 +905,13 @@ app.post("/api/chat", async (req, res) => {
     reply = enforced.reply;
     const aiMs = Math.round(now() - aiStart);
     const baseConsistency = validateKairoResponse(reply, kdm.trace);
+    const finalPlanIssues = findKairaResponsePlanIssues(reply, responsePlan);
+    const finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues])];
     const consistency = {
       ...baseConsistency,
-      accepted: baseConsistency.accepted && groundingIssues.length === 0,
-      score: Math.max(0, baseConsistency.score - groundingIssues.length * 15),
-      issues: [...baseConsistency.issues, ...groundingIssues],
+      accepted: baseConsistency.accepted && finalIssues.length === 0,
+      score: Math.max(0, baseConsistency.score - finalIssues.length * 15),
+      issues: [...baseConsistency.issues, ...finalIssues],
       warnings: enforced.reasons,
     };
     const postStart = now();
@@ -951,6 +953,7 @@ app.post("/api/chat", async (req, res) => {
         worldStateAppraisal,
         worldReasoningPolicy,
         worldMemoryGuard,
+        responsePlan,
       }),
       saveTestSessionTurn({
         sessionId,
@@ -998,6 +1001,7 @@ app.post("/api/chat", async (req, res) => {
           worldStateAppraisal,
           worldReasoningPolicy,
           worldMemoryGuard,
+          responsePlan,
           timings: { memoryMs, kdmMs, aiMs },
         },
       }).then((t) => {
