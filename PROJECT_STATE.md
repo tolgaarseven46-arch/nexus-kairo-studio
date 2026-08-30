@@ -408,3 +408,13 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `128620f` (`fix(kaira): normalize server personality boundary`). Personality boundary contractları, TypeScript, full regression ve production build başarıyla geçti.
 - Geçici migration workflow/script kaldırıldı.
 - Sonraki sadeleştirme adayı: request destructuring içindeki `personality = {}` artık normalizer `undefined` kabul ettiği için redundant olabilir; davranış değiştirmeden yalnız API boundary semantiğini netleştirecek şekilde audit edilecek.
+
+
+## 38. Redundant personality request default removal — 2026-08-31
+- `/api/chat` request destructuring içindeki `personality = {}` default'u kaldırıldı; request alanı artık eksikse `undefined` olarak boundary'de korunur.
+- Runtime davranışı değişmez: canonical `normalizeDroitPersonality(personality)` eksik personality'yi neutral 50 profile dönüştürür. Neutral fallback artık yalnız tek authoritative normalization boundary'sinde oluşur.
+- Böylece transport/request katmanı ile domain normalization ayrıldı; server eksik payload bilgisini erken `{}` ile gizlemez.
+- `kairaBasePersonalityOwnershipContracts.test.ts` `personality = {},` kalıbının geri gelmesini yasaklar ve personality alanının response overlay'den ayrı destructure edildiğini doğrular.
+- Entegrasyon commit'i: `ee2143d` (`refactor(kaira): remove redundant personality request default`). Personality ownership/normalizer contractları, TypeScript, full regression ve production build başarıyla geçti.
+- Geçici migration workflow/script kaldırıldı.
+- Sonraki audit adayı: personality normalizer finite numeric trait'leri koruyor ancak canonical 0..100 slider aralığını clamp etmiyor. Bu davranışın mevcut creator/editor ve behavior engine contract'larıyla uyumu koddan doğrulanmadan değiştirilmeyecek.
