@@ -1,4 +1,5 @@
 import fs from "node:fs";
+// trigger one-time integration workflow
 
 function patchFile(path, patches) {
   let text = fs.readFileSync(path, "utf8");
