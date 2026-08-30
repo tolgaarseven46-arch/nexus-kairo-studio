@@ -7,6 +7,8 @@ const local = fs.readFileSync(path.resolve(process.cwd(), "src/services/kairoLoc
 const persistence = fs.readFileSync(path.resolve(process.cwd(), "src/services/kdmPersistenceService.ts"), "utf8");
 const chat = fs.readFileSync(path.resolve(process.cwd(), "src/services/droitChatService.ts"), "utf8");
 const nexus = fs.readFileSync(path.resolve(process.cwd(), "src/types/nexus.ts"), "utf8");
+const layout = fs.readFileSync(path.resolve(process.cwd(), "src/components/studio/NexusStudioLayout.tsx"), "utf8");
+const mindMap = fs.readFileSync(path.resolve(process.cwd(), "src/components/studio/tabs/MindMapTab.tsx"), "utf8");
 
 describe("canonical KairaResponsePlan runtime integration", () => {
   it("builds one response plan from contract, dialogue and HOW-only speech", () => {
@@ -44,5 +46,14 @@ describe("canonical KairaResponsePlan runtime integration", () => {
     expect(nexus).toContain("lastResponsePlan?: unknown");
     expect(chat).toContain("responsePlan?: unknown");
     expect(chat).toContain("responsePlan: data.kdm?.responsePlan");
+  });
+
+  it("shows the same response plan in Studio KNT and copied last-turn reports", () => {
+    expect(layout).toContain("setLastResponsePlan(response.responsePlan ?? null)");
+    expect(layout).toContain("setLastResponsePlan(restored.lastResponsePlan ?? null)");
+    expect(layout).toContain("responsePlan={lastResponsePlan}");
+    expect(mindMap).toContain("responsePlan?: unknown");
+    expect(mindMap).toContain("Response plan: move=");
+    expect(mindMap).toContain('label="CEVAP PLANI"');
   });
 });
