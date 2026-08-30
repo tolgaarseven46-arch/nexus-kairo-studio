@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+
+const server = fs.readFileSync(path.resolve(process.cwd(), "server.ts"), "utf8");
+const local = fs.readFileSync(path.resolve(process.cwd(), "src/services/kairoLocalLanguageEngine.ts"), "utf8");
+const persistence = fs.readFileSync(path.resolve(process.cwd(), "src/services/kdmPersistenceService.ts"), "utf8");
+const chat = fs.readFileSync(path.resolve(process.cwd(), "src/services/droitChatService.ts"), "utf8");
+const nexus = fs.readFileSync(path.resolve(process.cwd(), "src/types/nexus.ts"), "utf8");
+
+describe("canonical KairaResponsePlan runtime integration", () => {
+  it("builds one response plan from contract, dialogue and HOW-only speech", () => {
+    expect(server).toContain("buildKairaResponsePlan(behaviorContract, dialogueDecision, speech)");
+    expect(server).toContain("kairaResponsePlanInstruction(responsePlan)");
+  });
+
+  it("feeds the same plan to local and AI verbalizers", () => {
+    expect(local).toContain("responsePlan?: KairaResponsePlan");
+    expect(server).toMatch(/dialogueDecision\.move,\s*responsePlan,\s*\)/u);
+    expect(server).toContain("${responsePlanInstruction}\\nKDM:");
+  });
+
+  it("validates initial, repair, fallback and local outputs against the plan", () => {
+    expect(server.match(/findKairaResponsePlanIssues\(/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(server).toContain("findKairaResponsePlanIssues(repairedReply, responsePlan)");
+    expect(server).toContain("findKairaResponsePlanIssues(fallback, responsePlan)");
+    expect(server).toContain("localPlanIssues = findKairaResponsePlanIssues(reply, responsePlan)");
+  });
+
+  it("persists, hydrates and exposes the response plan per turn", () => {
+    expect(persistence).toContain("responsePlan: payload.metadata?.responsePlan");
+    expect(persistence).toContain("lastResponsePlan: lastTurn?.metadata?.responsePlan");
+    expect(nexus).toContain("responsePlan?: unknown");
+    expect(nexus).toContain("lastResponsePlan?: unknown");
+    expect(chat).toContain("responsePlan?: unknown");
+    expect(chat).toContain("responsePlan: data.kdm?.responsePlan");
+  });
+});
