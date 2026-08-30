@@ -32,6 +32,7 @@ describe("Kaira contract registry", () => {
       "temporal-evidence",
       "contradiction-evidence",
       "world-model-projection",
+      "world-state-appraisal",
       "relationship-state",
       "state-to-behavior",
       "learned-policy-boundary",
@@ -89,6 +90,14 @@ describe("Kaira contract registry", () => {
         (item) => item.id === "world-event-retrieval" && item.version === 1,
       )?.status,
     ).toBe("superseded");
+  });
+
+  it("keeps world-state appraisal read-only and outside relationship mutation", () => {
+    const appraisal = activeContractVersion("world-state-appraisal");
+    expect(appraisal?.version).toBe(1);
+    expect(appraisal?.ownerLayer).toBe("world-state-appraisal");
+    expect(appraisal?.consumerLayers).toContain("response-generation");
+    expect(appraisal?.consumerLayers).not.toContain("relationship-state");
   });
 
   it("does not allow anonymous contracts without consumers", () => {
