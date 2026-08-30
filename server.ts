@@ -448,11 +448,6 @@ function normalizeKdmSemanticAliases(message: string) {
     .replace(/\bmalsın\b/gi, "salaksın")
     .replace(/\bmal\b/gi, "salak");
 }
-function runtimeFlag(personality: DroitPersonalityTraits, key: string, fallback = true) {
-  const value = personality?.[key];
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return value >= 50;
-}
 function buildEntityGroundingInstruction(entityResolution: any) {
   if (!entityResolution) return "";
   const refs = Array.isArray(entityResolution.references)
@@ -587,9 +582,9 @@ app.post("/api/chat", async (req, res) => {
       responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech),
       responsePlanInstruction = kairaResponsePlanInstruction(responsePlan),
       enforcementRules = {
-        continueConversation: behaviorContract.continueConversation && runtimeFlag(authoritativePersonality, "runtimeContinueConversation", true),
-        humorAllowed: behaviorContract.playfulness === "allowed" && runtimeFlag(authoritativePersonality, "runtimeHumorAllowed", true),
-        askQuestion: behaviorContract.questions === "allowed" && runtimeFlag(authoritativePersonality, "runtimeAskQuestion", true),
+        continueConversation: responsePlan.continueConversation,
+        humorAllowed: responsePlan.allowHumor,
+        askQuestion: responsePlan.allowQuestion,
         behaviorContract,
         emojiLevel: speech.emojiLevel,
         conversationState: kdm.nextDynamicState.relationship?.conversationState,
