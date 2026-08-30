@@ -14,6 +14,7 @@ export type WorldEventType =
 
 export type WorldEventPolarity = "positive" | "negative" | "unknown";
 export type WorldEventTemporalRelation = "past" | "present" | "future" | "unspecified";
+export type WorldEventTemporalPrecision = "day" | "week" | "instant" | "unknown";
 
 export interface WorldEventParticipant {
   id?: string;
@@ -35,10 +36,19 @@ export interface WorldEventProposition {
   targetKey?: string;
 }
 
+export interface WorldEventResolvedTemporalInterval {
+  startAt: string;
+  endAt: string;
+  precision: WorldEventTemporalPrecision;
+  anchorAt: string;
+  source: "relative_marker" | "explicit_date" | "relation_fallback";
+}
+
 export interface WorldEventTemporalReference {
   relation: WorldEventTemporalRelation;
   marker?: string;
   asksLatest: boolean;
+  resolved?: WorldEventResolvedTemporalInterval;
 }
 
 export interface CanonicalWorldEvent {
@@ -158,10 +168,6 @@ export function buildCanonicalWorldEvent(
   const unresolvedNamed = explicitNamed.filter((ref) => !ref.resolvedId);
   const explicitCurrentUserName = explicitNamed.find((ref) => ref.resolvedId === "current_user");
 
-  // `reportedSpeech` is the historical compatibility flag used by the world
-  // model to mean "the user is reporting an external claim", not only quoted
-  // speech. A single explicit third-party actor acting on first-person target
-  // ("Ayşe bana özür diledi") is therefore a reported claim as well.
   const reportsExplicitThirdPartyAction = unresolvedNamed.length === 1 && Boolean(firstPerson);
   const reportedSpeech = REPORTING_RE.test(message) || reportsExplicitThirdPartyAction;
 
