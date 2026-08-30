@@ -1,0 +1,45 @@
+name: One-time canonical dialogue projection
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-dialogue-projection.yml"
+      - "scripts/applyCanonicalDialogueProjection.mjs"
+      - "src/services/kairaDialogueTurnProjection.ts"
+      - "src/services/kairaDialogueTurnProjection.test.ts"
+      - "src/services/kairaCurrentTurnDialogueAuthorityContracts.test.ts"
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply canonical dialogue projection
+        run: node scripts/applyCanonicalDialogueProjection.mjs
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Authority contracts
+        run: npm test -- --run src/services/kairaCurrentTurnDialogueAuthorityContracts.test.ts src/services/kairaDialogueTurnProjection.test.ts
+      - name: TypeScript check
+        run: npm run lint
+      - name: Full tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit integration
+        run: |
+          if git diff --quiet -- server.ts src/services/kairoDialogueChaosEngine.ts src/services/kairoDialogueDecisionEngine.ts; then
+            echo "canonical dialogue projection already applied"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts src/services/kairoDialogueChaosEngine.ts src/services/kairoDialogueDecisionEngine.ts
+          git commit -m "feat(kaira): unify current-turn dialogue projection"
+          git pull --rebase origin main
+          git push origin main
