@@ -2,6 +2,7 @@ import {
   interpretSemanticEvent,
   type SemanticEvent,
 } from "./semanticEventEngine";
+import { canonicalizeSemanticEvent } from "./semanticEventCanonicalizer";
 import {
   isSemanticEvent,
   type SemanticEventSource,
@@ -176,9 +177,13 @@ export async function understandTurkishMessage(
   const entityResolution = resolveMessageEntities(message, options.context);
 
   if (isSemanticEvent(options.incomingSemanticEvent)) {
-    const grounded = groundSemanticEventForAppraisal(
+    const canonicalEvent = canonicalizeSemanticEvent(
       message,
       options.incomingSemanticEvent,
+    );
+    const grounded = groundSemanticEventForAppraisal(
+      message,
+      canonicalEvent,
       entityResolution,
     );
     return {
@@ -214,9 +219,10 @@ export async function understandTurkishMessage(
       });
 
       if (isSemanticEvent(event)) {
+        const canonicalEvent = canonicalizeSemanticEvent(message, event);
         const grounded = groundSemanticEventForAppraisal(
           message,
-          event,
+          canonicalEvent,
           entityResolution,
         );
         return {
@@ -243,7 +249,10 @@ export async function understandTurkishMessage(
     }
   }
 
-  const fallbackEvent = interpretSemanticEvent(message);
+  const fallbackEvent = canonicalizeSemanticEvent(
+    message,
+    interpretSemanticEvent(message),
+  );
   const grounded = groundSemanticEventForAppraisal(
     message,
     fallbackEvent,
