@@ -4,7 +4,7 @@ import {
   DroitDynamicState,
   ReasoningTrace,
 } from "../types/nexus";
-import { computeBehaviorProfile, BehaviorLayerProfile } from "./droitBehaviorEngine";
+import type { BehaviorLayerProfile } from "./droitBehaviorEngine";
 import { validateKairoResponse, ResponseConsistencyResult } from "./kairoResponseConsistency";
 import { appraiseEventV0, type AppraisalEventKind } from "./appraisalEngine";
 import { computeTemperamentResponse, temperamentFromFineTune } from "./temperamentEngine";
@@ -222,10 +222,9 @@ export const droitChatService = {
       expression: expressionRuntime.response,
     });
     const runtimePersonality = integrationRuntime.personality;
-    const behaviorProfile = computeBehaviorProfile(runtimePersonality, userMessage);
     const clientPrepMs = Math.round(performance.now() - prepStart);
 
-    const payload = { sessionId: resolvedSessionId, userId, userName, userMessage, semanticEvent, character: characterInfo, personality: runtimePersonality, behaviorProfile, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
+    const payload = { sessionId: resolvedSessionId, userId, userName, userMessage, semanticEvent, character: characterInfo, personality: runtimePersonality, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures, dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     try {
@@ -236,6 +235,8 @@ export const droitChatService = {
       const nextDynamicState = data.kdm?.dynamicState as DroitDynamicState | undefined;
       const reasoningTrace = data.kdm?.trace as ReasoningTrace | undefined;
       const canonicalSemanticEvent = (data.kdm?.semanticEvent as SemanticEvent | undefined) ?? semanticEvent;
+      const authoritativeBehaviorProfile = data.kdm?.behaviorProfile as BehaviorLayerProfile | undefined;
+      if (!authoritativeBehaviorProfile) throw new Error("Authoritative behavior profile missing from server response");
       const semanticSource = languageUnderstanding.semanticSource;
       const consistency = (data.consistency as ResponseConsistencyResult | undefined) ?? (reasoningTrace ? validateKairoResponse(reply, reasoningTrace) : undefined);
       const totalMs = Math.round(performance.now() - totalStart);
@@ -264,7 +265,7 @@ export const droitChatService = {
         rawDynamicStateBefore: dynamicState,
         temperamentAdjustedState,
       });
-      return { reply, profile: behaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId, kairaInstanceId: data.kairaInstanceId || kairaInstance.instanceId, kairaInstanceType: data.kairaInstanceType || kairaInstance.instanceType, languageUnderstanding, worldStateAppraisal: data.kdm?.worldStateAppraisal, worldReasoningPolicy: data.kdm?.worldReasoningPolicy, worldMemoryGuard: data.kdm?.worldMemoryGuard, responsePlan: data.kdm?.responsePlan };
+      return { reply, profile: authoritativeBehaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId, kairaInstanceId: data.kairaInstanceId || kairaInstance.instanceId, kairaInstanceType: data.kairaInstanceType || kairaInstance.instanceType, languageUnderstanding, worldStateAppraisal: data.kdm?.worldStateAppraisal, worldReasoningPolicy: data.kdm?.worldReasoningPolicy, worldMemoryGuard: data.kdm?.worldMemoryGuard, responsePlan: data.kdm?.responsePlan };
     } catch (err: any) {
       if (err?.name === "AbortError") throw new Error("Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.");
       throw err;
