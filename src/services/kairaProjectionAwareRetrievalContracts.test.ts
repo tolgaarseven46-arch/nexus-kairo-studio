@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { WorldEventObservation } from "./worldModelEventStore";
-import { rankWorldEventObservations } from "./worldEventRetrieval";
+import {
+  buildWorldEventMemoryInstruction,
+  rankWorldEventObservations,
+} from "./worldEventRetrieval";
 
 function row(input: {
   id: string;
@@ -85,5 +88,20 @@ describe("projection-aware retrieval contracts", () => {
 
     expect(ids).toEqual(new Set(["yes", "no"]));
     expect(retrieved.every((item) => item.reasons.includes("canonical_conflict_evidence"))).toBe(true);
+  });
+
+  it("keeps full-history conflict state after top-N truncates one side", () => {
+    const rows = [
+      row({ id: "yes", at: "2026-08-30T10:00:00.000Z", raw: "Ali istifa edecek", polarity: "positive" }),
+      row({ id: "no", at: "2026-08-30T10:05:00.000Z", raw: "Ali istifa etmeyecek", polarity: "negative" }),
+    ];
+
+    const retrieved = rankWorldEventObservations("Ali hakkında ne biliyorsun?", rows, 1);
+    const instruction = buildWorldEventMemoryInstruction(retrieved);
+
+    expect(retrieved).toHaveLength(1);
+    expect(retrieved[0]?.projectedState?.evidenceStatus).toBe("conflicting");
+    expect(instruction).toContain("state=conflicting");
+    expect(instruction).toContain("ÇELİŞEN KANIT");
   });
 });
