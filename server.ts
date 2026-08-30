@@ -47,6 +47,7 @@ import { saveWorldEventObservation, loadRecentWorldEventObservations } from "./s
 import { buildWorldEventMemoryInstruction, rankWorldEventObservations, shouldRetrieveWorldEvents } from "./src/services/worldEventRetrieval";
 import { enforceWorldModelRecallResponse, findWorldModelResponseIssues } from "./src/services/worldModelResponseGuard";
 import { appraiseRetrievedWorldState, buildWorldStateAppraisalInstruction } from "./src/services/worldStateAppraisal";
+import { deriveWorldReasoningPolicy, buildWorldReasoningPolicyInstruction } from "./src/services/worldReasoningPolicy";
 import {
   computeKairoSpeechIdentity,
   speechIdentityPrompt,
@@ -515,6 +516,8 @@ app.post("/api/chat", async (req, res) => {
     const worldEventMemoryInstruction = buildWorldEventMemoryInstruction(retrievedWorldEvents);
     const worldStateAppraisal = appraiseRetrievedWorldState(retrievedWorldEvents);
     const worldStateAppraisalInstruction = buildWorldStateAppraisalInstruction(worldStateAppraisal);
+    const worldReasoningPolicy = deriveWorldReasoningPolicy(worldStateAppraisal);
+    const worldReasoningPolicyInstruction = buildWorldReasoningPolicyInstruction(worldReasoningPolicy);
     const languageUnderstanding = await resolveServerLanguageUnderstanding({
       message: userMessage,
       incomingSemanticEvent,
@@ -756,7 +759,7 @@ app.post("/api/chat", async (req, res) => {
     const relationshipInstruction = behaviorProfile.relationshipInstruction
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
-    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();

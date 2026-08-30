@@ -231,6 +231,14 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     summary: "Retrieved canonical world evidence is reduced to read-only epistemic/reasoning permissions. It may constrain response truth posture and qualifiers but cannot mutate relationship, emotion, personality or dynamic state.",
   },
   {
+    id: "world-reasoning-policy",
+    version: 1,
+    status: "active",
+    ownerLayer: "world-reasoning-policy",
+    consumerLayers: ["response-generation", "consistency", "world-model-response-guard"],
+    summary: "Read-only world-state appraisal is converted into bounded response permissions: answer from evidence, preserve conflict, keep reported attribution, or avoid unsupported current-state claims. This policy has no authority over relationship, emotion, personality or dynamic state.",
+  },
+  {
     id: "relationship-state",
     version: 1,
     status: "active",
