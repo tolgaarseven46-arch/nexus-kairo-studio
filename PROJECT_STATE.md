@@ -418,3 +418,14 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `ee2143d` (`refactor(kaira): remove redundant personality request default`). Personality ownership/normalizer contractları, TypeScript, full regression ve production build başarıyla geçti.
 - Geçici migration workflow/script kaldırıldı.
 - Sonraki audit adayı: personality normalizer finite numeric trait'leri koruyor ancak canonical 0..100 slider aralığını clamp etmiyor. Bu davranışın mevcut creator/editor ve behavior engine contract'larıyla uyumu koddan doğrulanmadan değiştirilmeyecek.
+
+
+## 39. Canonical personality range enforcement — 2026-08-31
+- Personality UI contract'ı koddan doğrulandı: hem `PersonalityTraitSlider` hem Studio `CharacterPersonalityPanel` sliderları `min=0`, `max=100` kullanır; behavior engine de traitleri 0..100 kabul edip 100'e bölerek runtime profile üretir.
+- Direct/legacy `/api/chat` payload'ları UI'ı bypass edebildiği için finite fakat aralık dışı traitler (`150`, `-20` vb.) daha önce KDM/HOW matematiğini sözleşme dışına taşıyabiliyordu.
+- `normalizeDroitPersonality` canonical traitleri ve behavior/persistence tarafından tanınan legacy personality alias'larını (`sensitivity`, `confidence`, `analytical`, `decisiveness`) 0..100 aralığına clamp eder.
+- Personality slider olmayan finite numeric compatibility metadata (`trust` gibi) bilinçli olarak clamp edilmez.
+- Normalizer contractları `150→100`, `-20→0`, legacy alias clamp'i, non-finite filtreleme ve unrelated numeric metadata preservation senaryolarını kapsar.
+- Entegrasyon commit'i: `3776fbf` (`fix(kaira): enforce personality trait ranges`). Personality contracts, TypeScript, full regression ve production build başarıyla geçti.
+- Geçici migration workflow/script kaldırıldı.
+- Sonraki audit adayı: `NEUTRAL_DROIT_PERSONALITY` ve `droitPersonalityService.DEFAULT_PERSONALITY_TRAITS` aynı 50-default listesini iki yerde tutuyor; drift riski yaratıp yaratmadığı ve tek lightweight source-of-truth'a bağlanıp bağlanamayacağı koddan doğrulanacak.
