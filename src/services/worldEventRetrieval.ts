@@ -23,13 +23,25 @@ export function shouldRetrieveWorldEvents(message: string): boolean {
   return /\b(?:dün|geçen|önceki|daha önce|hatırla|hatırlat)\b/iu.test(text);
 }
 
+function observationSignature(item: RetrievedWorldEvent): string {
+  const event = item.observation.event;
+  return [
+    normalize(event.raw || ""),
+    normalize(event.actor?.name || event.actor?.id || ""),
+    normalize(event.target?.name || event.target?.id || ""),
+    item.observation.kind,
+    item.observation.status,
+  ].join("|");
+}
+
 export function rankWorldEventObservations(
   message: string,
   observations: WorldEventObservation[],
   maxItems = 5,
 ): RetrievedWorldEvent[] {
+  const normalizedMessage = normalize(message);
   const queryTokens = new Set(tokens(message));
-  const asksReportedSpeech = REPORTED_SPEECH_RE.test(normalize(message));
+  const asksReportedSpeech = REPORTED_SPEECH_RE.test(normalizedMessage);
   const ranked = observations
     .filter((observation) => !STORED_QUERY_RE.test(normalize(observation.event.raw || "")))
     .map((observation) => {
@@ -79,24 +91,60 @@ export function rankWorldEventObservations(
     });
 
   const aboveThreshold = ranked.filter((item) => item.score >= 2);
-  const hasExplicitNameMatch = aboveThreshold.some((item) =>
-    item.reasons.some((reason) => reason.startsWith("name:")),
-  );
-  const relevant = hasExplicitNameMatch
+  const matchedQueryNames = new Set<string>();
+  for (const item of aboveThreshold) {
+    for (const reason of item.reasons) {
+      if (reason.startsWith("name:")) matchedQueryNames.add(reason.slice(5));
+    }
+  }
+
+  const relevant = matchedQueryNames.size
     ? aboveThreshold.filter((item) => item.reasons.some((reason) => reason.startsWith("name:")))
     : aboveThreshold;
 
-  return relevant
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return Date.parse(b.observation.createdAt) - Date.parse(a.observation.createdAt);
-    })
-    .slice(0, Math.max(1, Math.min(maxItems, 10)));
+  const sorted = relevant.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return Date.parse(b.observation.createdAt) - Date.parse(a.observation.createdAt);
+  });
+
+  // Old test sessions can leave semantically identical observations behind.
+  // Keep only the best/newest copy so duplicate rows cannot crowd out another
+  // explicitly named person in a comparison query.
+  const deduped: RetrievedWorldEvent[] = [];
+  const seen = new Set<string>();
+  for (const item of sorted) {
+    const signature = observationSignature(item);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    deduped.push(item);
+  }
+
+  const limit = Math.max(1, Math.min(maxItems, 10));
+  if (matchedQueryNames.size <= 1) return deduped.slice(0, limit);
+
+  // Contrastive recall ("Ayşe mi Merve mi ...?") must preserve evidence for
+  // every explicitly matched name instead of letting one person's duplicate
+  // high-scoring rows consume the whole result window.
+  const namesInQueryOrder = [...matchedQueryNames].sort((a, b) => {
+    const ai = normalizedMessage.indexOf(a);
+    const bi = normalizedMessage.indexOf(b);
+    return (ai < 0 ? Number.MAX_SAFE_INTEGER : ai) - (bi < 0 ? Number.MAX_SAFE_INTEGER : bi);
+  });
+  const selected: RetrievedWorldEvent[] = [];
+  for (const name of namesInQueryOrder) {
+    const match = deduped.find((item) => item.reasons.includes(`name:${name}`));
+    if (match && !selected.includes(match)) selected.push(match);
+  }
+  for (const item of deduped) {
+    if (selected.length >= limit) break;
+    if (!selected.includes(item)) selected.push(item);
+  }
+  return selected.slice(0, limit);
 }
 
 export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): string {
   if (!items.length) return "";
-  const lines = items.map(({ observation }) => {
+  const lines = items.map(({ observation }, index) => {
     const event = observation.event;
     const actor = event.actor?.name || "çözülmedi";
     const target = event.target?.name || "çözülmedi";
@@ -104,8 +152,8 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
       ? "KULLANICININ AKTARDIĞI İDDİA"
       : "DOĞRUDAN ETKİLEŞİM";
     const certainty = observation.status === "grounded" ? "grounded" : "ambiguous";
-    return `- [${epistemic}; ${certainty}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
+    return `- #${index + 1} [${epistemic}; ${certainty}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
   });
 
-  return `WORLD MODEL HAFIZASI:\n${lines.join("\n")}\nKURAL: reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; çelişkiyi açıkça koru.`;
+  return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; çelişkiyi açıkça koru.`;
 }
