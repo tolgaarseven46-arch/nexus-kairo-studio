@@ -44,6 +44,26 @@ describe("resolveMessageEntities", () => {
     );
   });
 
+  it("captures both names in a contrastive recall question", () => {
+    const result = resolveMessageEntities("Ayşe mi Merve mi bana salak demişti?", {
+      userName: "Mert",
+      characterName: "Kaira",
+    });
+
+    expect(result.namedPeople).toEqual(expect.arrayContaining(["Ayşe", "Merve"]));
+    expect(result.references).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ surface: "Ayşe", role: "named_person" }),
+        expect.objectContaining({ surface: "Merve", role: "named_person" }),
+        expect.objectContaining({
+          surface: "bana",
+          role: "first_person",
+          resolvedId: "current_user",
+        }),
+      ]),
+    );
+  });
+
   it("surfaces ambiguity when the current speaker names themselves beside first person", () => {
     const result = resolveMessageEntities("Mert bana salak dedi", {
       userName: "Mert",
