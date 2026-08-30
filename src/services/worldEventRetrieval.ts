@@ -32,11 +32,12 @@ const REPORTED_SPEECH_RE = /\b(?:ne demişti|ne dedi|demişti|dedi|söylemişti|
 const COMPARISON_RECALL_RE = /\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
 const STORED_QUERY_RE = /[?？]\s*$|\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor musun|hatırladın mı|hakkında ne biliyorsun)\b|\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
 const LATEST_RECALL_RE = /\ben\s+son\b/iu;
+const CURRENT_STATE_RE = /\b(?:şu\s+an|şimdiki|şimdi\s+durum|durum\s+ne|hâlâ|hala|hakkında\s+ne\s+biliyorsun)\b/iu;
 
 export function shouldRetrieveWorldEvents(message: string): boolean {
   if (detectTemporalDiscourseDirection(message)) return true;
   const text = normalize(message);
-  if (RECALL_RE.test(text) || COMPARISON_RECALL_RE.test(text)) return true;
+  if (RECALL_RE.test(text) || COMPARISON_RECALL_RE.test(text) || CURRENT_STATE_RE.test(text)) return true;
   return /\b(?:dün|bugün|yarın|geçen|önceki|daha önce|hatırla|hatırlat|\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4})\b/iu.test(text);
 }
 
@@ -132,7 +133,16 @@ export function rankWorldEventObservations(
   const queryTokens = new Set(tokens(message));
   const asksReportedSpeech = REPORTED_SPEECH_RE.test(normalizedMessage);
   const asksLatest = LATEST_RECALL_RE.test(normalizedMessage);
+  const asksCurrentState = CURRENT_STATE_RE.test(normalizedMessage);
   const temporalCandidates = temporalQueryCandidates(message, observations, queryAnchorAt);
+  const projection = asksCurrentState ? projectWorldModel(temporalCandidates.observations) : [];
+  const projectionByKey = new Map(
+    projection.map((state) => [
+      `${state.kairaInstanceId}::${state.propositionKey}`,
+      state,
+    ]),
+  );
+
   const ranked = temporalCandidates.observations
     .filter((observation) => !STORED_QUERY_RE.test(normalize(observation.event.raw || "")))
     .map((observation) => {
@@ -182,6 +192,33 @@ export function rankWorldEventObservations(
         reasons.push("ambiguous");
       }
       score += Math.max(0, Math.min(1, event.certainty ?? 0));
+
+      if (asksCurrentState) {
+        const propositionKey = observationPropositionKey(observation);
+        const state = projectionByKey.get(
+          `${observationKairaInstanceId(observation)}::${propositionKey}`,
+        );
+        if (state?.evidenceStatus === "conflicting") {
+          // Current-state queries must keep both sides of a real contradiction
+          // visible instead of picking the newest row as synthetic truth.
+          score += 4;
+          reasons.push("canonical_conflict_evidence");
+        } else if (observation.id && state?.latestEvidenceId === observation.id) {
+          // For current-state recall the canonical read-model outranks lexical
+          // overlap from stale observations, while historical recall remains
+          // evidence-first and unchanged.
+          score += 5;
+          reasons.push(`canonical_current_state:${state.assertionState}`);
+        }
+        if (
+          state?.lifecycle.state !== "unknown" &&
+          observation.id &&
+          state?.lifecycle.evidenceObservationIds.includes(observation.id)
+        ) {
+          score += 2;
+          reasons.push(`canonical_lifecycle:${state.lifecycle.state}`);
+        }
+      }
 
       return { observation, score, reasons };
     });
