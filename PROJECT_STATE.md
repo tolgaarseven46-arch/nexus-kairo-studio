@@ -258,3 +258,14 @@ Yeni sohbet açıldığında:
 - `kairaBehaviorProfileAuthorityContracts.test.ts` kalıcı `test:contracts` architecture suite'ine eklendi.
 - Geçici behavior-profile migration workflow/script başarıyla uygulandıktan sonra kaldırıldı.
 - Entegrasyon commit'i: `17f3600` (`feat(kaira): make KDM behavior profile authoritative`). Migration doğrulamasında contract, TypeScript, full test suite ve production build başarıyla geçti.
+
+
+## 24. KairaResponsePlan final WHAT/WHETHER otoritesi — 2026-08-30
+- Canlı server response enforcement için `continueConversation`, `humorAllowed` ve `askQuestion` izinleri artık doğrudan canonical `responsePlan`dan gelir.
+- Client davranış entegrasyonunun personality içine yazdığı legacy `runtimeContinueConversation`, `runtimeHumorAllowed` ve `runtimeAskQuestion` değerleri server canlı yolunda canonical planı ikinci kez veto edemez.
+- Böylece `KairaResponsePlan`ın “TEK DAVRANIŞ OTORİTESİ” sözleşmesi ile final enforcement kodu aynı sınırda birleşti.
+- `kairoLocalLanguageEngine.ts` responsePlan verildiğinde planı öncelikli kullanır; legacy runtime flag fallback'i yalnız plan verilmeden yapılan doğrudan/geriye uyumlu çağrılar için kalabilir. Canlı server local yolunda responsePlan her zaman taşınır.
+- Client-side `behaviorIntegrationEngine` runtime alanlarını şimdilik personality/debug uyumluluğu için üretmeye devam edebilir; ancak final server WHAT/WHETHER otoritesi değildir. Bu alanların kalan tüketicileri ayrı audit konusudur.
+- `kairaResponsePlanFinalAuthorityContracts.test.ts` kalıcı `test:contracts` architecture suite'ine eklendi.
+- Geçici response-plan final-authority migration workflow/script başarıyla uygulandıktan sonra kaldırıldı.
+- Entegrasyon commit'i: `f0c956f` (`feat(kaira): make response plan final behavior authority`). Entegrasyon workflow'unda authority contract, TypeScript, full test suite ve production build başarıyla geçti.
