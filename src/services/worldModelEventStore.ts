@@ -1,6 +1,7 @@
 import { addDoc, collection, doc, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import type { CanonicalWorldEvent } from "./worldEventEngine";
+import { resolveTemporalReference } from "./temporalReferenceResolver";
 
 const WORLD_MODEL_COLLECTION = "worldModel";
 const EVENT_COLLECTION = "events";
@@ -35,15 +36,27 @@ export function classifyWorldEventObservation(
       ? "grounded"
       : "ambiguous";
 
-  // Questions/recall prompts are evidence requests, not world facts. Never persist
-  // them as observations; otherwise later retrieval can rank the question itself
-  // above the event it was asking about.
   const isQuestionLike = QUESTION_LIKE_RE.test(event.raw || "");
   const hasParticipant = Boolean(event.actor || event.target);
   const meaningfulType = event.eventType !== "general";
   const persist = !isQuestionLike && event.certainty >= 0.45 && (meaningfulType || hasParticipant);
 
   return { persist, kind, status };
+}
+
+export function enrichWorldEventTemporalAtPersistence(
+  event: CanonicalWorldEvent,
+  createdAt: string,
+): CanonicalWorldEvent {
+  const resolved = resolveTemporalReference(event.raw, event.temporal, createdAt);
+  if (!event.temporal || !resolved) return event;
+  return {
+    ...event,
+    temporal: {
+      ...event.temporal,
+      resolved,
+    },
+  };
 }
 
 export async function saveWorldEventObservation(input: {
@@ -55,6 +68,8 @@ export async function saveWorldEventObservation(input: {
   const classification = classifyWorldEventObservation(input.event);
   if (!classification.persist) return;
 
+  const createdAt = new Date().toISOString();
+  const event = enrichWorldEventTemporalAtPersistence(input.event, createdAt);
   const userId = scope(input.userId);
   const parent = doc(db, WORLD_MODEL_COLLECTION, userId);
   await addDoc(collection(parent, EVENT_COLLECTION), {
@@ -63,8 +78,8 @@ export async function saveWorldEventObservation(input: {
     speakerName: input.speakerName || null,
     kind: classification.kind,
     status: classification.status,
-    event: input.event,
-    createdAt: new Date().toISOString(),
+    event,
+    createdAt,
   });
 }
 
