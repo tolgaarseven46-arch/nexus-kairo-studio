@@ -1,6 +1,6 @@
 import { addDoc, collection, doc, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import type { CanonicalWorldEvent } from "./worldEventEngine";
+import type { CanonicalWorldEvent, WorldEventResolvedTemporalInterval } from "./worldEventEngine";
 import { resolveTemporalReference } from "./temporalReferenceResolver";
 
 const WORLD_MODEL_COLLECTION = "worldModel";
@@ -47,8 +47,9 @@ export function classifyWorldEventObservation(
 export function enrichWorldEventTemporalAtPersistence(
   event: CanonicalWorldEvent,
   createdAt: string,
+  referenceInterval?: WorldEventResolvedTemporalInterval,
 ): CanonicalWorldEvent {
-  const resolved = resolveTemporalReference(event.raw, event.temporal, createdAt);
+  const resolved = resolveTemporalReference(event.raw, event.temporal, createdAt, referenceInterval);
   if (!event.temporal || !resolved) return event;
   return {
     ...event,
@@ -57,6 +58,22 @@ export function enrichWorldEventTemporalAtPersistence(
       resolved,
     },
   };
+}
+
+async function loadPreviousResolvedInterval(
+  parent: ReturnType<typeof doc>,
+  sessionId: string,
+): Promise<WorldEventResolvedTemporalInterval | undefined> {
+  const snapshot = await getDocs(
+    query(collection(parent, EVENT_COLLECTION), orderBy("createdAt", "desc"), limit(12)),
+  );
+  for (const item of snapshot.docs) {
+    const row = item.data() as Omit<WorldEventObservation, "id">;
+    if (row.sessionId !== sessionId) continue;
+    const resolved = row.event?.temporal?.resolved;
+    if (resolved) return resolved;
+  }
+  return undefined;
 }
 
 export async function saveWorldEventObservation(input: {
@@ -69,9 +86,14 @@ export async function saveWorldEventObservation(input: {
   if (!classification.persist) return;
 
   const createdAt = new Date().toISOString();
-  const event = enrichWorldEventTemporalAtPersistence(input.event, createdAt);
   const userId = scope(input.userId);
   const parent = doc(db, WORLD_MODEL_COLLECTION, userId);
+  const needsPreviousEvent = input.event.temporal?.dependency?.anchor === "previous_event";
+  const referenceInterval = needsPreviousEvent
+    ? await loadPreviousResolvedInterval(parent, input.sessionId).catch(() => undefined)
+    : undefined;
+  const event = enrichWorldEventTemporalAtPersistence(input.event, createdAt, referenceInterval);
+
   await addDoc(collection(parent, EVENT_COLLECTION), {
     userId,
     sessionId: input.sessionId,
