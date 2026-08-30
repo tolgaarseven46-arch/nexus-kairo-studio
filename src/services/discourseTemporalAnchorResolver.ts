@@ -1,5 +1,8 @@
 import type { WorldEventObservation } from "./worldModelEventStore";
-import type { TemporalNeighborDirection } from "./worldEventTemporalGraph";
+import {
+  retrieveTemporalNeighbors,
+  type TemporalNeighborDirection,
+} from "./worldEventTemporalGraph";
 
 export type DiscourseAnchorStatus = "resolved" | "unresolved" | "ambiguous";
 
@@ -13,6 +16,11 @@ export interface DiscourseTemporalAnchorResolution {
     | "latest_observation_missing_id"
     | "latest_observation_time_ambiguous"
     | "resolved_latest_same_session_observation";
+}
+
+export interface DiscourseTemporalRetrievalResult {
+  resolution: DiscourseTemporalAnchorResolution;
+  observations: WorldEventObservation[];
 }
 
 const normalize = (value: string) =>
@@ -83,5 +91,29 @@ export function resolveDiscourseTemporalAnchor(input: {
     direction,
     anchorObservationId,
     reason: "resolved_latest_same_session_observation",
+  };
+}
+
+export function retrieveTemporalDiscourseNeighbors(input: {
+  message: string;
+  sessionId: string;
+  observations: WorldEventObservation[];
+}): DiscourseTemporalRetrievalResult {
+  const resolution = resolveDiscourseTemporalAnchor(input);
+  if (
+    resolution.status !== "resolved" ||
+    !resolution.anchorObservationId ||
+    !resolution.direction
+  ) {
+    return { resolution, observations: [] };
+  }
+
+  return {
+    resolution,
+    observations: retrieveTemporalNeighbors(
+      input.observations,
+      resolution.anchorObservationId,
+      resolution.direction,
+    ),
   };
 }
