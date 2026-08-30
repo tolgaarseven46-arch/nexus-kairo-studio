@@ -135,10 +135,20 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
   {
     id: "world-event-retrieval",
     version: 1,
-    status: "active",
+    status: "superseded",
     ownerLayer: "retrieval",
     consumerLayers: ["response-generation", "temporal-evidence", "contradiction-resolution"],
     summary: "Recall returns a bounded evidence set, not a generated answer; explicit compared people retain coverage.",
+    revisionReason: "V2 lets current-state recall use canonical world-model projection while historical recall remains source-evidence-first.",
+  },
+  {
+    id: "world-event-retrieval",
+    version: 2,
+    status: "active",
+    ownerLayer: "retrieval",
+    consumerLayers: ["world-model-projection", "response-generation", "temporal-evidence", "contradiction-resolution"],
+    summary: "Historical recall preserves bounded source evidence, while explicit current-state queries rank canonical current proposition/lifecycle evidence ahead of stale lexical matches; real contradiction keeps both sides visible instead of synthesizing truth.",
+    supersedes: "world-event-retrieval@1",
   },
   {
     id: "temporal-reference-resolution",
