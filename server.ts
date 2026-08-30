@@ -565,7 +565,7 @@ app.post("/api/chat", async (req, res) => {
         ? requestState
         : normalizeDynamicState(persistedState ?? dynamicState),
       basePersonality = personality as DroitPersonalityTraits,
-      responsePersonality = (incomingResponsePersonality || personality) as DroitPersonalityTraits,
+      responsePersonality = (incomingResponsePersonality ?? personality) as DroitPersonalityTraits,
       behaviorPolicy = normalizeBehaviorPolicyInput(incomingBehaviorPolicy),
       kdmStart = now(),
       kdm = analyzeKdmInteraction(
