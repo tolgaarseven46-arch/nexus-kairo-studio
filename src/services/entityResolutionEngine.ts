@@ -74,6 +74,9 @@ const normalize = (value: string) =>
 const sameName = (a?: string, b?: string) =>
   Boolean(a && b && normalize(a) === normalize(b));
 
+const looksLikeProperNameToken = (token?: string) =>
+  Boolean(token && /^[A-ZÇĞİÖŞÜ][a-zçğıöşü]+$/u.test(token));
+
 /**
  * Lightweight discourse/entity resolver.
  *
@@ -146,19 +149,25 @@ export function resolveMessageEntities(
       continue;
     }
 
-    const looksLikeProperName = /^[A-ZÇĞİÖŞÜ][a-zçğıöşü]+$/u.test(token);
+    const looksLikeProperName = looksLikeProperNameToken(token);
     const sentenceInitialPersonContext =
       tokenIndex === 0 &&
       tokens
         .slice(1, 4)
         .some((nextToken) => PERSON_CONTEXT_WORDS.has(normalize(nextToken)));
+    const sentenceInitialContrastiveName =
+      tokenIndex === 0 &&
+      normalize(tokens[1] || "") === "mi" &&
+      looksLikeProperNameToken(tokens[2]) &&
+      normalize(tokens[3] || "") === "mi";
 
     // Sentence-initial capitalization alone is weak evidence ("Mal aldım").
-    // Keep an unknown initial token as a person only when the nearby discourse
-    // structure supports a person reading ("Ayşe bana ...", "Ayşe dedi ...").
+    // Keep an unknown initial token as a person when nearby discourse supports
+    // a person reading, including contrastive questions such as
+    // "Ayşe mi Merve mi ...?".
     if (
       looksLikeProperName &&
-      (tokenIndex > 0 || sentenceInitialPersonContext)
+      (tokenIndex > 0 || sentenceInitialPersonContext || sentenceInitialContrastiveName)
     ) {
       namedPeople.add(token);
       references.push({
