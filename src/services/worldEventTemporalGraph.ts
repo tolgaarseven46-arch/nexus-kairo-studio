@@ -32,6 +32,16 @@ const validTime = (value?: string) => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+function observationsById(
+  observations: WorldEventObservation[],
+): Map<string, WorldEventObservation> {
+  const byId = new Map<string, WorldEventObservation>();
+  for (const item of observations) {
+    if (item.id) byId.set(item.id, item);
+  }
+  return byId;
+}
+
 /**
  * Builds a graph only from persisted provenance. It never infers what "ondan"
  * refers to and therefore cannot invent an event link that was not resolved at
@@ -40,11 +50,7 @@ const validTime = (value?: string) => {
 export function buildTemporalEventGraph(
   observations: WorldEventObservation[],
 ): TemporalEventGraph {
-  const byId = new Map(
-    observations
-      .filter((item): item is WorldEventObservation & { id: string } => Boolean(item.id))
-      .map((item) => [item.id, item]),
-  );
+  const byId = observationsById(observations);
   const edges: TemporalGraphEdge[] = [];
   const issues: TemporalGraphIssue[] = [];
 
@@ -172,13 +178,11 @@ export function retrieveTemporalNeighbors(
     : observationsBefore(graph, anchorObservationId);
   if (!neighborIds.length) return [];
 
-  const byId = new Map(
-    observations
-      .filter((item): item is WorldEventObservation & { id: string } => Boolean(item.id))
-      .map((item) => [item.id, item]),
-  );
-
-  return neighborIds
-    .map((id) => byId.get(id))
-    .filter((item): item is WorldEventObservation => Boolean(item));
+  const byId = observationsById(observations);
+  const result: WorldEventObservation[] = [];
+  for (const id of neighborIds) {
+    const item = byId.get(id);
+    if (item) result.push(item);
+  }
+  return result;
 }
