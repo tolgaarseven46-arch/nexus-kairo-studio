@@ -46,6 +46,7 @@ export const KAIRA_ARCHITECTURE_CONTRACTS_V1 = {
     "Participant objeleri undefined değer serialize etmez.",
     "Yeni canonical event V2 proposition/polarity/temporal alanlarını taşır.",
     "Proposition predicate eventType ile aynı semantic kimliği temsil eder.",
+    "Resolved temporal interval varsa geçerli ISO zamanları ve start<=end şartını taşır.",
     "Recall/query mesajları kalıcı dünya olayı olarak değerlendirilmemelidir.",
   ],
   retrieval: [
@@ -200,6 +201,22 @@ export function validateWorldEventContract(
       invariant: "world_event.v2_temporal_reference",
       message: "Canonical World Event V2 temporal reference eksik/geçersiz.",
     });
+  }
+
+  const resolved = event.temporal?.resolved;
+  if (resolved) {
+    const start = Date.parse(resolved.startAt);
+    const end = Date.parse(resolved.endAt);
+    const anchor = Date.parse(resolved.anchorAt);
+    const precisionOk = ["day", "week", "instant", "unknown"].includes(resolved.precision);
+    const sourceOk = ["relative_marker", "explicit_date", "relation_fallback"].includes(resolved.source);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || !Number.isFinite(anchor) || start > end || !precisionOk || !sourceOk) {
+      issues.push({
+        layer: "world_event",
+        invariant: "world_event.v2_resolved_temporal_interval",
+        message: "Resolved temporal interval geçersiz, ters sıralı veya canonical enum dışında.",
+      });
+    }
   }
 
   return { accepted: issues.length === 0, issues };
