@@ -174,6 +174,7 @@ describe("world event retrieval", () => {
     expect(text).toContain("YETERLİ KANITTIR");
     expect(text).toContain("kaydım yok");
     expect(text).toContain("doğrulanmış dünya gerçeği gibi anlatma");
-    expect(text).toContain("çelişen kayıtlar");
+    expect(text).toContain("çelişen veya zaman içinde değişen kayıtlar");
+    expect(text).toContain("kayıtları ayrı kanıtlar olarak koru");
   });
 });
