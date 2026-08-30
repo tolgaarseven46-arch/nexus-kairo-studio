@@ -29,23 +29,33 @@ function observation(message: string, createdAt: string): WorldEventObservation 
   };
 }
 
-describe("Kaira canonical v2 contradiction contracts", () => {
-  it("emits bounded proposition, polarity and temporal semantics", () => {
+describe("Kaira canonical v3 contradiction contracts", () => {
+  it("emits bounded proposition content, polarity and temporal semantics", () => {
     const event = canonical("Ayşe dün bana salak dedi");
     expect(event.proposition?.predicate).toBe("insult");
     expect(event.proposition?.actorKey).toBe("ayşe");
     expect(event.proposition?.targetKey).toBe("current_user");
+    expect(event.proposition?.contentKey).toBe("salak");
     expect(event.polarity).toBe("positive");
     expect(event.temporal?.relation).toBe("past");
     expect(event.temporal?.marker).toBe("dün");
   });
 
-  it("gives positive and negative forms the same proposition identity", () => {
+  it("gives positive and negative forms of the same content one proposition identity", () => {
     const positive = canonical("Ayşe bana salak dedi");
     const negative = canonical("Ayşe bana salak demedi");
     expect(positive.proposition?.key).toBe(negative.proposition?.key);
     expect(positive.polarity).toBe("positive");
     expect(negative.polarity).toBe("negative");
+  });
+
+  it("keeps different semantic content in separate proposition sets", () => {
+    const salak = observation("Ayşe bana salak dedi", "2026-08-29T20:00:00.000Z");
+    const aptal = observation("Ayşe bana aptal demedi", "2026-08-29T21:00:00.000Z");
+    expect(salak.event.proposition?.key).not.toBe(aptal.event.proposition?.key);
+    const sets = resolveContradictionEvidence([salak, aptal]);
+    expect(sets).toHaveLength(2);
+    expect(sets.every((set) => set.status === "consistent")).toBe(true);
   });
 
   it("marks opposite polarities as conflicting without deleting either source", () => {
