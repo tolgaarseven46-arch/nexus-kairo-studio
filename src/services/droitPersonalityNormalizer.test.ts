@@ -20,9 +20,26 @@ describe("droit personality normalization", () => {
     expect(normalized.authority).toBe(50);
   });
 
-  it("preserves additional finite numeric traits used by compatibility layers", () => {
-    const normalized = normalizeDroitPersonality({ analytical: 77, trust: 64 });
+  it("clamps canonical and recognized legacy personality traits to the 0..100 slider contract", () => {
+    const normalized = normalizeDroitPersonality({
+      humor: 150,
+      empathy: -20,
+      confidence: 130,
+      analytical: -5,
+      decisiveness: 101,
+      sensitivity: -1,
+    });
+    expect(normalized.humor).toBe(100);
+    expect(normalized.empathy).toBe(0);
+    expect(normalized.confidence).toBe(100);
+    expect(normalized.analytical).toBe(0);
+    expect(normalized.decisiveness).toBe(100);
+    expect(normalized.sensitivity).toBe(0);
+  });
+
+  it("preserves finite numeric compatibility metadata that is not a personality slider", () => {
+    const normalized = normalizeDroitPersonality({ analytical: 77, trust: 140 });
     expect(normalized.analytical).toBe(77);
-    expect(normalized.trust).toBe(64);
+    expect(normalized.trust).toBe(140);
   });
 });

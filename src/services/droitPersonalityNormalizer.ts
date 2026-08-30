@@ -28,9 +28,19 @@ export function normalizeDroitPersonality(
   const normalized: DroitPersonalityTraits = { ...NEUTRAL_DROIT_PERSONALITY };
   if (!value || typeof value !== "object") return normalized;
 
+  const boundedTraitKeys = new Set([
+    ...Object.keys(NEUTRAL_DROIT_PERSONALITY),
+    "sensitivity",
+    "confidence",
+    "analytical",
+    "decisiveness",
+  ]);
+
   for (const [key, raw] of Object.entries(value)) {
     if (typeof raw === "number" && Number.isFinite(raw)) {
-      normalized[key] = raw;
+      normalized[key] = boundedTraitKeys.has(key)
+        ? Math.max(0, Math.min(100, raw))
+        : raw;
     }
   }
   return normalized;
