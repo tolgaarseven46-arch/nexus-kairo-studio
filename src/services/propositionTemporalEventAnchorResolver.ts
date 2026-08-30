@@ -65,13 +65,35 @@ function detectTemporalAnchorPolarity(message: string): WorldEventPolarity {
   return detectWorldEventPolarity(message);
 }
 
+function detectTemporalAnchorEventTypeAndContent(message: string): {
+  eventType?: WorldEventType;
+  contentKey?: string;
+} {
+  const explicitEventType = detectMentionedWorldEventType(message);
+  if (explicitEventType) {
+    return {
+      eventType: explicitEventType,
+      contentKey: detectWorldEventContentKey(explicitEventType, message),
+    };
+  }
+
+  const generalContentKey = detectWorldEventContentKey("general", message);
+  if (generalContentKey) {
+    return { eventType: "general", contentKey: generalContentKey };
+  }
+
+  return {};
+}
+
 export function resolvePropositionTemporalEventAnchor(input: {
   message: string;
   sessionId: string;
   observations: WorldEventObservation[];
 }): PropositionTemporalAnchorResolution {
   const direction = detectExplicitTemporalRelationDirection(input.message);
-  const matchedEventType = detectMentionedWorldEventType(input.message);
+  const detected = detectTemporalAnchorEventTypeAndContent(input.message);
+  const matchedEventType = detected.eventType;
+  const matchedContentKey = detected.contentKey;
   if (!direction || !matchedEventType) {
     return { status: "unresolved", reason: "no_proposition_anchor" };
   }
@@ -85,6 +107,7 @@ export function resolvePropositionTemporalEventAnchor(input: {
       status: "unresolved",
       direction,
       matchedEventType,
+      ...(matchedContentKey ? { matchedContentKey } : {}),
       reason: "no_same_session_candidate",
     };
   }
@@ -98,6 +121,7 @@ export function resolvePropositionTemporalEventAnchor(input: {
       status: matchedActorNames.length > 1 ? "ambiguous" : "unresolved",
       direction,
       matchedEventType,
+      ...(matchedContentKey ? { matchedContentKey } : {}),
       ...(matchedActorNames.length ? { matchedActorNames } : {}),
       reason: matchedActorNames.length > 1 ? "proposition_not_unique" : "no_proposition_anchor",
     };
@@ -105,7 +129,6 @@ export function resolvePropositionTemporalEventAnchor(input: {
 
   const firstPersonTarget = FIRST_PERSON_TARGET_RE.test(query);
   const matchedPolarity = detectTemporalAnchorPolarity(input.message);
-  const matchedContentKey = detectWorldEventContentKey(matchedEventType, input.message);
   let candidates = sameSession.filter(
     (item) =>
       actorName(item) === matchedActorNames[0] &&
