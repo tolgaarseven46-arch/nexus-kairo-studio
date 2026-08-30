@@ -113,6 +113,8 @@ export interface SaveTestSessionTurnPayload {
     entityResolution?: unknown;
     worldEvent?: unknown;
     retrievedWorldEvents?: unknown;
+    worldStateAppraisal?: unknown;
+    worldReasoningPolicy?: unknown;
   };
 }
 
