@@ -52,4 +52,33 @@ describe("Canonical World Event V3 contracts", () => {
     expect(event.proposition?.contentKey).toBeUndefined();
     expect(event.proposition?.key.endsWith("|?")).toBe(true);
   });
+
+  it("canonicalizes bounded general action and state concepts", () => {
+    expect(detectWorldEventContentKey("general", "yarın istifa edeceğim")).toBe("resign");
+    expect(detectWorldEventContentKey("general", "işten ayrılacağım")).toBe("leave_job");
+    expect(detectWorldEventContentKey("general", "müdürle görüşeceğim")).toBe("manager_meeting");
+    expect(detectWorldEventContentKey("general", "maaşıma zam gelecek")).toBe("salary_raise");
+    expect(detectWorldEventContentKey("general", "ben öğrenciyim")).toBe("student_status");
+    expect(detectWorldEventContentKey("general", "yarın işe gideceğim")).toBe("go_to_work");
+  });
+
+  it("keeps future negation outside proposition identity for bounded actions", () => {
+    const positive = canonical("yarın istifa edeceğim");
+    const negative = canonical("yarın istifa etmeyeceğim");
+
+    expect(positive.proposition?.contentKey).toBe("resign");
+    expect(negative.proposition?.contentKey).toBe("resign");
+    expect(positive.proposition?.key).toBe(negative.proposition?.key);
+    expect(positive.polarity).toBe("positive");
+    expect(negative.polarity).toBe("negative");
+  });
+
+  it("does not collapse distinct general actions into the same proposition", () => {
+    const resign = canonical("yarın istifa edeceğim");
+    const meeting = canonical("yarın müdürle görüşeceğim");
+
+    expect(resign.eventType).toBe("general");
+    expect(meeting.eventType).toBe("general");
+    expect(resign.proposition?.key).not.toBe(meeting.proposition?.key);
+  });
 });
