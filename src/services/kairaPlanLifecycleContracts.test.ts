@@ -65,6 +65,7 @@ describe("Kaira plan lifecycle contracts", () => {
     const result = resolvePlanLifecycle([plan, done], "mert|general|?|resign");
     expect(result.state).toBe("executed");
     expect(result.planObservationId).toBe("plan");
+    expect(result.generationObservationId).toBe("plan");
     expect(result.evidenceObservationIds).toEqual(expect.arrayContaining(["plan", "done"]));
   });
 
@@ -76,12 +77,37 @@ describe("Kaira plan lifecycle contracts", () => {
     }
   });
 
-  it("uses the newest lifecycle signal instead of an older outcome", () => {
+  it("uses the newest lifecycle signal inside the current generation", () => {
     const plan = observation({ id: "plan", createdAt: "2026-08-20T10:00:00.000Z", modality: "commitment" });
     const postponed = observation({ id: "postponed", createdAt: "2026-08-21T10:00:00.000Z", lifecycle: "postponed" });
     const executed = observation({ id: "executed", createdAt: "2026-08-22T10:00:00.000Z", lifecycle: "executed" });
 
     expect(resolvePlanLifecycle([plan, postponed, executed], "mert|general|?|resign").state).toBe("executed");
+  });
+
+  it("starts a fresh generation when a newer plan follows cancellation", () => {
+    const firstPlan = observation({ id: "plan-1", createdAt: "2026-08-20T10:00:00.000Z", modality: "commitment" });
+    const cancelled = observation({ id: "cancelled-1", createdAt: "2026-08-21T10:00:00.000Z", lifecycle: "cancelled" });
+    const secondPlan = observation({ id: "plan-2", createdAt: "2026-08-22T10:00:00.000Z", modality: "plan" });
+
+    const result = resolvePlanLifecycle([firstPlan, cancelled, secondPlan], "mert|general|?|resign");
+    expect(result.state).toBe("planned");
+    expect(result.planObservationId).toBe("plan-2");
+    expect(result.generationObservationId).toBe("plan-2");
+    expect(result.evidenceObservationIds).toEqual(["plan-2"]);
+  });
+
+  it("allows a new generation to close independently of older outcomes", () => {
+    const firstPlan = observation({ id: "plan-1", createdAt: "2026-08-20T10:00:00.000Z", modality: "commitment" });
+    const postponed = observation({ id: "postponed-1", createdAt: "2026-08-21T10:00:00.000Z", lifecycle: "postponed" });
+    const secondPlan = observation({ id: "plan-2", createdAt: "2026-08-22T10:00:00.000Z", modality: "commitment" });
+    const executed = observation({ id: "executed-2", createdAt: "2026-08-23T10:00:00.000Z", lifecycle: "executed" });
+
+    const result = resolvePlanLifecycle([firstPlan, postponed, secondPlan, executed], "mert|general|?|resign");
+    expect(result.state).toBe("executed");
+    expect(result.planObservationId).toBe("plan-2");
+    expect(result.evidenceObservationIds).toEqual(["executed-2", "plan-2"]);
+    expect(result.evidenceObservationIds).not.toContain("postponed-1");
   });
 
   it("does not treat refusal or negative evidence as an active plan", () => {
@@ -104,18 +130,35 @@ describe("Kaira plan lifecycle contracts", () => {
     expect(recall.resolution?.state).toBe("executed");
   });
 
-  it("routes outcome recall through lifecycle mode and exposes lifecycle evidence", () => {
-    const plan = observation({ id: "plan", createdAt: "2026-08-20T10:00:00.000Z", modality: "commitment" });
-    const cancelled = observation({ id: "cancelled", createdAt: "2026-08-21T10:00:00.000Z", lifecycle: "cancelled" });
+  it("outcome recall reports the newest plan generation instead of stale cancellation", () => {
+    const firstPlan = observation({ id: "plan-1", createdAt: "2026-08-20T10:00:00.000Z", modality: "commitment" });
+    const cancelled = observation({ id: "cancelled-1", createdAt: "2026-08-21T10:00:00.000Z", lifecycle: "cancelled" });
+    const secondPlan = observation({ id: "plan-2", createdAt: "2026-08-22T10:00:00.000Z", modality: "commitment" });
+    const recall = resolvePlanOutcomeRecall({
+      message: "Mert'in istifa planına ne oldu?",
+      observations: [secondPlan, cancelled, firstPlan],
+    });
+
+    expect(recall.matched).toBe(true);
+    expect(recall.resolution?.state).toBe("planned");
+    expect(recall.resolution?.generationObservationId).toBe("plan-2");
+  });
+
+  it("routes outcome recall through lifecycle mode and exposes only current generation evidence", () => {
+    const firstPlan = observation({ id: "plan-1", createdAt: "2026-08-20T10:00:00.000Z", modality: "commitment" });
+    const cancelled = observation({ id: "cancelled-1", createdAt: "2026-08-21T10:00:00.000Z", lifecycle: "cancelled" });
+    const secondPlan = observation({ id: "plan-2", createdAt: "2026-08-22T10:00:00.000Z", modality: "commitment" });
+    const executed = observation({ id: "executed-2", createdAt: "2026-08-23T10:00:00.000Z", lifecycle: "executed" });
     const result = coordinateWorldEventRetrieval({
-      message: "Mert istifadan vazgeçti mi?",
+      message: "Mert istifa etti mi?",
       sessionId: "session-1",
-      observations: [cancelled, plan],
+      observations: [executed, secondPlan, cancelled, firstPlan],
     });
 
     expect(result.mode).toBe("plan_outcome");
-    expect(result.planLifecycleResolution?.state).toBe("cancelled");
-    expect(result.items.map((item) => item.observation.id)).toEqual(expect.arrayContaining(["plan", "cancelled"]));
+    expect(result.planLifecycleResolution?.state).toBe("executed");
+    expect(result.planLifecycleResolution?.generationObservationId).toBe("plan-2");
+    expect(result.items.map((item) => item.observation.id)).toEqual(["executed-2", "plan-2"]);
     expect(result.items.every((item) => item.reasons.includes("plan_lifecycle_evidence"))).toBe(true);
   });
 });
