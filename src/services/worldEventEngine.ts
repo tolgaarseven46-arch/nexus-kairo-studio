@@ -14,7 +14,8 @@ export type WorldEventType =
 
 export type WorldEventPolarity = "positive" | "negative" | "unknown";
 export type WorldEventTemporalRelation = "past" | "present" | "future" | "unspecified";
-export type WorldEventTemporalPrecision = "day" | "week" | "instant" | "unknown";
+export type WorldEventTemporalPrecision = "day" | "week" | "hour" | "minute" | "instant" | "unknown";
+export type WorldEventTemporalOffsetUnit = "minute" | "hour" | "day" | "week";
 
 export interface WorldEventParticipant {
   id?: string;
@@ -23,12 +24,6 @@ export interface WorldEventParticipant {
   confidence: number;
 }
 
-/**
- * V2 proposition identity is deliberately bounded. It is not a generated
- * sentence; it is the stable semantic key consumed by temporal/contradiction
- * policy. `key` must therefore be reproducible from canonical participants +
- * event type and must never depend on retrieval score or LLM wording.
- */
 export interface WorldEventProposition {
   key: string;
   predicate: WorldEventType;
@@ -41,13 +36,22 @@ export interface WorldEventResolvedTemporalInterval {
   endAt: string;
   precision: WorldEventTemporalPrecision;
   anchorAt: string;
-  source: "relative_marker" | "explicit_date" | "relation_fallback";
+  source: "relative_marker" | "relative_offset" | "explicit_date" | "relation_fallback" | "referenced_event";
+}
+
+export interface WorldEventTemporalDependency {
+  anchor: "observation" | "previous_event";
+  direction: "before" | "after";
+  offsetAmount?: number;
+  offsetUnit?: WorldEventTemporalOffsetUnit;
+  marker: string;
 }
 
 export interface WorldEventTemporalReference {
   relation: WorldEventTemporalRelation;
   marker?: string;
   asksLatest: boolean;
+  dependency?: WorldEventTemporalDependency;
   resolved?: WorldEventResolvedTemporalInterval;
 }
 
@@ -60,7 +64,6 @@ export interface CanonicalWorldEvent {
   certainty: number;
   ambiguities: string[];
   evidence: string[];
-  /** Canonical World Event v2 fields. Optional only for legacy persisted rows. */
   proposition?: WorldEventProposition;
   polarity?: WorldEventPolarity;
   temporal?: WorldEventTemporalReference;
@@ -69,10 +72,23 @@ export interface CanonicalWorldEvent {
 const REPORTING_RE = /\b(?:dedi|demiş|diyor|diyordu|söyledi|söylemiş|söylüyor)\b/iu;
 const EXPLICIT_APOLOGY_ACTION_RE = /\bözür\s+diledi\b/iu;
 const NEGATED_CLAIM_RE = /\b(?:değil(?:di)?|demedi|söylemedi|yapmadı|olmadı|etmedi|istemedi|sevmedi|kızmadı)\b/iu;
-const FUTURE_RE = /\b(?:yarın|sonra|yapacak|edecek|olacak|diyecek|söyleyecek)\b/iu;
+const FUTURE_RE = /\b(?:yarın|sonra|yapacak|edecek|olacak|diyecek|söyleyecek|ertesi)\b/iu;
 const PRESENT_RE = /\b(?:bugün|şimdi|şu an|halen|hâlen)\b/iu;
 const PAST_RE = /\b(?:dün|önce|geçen|demişti|dedi|söyledi|yaptı|oldu|etti)\b/iu;
 const LATEST_RE = /\ben\s+son\b/iu;
+const NUMBER_WORDS: Record<string, number> = {
+  bir: 1,
+  iki: 2,
+  üç: 3,
+  dort: 4,
+  dört: 4,
+  beş: 5,
+  bes: 5,
+  altı: 6,
+  alti: 6,
+  yedi: 7,
+};
+const OFFSET_RE = /\b(\d+|bir|iki|üç|dört|dort|beş|bes|altı|alti|yedi)\s+(dakika|saat|gün|hafta)\s+(önce|sonra)\b/iu;
 
 function eventTypeFromSemantic(event: SemanticEvent, message: string): WorldEventType {
   if (event.insult || event.intent === "insult") return "insult";
@@ -112,12 +128,52 @@ export function detectWorldEventPolarity(message: string): WorldEventPolarity {
   return message.trim() ? "positive" : "unknown";
 }
 
+function parseOffsetDependency(text: string): WorldEventTemporalDependency | undefined {
+  const match = text.match(OFFSET_RE);
+  if (!match) return undefined;
+  const rawAmount = match[1].toLocaleLowerCase("tr-TR");
+  const offsetAmount = /^\d+$/.test(rawAmount) ? Number(rawAmount) : NUMBER_WORDS[rawAmount];
+  const unitMap: Record<string, WorldEventTemporalOffsetUnit> = {
+    dakika: "minute",
+    saat: "hour",
+    gün: "day",
+    hafta: "week",
+  };
+  const offsetUnit = unitMap[match[2].toLocaleLowerCase("tr-TR")];
+  if (!offsetAmount || !offsetUnit) return undefined;
+  return {
+    anchor: "observation",
+    direction: match[3].toLocaleLowerCase("tr-TR") === "önce" ? "before" : "after",
+    offsetAmount,
+    offsetUnit,
+    marker: match[0],
+  };
+}
+
 export function detectWorldEventTemporalReference(message: string): WorldEventTemporalReference {
   const text = message.toLocaleLowerCase("tr-TR");
   let relation: WorldEventTemporalRelation = "unspecified";
   let marker: string | undefined;
+  let dependency = parseOffsetDependency(text);
 
-  if (FUTURE_RE.test(text)) {
+  if (/\bert(?:esi)?\s+gün\b/iu.test(text)) {
+    dependency = {
+      anchor: "previous_event",
+      direction: "after",
+      offsetAmount: 1,
+      offsetUnit: "day",
+      marker: text.match(/\bert(?:esi)?\s+gün\b/iu)?.[0] || "ertesi gün",
+    };
+  } else if (/\bondan\s+sonra\b/iu.test(text)) {
+    dependency = { anchor: "previous_event", direction: "after", marker: "ondan sonra" };
+  } else if (/\bondan\s+önce\b/iu.test(text)) {
+    dependency = { anchor: "previous_event", direction: "before", marker: "ondan önce" };
+  }
+
+  if (dependency) {
+    relation = dependency.direction === "before" ? "past" : "future";
+    marker = dependency.marker;
+  } else if (FUTURE_RE.test(text)) {
     relation = "future";
     marker = text.match(FUTURE_RE)?.[0];
   } else if (PRESENT_RE.test(text)) {
@@ -132,6 +188,7 @@ export function detectWorldEventTemporalReference(message: string): WorldEventTe
     relation,
     ...(marker ? { marker } : {}),
     asksLatest: LATEST_RE.test(text),
+    ...(dependency ? { dependency } : {}),
   };
 }
 
@@ -149,11 +206,6 @@ const toParticipant = (
   return participant;
 };
 
-/**
- * Converts semantic meaning + discourse entity resolution into a small,
- * canonical world event. It is intentionally conservative: ambiguity is
- * preserved instead of inventing an actor or target.
- */
 export function buildCanonicalWorldEvent(
   message: string,
   semantic: SemanticEvent,
