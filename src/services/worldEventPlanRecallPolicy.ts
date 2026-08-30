@@ -6,7 +6,7 @@ import { compareObservationRecency } from "./temporalEvidencePolicy";
 const normalize = (value: string) =>
   value.toLocaleLowerCase("tr-TR").replace(/[’']/g, "'").replace(/\s+/g, " ").trim();
 
-const PLAN_RECALL_RE = /\b(?:ne yapacaktı|ne yapmayı düşünüyordu|planı neydi|ne planlıyordu)\b/iu;
+const PLAN_RECALL_RE = /(?:ne yapacaktı|ne yapmayı düşünüyordu|planı neydi|ne planlıyordu)/iu;
 
 export function isPlanRecallQuery(message: string): boolean {
   return PLAN_RECALL_RE.test(normalize(message));
