@@ -1,5 +1,6 @@
 import type { WorldEventObservation } from "./worldModelEventStore";
 import {
+  detectWorldEventContentKey,
   detectWorldEventPolarity,
   type WorldEventPolarity,
   type WorldEventType,
@@ -23,6 +24,7 @@ export interface PropositionTemporalAnchorResolution {
   matchedActorNames?: string[];
   matchedEventType?: WorldEventType;
   matchedPolarity?: WorldEventPolarity;
+  matchedContentKey?: string;
   firstPersonTarget?: boolean;
   reason:
     | "no_proposition_anchor"
@@ -59,19 +61,10 @@ function isFirstPersonTarget(observation: WorldEventObservation): boolean {
 
 function detectTemporalAnchorPolarity(message: string): WorldEventPolarity {
   const text = normalize(message);
-  // Turkish temporal subordination changes surface forms (e.g. "demedikten").
-  // Keep this resolver bounded to explicit negative verb stems instead of
-  // treating the whole follow-up question as a fresh positive proposition.
   if (NEGATED_TEMPORAL_ANCHOR_RE.test(text)) return "negative";
   return detectWorldEventPolarity(message);
 }
 
-/**
- * Resolves a temporal anchor from bounded canonical proposition components.
- * It is deliberately stricter than the named-event resolver: a canonical
- * predicate and an explicit actor name are required. First-person target and
- * polarity refine the candidate set when present. No recency tie-break exists.
- */
 export function resolvePropositionTemporalEventAnchor(input: {
   message: string;
   sessionId: string;
@@ -112,6 +105,7 @@ export function resolvePropositionTemporalEventAnchor(input: {
 
   const firstPersonTarget = FIRST_PERSON_TARGET_RE.test(query);
   const matchedPolarity = detectTemporalAnchorPolarity(input.message);
+  const matchedContentKey = detectWorldEventContentKey(matchedEventType, input.message);
   let candidates = sameSession.filter(
     (item) =>
       actorName(item) === matchedActorNames[0] &&
@@ -126,6 +120,12 @@ export function resolvePropositionTemporalEventAnchor(input: {
     (item) => !item.event.polarity || item.event.polarity === matchedPolarity,
   );
 
+  if (matchedContentKey) {
+    candidates = candidates.filter(
+      (item) => item.event.proposition?.contentKey === matchedContentKey,
+    );
+  }
+
   const candidateObservationIds = candidates
     .map((item) => item.id)
     .filter((id): id is string => Boolean(id));
@@ -137,6 +137,7 @@ export function resolvePropositionTemporalEventAnchor(input: {
       matchedActorNames,
       matchedEventType,
       matchedPolarity,
+      ...(matchedContentKey ? { matchedContentKey } : {}),
       firstPersonTarget,
       reason: "no_same_session_candidate",
     };
@@ -150,6 +151,7 @@ export function resolvePropositionTemporalEventAnchor(input: {
       matchedActorNames,
       matchedEventType,
       matchedPolarity,
+      ...(matchedContentKey ? { matchedContentKey } : {}),
       firstPersonTarget,
       reason: "proposition_not_unique",
     };
@@ -163,6 +165,7 @@ export function resolvePropositionTemporalEventAnchor(input: {
     matchedActorNames,
     matchedEventType,
     matchedPolarity,
+    ...(matchedContentKey ? { matchedContentKey } : {}),
     firstPersonTarget,
     reason: "resolved_proposition_anchor",
   };
