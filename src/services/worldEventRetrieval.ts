@@ -56,9 +56,8 @@ function intervalsOverlap(
 function temporalQueryCandidates(
   message: string,
   observations: WorldEventObservation[],
-  queryAnchorAt?: string,
+  queryAnchorAt: string,
 ): { observations: WorldEventObservation[]; temporalMatched: Set<WorldEventObservation> } {
-  if (!queryAnchorAt) return { observations, temporalMatched: new Set() };
   const queryInterval = resolveTemporalReference(
     message,
     detectWorldEventTemporalReference(message),
@@ -80,7 +79,7 @@ export function rankWorldEventObservations(
   message: string,
   observations: WorldEventObservation[],
   maxItems = 5,
-  queryAnchorAt?: string,
+  queryAnchorAt = new Date().toISOString(),
 ): RetrievedWorldEvent[] {
   const normalizedMessage = normalize(message);
   const queryTokens = new Set(tokens(message));
