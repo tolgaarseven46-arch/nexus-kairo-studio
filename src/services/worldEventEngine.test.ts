@@ -22,6 +22,8 @@ describe("buildCanonicalWorldEvent", () => {
     expect(event.target).toEqual(
       expect.objectContaining({ id: "current_user", name: "Mert" }),
     );
+    expect(event.actor).not.toHaveProperty("id");
+    expect(JSON.stringify(event)).not.toContain("undefined");
   });
 
   it("keeps actor unresolved when the current speaker names themselves beside first person", () => {
