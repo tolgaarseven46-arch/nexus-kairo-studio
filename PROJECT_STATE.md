@@ -396,3 +396,15 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `3820510` (`refactor(kaira): narrow response personality fallback`). Ownership contract, TypeScript, full regression ve production build başarıyla geçti.
 - Geçici migration workflow/script kaldırıldı.
 - Sonraki audit adayı: `/api/chat` request destructuring içindeki `personality = {}` default'u gerçekten desteklenen opsiyonel API davranışı mı, yoksa eksik base personality'yi sessizce kabul eden bir contract açığı mı? Koddan doğrulanmadan değiştirilmeyecek.
+
+
+## 37. Canonical personality normalization boundary — 2026-08-31
+- `/api/chat` doğrudan/legacy çağrılarında `personality` eksik veya partial gelebiliyordu. KDM trait/profile tarafı 50 neutral fallback kullanırken SpeechIdentity HOW hesapları trait alanlarını doğrudan aritmetiğe soktuğu için eksik değerler `NaN` üretebiliyordu.
+- `droitPersonalityNormalizer.ts` eklendi. Canonical neutral personality tüm zorunlu trait'lerde 50 kullanır; finite gönderilmiş değerleri korur, eksik canonical trait'leri 50 ile tamamlar, `NaN`/`Infinity` değerlerini kabul etmez ve finite numeric compatibility trait'lerini korur.
+- Server artık KDM öncesi `basePersonality = normalizeDroitPersonality(personality)` üretir. KDM sonrası HOW overlay'i de `normalizeDroitPersonality(incomingResponsePersonality ?? basePersonality)` ile güvenli tam personality olur.
+- Unsafe `as DroitPersonalityTraits` request-boundary cast'i kaldırıldı; runtime gerçekliği ile TypeScript contract aynı hale getirildi.
+- Normal Studio/client davranışı değişmedi; `droitChatService` tam base personality ve runtime response overlay göndermeye devam eder.
+- `droitPersonalityNormalizer.test.ts` omitted/partial/non-finite/compatibility trait senaryolarını kalıcı olarak doğrular; ownership contract normalized KDM/HOW sınırını korur.
+- Entegrasyon commit'i: `128620f` (`fix(kaira): normalize server personality boundary`). Personality boundary contractları, TypeScript, full regression ve production build başarıyla geçti.
+- Geçici migration workflow/script kaldırıldı.
+- Sonraki sadeleştirme adayı: request destructuring içindeki `personality = {}` artık normalizer `undefined` kabul ettiği için redundant olabilir; davranış değiştirmeden yalnız API boundary semantiğini netleştirecek şekilde audit edilecek.
