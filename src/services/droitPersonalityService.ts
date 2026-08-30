@@ -9,6 +9,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { NEUTRAL_DROIT_PERSONALITY } from './droitPersonalityNormalizer';
 import {
   DroitPersonalityTraits,
   StructuredDroitPersonality,
@@ -17,34 +18,7 @@ import {
 const COLLECTION_NAME = 'characters';
 const DEFAULT_KAIRO_DOC_ID = 'kairo';
 
-export const DEFAULT_PERSONALITY_TRAITS: DroitPersonalityTraits = {
-  // DUYGUSAL
-  anger: 50,
-  patience: 50,
-  empathy: 50,
-  emotionalSensitivity: 50,
-
-  // SOSYAL
-  socialIntelligence: 50,
-  selfConfidence: 50,
-  humor: 50,
-  communication: 50,
-  charisma: 50,
-
-  // ZİHİNSEL
-  curiosity: 50,
-  analyticalThinking: 50,
-  creativity: 50,
-  decisionMaking: 50,
-  attention: 50,
-
-  // KARAKTER
-  authority: 50,
-  courage: 50,
-  seriousness: 50,
-  loyalty: 50,
-  initiative: 50,
-};
+export const DEFAULT_PERSONALITY_TRAITS: DroitPersonalityTraits = { ...NEUTRAL_DROIT_PERSONALITY };
 
 /**
  * Converts flat frontend traits to the exact structured hierarchy required:
