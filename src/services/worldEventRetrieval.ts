@@ -4,6 +4,8 @@ import {
   observationPropositionKey,
   resolveContradictionEvidence,
 } from "./worldEventContradictionResolver";
+import { detectWorldEventTemporalReference } from "./worldEventEngine";
+import { resolveTemporalReference } from "./temporalReferenceResolver";
 
 export interface RetrievedWorldEvent {
   observation: WorldEventObservation;
@@ -26,7 +28,7 @@ const LATEST_RECALL_RE = /\ben\s+son\b/iu;
 export function shouldRetrieveWorldEvents(message: string): boolean {
   const text = normalize(message);
   if (RECALL_RE.test(text) || COMPARISON_RECALL_RE.test(text)) return true;
-  return /\b(?:dün|geçen|önceki|daha önce|hatırla|hatırlat)\b/iu.test(text);
+  return /\b(?:dün|bugün|yarın|geçen|önceki|daha önce|hatırla|hatırlat|\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4})\b/iu.test(text);
 }
 
 function observationSignature(item: RetrievedWorldEvent): string {
@@ -40,16 +42,52 @@ function observationSignature(item: RetrievedWorldEvent): string {
   ].join("|");
 }
 
+function intervalsOverlap(
+  a: { startAt: string; endAt: string },
+  b: { startAt: string; endAt: string },
+): boolean {
+  const aStart = Date.parse(a.startAt);
+  const aEnd = Date.parse(a.endAt);
+  const bStart = Date.parse(b.startAt);
+  const bEnd = Date.parse(b.endAt);
+  return [aStart, aEnd, bStart, bEnd].every(Number.isFinite) && aStart <= bEnd && bStart <= aEnd;
+}
+
+function temporalQueryCandidates(
+  message: string,
+  observations: WorldEventObservation[],
+  queryAnchorAt?: string,
+): { observations: WorldEventObservation[]; temporalMatched: Set<WorldEventObservation> } {
+  if (!queryAnchorAt) return { observations, temporalMatched: new Set() };
+  const queryInterval = resolveTemporalReference(
+    message,
+    detectWorldEventTemporalReference(message),
+    queryAnchorAt,
+  );
+  if (!queryInterval) return { observations, temporalMatched: new Set() };
+
+  const resolvable = observations.filter((item) => item.event.temporal?.resolved);
+  if (!resolvable.length) return { observations, temporalMatched: new Set() };
+
+  const matching = resolvable.filter((item) =>
+    intervalsOverlap(queryInterval, item.event.temporal!.resolved!),
+  );
+  if (!matching.length) return { observations, temporalMatched: new Set() };
+  return { observations: matching, temporalMatched: new Set(matching) };
+}
+
 export function rankWorldEventObservations(
   message: string,
   observations: WorldEventObservation[],
   maxItems = 5,
+  queryAnchorAt?: string,
 ): RetrievedWorldEvent[] {
   const normalizedMessage = normalize(message);
   const queryTokens = new Set(tokens(message));
   const asksReportedSpeech = REPORTED_SPEECH_RE.test(normalizedMessage);
   const asksLatest = LATEST_RECALL_RE.test(normalizedMessage);
-  const ranked = observations
+  const temporalCandidates = temporalQueryCandidates(message, observations, queryAnchorAt);
+  const ranked = temporalCandidates.observations
     .filter((observation) => !STORED_QUERY_RE.test(normalize(observation.event.raw || "")))
     .map((observation) => {
       const reasons: string[] = [];
@@ -74,6 +112,11 @@ export function rankWorldEventObservations(
       if (overlap) {
         score += Math.min(3, overlap);
         reasons.push(`token_overlap:${overlap}`);
+      }
+
+      if (temporalCandidates.temporalMatched.has(observation)) {
+        score += 4;
+        reasons.push("temporal_interval_match");
       }
 
       if (asksReportedSpeech && observation.kind === "reported_claim") {
@@ -165,8 +208,11 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
     const contradiction = contradictionByKey.get(observationPropositionKey(observation));
     const conflictLabel = contradiction?.status === "conflicting" ? "; ÇELİŞEN KANIT" : "";
     const polarity = event.polarity ? `; polarity=${event.polarity}` : "";
-    return `- #${index + 1} [${epistemic}; ${certainty}${polarity}${conflictLabel}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
+    const temporal = event.temporal?.resolved
+      ? `; zaman=${event.temporal.resolved.startAt}..${event.temporal.resolved.endAt}`
+      : "";
+    return `- #${index + 1} [${epistemic}; ${certainty}${polarity}${temporal}${conflictLabel}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
   });
 
-  return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır; bu seçim timestamp ile belirlenir, lexical score eski kaydı öne geçiremez.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- ÇELİŞEN KANIT etiketi varsa aynı canonical proposition için zıt polarity kayıtları vardır. En yeni kaydı güncel kanıt olarak kullanabilirsin ama onu otomatik doğrulanmış gerçek sayma; gerektiğinde önceki ve sonraki iddiayı ayrı belirt.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen veya zaman içinde değişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; kayıtları ayrı kanıtlar olarak koru.`;
+  return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- Çözümlenmiş zaman aralığı varsa kullanıcıdaki temporal ifadeyle eşleşen kanıtlar retrieval tarafından önceden sınırlandırılmıştır; bu zamanı yeniden ham metinden tahmin etme.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır; bu seçim timestamp ile belirlenir, lexical score eski kaydı öne geçiremez.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- ÇELİŞEN KANIT etiketi varsa aynı canonical proposition için zıt polarity kayıtları vardır. En yeni kaydı güncel kanıt olarak kullanabilirsin ama onu otomatik doğrulanmış gerçek sayma; gerektiğinde önceki ve sonraki iddiayı ayrı belirt.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen veya zaman içinde değişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; kayıtları ayrı kanıtlar olarak koru.`;
 }
