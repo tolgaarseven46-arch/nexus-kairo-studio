@@ -79,6 +79,14 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     summary: "Measurable offsets resolve against an explicit anchor; previous-event relations remain explicit dependencies until a referenced event interval is supplied.",
   },
   {
+    id: "temporal-event-graph",
+    version: 1,
+    status: "active",
+    ownerLayer: "world-model-store",
+    consumerLayers: ["retrieval", "temporal-evidence", "future-event-chain-reasoning"],
+    summary: "Persisted temporal provenance forms auditable same-session before/after edges; missing, cross-session, self-referential or interval-inconsistent links are rejected instead of inferred.",
+  },
+  {
     id: "temporal-evidence",
     version: 1,
     status: "active",
