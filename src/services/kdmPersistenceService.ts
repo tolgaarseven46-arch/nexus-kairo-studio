@@ -229,6 +229,9 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
       entityResolution: payload.metadata?.entityResolution,
       worldEvent: payload.metadata?.worldEvent,
       retrievedWorldEvents: payload.metadata?.retrievedWorldEvents,
+      worldStateAppraisal: payload.metadata?.worldStateAppraisal,
+      worldReasoningPolicy: payload.metadata?.worldReasoningPolicy,
+      worldMemoryGuard: payload.metadata?.worldMemoryGuard,
     },
   };
 
@@ -334,6 +337,9 @@ export async function loadTestSession(sessionId: string): Promise<RestoredTestSe
         lastConsistency: lastTurn?.consistency,
         lastTimings: lastTurn?.metadata?.timings,
         lastProviderUsed: lastTurn?.metadata?.providerUsed,
+        lastWorldStateAppraisal: lastTurn?.metadata?.worldStateAppraisal,
+        lastWorldReasoningPolicy: lastTurn?.metadata?.worldReasoningPolicy,
+        lastWorldMemoryGuard: lastTurn?.metadata?.worldMemoryGuard,
       };
     } catch (err) {
       console.warn('[TestSessionPersistence] loadTestSession failed:', err);

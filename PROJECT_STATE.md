@@ -219,5 +219,5 @@ Yeni sohbet açıldığında:
 - Deterministic `worldModelResponseGuard`, grounded kanıt varken hafızayı inkâr etme, çelişkiyi tek tarafa düşürme, reported claim kaynak atfını kaybetme ve gerekli epistemik nitelemeyi kaldırma durumlarını modelden bağımsız olarak engelliyor.
 - Reported claim ile direct interaction ayrımı contract testleriyle kilitli; direct interaction yanlışlıkla kullanıcı kaynaklı bilgi gibi etiketlenmiyor.
 - Guard yalnız AI yolunda değil, Yerel Dil Motoru erken dönüş yolunda da uygulanıyor; world reasoning boundary bütün cevap yollarında bağlayıcı.
-- `worldStateAppraisal`, `worldReasoningPolicy` ve `worldMemoryGuard` KNT trace, test-session metadata ve chat debug/KDM response içinde gözlemlenebilir. Böylece tek turda policy kararı, guard issue listesi ve cevabın değiştirilip değiştirilmediği izlenebilir.
+- `worldStateAppraisal`, `worldReasoningPolicy` ve `worldMemoryGuard` KNT trace, test-session metadata, chat debug/KDM response ve Studio SON KARAR İZİ/SON TURU KOPYALA raporunda gözlemlenebilir. Böylece tek turda appraisal → policy → guard zinciri, guard issue listesi ve cevabın değiştirilip değiştirilmediği izlenebilir.
 - CI bu değişiklikleri architecture contracts + tests + TypeScript + production build ile doğrular.

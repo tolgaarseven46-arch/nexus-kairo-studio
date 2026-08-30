@@ -108,6 +108,9 @@ export interface TestSessionTurnRecord {
     entityResolution?: unknown;
     worldEvent?: unknown;
     retrievedWorldEvents?: unknown;
+    worldStateAppraisal?: unknown;
+    worldReasoningPolicy?: unknown;
+    worldMemoryGuard?: unknown;
   };
 }
 
@@ -136,4 +139,7 @@ export interface RestoredTestSession {
   lastConsistency?: any;
   lastTimings?: any;
   lastProviderUsed?: string;
+  lastWorldStateAppraisal?: unknown;
+  lastWorldReasoningPolicy?: unknown;
+  lastWorldMemoryGuard?: unknown;
 }

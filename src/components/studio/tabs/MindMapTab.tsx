@@ -43,6 +43,9 @@ type Props = {
   timings: KairoTimingMetrics | null;
   providerUsed: string | null;
   consistency: ResponseConsistencyResult | null;
+  worldStateAppraisal?: unknown;
+  worldReasoningPolicy?: unknown;
+  worldMemoryGuard?: unknown;
   participants: ReadonlyArray<{ id: string; label: string }>;
   selectedParticipantId: string;
   activeSessionId?: string | null;
@@ -111,6 +114,9 @@ export const MindMapTab: React.FC<Props> = ({
   timings,
   providerUsed,
   consistency,
+  worldStateAppraisal,
+  worldReasoningPolicy,
+  worldMemoryGuard,
   participants,
   selectedParticipantId,
   activeSessionId,
@@ -145,6 +151,12 @@ export const MindMapTab: React.FC<Props> = ({
   );
   const hasResult = Boolean(lastUser && lastReply && timings);
   const responseSource = sourceLabel(providerUsed, timings);
+  const worldAppraisal = (worldStateAppraisal || {}) as Record<string, any>;
+  const worldPolicy = (worldReasoningPolicy || {}) as Record<string, any>;
+  const worldGuard = (worldMemoryGuard || {}) as Record<string, any>;
+  const worldGuardIssues = Array.isArray(worldGuard.issues)
+    ? worldGuard.issues.map((issue: any) => issue?.code || issue?.message || String(issue)).filter(Boolean)
+    : [];
 
   const submit = () => {
     const submitted = text.trim();
@@ -164,7 +176,7 @@ export const MindMapTab: React.FC<Props> = ({
       reasoningTrace.relationship.interactionCount ??
       relationship?.interactionCount ??
       0;
-    const report = `KAIRA KNT SON TUR RAPORU\nMesaj: ${lastUser?.text || lastSubmittedMessage || "-"}\nKonuşan: ${lastUser?.participantName || activeParticipant?.label || "-"}\nYanıt: ${lastReply?.text || "-"}\nYanıt kaynağı: ${responseSource}\nNiyet: ${reasoningTrace.messageInterpretation.intent}\nDuygu sinyali: ${reasoningTrace.messageInterpretation.sentiment}\nKarar tonu: ${reasoningTrace.decision.chosenTone}\nOturum tur sayısı: ${interactionCount}\nYeni kullanıcı: ${reasoningTrace.whoSent.isNewUser ? "Evet" : "Hayır"}\nİlişki: güven=${relationship?.trust ?? 50}, sıcaklık=${relationship?.warmth ?? reasoningTrace.relationship.warmthScore}, kırgınlık=${relationship?.hurtScore || 0}, çatışma=${relationship?.conflictScore || 0}, tekrar=${relationship?.repeatedNegativeCount || 0}\nDuygu durumu: sakinlik=${dynamicState.calmness}, stres=${dynamicState.stress}, öfke=${dynamicState.anger}, mutluluk=${dynamicState.happiness}\nKDM doğrulaması: ${consistency ? `${consistency.accepted ? "Kabul" : "Sorunlu"} (${consistency.score}/100)${consistency.issues.length ? ` - ${consistency.issues.join("; ")}` : ""}` : "ölçüm yok"}\nSüreler: ${timings ? `istemci=${timings.clientPrepMs}ms, hafıza=${timings.memoryMs}ms, KDM=${timings.kdmMs}ms, AI=${timings.aiMs}ms, kayıt=${timings.postProcessMs}ms, ağ=${timings.networkAndOverheadMs}ms, toplam=${timings.totalMs}ms` : "ölçüm yok"}`;
+    const report = `KAIRA KNT SON TUR RAPORU\nMesaj: ${lastUser?.text || lastSubmittedMessage || "-"}\nKonuşan: ${lastUser?.participantName || activeParticipant?.label || "-"}\nYanıt: ${lastReply?.text || "-"}\nYanıt kaynağı: ${responseSource}\nNiyet: ${reasoningTrace.messageInterpretation.intent}\nDuygu sinyali: ${reasoningTrace.messageInterpretation.sentiment}\nKarar tonu: ${reasoningTrace.decision.chosenTone}\nOturum tur sayısı: ${interactionCount}\nYeni kullanıcı: ${reasoningTrace.whoSent.isNewUser ? "Evet" : "Hayır"}\nİlişki: güven=${relationship?.trust ?? 50}, sıcaklık=${relationship?.warmth ?? reasoningTrace.relationship.warmthScore}, kırgınlık=${relationship?.hurtScore || 0}, çatışma=${relationship?.conflictScore || 0}, tekrar=${relationship?.repeatedNegativeCount || 0}\nDuygu durumu: sakinlik=${dynamicState.calmness}, stres=${dynamicState.stress}, öfke=${dynamicState.anger}, mutluluk=${dynamicState.happiness}\nKDM doğrulaması: ${consistency ? `${consistency.accepted ? "Kabul" : "Sorunlu"} (${consistency.score}/100)${consistency.issues.length ? ` - ${consistency.issues.join("; ")}` : ""}` : "ölçüm yok"}\nWorld appraisal: truth=${worldAppraisal.truthPosture ?? "-"}, evidence=${worldAppraisal.evidencePosture ?? "-"}, grounded=${worldAppraisal.groundedEvidenceCount ?? 0}\nWorld policy: mode=${worldPolicy.mode ?? "-"}, qualify=${worldPolicy.mustQualify ?? false}, conflict=${worldPolicy.mustPreserveConflict ?? false}, attribution=${worldPolicy.mustPreserveReportedAttribution ?? false}\nWorld guard: changed=${worldGuard.changed ?? false}, reason=${worldGuard.reason ?? "-"}, issues=${worldGuardIssues.length ? worldGuardIssues.join(",") : "yok"}\nSüreler: ${timings ? `istemci=${timings.clientPrepMs}ms, hafıza=${timings.memoryMs}ms, KDM=${timings.kdmMs}ms, AI=${timings.aiMs}ms, kayıt=${timings.postProcessMs}ms, ağ=${timings.networkAndOverheadMs}ms, toplam=${timings.totalMs}ms` : "ölçüm yok"}`;
     try {
       await navigator.clipboard.writeText(report);
       markCopied("last");
@@ -515,6 +527,17 @@ export const MindMapTab: React.FC<Props> = ({
                           Deterministik kontrol bildirilen bir sorun bulmadı.
                         </p>
                       )}
+                    </div>
+                    <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-3">
+                      <DataRow label="WORLD APPRAISAL" value={String(worldAppraisal.truthPosture ?? "-")} accent />
+                      <DataRow label="EVIDENCE POSTURE" value={String(worldAppraisal.evidencePosture ?? "-")} />
+                      <DataRow label="REASONING MODE" value={String(worldPolicy.mode ?? "-")} />
+                      <DataRow label="QUALIFY" value={worldPolicy.mustQualify ? "Evet" : "Hayır"} />
+                      <DataRow label="CONFLICT KORU" value={worldPolicy.mustPreserveConflict ? "Evet" : "Hayır"} />
+                      <DataRow label="KAYNAK ATFI" value={worldPolicy.mustPreserveReportedAttribution ? "Evet" : "Hayır"} />
+                      <DataRow label="GUARD DEĞİŞTİRDİ" value={worldGuard.changed ? "Evet" : "Hayır"} />
+                      <DataRow label="GUARD NEDENİ" value={String(worldGuard.reason ?? "-")} />
+                      <DataRow label="GUARD ISSUES" value={worldGuardIssues.length ? worldGuardIssues.join(", ") : "Yok"} />
                     </div>
                     <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
                       <p className="text-[9px] font-mono font-bold text-zinc-300">

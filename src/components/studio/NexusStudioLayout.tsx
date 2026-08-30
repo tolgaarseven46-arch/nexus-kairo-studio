@@ -152,6 +152,9 @@ export const NexusStudioLayout: React.FC = () => {
       useState<ResponseConsistencyResult | null>(null),
     [lastTimings, setLastTimings] = useState<KairoTimingMetrics | null>(null),
     [lastProviderUsed, setLastProviderUsed] = useState<string | null>(null),
+    [lastWorldStateAppraisal, setLastWorldStateAppraisal] = useState<unknown>(null),
+    [lastWorldReasoningPolicy, setLastWorldReasoningPolicy] = useState<unknown>(null),
+    [lastWorldMemoryGuard, setLastWorldMemoryGuard] = useState<unknown>(null),
     [activeConversationScope, setActiveConversationScope] = useState<
       string | null
     >(null),
@@ -210,6 +213,9 @@ export const NexusStudioLayout: React.FC = () => {
           if (restored.lastProviderUsed) {
             setLastProviderUsed(restored.lastProviderUsed);
           }
+          setLastWorldStateAppraisal(restored.lastWorldStateAppraisal ?? null);
+          setLastWorldReasoningPolicy(restored.lastWorldReasoningPolicy ?? null);
+          setLastWorldMemoryGuard(restored.lastWorldMemoryGuard ?? null);
           setActiveConversationScope(restored.summary.userId);
           setActiveSessionId(restored.summary.sessionId);
           setIsolatedConversation(false);
@@ -231,6 +237,9 @@ export const NexusStudioLayout: React.FC = () => {
       setLastAnalysis(null);
       setLastTimings(null);
       setLastProviderUsed(null);
+    setLastWorldStateAppraisal(null);
+    setLastWorldReasoningPolicy(null);
+    setLastWorldMemoryGuard(null);
       setMessages([]);
       setActiveConversationScope(null);
       setActiveSessionId(null);
@@ -308,6 +317,9 @@ export const NexusStudioLayout: React.FC = () => {
     setLastAnalysis(null);
     setLastTimings(null);
     setLastProviderUsed(null);
+    setLastWorldStateAppraisal(null);
+    setLastWorldReasoningPolicy(null);
+    setLastWorldMemoryGuard(null);
     setIsolatedConversation(true);
     setActiveConversationScope(null);
     setActiveSessionId(null);
@@ -346,6 +358,9 @@ export const NexusStudioLayout: React.FC = () => {
     setLastAnalysis(null);
     setLastTimings(null);
     setLastProviderUsed(null);
+    setLastWorldStateAppraisal(null);
+    setLastWorldReasoningPolicy(null);
+    setLastWorldMemoryGuard(null);
     setActiveConversationScope(null);
     setActiveSessionId(null);
     setIsolatedConversation(true);
@@ -416,6 +431,9 @@ export const NexusStudioLayout: React.FC = () => {
         if (response.timings) setLastTimings(response.timings);
         setLastAnalysis(response.consistency ?? null);
         setLastProviderUsed(response.providerUsed || null);
+        setLastWorldStateAppraisal(response.worldStateAppraisal ?? null);
+        setLastWorldReasoningPolicy(response.worldReasoningPolicy ?? null);
+        setLastWorldMemoryGuard(response.worldMemoryGuard ?? null);
         setActiveConversationScope(conversationScope);
         if (response.sessionId) {
           setActiveSessionId(response.sessionId);
@@ -509,6 +527,9 @@ export const NexusStudioLayout: React.FC = () => {
             timings={lastTimings}
             providerUsed={lastProviderUsed}
             consistency={lastAnalysis}
+            worldStateAppraisal={lastWorldStateAppraisal}
+            worldReasoningPolicy={lastWorldReasoningPolicy}
+            worldMemoryGuard={lastWorldMemoryGuard}
             participants={TEST_USERS}
             selectedParticipantId={selectedTestUser}
             activeSessionId={activeSessionId}
