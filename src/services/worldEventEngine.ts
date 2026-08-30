@@ -47,12 +47,16 @@ function eventTypeFromSemantic(event: SemanticEvent): WorldEventType {
 const toParticipant = (
   ref: ResolvedEntityReference,
   source: WorldEventParticipant["source"],
-): WorldEventParticipant => ({
-  id: ref.resolvedId,
-  name: ref.resolvedName || ref.surface,
-  source,
-  confidence: ref.confidence,
-});
+): WorldEventParticipant => {
+  const participant: WorldEventParticipant = {
+    source,
+    confidence: ref.confidence,
+  };
+  if (ref.resolvedId) participant.id = ref.resolvedId;
+  const name = ref.resolvedName || ref.surface;
+  if (name) participant.name = name;
+  return participant;
+};
 
 /**
  * Converts semantic meaning + discourse entity resolution into a small,
