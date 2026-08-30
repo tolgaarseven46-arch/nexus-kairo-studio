@@ -14,10 +14,12 @@ const tokens = (value: string) =>
 
 const RECALL_RE = /\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor musun|hatırladın mı|hakkında ne biliyorsun|kimdi|kime|kimi)\b/iu;
 const REPORTED_SPEECH_RE = /\b(?:ne demişti|ne dedi|demişti|dedi|söylemişti|söyledi)\b/iu;
+const COMPARISON_RECALL_RE = /\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
+const STORED_QUERY_RE = /[?？]\s*$|\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor musun|hatırladın mı|hakkında ne biliyorsun)\b|\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
 
 export function shouldRetrieveWorldEvents(message: string): boolean {
   const text = normalize(message);
-  if (RECALL_RE.test(text)) return true;
+  if (RECALL_RE.test(text) || COMPARISON_RECALL_RE.test(text)) return true;
   return /\b(?:dün|geçen|önceki|daha önce|hatırla|hatırlat)\b/iu.test(text);
 }
 
@@ -28,51 +30,53 @@ export function rankWorldEventObservations(
 ): RetrievedWorldEvent[] {
   const queryTokens = new Set(tokens(message));
   const asksReportedSpeech = REPORTED_SPEECH_RE.test(normalize(message));
-  const ranked = observations.map((observation) => {
-    const reasons: string[] = [];
-    let score = 0;
-    const event = observation.event;
-    const names = [event.actor?.name, event.target?.name, observation.speakerName]
-      .filter((value): value is string => Boolean(value))
-      .map(normalize);
+  const ranked = observations
+    .filter((observation) => !STORED_QUERY_RE.test(normalize(observation.event.raw || "")))
+    .map((observation) => {
+      const reasons: string[] = [];
+      let score = 0;
+      const event = observation.event;
+      const names = [event.actor?.name, event.target?.name, observation.speakerName]
+        .filter((value): value is string => Boolean(value))
+        .map(normalize);
 
-    for (const name of names) {
-      if (queryTokens.has(name)) {
-        score += 5;
-        reasons.push(`name:${name}`);
+      for (const name of names) {
+        if (queryTokens.has(name)) {
+          score += 5;
+          reasons.push(`name:${name}`);
+        }
       }
-    }
 
-    const rawTokens = new Set(tokens(event.raw || ""));
-    let overlap = 0;
-    for (const token of queryTokens) {
-      if (rawTokens.has(token)) overlap += 1;
-    }
-    if (overlap) {
-      score += Math.min(3, overlap);
-      reasons.push(`token_overlap:${overlap}`);
-    }
+      const rawTokens = new Set(tokens(event.raw || ""));
+      let overlap = 0;
+      for (const token of queryTokens) {
+        if (rawTokens.has(token)) overlap += 1;
+      }
+      if (overlap) {
+        score += Math.min(3, overlap);
+        reasons.push(`token_overlap:${overlap}`);
+      }
 
-    if (asksReportedSpeech && observation.kind === "reported_claim") {
-      score += 1.5;
-      reasons.push("reported_speech_match");
-    }
+      if (asksReportedSpeech && observation.kind === "reported_claim") {
+        score += 1.5;
+        reasons.push("reported_speech_match");
+      }
 
-    if (observation.kind === "direct_interaction") {
-      score += 1.25;
-      reasons.push("direct_interaction");
-    }
-    if (observation.status === "grounded") {
-      score += 1.5;
-      reasons.push("grounded");
-    } else {
-      score -= 0.75;
-      reasons.push("ambiguous");
-    }
-    score += Math.max(0, Math.min(1, event.certainty ?? 0));
+      if (observation.kind === "direct_interaction") {
+        score += 1.25;
+        reasons.push("direct_interaction");
+      }
+      if (observation.status === "grounded") {
+        score += 1.5;
+        reasons.push("grounded");
+      } else {
+        score -= 0.75;
+        reasons.push("ambiguous");
+      }
+      score += Math.max(0, Math.min(1, event.certainty ?? 0));
 
-    return { observation, score, reasons };
-  });
+      return { observation, score, reasons };
+    });
 
   const aboveThreshold = ranked.filter((item) => item.score >= 2);
   const hasExplicitNameMatch = aboveThreshold.some((item) =>
