@@ -46,6 +46,7 @@ type Props = {
   worldStateAppraisal?: unknown;
   worldReasoningPolicy?: unknown;
   worldMemoryGuard?: unknown;
+  responsePlan?: unknown;
   participants: ReadonlyArray<{ id: string; label: string }>;
   selectedParticipantId: string;
   activeSessionId?: string | null;
@@ -117,6 +118,7 @@ export const MindMapTab: React.FC<Props> = ({
   worldStateAppraisal,
   worldReasoningPolicy,
   worldMemoryGuard,
+  responsePlan,
   participants,
   selectedParticipantId,
   activeSessionId,
@@ -154,6 +156,8 @@ export const MindMapTab: React.FC<Props> = ({
   const worldAppraisal = (worldStateAppraisal || {}) as Record<string, any>;
   const worldPolicy = (worldReasoningPolicy || {}) as Record<string, any>;
   const worldGuard = (worldMemoryGuard || {}) as Record<string, any>;
+  const plan = (responsePlan || {}) as Record<string, any>;
+  const planReasons = Array.isArray(plan.reasons) ? plan.reasons.map(String).filter(Boolean) : [];
   const worldGuardIssues = Array.isArray(worldGuard.issues)
     ? worldGuard.issues.map((issue: any) => issue?.code || issue?.message || String(issue)).filter(Boolean)
     : [];
@@ -176,7 +180,7 @@ export const MindMapTab: React.FC<Props> = ({
       reasoningTrace.relationship.interactionCount ??
       relationship?.interactionCount ??
       0;
-    const report = `KAIRA KNT SON TUR RAPORU\nMesaj: ${lastUser?.text || lastSubmittedMessage || "-"}\nKonuşan: ${lastUser?.participantName || activeParticipant?.label || "-"}\nYanıt: ${lastReply?.text || "-"}\nYanıt kaynağı: ${responseSource}\nNiyet: ${reasoningTrace.messageInterpretation.intent}\nDuygu sinyali: ${reasoningTrace.messageInterpretation.sentiment}\nKarar tonu: ${reasoningTrace.decision.chosenTone}\nOturum tur sayısı: ${interactionCount}\nYeni kullanıcı: ${reasoningTrace.whoSent.isNewUser ? "Evet" : "Hayır"}\nİlişki: güven=${relationship?.trust ?? 50}, sıcaklık=${relationship?.warmth ?? reasoningTrace.relationship.warmthScore}, kırgınlık=${relationship?.hurtScore || 0}, çatışma=${relationship?.conflictScore || 0}, tekrar=${relationship?.repeatedNegativeCount || 0}\nDuygu durumu: sakinlik=${dynamicState.calmness}, stres=${dynamicState.stress}, öfke=${dynamicState.anger}, mutluluk=${dynamicState.happiness}\nKDM doğrulaması: ${consistency ? `${consistency.accepted ? "Kabul" : "Sorunlu"} (${consistency.score}/100)${consistency.issues.length ? ` - ${consistency.issues.join("; ")}` : ""}` : "ölçüm yok"}\nWorld appraisal: truth=${worldAppraisal.truthPosture ?? "-"}, evidence=${worldAppraisal.evidencePosture ?? "-"}, grounded=${worldAppraisal.groundedEvidenceCount ?? 0}\nWorld policy: mode=${worldPolicy.mode ?? "-"}, qualify=${worldPolicy.mustQualify ?? false}, conflict=${worldPolicy.mustPreserveConflict ?? false}, attribution=${worldPolicy.mustPreserveReportedAttribution ?? false}\nWorld guard: changed=${worldGuard.changed ?? false}, reason=${worldGuard.reason ?? "-"}, issues=${worldGuardIssues.length ? worldGuardIssues.join(",") : "yok"}\nSüreler: ${timings ? `istemci=${timings.clientPrepMs}ms, hafıza=${timings.memoryMs}ms, KDM=${timings.kdmMs}ms, AI=${timings.aiMs}ms, kayıt=${timings.postProcessMs}ms, ağ=${timings.networkAndOverheadMs}ms, toplam=${timings.totalMs}ms` : "ölçüm yok"}`;
+    const report = `KAIRA KNT SON TUR RAPORU\nMesaj: ${lastUser?.text || lastSubmittedMessage || "-"}\nKonuşan: ${lastUser?.participantName || activeParticipant?.label || "-"}\nYanıt: ${lastReply?.text || "-"}\nYanıt kaynağı: ${responseSource}\nNiyet: ${reasoningTrace.messageInterpretation.intent}\nDuygu sinyali: ${reasoningTrace.messageInterpretation.sentiment}\nKarar tonu: ${reasoningTrace.decision.chosenTone}\nOturum tur sayısı: ${interactionCount}\nYeni kullanıcı: ${reasoningTrace.whoSent.isNewUser ? "Evet" : "Hayır"}\nİlişki: güven=${relationship?.trust ?? 50}, sıcaklık=${relationship?.warmth ?? reasoningTrace.relationship.warmthScore}, kırgınlık=${relationship?.hurtScore || 0}, çatışma=${relationship?.conflictScore || 0}, tekrar=${relationship?.repeatedNegativeCount || 0}\nDuygu durumu: sakinlik=${dynamicState.calmness}, stres=${dynamicState.stress}, öfke=${dynamicState.anger}, mutluluk=${dynamicState.happiness}\nKDM doğrulaması: ${consistency ? `${consistency.accepted ? "Kabul" : "Sorunlu"} (${consistency.score}/100)${consistency.issues.length ? ` - ${consistency.issues.join("; ")}` : ""}` : "ölçüm yok"}\nWorld appraisal: truth=${worldAppraisal.truthPosture ?? "-"}, evidence=${worldAppraisal.evidencePosture ?? "-"}, grounded=${worldAppraisal.groundedEvidenceCount ?? 0}\nWorld policy: mode=${worldPolicy.mode ?? "-"}, qualify=${worldPolicy.mustQualify ?? false}, conflict=${worldPolicy.mustPreserveConflict ?? false}, attribution=${worldPolicy.mustPreserveReportedAttribution ?? false}\nWorld guard: changed=${worldGuard.changed ?? false}, reason=${worldGuard.reason ?? "-"}, issues=${worldGuardIssues.length ? worldGuardIssues.join(",") : "yok"}\nResponse plan: move=${plan.move ?? "-"}, stance=${plan.stance ?? "-"}, register=${plan.register ?? "-"}, rel=${plan.relationshipLevel ?? "-"}, continue=${plan.continueConversation ?? "-"}, question=${plan.allowQuestion ?? "-"}, humor=${plan.allowHumor ?? "-"}, affection=${plan.allowAffection ?? "-"}, forgive=${plan.allowForgiveness ?? "-"}, reopen=${plan.allowReopeningCloseness ?? "-"}, sentences=${plan.maxSentences ?? "-"}, words=${plan.maxWords ?? "-"}, emoji=${plan.emojiBudget ?? "-"}\nResponse plan reasons: ${planReasons.length ? planReasons.join(" | ") : "-"}\nSüreler: ${timings ? `istemci=${timings.clientPrepMs}ms, hafıza=${timings.memoryMs}ms, KDM=${timings.kdmMs}ms, AI=${timings.aiMs}ms, kayıt=${timings.postProcessMs}ms, ağ=${timings.networkAndOverheadMs}ms, toplam=${timings.totalMs}ms` : "ölçüm yok"}`;
     try {
       await navigator.clipboard.writeText(report);
       markCopied("last");
@@ -538,6 +542,19 @@ export const MindMapTab: React.FC<Props> = ({
                       <DataRow label="GUARD DEĞİŞTİRDİ" value={worldGuard.changed ? "Evet" : "Hayır"} />
                       <DataRow label="GUARD NEDENİ" value={String(worldGuard.reason ?? "-")} />
                       <DataRow label="GUARD ISSUES" value={worldGuardIssues.length ? worldGuardIssues.join(", ") : "Yok"} />
+                    </div>
+                    <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-3">
+                      <DataRow label="CEVAP PLANI" value={String(plan.move ?? "-")} accent />
+                      <DataRow label="STANCE" value={String(plan.stance ?? "-")} />
+                      <DataRow label="REGISTER" value={String(plan.register ?? "-")} />
+                      <DataRow label="İLİŞKİ DİLİ" value={String(plan.relationshipLevel ?? "-")} />
+                      <DataRow label="DEVAM" value={plan.continueConversation === undefined ? "-" : plan.continueConversation ? "Evet" : "Hayır"} />
+                      <DataRow label="SORU" value={plan.allowQuestion === undefined ? "-" : plan.allowQuestion ? "İzinli" : "Yasak"} />
+                      <DataRow label="MİZAH" value={plan.allowHumor === undefined ? "-" : plan.allowHumor ? "İzinli" : "Yasak"} />
+                      <DataRow label="YAKINLIK" value={plan.allowAffection === undefined ? "-" : plan.allowAffection ? "İzinli" : "Yasak"} />
+                      <DataRow label="AFFETME" value={plan.allowForgiveness === undefined ? "-" : plan.allowForgiveness ? "İzinli" : "Yasak"} />
+                      <DataRow label="YENİDEN YAKINLAŞMA" value={plan.allowReopeningCloseness === undefined ? "-" : plan.allowReopeningCloseness ? "İzinli" : "Yasak"} />
+                      <DataRow label="BÜTÇE" value={plan.maxSentences || plan.maxWords ? `${plan.maxSentences ?? "-"} cümle / ${plan.maxWords ?? "-"} kelime / ${plan.emojiBudget ?? "-"} emoji` : "-"} />
                     </div>
                     <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
                       <p className="text-[9px] font-mono font-bold text-zinc-300">
