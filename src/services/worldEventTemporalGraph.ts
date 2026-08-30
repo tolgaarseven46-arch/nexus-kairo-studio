@@ -1,6 +1,7 @@
 import type { WorldEventObservation } from "./worldModelEventStore";
 
 export type TemporalGraphRelation = "before" | "after";
+export type TemporalNeighborDirection = "before" | "after";
 
 export interface TemporalGraphEdge {
   sourceObservationId: string;
@@ -150,4 +151,34 @@ export function observationsBefore(
         edge.targetObservationId === anchorObservationId,
     )
     .map((edge) => edge.sourceObservationId);
+}
+
+/**
+ * Retrieval seam for event-chain queries. The caller must supply an explicit
+ * anchor observation id that was resolved by a higher discourse/context layer.
+ * No "latest event" or lexical guess is performed here.
+ */
+export function retrieveTemporalNeighbors(
+  observations: WorldEventObservation[],
+  anchorObservationId: string | undefined,
+  direction: TemporalNeighborDirection,
+): WorldEventObservation[] {
+  if (!anchorObservationId) return [];
+  const graph = buildTemporalEventGraph(observations);
+  if (graph.issues.length) return [];
+
+  const neighborIds = direction === "after"
+    ? observationsAfter(graph, anchorObservationId)
+    : observationsBefore(graph, anchorObservationId);
+  if (!neighborIds.length) return [];
+
+  const byId = new Map(
+    observations
+      .filter((item): item is WorldEventObservation & { id: string } => Boolean(item.id))
+      .map((item) => [item.id, item]),
+  );
+
+  return neighborIds
+    .map((id) => byId.get(id))
+    .filter((item): item is WorldEventObservation => Boolean(item));
 }
