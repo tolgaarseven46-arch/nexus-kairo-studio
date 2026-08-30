@@ -1,5 +1,5 @@
 import type { RetrievedWorldEvent } from "./worldEventRetrieval";
-import { resolveContradictionEvidence } from "./worldEventContradictionResolver";
+import { appraiseRetrievedWorldState } from "./worldStateAppraisal";
 
 export interface WorldModelResponseIssue {
   code: "memory_evidence_denied";
@@ -23,33 +23,21 @@ function grounded(items: RetrievedWorldEvent[]) {
   return items.filter((item) => item.observation.status === "grounded");
 }
 
-function hasConflict(items: RetrievedWorldEvent[]) {
-  if (
-    items.some(
-      (item) =>
-        item.projectedState?.evidenceStatus === "conflicting" ||
-        item.reasons.includes("canonical_conflict_evidence"),
-    )
-  ) return true;
-
-  return resolveContradictionEvidence(items.map((item) => item.observation))
-    .some((set) => set.status === "conflicting");
-}
-
 /**
  * Retrieval is authoritative only about evidence existence, not absolute truth.
- * A model may express uncertainty for conflicting evidence, but it may not claim
- * that no memory/evidence exists when grounded retrieval already supplied it.
+ * WorldStateAppraisal is the single bounded authority for evidence/conflict
+ * posture. The response guard consumes that appraisal instead of independently
+ * reconstructing world truth from raw rows.
  */
 export function findWorldModelResponseIssues(
   reply: string,
   items: RetrievedWorldEvent[],
 ): WorldModelResponseIssue[] {
-  const evidence = grounded(items);
-  if (!evidence.length) return [];
+  const appraisal = appraiseRetrievedWorldState(items);
+  if (appraisal.mayClaimNoMemory) return [];
 
   const text = normalize(reply);
-  const conflict = hasConflict(evidence);
+  const conflict = appraisal.truthPosture === "conflicting";
   const deniesEvidence = HARD_MEMORY_DENIAL_RE.test(text) || (!conflict && SOFT_MEMORY_DENIAL_RE.test(text));
   if (!deniesEvidence) return [];
 
@@ -70,7 +58,8 @@ export function buildWorldModelRecallFallback(items: RetrievedWorldEvent[]): str
   const evidence = grounded(items);
   if (!evidence.length) return "";
 
-  if (hasConflict(evidence)) {
+  const appraisal = appraiseRetrievedWorldState(items);
+  if (appraisal.truthPosture === "conflicting") {
     const distinct = Array.from(
       new Set(evidence.map(compactEvidenceText).filter(Boolean)),
     ).slice(0, 2);
