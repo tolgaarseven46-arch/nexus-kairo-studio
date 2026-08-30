@@ -6,6 +6,7 @@ import type { DroitDynamicState } from "../types/nexus";
 
 const server = fs.readFileSync(path.resolve(process.cwd(), "server.ts"), "utf8");
 const lockSource = fs.readFileSync(path.resolve(process.cwd(), "src/services/conversationStateLock.ts"), "utf8");
+const legacyAuthorityPath = path.resolve(process.cwd(), "src/services/conversationStateAuthority.ts");
 
 const state = (conversationState: "active" | "distancing" | "disengaged" | "repairing") => ({
   calmness: 70,
@@ -31,6 +32,10 @@ describe("pure conversation state lock projection", () => {
   it("keeps the projection independent from personality types", () => {
     expect(lockSource).not.toContain("DroitPersonalityTraits");
     expect(lockSource).not.toContain("personality:");
+  });
+
+  it("does not allow the retired conversation-state authority source to return", () => {
+    expect(fs.existsSync(legacyAuthorityPath)).toBe(false);
   });
 
   it("uses responsePersonality directly after KDM instead of passing it through a fake authority", () => {
