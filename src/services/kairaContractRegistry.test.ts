@@ -53,8 +53,13 @@ describe("Kaira contract registry", () => {
     expect(activeContractVersion("event-modality")?.version).toBe(1);
   });
 
-  it("registers immutable plan lifecycle semantics", () => {
-    expect(activeContractVersion("plan-lifecycle")?.version).toBe(1);
+  it("activates generation-aware plan lifecycle v2", () => {
+    expect(activeContractVersion("plan-lifecycle")?.version).toBe(2);
+    expect(
+      KAIRA_CONTRACT_REGISTRY.find(
+        (item) => item.id === "plan-lifecycle" && item.version === 1,
+      )?.status,
+    ).toBe("superseded");
   });
 
   it("does not allow anonymous contracts without consumers", () => {
