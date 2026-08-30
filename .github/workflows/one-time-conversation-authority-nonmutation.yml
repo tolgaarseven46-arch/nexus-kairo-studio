@@ -6,6 +6,10 @@ on:
       - ".github/workflows/one-time-conversation-authority-nonmutation.yml"
       - "scripts/applyConversationAuthorityNonMutation.mjs"
       - "src/services/kairaConversationAuthorityNonMutationContracts.test.ts"
+      - "src/services/kairaLegacyRuntimeFlagRemovalContracts.test.ts"
+      - "src/services/conversationStateAuthority.test.ts"
+      - "src/services/kairaStateBehaviorContracts.ts"
+      - "src/services/kairaStateBehaviorContracts.test.ts"
 
 permissions:
   contents: write
