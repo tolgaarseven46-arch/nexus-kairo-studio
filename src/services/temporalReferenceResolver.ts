@@ -1,16 +1,15 @@
-import type { WorldEventTemporalReference } from "./worldEventEngine";
+import type {
+  WorldEventTemporalOffsetUnit,
+  WorldEventTemporalReference,
+  WorldEventResolvedTemporalInterval,
+} from "./worldEventEngine";
 
-export type TemporalPrecision = "day" | "week" | "instant" | "unknown";
-
-export interface ResolvedTemporalInterval {
-  startAt: string;
-  endAt: string;
-  precision: TemporalPrecision;
-  anchorAt: string;
-  source: "relative_marker" | "explicit_date" | "relation_fallback";
-}
+export type TemporalPrecision = "day" | "week" | "hour" | "minute" | "instant" | "unknown";
+export type ResolvedTemporalInterval = WorldEventResolvedTemporalInterval;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
 
 const normalize = (value: string) =>
   value.toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
@@ -69,20 +68,112 @@ function explicitDateInterval(text: string, anchor: Date): ResolvedTemporalInter
   };
 }
 
+function unitMs(unit: WorldEventTemporalOffsetUnit): number {
+  if (unit === "minute") return MINUTE_MS;
+  if (unit === "hour") return HOUR_MS;
+  if (unit === "day") return DAY_MS;
+  return 7 * DAY_MS;
+}
+
+function precisionForUnit(unit: WorldEventTemporalOffsetUnit): TemporalPrecision {
+  if (unit === "minute") return "minute";
+  if (unit === "hour") return "hour";
+  if (unit === "day") return "day";
+  return "week";
+}
+
+function intervalAroundInstant(
+  instantMs: number,
+  unit: WorldEventTemporalOffsetUnit,
+  anchorAt: string,
+  source: ResolvedTemporalInterval["source"],
+): ResolvedTemporalInterval {
+  const precision = precisionForUnit(unit);
+  if (unit === "day") {
+    const day = startOfUtcDay(new Date(instantMs));
+    return {
+      startAt: day.toISOString(),
+      endAt: new Date(day.getTime() + DAY_MS - 1).toISOString(),
+      precision,
+      anchorAt,
+      source,
+    };
+  }
+  if (unit === "week") {
+    const day = startOfUtcDay(new Date(instantMs));
+    const mondayOffset = (day.getUTCDay() + 6) % 7;
+    const monday = new Date(day.getTime() - mondayOffset * DAY_MS);
+    return {
+      startAt: monday.toISOString(),
+      endAt: new Date(monday.getTime() + 7 * DAY_MS - 1).toISOString(),
+      precision,
+      anchorAt,
+      source,
+    };
+  }
+  return {
+    startAt: new Date(instantMs).toISOString(),
+    endAt: new Date(instantMs).toISOString(),
+    precision,
+    anchorAt,
+    source,
+  };
+}
+
+function resolveDependency(
+  temporal: WorldEventTemporalReference,
+  observationAnchor: Date,
+  referenceInterval?: ResolvedTemporalInterval,
+): ResolvedTemporalInterval | undefined {
+  const dependency = temporal.dependency;
+  if (!dependency) return undefined;
+
+  if (dependency.anchor === "previous_event") {
+    if (!referenceInterval) return undefined;
+    if (!dependency.offsetAmount || !dependency.offsetUnit) return undefined;
+    const referenceBase = dependency.direction === "after"
+      ? Date.parse(referenceInterval.endAt)
+      : Date.parse(referenceInterval.startAt);
+    if (!Number.isFinite(referenceBase)) return undefined;
+    const delta = dependency.offsetAmount * unitMs(dependency.offsetUnit);
+    const instant = dependency.direction === "after" ? referenceBase + delta : referenceBase - delta;
+    return intervalAroundInstant(
+      instant,
+      dependency.offsetUnit,
+      referenceInterval.endAt,
+      "referenced_event",
+    );
+  }
+
+  if (!dependency.offsetAmount || !dependency.offsetUnit) return undefined;
+  const direction = dependency.direction === "before" ? -1 : 1;
+  const instant = observationAnchor.getTime() + direction * dependency.offsetAmount * unitMs(dependency.offsetUnit);
+  return intervalAroundInstant(
+    instant,
+    dependency.offsetUnit,
+    observationAnchor.toISOString(),
+    "relative_offset",
+  );
+}
+
 /**
- * Resolves bounded Turkish temporal expressions against an explicit anchor.
- * It never guesses an interval for vague expressions such as "önce" or
- * "sonra" without a measurable offset; those stay unresolved instead of
- * inventing time.
+ * Resolves bounded Turkish temporal expressions against an explicit observation
+ * anchor. Expressions that depend on another event remain unresolved until a
+ * reference interval is explicitly supplied; no synthetic time is invented.
  */
 export function resolveTemporalReference(
   message: string,
   temporal: WorldEventTemporalReference | undefined,
   anchorAt: string,
+  referenceInterval?: ResolvedTemporalInterval,
 ): ResolvedTemporalInterval | undefined {
   const anchor = new Date(anchorAt);
   if (!Number.isFinite(anchor.getTime())) return undefined;
   const text = normalize(message);
+
+  const dependencyResolved = temporal ? resolveDependency(temporal, anchor, referenceInterval) : undefined;
+  if (dependencyResolved) return dependencyResolved;
+  if (temporal?.dependency?.anchor === "previous_event") return undefined;
 
   const explicit = explicitDateInterval(text, anchor);
   if (explicit) return explicit;
