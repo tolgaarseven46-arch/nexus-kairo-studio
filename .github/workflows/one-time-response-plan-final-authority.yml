@@ -1,0 +1,43 @@
+name: One-time response plan final authority
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-response-plan-final-authority.yml"
+      - "scripts/applyResponsePlanFinalAuthority.mjs"
+      - "src/services/kairaResponsePlanFinalAuthorityContracts.test.ts"
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply response plan final authority
+        run: node scripts/applyResponsePlanFinalAuthority.mjs
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Authority contract
+        run: npm test -- --run src/services/kairaResponsePlanFinalAuthorityContracts.test.ts
+      - name: TypeScript check
+        run: npm run lint
+      - name: Full tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit integration
+        run: |
+          if git diff --quiet -- server.ts; then
+            echo "response plan final authority already applied"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts
+          git commit -m "feat(kaira): make response plan final behavior authority"
+          git pull --rebase origin main
+          git push origin main
