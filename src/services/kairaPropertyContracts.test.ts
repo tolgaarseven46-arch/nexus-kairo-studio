@@ -5,7 +5,7 @@ import { resolveMessageEntities } from "./entityResolutionEngine";
 import { groundSemanticEventForAppraisal } from "./languageUnderstandingService";
 import { analyzeKdmInteraction } from "./kdmConsistencyEngine";
 import { buildBehaviorContract } from "./behaviorContract";
-import { applyConversationStateAuthority } from "./conversationStateAuthority";
+import { projectConversationStateLock } from "./conversationStateLock";
 import { validateStateBehaviorSeam } from "./kairaStateBehaviorContracts";
 
 const personality: DroitPersonalityTraits = {
@@ -76,8 +76,8 @@ function step(message: string, state: DroitDynamicState) {
   const result = analyzeKdmInteraction(message, personality, state, appraisalEvent(message));
   const next = result.nextDynamicState;
   const behavior = buildBehaviorContract(next, result.trace);
-  const authority = applyConversationStateAuthority(personality, next);
-  const seam = validateStateBehaviorSeam({ state: next, behavior, authority });
+  const stateLock = projectConversationStateLock(next);
+  const seam = validateStateBehaviorSeam({ state: next, behavior, stateLock });
   return { result, next, seam };
 }
 
