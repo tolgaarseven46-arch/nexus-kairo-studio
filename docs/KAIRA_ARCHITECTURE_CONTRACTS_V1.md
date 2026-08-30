@@ -14,12 +14,13 @@ Kaira geliştirmesinde yeni büyük katman eklemeden önce mevcut veri akışı 
 2. Entity Resolution -> `EntityResolutionResult`
 3. World Event Mapping -> `CanonicalWorldEvent`
 4. World Model Store / Retrieval -> `EvidenceSet` (`RetrievedWorldEvent[]`)
-5. Appraisal / Relationship / Temperament -> `DroitDynamicState`
-6. Conversation State Authority -> authoritative social state
-7. Behavior Policy -> `BehaviorContract`
-8. Response Generation -> natural-language realization
-9. Deterministic Enforcement / Consistency -> delivered response
-10. Contract Audit -> invariant violations
+5. Temporal Evidence Policy -> zaman sıralaması / latest seçimi / evidence preservation
+6. Appraisal / Relationship / Temperament -> `DroitDynamicState`
+7. Conversation State Authority -> authoritative social state
+8. Behavior Policy -> `BehaviorContract`
+9. Response Generation -> natural-language realization
+10. Deterministic Enforcement / Consistency -> delivered response
+11. Contract Audit -> invariant violations
 
 Bir katman downstream katmanın işini üstlenmemeli. Ham kullanıcı cümlesi mümkün olduğunca erken canonical temsile indirgenmeli; downstream motorlar aynı anlamı yeniden bağımsız regex/heuristic ile çözmeye çalışmamalı.
 
@@ -40,6 +41,7 @@ Bir katman downstream katmanın işini üstlenmemeli. Ham kullanıcı cümlesi m
 - `certainty` `0..1` aralığındadır.
 - Participant objeleri Firestore'a `undefined` alan taşımaz.
 - Recall/query mesajları dünya gerçeği olarak persist edilmez.
+- Kullanıcının açık üçüncü şahıs aktarımları (`Ayşe bana özür diledi`) epistemik olarak `reported_claim` kalır; doğrudan Kaira-kullanıcı etkileşimi sayılmaz.
 
 ### Retrieval
 - Retrieval cevap yazmaz; evidence döndürür.
@@ -48,10 +50,20 @@ Bir katman downstream katmanın işini üstlenmemeli. Ham kullanıcı cümlesi m
 - Önceden yanlış persist edilmiş recall soruları evidence olarak dönmemelidir.
 - Duplicate historical observations tek kişinin result limitini doldurup başka explicit isimleri dışarı itememelidir.
 
+### Temporal Evidence
+- `en son` sorgusunda entity-relevant candidate set içinde `createdAt` authoritative sıralamadır; lexical retrieval score eski kaydı yeni kaydın önüne geçiremez.
+- Geçersiz timestamp `latest` kararı kazanamaz ve contract ihlali olarak görünür.
+- Temporal sıralama observation `kind` / `status` epistemik bilgisini değiştiremez.
+- Zaman içinde farklılaşan kayıtlar destructive overwrite ile tek sahte gerçeğe dönüştürülmez; eski evidence korunur.
+- Mevcut `CanonicalWorldEvent` şemasında proposition identity/polarity olmadığı için salt metin farkından **mantıksal contradiction** ilan edilmez. Şimdilik güvenli davranış `preserve distinct evidence` yaklaşımıdır.
+- İleride contradiction resolution eklenecekse önce proposition/claim identity contractı açılacak; resolution motoru bu contract olmadan geçmiş evidence'i silmeyecek veya doğrulanmış tek gerçeğe çevirmeyecek.
+
 ### Retrieval -> Response seam
 - Grounded matching `reported_claim` varsa response generator bunu `kayıt yok` sayamaz.
 - `reported_claim`, doğrulanmış dünya gerçeği değil kullanıcının aktardığı iddia olarak ifade edilir.
 - Response generator retrieval kanıtını değiştiremez veya yeni actor/target icat edemez.
+- `en son` cevabında temporal policy'nin ilk matching evidence'i kullanılmalıdır.
+- Zaman içinde farklı kayıtlar varsa response layer evidence geçmişini keyfi biçimde tek gerçeğe sıkıştıramaz.
 
 ### Dynamic / Relationship State
 - Mood ve relationship score alanları canonical aralıkların dışına çıkmaz.
@@ -100,7 +112,8 @@ Bunlar bir invariant'ın örneğidir; yeni mimari kural bu cümlelerin kendisind
 Producer-consumer sınırları ayrı test edilir:
 - semantic -> entity/world-event
 - world-event -> retrieval
-- retrieval -> response evidence
+- retrieval -> temporal evidence
+- temporal evidence -> response evidence
 - relationship state -> authority
 - authority/state -> behavior contract
 - behavior contract -> delivered response
@@ -113,7 +126,19 @@ Exact cevap metni yerine çok-turn dizilerde şunlar kontrol edilir:
 - disengagement persistence
 - authority/behavior alignment
 
-### 4. Bilinçli semantic revision
+### 4. Property/world-model simulation
+Generated kişi/olay dizilerinde:
+- query pollution
+- duplicate crowding
+- multi-name evidence coverage
+- reported-claim epistemics
+- temporal ordering
+- latest determinism
+- historical evidence preservation
+
+otomatik zorlanır.
+
+### 5. Bilinçli semantic revision
 Yeni katman eski davranışın anlamını kasıtlı değiştirirse bu regression sayılmaz. Değişiklik hangi contract version'ını değiştirdiğini açıkça belirtir.
 
 Sessiz test silme veya sadece mevcut implementasyonu spesifikasyon kabul etme yoktur.
@@ -144,7 +169,7 @@ Architecture-contract kapısı kırmızıysa yeni feature ilerletilmez.
 
 1. V1 contract gate tamamen yeşil tutulur.
 2. Yeni bulunan bug önce mevcut invariant'a bağlanır.
-3. Daha geniş generated/property-style state-sequence senaryoları eklenir.
-4. Temporal memory / contradiction resolution için önce yeni contract/version tasarlanır.
+3. Generated/property-style state ve world-model senaryoları sürekli genişletilir.
+4. Temporal evidence V1 contractı korunur; gerçek contradiction resolution başlamadan önce proposition identity/polarity şeması tasarlanır.
 5. Multi-user world model için actor/target/ownership contract'ı revize edilmeden implementation başlanmaz.
 6. Learned behavior policy gelirse BehaviorContract authoritative ara yüzü korunur; model doğrudan relationship state'i mutate etmez.
