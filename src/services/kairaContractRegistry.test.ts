@@ -34,13 +34,17 @@ describe("Kaira contract registry", () => {
     }
   });
 
-  it("activates Canonical World Event v2 after explicit semantic revision", () => {
-    expect(activeContractVersion("canonical-world-event")?.version).toBe(2);
+  it("activates Canonical World Event v3 after explicit semantic revision", () => {
+    expect(activeContractVersion("canonical-world-event")?.version).toBe(3);
     expect(
       KAIRA_CONTRACT_REGISTRY.find(
-        (item) => item.id === "canonical-world-event" && item.version === 1,
+        (item) => item.id === "canonical-world-event" && item.version === 2,
       )?.status,
     ).toBe("superseded");
+  });
+
+  it("activates proposition temporal anchor v2 with content identity", () => {
+    expect(activeContractVersion("proposition-temporal-event-anchor")?.version).toBe(2);
   });
 
   it("does not allow anonymous contracts without consumers", () => {
