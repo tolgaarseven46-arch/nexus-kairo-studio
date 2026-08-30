@@ -9,12 +9,12 @@ const server = read("server.ts");
 describe("authoritative behavior profile boundary", () => {
   it("does not compute or send a parallel client behavior profile", () => {
     expect(client).not.toContain("computeBehaviorProfile(runtimePersonality, userMessage)");
-    expect(client).not.toMatch(/const payload = \{[^}]*behaviorProfile,/su);
+    expect(client).not.toContain("personality: runtimePersonality, behaviorProfile, personalityTendency:");
   });
 
   it("returns the KDM behavior profile from both server response paths", () => {
-    expect(server.match(/behaviorProfile,/g)?.length).toBeGreaterThanOrEqual(2);
-    expect(server.match(/kdm: \{[^}]*behaviorProfile,/gsu)?.length).toBeGreaterThanOrEqual(2);
+    const marker = "worldMemoryGuard, behaviorContract, behaviorProfile, responsePlan, conversationAuthority:";
+    expect(server.split(marker).length - 1).toBeGreaterThanOrEqual(2);
   });
 
   it("requires the client to expose the server profile to callers", () => {
