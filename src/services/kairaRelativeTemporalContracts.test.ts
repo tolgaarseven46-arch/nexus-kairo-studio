@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { detectWorldEventTemporalReference, type CanonicalWorldEvent } from "./worldEventEngine";
 import { resolveTemporalReference } from "./temporalReferenceResolver";
 import { validateWorldEventContract } from "./kairaArchitectureContracts";
+import {
+  previousResolvedIntervalFromObservations,
+  type WorldEventObservation,
+} from "./worldModelEventStore";
 
 const ANCHOR = "2026-08-30T02:00:00.000Z";
 
@@ -16,6 +20,19 @@ function baseEvent(raw: string): CanonicalWorldEvent {
     proposition: { key: "current_user|general|?", predicate: "general", actorKey: "current_user" },
     polarity: "positive",
     temporal: detectWorldEventTemporalReference(raw),
+  };
+}
+
+function observation(raw: string, createdAt: string, resolved?: CanonicalWorldEvent["temporal"] extends infer T ? any : never): WorldEventObservation {
+  const event = baseEvent(raw);
+  if (resolved) event.temporal = { ...event.temporal!, resolved };
+  return {
+    userId: "mert",
+    sessionId: "relative-temporal",
+    kind: "reported_claim",
+    status: "grounded",
+    createdAt,
+    event,
   };
 }
 
@@ -84,6 +101,30 @@ describe("Kaira relative temporal contracts", () => {
       marker: "ondan sonra",
     });
     expect(resolveTemporalReference("Ondan sonra Ayşe gitti", temporal, ANCHOR)).toBeUndefined();
+  });
+
+  it("does not skip an unresolved immediate previous event to borrow an older timestamp", () => {
+    const olderResolved = observation(
+      "Ayşe dün geldi",
+      "2026-08-30T01:00:00.000Z",
+      {
+        startAt: "2026-08-29T00:00:00.000Z",
+        endAt: "2026-08-29T23:59:59.999Z",
+        precision: "day",
+        anchorAt: "2026-08-30T01:00:00.000Z",
+        source: "relative_marker",
+      },
+    );
+    const immediateUnresolved = observation(
+      "Ayşe bir şey anlattı",
+      "2026-08-30T01:30:00.000Z",
+    );
+    expect(
+      previousResolvedIntervalFromObservations(
+        [olderResolved, immediateUnresolved],
+        "relative-temporal",
+      ),
+    ).toBeUndefined();
   });
 
   it("accepts new canonical relative offset enums", () => {
