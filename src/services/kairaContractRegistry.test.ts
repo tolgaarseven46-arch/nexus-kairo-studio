@@ -82,6 +82,15 @@ describe("Kaira contract registry", () => {
     expect(projection?.consumerLayers).toContain("response-generation");
   });
 
+  it("activates projection-aware current-state retrieval v2", () => {
+    expect(activeContractVersion("world-event-retrieval")?.version).toBe(2);
+    expect(
+      KAIRA_CONTRACT_REGISTRY.find(
+        (item) => item.id === "world-event-retrieval" && item.version === 1,
+      )?.status,
+    ).toBe("superseded");
+  });
+
   it("does not allow anonymous contracts without consumers", () => {
     expect(KAIRA_CONTRACT_REGISTRY.every((item) => item.consumerLayers.length > 0)).toBe(true);
   });
