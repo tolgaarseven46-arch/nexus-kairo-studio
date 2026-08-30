@@ -333,3 +333,15 @@ Yeni sohbet açıldığında:
 - `kairaConversationAuthorityNonMutationContracts.test.ts` kalıcı `test:contracts` suite'ine eklendi. Legacy runtime-removal contract da replacement trait mutation'ını yasaklayacak şekilde güncellendi.
 - Entegrasyon commit'i: `fa3f9b0` (`refactor(kaira): make conversation authority non-mutating`). Non-mutation contract, TypeScript, 501/501 test ve production build başarıyla geçti. Geçici migration workflow/script kaldırıldı.
 - Sonraki audit adayı: bu servis artık yalnız state-lock projection ürettiği için `conversationStateAuthority` adı/katmanı sadeleştirilebilir; ancak observability ve response metadata tüketicileri repo çapında doğrulanmadan kaldırılmayacak.
+
+
+## 31. Conversation state lock projection — 2026-08-31
+- Eski `conversationStateAuthority` canlı response yolundaki personality passthrough rolünden çıkarıldı. Yeni `conversationStateLock` saf projection yalnız `state`, `locked` ve `reason` üretir; personality payload taşımaz ve trait mutasyonu yapamaz.
+- Server KDM sonrası `conversationStateLock = projectConversationStateLock(kdm.nextDynamicState)` üretir. Response HOW shaping için per-turn `responsePersonality` doğrudan `responseStylePersonality` olarak kullanılır; state-lock katmanı HOW traitlerini değiştirmez.
+- Base personality sahipliği korunur: `analyzeKdmInteraction` yalnız `basePersonality` + explicit `behaviorPolicy` alır. Per-turn response overlay KDM reducer inputuna girmez.
+- State→behavior seam artık `stateLock` ile doğrulanır; legacy `authority` test/input terminolojisi kaldırıldı. Property ve multi-turn sequence contractları da yeni projection'a taşındı.
+- World-state appraisal/reasoning evidence KDM state mutation inputunun dışında kalmaya devam eder; integration contract markerları state-lock sınırına güncellendi.
+- Dış debug/API compatibility için `kdm.conversationAuthority` alan adı şimdilik korunur, fakat içeriği yeni `conversationStateLock` projection'ından gelir. Bu compatibility adı yeni authority katmanı olduğu anlamına gelmez.
+- `kairaConversationStateLockContracts.test.ts` kalıcı `test:contracts` suite'ine eklendi.
+- Entegrasyon commit'i: `db0ae1a` (`refactor(kaira): reduce conversation authority to state lock`). State-lock contract, TypeScript, 508/508 test ve production build başarıyla geçti. Geçici migration workflow/script kaldırıldı.
+- Sonraki audit adayı: `src/services/conversationStateAuthority.ts` dosyası ve `conversationAuthority` compatibility metadata adı. Repo çapında gerçek consumer bulunmadan dosya/alan kaldırılmayacak.
