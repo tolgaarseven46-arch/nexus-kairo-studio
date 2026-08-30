@@ -40,11 +40,21 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
   {
     id: "canonical-world-event",
     version: 2,
-    status: "active",
+    status: "superseded",
     ownerLayer: "world-event",
     consumerLayers: ["world-model-store", "retrieval", "appraisal", "temporal-evidence", "contradiction-resolution"],
     summary: "Canonical events preserve V1 evidence semantics and additionally expose stable proposition identity, polarity and bounded temporal reference.",
     supersedes: "canonical-world-event@1",
+    revisionReason: "V3 adds bounded proposition content identity because actor+predicate+target can collapse semantically different events such as separate insult contents.",
+  },
+  {
+    id: "canonical-world-event",
+    version: 3,
+    status: "active",
+    ownerLayer: "world-event",
+    consumerLayers: ["world-model-store", "retrieval", "appraisal", "temporal-evidence", "contradiction-resolution", "discourse-context"],
+    summary: "Canonical propositions include bounded content identity when available, preventing distinct event contents from collapsing into one proposition while preserving V2 polarity and temporal semantics.",
+    supersedes: "canonical-world-event@2",
   },
   {
     id: "world-model-ownership",
@@ -104,11 +114,11 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
   },
   {
     id: "proposition-temporal-event-anchor",
-    version: 1,
+    version: 2,
     status: "active",
     ownerLayer: "discourse-context",
     consumerLayers: ["temporal-event-graph", "retrieval", "response-generation"],
-    summary: "Specific temporal questions may resolve an anchor from same-session canonical actor, predicate, target and polarity components; repeated matching propositions remain ambiguous and recency never breaks the tie.",
+    summary: "Specific temporal questions resolve anchors from same-session canonical actor, predicate, target, polarity and bounded content identity when present; repeated full propositions remain ambiguous and recency never breaks the tie.",
   },
   {
     id: "temporal-evidence",
