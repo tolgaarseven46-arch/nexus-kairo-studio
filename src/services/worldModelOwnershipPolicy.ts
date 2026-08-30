@@ -1,26 +1,37 @@
-import type { WorldEventObservation } from "./worldModelEventStore";
+import {
+  observationKairaInstanceId,
+  type WorldEventObservation,
+} from "./worldModelEventStore";
+import {
+  DEFAULT_KAIRA_INSTANCE_ID,
+  resolveKairaInstanceContext,
+} from "./kairaInstanceContext";
 
 export interface WorldModelOwnershipContext {
   ownerUserId: string;
+  kairaInstanceId?: string;
   sessionId?: string;
 }
 
 const normalizedId = (value?: string) => String(value || "").trim();
 
 /**
- * Multi-user ownership seam.
+ * Multi-user + multi-Kaira ownership seam.
  *
- * World-model evidence belongs to the account/user scope that persisted it.
- * Participant names inside an event are facts about the event; they never
- * redefine who owns the memory record.
+ * World-model evidence belongs to both the account/user scope and the Kaira
+ * instance that experienced it. Participant names never redefine ownership.
  */
 export function selectOwnedObservations(
   observations: WorldEventObservation[],
   context: WorldModelOwnershipContext,
 ): WorldEventObservation[] {
   const owner = normalizedId(context.ownerUserId);
+  const instanceId = resolveKairaInstanceContext({
+    instanceId: context.kairaInstanceId || DEFAULT_KAIRA_INSTANCE_ID,
+  }).instanceId;
   return observations.filter((item) => {
     if (normalizedId(item.userId) !== owner) return false;
+    if (observationKairaInstanceId(item) !== instanceId) return false;
     if (context.sessionId && item.sessionId !== context.sessionId) return false;
     return true;
   });
@@ -37,6 +48,9 @@ export function validateWorldModelOwnership(
 ): WorldModelOwnershipIssue[] {
   const issues: WorldModelOwnershipIssue[] = [];
   const owner = normalizedId(context.ownerUserId);
+  const instanceId = resolveKairaInstanceContext({
+    instanceId: context.kairaInstanceId || DEFAULT_KAIRA_INSTANCE_ID,
+  }).instanceId;
 
   if (!owner) {
     issues.push({
@@ -66,6 +80,12 @@ export function validateWorldModelOwnership(
     issues.push({
       invariant: "ownership.cross_user_isolation",
       message: "Ownership filtresi başka kullanıcıya ait evidence döndürdü.",
+    });
+  }
+  if (selected.some((item) => observationKairaInstanceId(item) !== instanceId)) {
+    issues.push({
+      invariant: "ownership.cross_instance_isolation",
+      message: "Ownership filtresi başka Kaira instance'ına ait evidence döndürdü.",
     });
   }
 
