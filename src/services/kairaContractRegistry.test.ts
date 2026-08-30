@@ -15,10 +15,12 @@ describe("Kaira contract registry", () => {
       "semantic-event",
       "entity-resolution",
       "canonical-world-event",
+      "world-model-ownership",
       "world-event-retrieval",
       "temporal-evidence",
       "relationship-state",
       "state-to-behavior",
+      "learned-policy-boundary",
       "retrieval-to-response",
     ]) {
       expect(activeContractVersion(id)?.status).toBe("active");
