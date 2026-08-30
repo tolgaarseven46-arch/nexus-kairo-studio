@@ -1,6 +1,7 @@
 import type { RetrievedWorldEvent } from "./worldEventRetrieval";
 import type { WorldModelAssertionState } from "./worldModelProjection";
 import type { PlanLifecycleState } from "./worldEventLifecycle";
+import { resolveContradictionEvidence } from "./worldEventContradictionResolver";
 
 export type WorldStateEvidencePosture =
   | "none"
@@ -58,12 +59,18 @@ export function appraiseRetrievedWorldState(
       .filter((value): value is PlanLifecycleState => Boolean(value) && value !== "unknown"),
   );
 
-  const hasCanonicalConflict = items.some(
-    (item) =>
-      item.projectedState?.evidenceStatus === "conflicting" ||
-      item.projectedState?.assertionState === "conflicting" ||
-      item.reasons.includes("canonical_conflict_evidence"),
-  );
+  const rawGroundedConflict = resolveContradictionEvidence(
+    grounded.map((item) => item.observation),
+  ).some((set) => set.status === "conflicting");
+
+  const hasCanonicalConflict =
+    rawGroundedConflict ||
+    items.some(
+      (item) =>
+        item.projectedState?.evidenceStatus === "conflicting" ||
+        item.projectedState?.assertionState === "conflicting" ||
+        item.reasons.includes("canonical_conflict_evidence"),
+    );
 
   const hasSupportedCurrentState =
     grounded.length > 0 &&
