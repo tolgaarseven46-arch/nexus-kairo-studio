@@ -16,6 +16,7 @@ describe("Kaira contract registry", () => {
       "entity-resolution",
       "canonical-world-event",
       "world-event-retrieval",
+      "temporal-evidence",
       "relationship-state",
       "state-to-behavior",
       "retrieval-to-response",
