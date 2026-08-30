@@ -47,6 +47,7 @@ export const KAIRA_ARCHITECTURE_CONTRACTS_V1 = {
     "Yeni canonical event V2 proposition/polarity/temporal alanlarını taşır.",
     "Proposition predicate eventType ile aynı semantic kimliği temsil eder.",
     "Resolved temporal interval varsa geçerli ISO zamanları ve start<=end şartını taşır.",
+    "Relative temporal dependency canonical anchor/direction/unit/amount sözleşmesine uyar.",
     "Recall/query mesajları kalıcı dünya olayı olarak değerlendirilmemelidir.",
   ],
   retrieval: [
@@ -203,13 +204,29 @@ export function validateWorldEventContract(
     });
   }
 
+  const dependency = event.temporal?.dependency;
+  if (dependency) {
+    const anchorOk = ["observation", "previous_event"].includes(dependency.anchor);
+    const directionOk = ["before", "after"].includes(dependency.direction);
+    const unitOk = dependency.offsetUnit === undefined || ["minute", "hour", "day", "week"].includes(dependency.offsetUnit);
+    const amountOk = dependency.offsetAmount === undefined || (Number.isFinite(dependency.offsetAmount) && dependency.offsetAmount > 0);
+    const pairedOffset = (dependency.offsetAmount === undefined) === (dependency.offsetUnit === undefined);
+    if (!anchorOk || !directionOk || !unitOk || !amountOk || !pairedOffset || !dependency.marker?.trim()) {
+      issues.push({
+        layer: "world_event",
+        invariant: "world_event.v2_temporal_dependency",
+        message: "Relative temporal dependency canonical anchor/direction/offset sözleşmesine uymuyor.",
+      });
+    }
+  }
+
   const resolved = event.temporal?.resolved;
   if (resolved) {
     const start = Date.parse(resolved.startAt);
     const end = Date.parse(resolved.endAt);
     const anchor = Date.parse(resolved.anchorAt);
-    const precisionOk = ["day", "week", "instant", "unknown"].includes(resolved.precision);
-    const sourceOk = ["relative_marker", "explicit_date", "relation_fallback"].includes(resolved.source);
+    const precisionOk = ["day", "week", "hour", "minute", "instant", "unknown"].includes(resolved.precision);
+    const sourceOk = ["relative_marker", "relative_offset", "explicit_date", "relation_fallback", "referenced_event"].includes(resolved.source);
     if (!Number.isFinite(start) || !Number.isFinite(end) || !Number.isFinite(anchor) || start > end || !precisionOk || !sourceOk) {
       issues.push({
         layer: "world_event",
