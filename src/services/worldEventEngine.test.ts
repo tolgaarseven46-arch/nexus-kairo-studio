@@ -45,7 +45,7 @@ describe("buildCanonicalWorldEvent", () => {
     expect(event.certainty).toBeLessThan(0.8);
   });
 
-  it("resolves a named third-party actor for non-speech actions aimed at first person", () => {
+  it("classifies a named third-party action reported by the user as a reported claim", () => {
     const message = "Ayşe bana özür diledi";
     const semantic = interpretSemanticEvent(message);
     const entities = resolveMessageEntities(message, {
@@ -55,7 +55,10 @@ describe("buildCanonicalWorldEvent", () => {
 
     const event = buildCanonicalWorldEvent(message, semantic, entities);
 
-    expect(event.reportedSpeech).toBe(false);
+    // Semantic revision: reportedSpeech now means the user is reporting a
+    // third-party event, not only literal speech verbs. This keeps epistemic
+    // provenance correct in the world model.
+    expect(event.reportedSpeech).toBe(true);
     expect(event.eventType).toBe("apology");
     expect(event.actor).toEqual(
       expect.objectContaining({ name: "Ayşe", source: "explicit_name" }),
