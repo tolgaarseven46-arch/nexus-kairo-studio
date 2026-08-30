@@ -33,6 +33,7 @@ describe("Kaira contract registry", () => {
       "contradiction-evidence",
       "world-model-projection",
       "world-state-appraisal",
+      "world-reasoning-policy",
       "relationship-state",
       "state-to-behavior",
       "learned-policy-boundary",
@@ -98,6 +99,14 @@ describe("Kaira contract registry", () => {
     expect(appraisal?.ownerLayer).toBe("world-state-appraisal");
     expect(appraisal?.consumerLayers).toContain("response-generation");
     expect(appraisal?.consumerLayers).not.toContain("relationship-state");
+  });
+
+  it("keeps world reasoning policy separate from social-state authority", () => {
+    const policy = activeContractVersion("world-reasoning-policy");
+    expect(policy?.version).toBe(1);
+    expect(policy?.ownerLayer).toBe("world-reasoning-policy");
+    expect(policy?.consumerLayers).toContain("response-generation");
+    expect(policy?.consumerLayers).not.toContain("relationship-state");
   });
 
   it("does not allow anonymous contracts without consumers", () => {
