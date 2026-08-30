@@ -21,20 +21,20 @@ describe("base personality vs per-turn response overlay ownership", () => {
   it("uses base personality as the KDM relationship/emotion reducer input", () => {
     expect(server).toContain("basePersonality = personality as DroitPersonalityTraits");
     expect(server).toContain("responsePersonality = (incomingResponsePersonality || personality) as DroitPersonalityTraits");
-    const kdmCall = between(server, "kdm = analyzeKdmInteraction(", "),\n      responseStylePersonality");
+    const kdmCall = between(server, "kdm = analyzeKdmInteraction(", "),\n      behaviorContract");
     expect(kdmCall).toContain("basePersonality");
     expect(kdmCall).not.toContain("responsePersonality");
   });
 
   it("uses per-turn overlay only after KDM for response HOW shaping", () => {
-    const afterKdm = server.slice(server.indexOf("responseStylePersonality = responsePersonality"));
-    expect(afterKdm).toContain("responseStylePersonality = responsePersonality");
-    expect(afterKdm).toContain("computeKairoSpeechIdentity(\n        responseStylePersonality,");
-    expect(afterKdm).toContain("tryLocalKairoReply(\n        userMessage,\n        responseStylePersonality,");
+    const afterKdm = server.slice(server.indexOf("behaviorContract = buildBehaviorContract"));
+    expect(afterKdm).toContain("computeKairoSpeechIdentity(\n        responsePersonality,");
+    expect(afterKdm).toContain("tryLocalKairoReply(\n        userMessage,\n        responsePersonality,");
+    expect(afterKdm).not.toContain("responseStylePersonality");
   });
 
   it("keeps explicit behavior policy as the only per-turn decision input entering KDM", () => {
-    const kdmCall = between(server, "kdm = analyzeKdmInteraction(", "),\n      responseStylePersonality");
+    const kdmCall = between(server, "kdm = analyzeKdmInteraction(", "),\n      behaviorContract");
     expect(kdmCall).toContain("behaviorPolicy");
   });
 });

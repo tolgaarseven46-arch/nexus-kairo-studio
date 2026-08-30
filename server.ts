@@ -575,11 +575,10 @@ app.post("/api/chat", async (req, res) => {
         canonicalSemantic.event,
         behaviorPolicy,
       ),
-      responseStylePersonality = responsePersonality,
       behaviorContract = buildBehaviorContract(kdm.nextDynamicState, kdm.trace),
       behaviorProfile = kdm.behaviorProfile,
       speech = computeKairoSpeechIdentity(
-        responseStylePersonality,
+        responsePersonality,
         kdm.nextDynamicState,
         kdm.trace,
       ),
@@ -599,7 +598,7 @@ app.post("/api/chat", async (req, res) => {
       },
       local = tryLocalKairoReply(
         userMessage,
-        responseStylePersonality,
+        responsePersonality,
         kdm.nextDynamicState,
         kdm.trace,
         stateUserId,

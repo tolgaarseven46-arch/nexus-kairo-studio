@@ -19,7 +19,7 @@ describe("world-state appraisal runtime integration contract", () => {
 
   it("keeps retrieved world-state outside KDM state mutation input", () => {
     const kdmCallStart = server.indexOf("kdm = analyzeKdmInteraction(");
-    const kdmCallEnd = server.indexOf("),\n      responseStylePersonality", kdmCallStart);
+    const kdmCallEnd = server.indexOf("),\n      behaviorContract", kdmCallStart);
     const kdmCall = server.slice(kdmCallStart, kdmCallEnd);
 
     expect(kdmCallStart).toBeGreaterThan(0);
