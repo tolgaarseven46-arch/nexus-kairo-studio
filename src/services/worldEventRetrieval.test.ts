@@ -40,6 +40,33 @@ describe("world event retrieval", () => {
     expect(ranked[0]?.observation.event.actor?.name).toBe("Ayşe");
   });
 
+  it("keeps a named reported claim above old grounded direct interactions", () => {
+    const oldMatchEvent = observation({
+      sessionId: "old-session",
+      kind: "direct_interaction",
+      status: "grounded",
+      event: {
+        raw: "ya boşver maç var",
+        eventType: "rejection",
+        actor: { id: "current_user", name: "Mert", source: "first_person", confidence: 1 },
+        target: { id: "kaira", name: "KAIRO", source: "semantic_target", confidence: 0.98 },
+        reportedSpeech: false,
+        certainty: 0.96,
+        ambiguities: [],
+        evidence: ["actor:current_speaker", "target:kaira"],
+      },
+    });
+
+    const ranked = rankWorldEventObservations(
+      "Ayşe bana ne demişti?",
+      [oldMatchEvent, observation()],
+    );
+
+    expect(ranked[0]?.observation.kind).toBe("reported_claim");
+    expect(ranked[0]?.observation.event.actor?.name).toBe("Ayşe");
+    expect(ranked[0]?.reasons).toContain("name:ayşe");
+  });
+
   it("preserves reported claim epistemics in prompt", () => {
     const text = buildWorldEventMemoryInstruction([{ observation: observation(), score: 8, reasons: ["name:ayşe"] }]);
     expect(text).toContain("KULLANICININ AKTARDIĞI İDDİA");
