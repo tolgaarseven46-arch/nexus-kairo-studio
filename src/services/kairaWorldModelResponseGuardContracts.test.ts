@@ -78,6 +78,24 @@ describe("world-model response guard contracts", () => {
     expect(guarded.reply).toMatch(/çelişen/iu);
   });
 
+  it("uses appraisal conflict posture for historical recall without projected state", () => {
+    const retrieved = rankWorldEventObservations(
+      "Ali ne demişti?",
+      [
+        row({ id: "yes-h", raw: "Ali istifa edecek", at: "2026-08-30T10:00:00.000Z", polarity: "positive" }),
+        row({ id: "no-h", raw: "Ali istifa etmeyecek", at: "2026-08-30T10:05:00.000Z", polarity: "negative" }),
+      ],
+      2,
+    );
+
+    expect(retrieved.every((item) => item.projectedState === undefined)).toBe(true);
+    expect(findWorldModelResponseIssues("Emin değilim, iki çelişen kayıt var.", retrieved)).toEqual([]);
+
+    const guarded = enforceWorldModelRecallResponse("Hatırlamıyorum, kaydım yok.", retrieved);
+    expect(guarded.changed).toBe(true);
+    expect(guarded.reply).toMatch(/çelişen/iu);
+  });
+
   it("does not force recall from ambiguous-only evidence", () => {
     const retrieved = rankWorldEventObservations(
       "Ali ne demişti?",
