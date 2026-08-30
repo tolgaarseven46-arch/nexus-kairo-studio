@@ -14,6 +14,10 @@ import {
   retrieveExplicitTemporalEventNeighbors,
   type ExplicitTemporalAnchorResolution,
 } from "./explicitTemporalEventAnchorResolver";
+import {
+  retrievePropositionTemporalEventNeighbors,
+  type PropositionTemporalAnchorResolution,
+} from "./propositionTemporalEventAnchorResolver";
 
 export type WorldEventRetrievalMode = "none" | "ranked_recall" | "temporal_graph";
 
@@ -22,6 +26,7 @@ export interface CoordinatedWorldEventRetrieval {
   items: RetrievedWorldEvent[];
   discourseResolution?: DiscourseTemporalAnchorResolution;
   explicitAnchorResolution?: ExplicitTemporalAnchorResolution;
+  propositionAnchorResolution?: PropositionTemporalAnchorResolution;
 }
 
 export function shouldCoordinateWorldEventRetrieval(message: string): boolean {
@@ -35,7 +40,7 @@ function graphItems(
   anchorObservationId: string | undefined,
   direction: "before" | "after" | undefined,
   maxItems: number,
-  reasonPrefix: "explicit_anchor" | "discourse_anchor",
+  reasonPrefix: "proposition_anchor" | "explicit_anchor" | "discourse_anchor",
 ): RetrievedWorldEvent[] {
   return observations.slice(0, maxItems).map((observation) => ({
     observation,
@@ -50,10 +55,9 @@ function graphItems(
 
 /**
  * Single policy seam for world-model retrieval. Temporal event questions are
- * graph-only. Explicit named/event anchors get first priority; if no explicit
- * canonical anchor is present, the conservative latest-turn discourse resolver
- * may run. Neither path falls back to lexical ranking when anchor resolution is
- * ambiguous, unresolved or has no graph neighbor.
+ * graph-only. Full proposition anchors have highest priority, followed by the
+ * coarser named/event anchor, then the conservative latest-turn discourse
+ * resolver. Ambiguous temporal anchors never fall back to lexical ranking.
  */
 export function coordinateWorldEventRetrieval(input: {
   message: string;
@@ -65,6 +69,25 @@ export function coordinateWorldEventRetrieval(input: {
   const maxItems = Math.max(1, Math.min(input.maxItems ?? 5, 10));
   const explicitDirection = detectExplicitTemporalRelationDirection(input.message);
   if (explicitDirection) {
+    const propositionResult = retrievePropositionTemporalEventNeighbors({
+      message: input.message,
+      sessionId: input.sessionId,
+      observations: input.observations,
+    });
+    if (propositionResult.resolution.reason !== "no_proposition_anchor") {
+      return {
+        mode: "temporal_graph",
+        propositionAnchorResolution: propositionResult.resolution,
+        items: graphItems(
+          propositionResult.observations,
+          propositionResult.resolution.anchorObservationId,
+          propositionResult.resolution.direction,
+          maxItems,
+          "proposition_anchor",
+        ),
+      };
+    }
+
     const explicitResult = retrieveExplicitTemporalEventNeighbors({
       message: input.message,
       sessionId: input.sessionId,
