@@ -29,10 +29,11 @@ describe("legacy runtime decision flag removal", () => {
     expect(integration).toContain("const decision: IntegratedBehaviorDecision = {");
   });
 
-  it("does not use dead runtime fields in conversation-state authority", () => {
+  it("does not use dead runtime fields or replacement trait mutation in conversation-state authority", () => {
     for (const key of LEGACY_RUNTIME_KEYS) expect(conversationAuthority).not.toContain(key);
-    expect(conversationAuthority).toContain("humor: 0");
-    expect(conversationAuthority).toContain("humor: Math.min(20");
+    expect(conversationAuthority).not.toContain("humor: 0");
+    expect(conversationAuthority).not.toContain("humor: Math.min(20");
+    expect(conversationAuthority).toContain("personality,");
   });
 
   it("keeps final WHAT/WHETHER authority in responsePlan", () => {
