@@ -7,6 +7,7 @@ import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguag
 import { applyConversationStateAuthority } from "./src/services/conversationStateAuthority";
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
 import { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";
+import { buildKairaResponsePlan, findKairaResponsePlanIssues, kairaResponsePlanInstruction } from "./src/services/kairaResponsePlan";
 import {
   loadKdmState,
   loadRecentKdmMemory,
@@ -580,6 +581,8 @@ app.post("/api/chat", async (req, res) => {
         kdm.nextDynamicState,
         kdm.trace,
       ),
+      responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech),
+      responsePlanInstruction = kairaResponsePlanInstruction(responsePlan),
       enforcementRules = {
         continueConversation: behaviorContract.continueConversation && runtimeFlag(authoritativePersonality, "runtimeContinueConversation", true),
         humorAllowed: behaviorContract.playfulness === "allowed" && runtimeFlag(authoritativePersonality, "runtimeHumorAllowed", true),
@@ -599,6 +602,7 @@ app.post("/api/chat", async (req, res) => {
         kdm.trace,
         stateUserId,
         dialogueDecision.move,
+        responsePlan,
       ),
       kdmMs = Math.round(now() - kdmStart),
       validatedMemory = persistentMemory.filter(
@@ -634,7 +638,14 @@ app.post("/api/chat", async (req, res) => {
           ],
         },
         reply = enforced.reply,
-        consistency = validateKairoResponse(reply, kdm.trace),
+        localPlanIssues = findKairaResponsePlanIssues(reply, responsePlan),
+        localBaseConsistency = validateKairoResponse(reply, kdm.trace),
+        consistency = {
+          ...localBaseConsistency,
+          accepted: localBaseConsistency.accepted && localPlanIssues.length === 0,
+          score: Math.max(0, localBaseConsistency.score - localPlanIssues.length * 15),
+          issues: [...localBaseConsistency.issues, ...localPlanIssues],
+        },
         postStart = now();
       let savedTurnId = "";
       await Promise.allSettled([
@@ -672,6 +683,7 @@ app.post("/api/chat", async (req, res) => {
           worldStateAppraisal,
           worldReasoningPolicy,
           worldMemoryGuard,
+          responsePlan,
         }),
         saveTestSessionTurn({
           sessionId,
@@ -719,6 +731,7 @@ app.post("/api/chat", async (req, res) => {
             worldStateAppraisal,
             worldReasoningPolicy,
             worldMemoryGuard,
+            responsePlan,
             timings: { memoryMs, kdmMs, aiMs: 0 },
           },
         }).then((t) => {
@@ -748,7 +761,7 @@ app.post("/api/chat", async (req, res) => {
         },
         enforcement: enforced,
         speechIdentity: speech,
-        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
+        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, responsePlan, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
         consistency,
         dialogue: dialogueAnalysis,
         timings,
@@ -774,7 +787,7 @@ app.post("/api/chat", async (req, res) => {
     const relationshipInstruction = behaviorProfile.relationshipInstruction
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
-    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
@@ -794,6 +807,7 @@ app.post("/api/chat", async (req, res) => {
         dialogueDecision,
         dialogueOutputStyle,
       ),
+      ...findKairaResponsePlanIssues(reply, responsePlan),
       ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
     ];
     let repairAttempts = 0;
@@ -825,6 +839,7 @@ app.post("/api/chat", async (req, res) => {
             dialogueDecision,
             dialogueOutputStyle,
           ),
+          ...findKairaResponsePlanIssues(repairedReply, responsePlan),
           ...findWorldModelResponseIssues(repairedReply, retrievedWorldEvents).map((issue) => issue.message),
         ];
         if (repairedIssues.length < groundingIssues.length) {
@@ -856,6 +871,7 @@ app.post("/api/chat", async (req, res) => {
             dialogueDecision,
             dialogueOutputStyle,
           ),
+          ...findKairaResponsePlanIssues(fallback, responsePlan),
           ...findWorldModelResponseIssues(fallback, retrievedWorldEvents).map((issue) => issue.message),
         ];
         if (fallbackIssues.length < groundingIssues.length) {
@@ -871,7 +887,8 @@ app.post("/api/chat", async (req, res) => {
         ...findKairoGroundingIssues(reply, cleanHistory, userMessage),
         ...findDialogueAttributionIssues(reply, cleanHistory, userMessage, userName),
         ...findDialogueDecisionIssues(reply, dialogueDecision, dialogueOutputStyle),
-        ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
+        ...findKairaResponsePlanIssues(reply, responsePlan),
+      ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
       ];
     }
     const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules);
@@ -1005,7 +1022,7 @@ app.post("/api/chat", async (req, res) => {
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
+      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, responsePlan, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
       consistency,
       dialogue: dialogueAnalysis,
       dialogueDecision,

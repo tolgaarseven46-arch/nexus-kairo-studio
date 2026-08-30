@@ -111,6 +111,7 @@ export interface TestSessionTurnRecord {
     worldStateAppraisal?: unknown;
     worldReasoningPolicy?: unknown;
     worldMemoryGuard?: unknown;
+    responsePlan?: unknown;
   };
 }
 
@@ -142,4 +143,5 @@ export interface RestoredTestSession {
   lastWorldStateAppraisal?: unknown;
   lastWorldReasoningPolicy?: unknown;
   lastWorldMemoryGuard?: unknown;
+  lastResponsePlan?: unknown;
 }
