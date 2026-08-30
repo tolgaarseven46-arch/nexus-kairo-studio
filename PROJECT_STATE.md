@@ -483,3 +483,14 @@ Yeni sohbet açıldığında:
 - Server davranışı semantik olarak değişmez; `/api/chat` zaten normalized base personality geçiriyordu. Değişiklik exported direct/legacy KDM kullanımını güvenli hale getirir.
 - Geçici KDM migration workflow/script ve bölüm 43'ün geçici docs workflow'u kaldırıldı.
 - Sonraki audit adayı koddan belirlenecek; normalization zincirinde artık server, behavior, KDM ve persistence sınırları canonical normalizer ile hizalı.
+
+
+## 45. Fine-tune profile hydration normalization — 2026-08-31
+- `CharacterTab` fine-tune ayarlarını `kairo_character_finetune_v2` localStorage kaydına yazıyor ve `droitChatService` aynı kaydı runtime personality/motivation/value/preference/social/boundary/expression zincirinde tüketiyor. Önceden hydrate edilen obje parse edildikten sonra sayı/range doğrulaması yapılmıyordu.
+- Lightweight `fineTuneProfileNormalizer.ts` eklendi. Yalnız finite number değerleri kabul eder, tüm değerleri 0..100 aralığına clamp eder; string/null/non-finite alanları profile sokmaz.
+- Aynı canonical normalizer hem `CharacterTab` hydrate yolunda hem `droitChatService.readFineTuneProfile()` runtime boundary'sinde kullanılır. Böylece eski/bozuk localStorage değeri hem UI slider state'ini hem client behavior matematiğini zehirleyemez.
+- Fine-tune registry ve `personalityTendencyEngine` tarafından kullanılan `personality.cognition.deciveness` yazımı incelendi. UI ve engine aynı persisted key'i kullandığı için mevcut davranışta bağlantı kopuğu yoktur. Key localStorage contract'ının parçası olduğundan compatibility migration olmadan rename edilmedi ve normalizer testi legacy key'in aynen korunduğunu doğrular.
+- `fineTuneProfileNormalizer.test.ts` range clamp, invalid/non-finite drop ve persisted `deciveness` compatibility davranışını kalıcı olarak test eder. Personality tendency ve temperament targeted testleriyle birlikte geçti.
+- Entegrasyon commit'i: `4784dcf` (`fix(kaira): normalize persisted fine-tune profiles`). Targeted contractlar, TypeScript, full regression ve production build başarıyla geçti.
+- Geçici migration workflow/script kaldırıldı.
+- Sonraki audit adayı: CharacterTab'daki LAYERS fine-tune key registry ile her runtime engine'in beklediği key seti karşılaştırılacak; aynı isimde görünmeyen veya UI'da olup hiçbir runtime engine tarafından tüketilmeyen parametre varsa sessiz no-op slider olarak işaretlenecek.
