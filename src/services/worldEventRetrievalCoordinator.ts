@@ -5,6 +5,10 @@ import {
   type RetrievedWorldEvent,
 } from "./worldEventRetrieval";
 import {
+  isPlanRecallQuery,
+  rankPlanRecallObservations,
+} from "./worldEventPlanRecallPolicy";
+import {
   detectTemporalDiscourseDirection,
   retrieveTemporalDiscourseNeighbors,
   type DiscourseTemporalAnchorResolution,
@@ -19,7 +23,7 @@ import {
   type PropositionTemporalAnchorResolution,
 } from "./propositionTemporalEventAnchorResolver";
 
-export type WorldEventRetrievalMode = "none" | "ranked_recall" | "temporal_graph";
+export type WorldEventRetrievalMode = "none" | "ranked_recall" | "plan_recall" | "temporal_graph";
 
 export interface CoordinatedWorldEventRetrieval {
   mode: WorldEventRetrievalMode;
@@ -32,6 +36,7 @@ export interface CoordinatedWorldEventRetrieval {
 export function shouldCoordinateWorldEventRetrieval(message: string): boolean {
   return Boolean(detectExplicitTemporalRelationDirection(message)) ||
     Boolean(detectTemporalDiscourseDirection(message)) ||
+    isPlanRecallQuery(message) ||
     shouldRetrieveWorldEvents(message);
 }
 
@@ -125,6 +130,17 @@ export function coordinateWorldEventRetrieval(input: {
         maxItems,
         "discourse_anchor",
       ),
+    };
+  }
+
+  if (isPlanRecallQuery(input.message)) {
+    return {
+      mode: "plan_recall",
+      items: rankPlanRecallObservations({
+        message: input.message,
+        observations: input.observations,
+        maxItems,
+      }),
     };
   }
 
