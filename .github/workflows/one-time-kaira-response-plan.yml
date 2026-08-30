@@ -5,6 +5,8 @@ on:
     paths:
       - ".github/workflows/one-time-kaira-response-plan.yml"
       - "scripts/applyKairaResponsePlanIntegration.mjs"
+      - "src/services/kairoSpeechIdentity.ts"
+      - "src/services/kairaSpeechIdentityAuthorityContracts.test.ts"
 
 permissions:
   contents: write
