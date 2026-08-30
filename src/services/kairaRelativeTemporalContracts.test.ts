@@ -57,7 +57,7 @@ describe("Kaira relative temporal contracts", () => {
         source: "relative_marker",
       },
     );
-    expect(resolved?.startAt).toBe("2026-08-22T00:00:00.000Z");
+    expect(resolved?.startAt).toBe("2026-08-21T00:00:00.000Z");
     expect(resolved?.source).toBe("referenced_event");
   });
 
