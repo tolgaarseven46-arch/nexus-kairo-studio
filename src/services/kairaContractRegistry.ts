@@ -57,6 +57,14 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     supersedes: "canonical-world-event@2",
   },
   {
+    id: "event-modality",
+    version: 1,
+    status: "active",
+    ownerLayer: "world-event",
+    consumerLayers: ["world-model-store", "retrieval", "response-generation"],
+    summary: "Persisted world events distinguish bounded intention, plan, commitment, possibility, desire and refusal semantics without changing proposition identity; plan recall cannot promote weak or negative modality to committed execution.",
+  },
+  {
     id: "world-model-ownership",
     version: 1,
     status: "active",
