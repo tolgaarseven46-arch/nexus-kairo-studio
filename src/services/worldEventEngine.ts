@@ -82,12 +82,10 @@ export function buildCanonicalWorldEvent(
   let target: WorldEventParticipant | undefined;
 
   if (reportedSpeech) {
-    // For reported speech, an unresolved explicit name is the strongest actor evidence.
     if (unresolvedNamed.length === 1) {
       actor = toParticipant(unresolvedNamed[0], "explicit_name");
       evidence.push(`actor:${unresolvedNamed[0].surface}`);
     } else if (explicitCurrentUserName && firstPerson) {
-      // "Mert bana ... dedi" while Mert is the current speaker is discourse-ambiguous.
       ambiguities.push(
         "Reported speech contains the current speaker's explicit name together with first person; actor is intentionally unresolved.",
       );
@@ -102,11 +100,10 @@ export function buildCanonicalWorldEvent(
       evidence.push(`target:${secondPerson.surface}`);
     }
   } else {
-    // A described third-party action such as "Ayşe bana özür diledi" is not
-    // reported speech, but the explicit named person is still the actor and
-    // first person is the target. Do not fall back to current speaker here.
-    const explicitThirdPartyActor =
-      unresolvedNamed.length === 1 && Boolean(firstPerson) && semantic.target === "third_party";
+    // If a message contains exactly one explicit third-party name together with
+    // a first-person target ("Ayşe bana özür diledi"), the named person is the
+    // actor regardless of the semantic target label.
+    const explicitThirdPartyActor = unresolvedNamed.length === 1 && Boolean(firstPerson);
 
     if (explicitThirdPartyActor && firstPerson) {
       actor = toParticipant(unresolvedNamed[0], "explicit_name");
@@ -114,7 +111,6 @@ export function buildCanonicalWorldEvent(
       evidence.push(`actor:${unresolvedNamed[0].surface}`);
       evidence.push(`target:${firstPerson.surface}`);
     } else {
-      // Direct utterances are authored by the current speaker.
       if (entities.speaker.name || entities.speaker.id) {
         actor = {
           id: entities.speaker.id,
