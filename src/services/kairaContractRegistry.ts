@@ -103,6 +103,14 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     summary: "Named temporal questions resolve an anchor only from same-session canonical participant names plus bounded canonical event-type markers; multiple matching events remain ambiguous instead of being broken by recency.",
   },
   {
+    id: "proposition-temporal-event-anchor",
+    version: 1,
+    status: "active",
+    ownerLayer: "discourse-context",
+    consumerLayers: ["temporal-event-graph", "retrieval", "response-generation"],
+    summary: "Specific temporal questions may resolve an anchor from same-session canonical actor, predicate, target and polarity components; repeated matching propositions remain ambiguous and recency never breaks the tie.",
+  },
+  {
     id: "temporal-evidence",
     version: 1,
     status: "active",
