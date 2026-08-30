@@ -18,6 +18,14 @@ describe("canonical current-turn dialogue authority", () => {
     expect(server).toMatch(/planDialogueResponse\(\s*cleanHistory,\s*userMessage,\s*userName,\s*languageUnderstanding\.event,\s*dialogueAnalysis,\s*\)/u);
   });
 
+  it("passes the same projection through every server attribution gate", () => {
+    const attributionCalls = server.match(/findDialogueAttributionIssues\([\s\S]*?\),/gu) ?? [];
+    expect(attributionCalls.length).toBeGreaterThanOrEqual(4);
+    for (const call of attributionCalls) {
+      expect(call).toContain("dialogueAnalysis");
+    }
+  });
+
   it("lets claim ledger and attribution consume a supplied current analysis", () => {
     expect(chaos).toContain("currentAnalysis?: DialogueTurnAnalysis");
     expect(chaos).toContain("const analysis = turn.analysis ?? analyzeDialogueTurn(turn.text)");
