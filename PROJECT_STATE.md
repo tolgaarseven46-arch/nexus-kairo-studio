@@ -440,3 +440,15 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `a50e8da` (`refactor(kaira): consolidate personality defaults`). Default-source contract, normalizer contract, TypeScript, full regression ve production build başarıyla geçti.
 - Geçici migration workflow/script kaldırıldı.
 - Sonraki audit adayı: Firestore'dan yüklenen/eski personality kayıtları `structuredPersonalityToTraits` içinde normalize edilmeden UI'a dönebiliyor; persisted legacy/out-of-range/non-finite değerlerin canonical normalizer boundary'sinden geçmesi gerekip gerekmediği koddan doğrulanacak.
+
+
+## 41. Personality persistence normalization boundary — 2026-08-31
+- Firestore load mapper daha önce nested/legacy personality alanlarında `typeof value === 'number'` kontrolüyle `NaN` ve 0..100 dışı değerleri de kabul edip UI'a taşıyabiliyordu. Save mapper da flat trait değerlerini canonical normalization olmadan structured Firestore payload'ına yazabiliyordu.
+- `traitsToStructuredPersonality(...)` artık serialization öncesi `normalizeDroitPersonality(traits)` çağırır ve tüm personality değerlerini normalized kaynaktan yazar; `decisionMaking` için kalan ham trait bypass'ı da kapatıldı.
+- `structuredPersonalityToTraits(...)` mapped Firestore verisini UI'a döndürmeden önce canonical normalizer'dan geçirir. Invalid/non-object raw personality fallback'ı da `normalizeDroitPersonality(fallback)` kullanır.
+- Sonuç: eski kirli persisted kayıtlar memory/UI boundary'sinde güvenli hale gelir; yeni invalid/out-of-range/non-finite personality değerleri bu service üzerinden Firestore'a yazılamaz.
+- `kairaPersonalityPersistenceNormalizationContracts.test.ts` load/save normalization ve raw serialization bypass'larının geri gelmemesini doğrular. `kairaPersonalityDefaultSourceContracts.test.ts` import genişlemesine dayanıklı hale getirildi.
+- Entegrasyon commit'i: `3de2a71` (`fix(kaira): normalize personality persistence boundaries`). Targeted persistence/default/normalizer contractları, TypeScript, full regression (`518/518`) ve production build başarıyla geçti.
+- Geçici persistence migration workflow/script kaldırıldı; bölüm 40'ın geçici docs workflow'u da temizlendi.
+- Persisted kirli değerleri load sırasında Firestore'a otomatik geri yazan self-heal davranışı eklenmedi; read path'in gizli write üretmesi için ürün gereksinimi yok.
+- Sonraki audit adayı: `droitBehaviorEngine.ts` içindeki `effectiveEmpathy` normalize 0..1 değer olmasına rağmen `>= 75` eşiğiyle karşılaştırılıyor olabilir; bu branch'in fiilen dead olup olmadığı testlerle doğrulanacak.
