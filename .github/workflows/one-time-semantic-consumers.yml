@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/one-time-semantic-consumers.yml"
       - "scripts/applyCanonicalSemanticConsumers.mjs"
+      - "scripts/repairCanonicalSemanticConsumers.mjs"
       - "src/services/kairaSemanticConsumerAuthorityContracts.test.ts"
 
 permissions:
@@ -19,6 +20,8 @@ jobs:
           fetch-depth: 0
       - name: Apply canonical semantic consumer integration
         run: node scripts/applyCanonicalSemanticConsumers.mjs
+      - name: Preserve explicit advice semantics
+        run: node scripts/repairCanonicalSemanticConsumers.mjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Architecture contracts
@@ -31,13 +34,13 @@ jobs:
         run: npm run build
       - name: Commit integration
         run: |
-          if git diff --quiet -- server.ts src/services/semanticEventEngine.ts src/services/semanticEventAuthority.ts src/services/llmSemanticUnderstandingProvider.ts src/services/kairoDialogueDecisionEngine.ts src/services/kairoLocalLanguageEngine.ts; then
+          if git diff --quiet -- server.ts src/services/semanticEventEngine.ts src/services/semanticEventAuthority.ts src/services/llmSemanticUnderstandingProvider.ts src/services/kairoDialogueDecisionEngine.ts src/services/kairoLocalLanguageEngine.ts src/services/kairaResponsePlanIntegrationContracts.test.ts; then
             echo "canonical semantic consumer integration already applied"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add server.ts src/services/semanticEventEngine.ts src/services/semanticEventAuthority.ts src/services/llmSemanticUnderstandingProvider.ts src/services/kairoDialogueDecisionEngine.ts src/services/kairoLocalLanguageEngine.ts
+          git add server.ts src/services/semanticEventEngine.ts src/services/semanticEventAuthority.ts src/services/llmSemanticUnderstandingProvider.ts src/services/kairoDialogueDecisionEngine.ts src/services/kairoLocalLanguageEngine.ts src/services/kairaResponsePlanIntegrationContracts.test.ts
           git commit -m "feat(kaira): unify semantic consumers"
           git pull --rebase origin main
           git push origin main
