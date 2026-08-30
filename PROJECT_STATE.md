@@ -471,3 +471,15 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `f5aed8e` (`fix(kaira): normalize personality at behavior boundary`). Targeted contractlar, TypeScript, full regression ve production build başarıyla geçti.
 - Geçici migration workflow/script kaldırıldı.
 - Sonraki audit adayı: `analyzeKdmInteraction(...)` exported boundary içinde `trait(...)` helper raw personality üzerinde `typeof number` + clamp kullanıyor; `NaN` bir number olduğu için direct KDM çağrısında ilişki/state matematiğine non-finite değer sızma ihtimali ayrıca doğrulanacak.
+
+
+## 44. KDM personality normalization ownership — 2026-08-31
+- Exported `analyzeKdmInteraction(...)` server dışında doğrudan çağrılabildiği halde KDM içindeki `trait(...)` helper raw personality alanlarını `typeof value === "number"` ile okuyordu. `NaN` da JavaScript'te number olduğu için direct/legacy KDM çağrısında ilişki ve state matematiğine non-finite değer sızabiliyordu.
+- KDM boundary artık işlem başında `normalizeDroitPersonality(personality)` ile tek bir canonical `normalizedPersonality` üretir. Behavior profile sentezi ile sabır, hassasiyet, öfke, empati ve sadakat ilişki matematiği aynı normalized kaynaktan beslenir.
+- `analyzeKdmInteraction(...)` personality parametre tipi `Partial<DroitPersonalityTraits> | null` olarak genişletildi. Bu, runtime'ın zaten desteklediği neutral-default normalization contract'ını TypeScript imzasıyla hizalar; tam personality çağrıları compatibility olarak aynen geçerlidir.
+- `kairaKdmPersonalityNormalizationBoundaryContracts.test.ts` non-finite direct input altında state/tolerance matematiğinin finite kalmasını ve out-of-range traitlerin canonical behavior input katmanında 0..100'e clamp edilmesini doğrular.
+- İlk test denemesinde final `behaviorProfile.patienceLevel` doğrudan 0 beklenmişti; relationship context'in daha sonra behavior profile'ı bilinçli olarak şekillendirdiği görüldü. Contract bu nedenle normalization'ın gerçek sahiplik katmanı olan `debugMatrix.inputTraits` üzerinden ölçülür.
+- Entegrasyon commit'i: `13c18da` (`fix(kaira): normalize personality at KDM boundary`). Targeted KDM/behavior/normalizer contractları, TypeScript, full regression ve production build başarıyla geçti.
+- Server davranışı semantik olarak değişmez; `/api/chat` zaten normalized base personality geçiriyordu. Değişiklik exported direct/legacy KDM kullanımını güvenli hale getirir.
+- Geçici KDM migration workflow/script ve bölüm 43'ün geçici docs workflow'u kaldırıldı.
+- Sonraki audit adayı koddan belirlenecek; normalization zincirinde artık server, behavior, KDM ve persistence sınırları canonical normalizer ile hizalı.
