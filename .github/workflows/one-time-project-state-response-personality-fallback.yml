@@ -1,0 +1,37 @@
+name: One-time project state response personality fallback
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-response-personality-fallback.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 36. Response personality fallback contract — 2026-08-31\n- Normal Studio/client akışı `droitChatService` üzerinden her `/api/chat` isteğinde base `personality` ile birlikte `responsePersonality: runtimePersonality` gönderir; bu yüzden server fallback'ı normal canlı client yolunda kullanılmaz.\n- Server fallback'ı doğrudan/legacy çağrılar için korunmuştur ancak semantiği daraltılmıştır: `incomingResponsePersonality || personality` yerine `incomingResponsePersonality ?? personality` kullanılır.\n- Böylece fallback yalnız overlay gerçekten eksik (`undefined`) veya açıkça `null` olduğunda base personality'ye düşer; genel falsy değerleri sessizce compatibility gibi yorumlamaz.\n- `kairaBasePersonalityOwnershipContracts.test.ts` canonical nullish fallback'ı ve broad `||` fallback'ın geri gelmemesini doğrular.\n- KDM ownership değişmedi: base personality reducer girdisidir; response personality yalnız KDM sonrası HOW shaping tüketicilerine gider.\n- Entegrasyon commit'i: `3820510` (`refactor(kaira): narrow response personality fallback`). Ownership contract, TypeScript, full regression ve production build başarıyla geçti.\n- Geçici migration workflow/script kaldırıldı.\n- Sonraki audit adayı: `/api/chat` request destructuring içindeki `personality = {}` default'u gerçekten desteklenen opsiyonel API davranışı mı, yoksa eksik base personality'yi sessizce kabul eden bir contract açığı mı? Koddan doğrulanmadan değiştirilmeyecek.\n'''
+          if '## 36. Response personality fallback contract — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record response personality fallback contract"
+          git pull --rebase origin main
+          git push origin main
