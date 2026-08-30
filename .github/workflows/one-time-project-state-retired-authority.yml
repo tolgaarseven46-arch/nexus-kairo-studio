@@ -1,0 +1,37 @@
+name: One-time project state retired authority
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-retired-authority.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 32. Retired conversation authority source removal — 2026-08-31\n- `src/services/conversationStateAuthority.ts` artık canlı veya test yolunda tüketilmeyen retired source olarak kaldırıldı.\n- `kairaConversationStateLockContracts.test.ts` legacy source dosyasının yeniden eklenmesini yasaklayan kalıcı invariant içerir.\n- Silme commit'i: `9daf600` (`refactor(kaira): remove retired conversation authority source`).\n- Fresh GitHub Actions checkout üzerinde architecture contracts, full tests, TypeScript ve production build başarıyla geçti; dolayısıyla eski source'un gizli import/consumer'ı olmadığı doğrulandı.\n- Client `droitChatService` server cevabındaki `conversationAuthority` compatibility metadata'sını KairoChatResponse'a taşımıyor; Test Lab da raw endpoint yerine `droitChatService.sendMessage` kullanıyor.\n- Sonraki adım: server response içindeki eski `conversationAuthority` JSON compatibility adı da gerçek consumer audit'i tamamlanınca kaldırılacak; canonical iç isim `conversationStateLock`.\n'''
+          if '## 32. Retired conversation authority source removal — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record retired conversation authority removal"
+          git pull --rebase origin main
+          git push origin main
