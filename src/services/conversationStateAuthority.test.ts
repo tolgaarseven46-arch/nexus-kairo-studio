@@ -23,19 +23,24 @@ describe("conversationStateAuthority", () => {
     expect(result.personality.humor).toBe(80);
   });
 
-  it("prevents a pre-KDM warm client decision from reopening distancing", () => {
+  it("locks distancing without mutating response personality", () => {
     const result = applyConversationStateAuthority(personality, state("distancing"));
     expect(result.locked).toBe(true);
-    expect(result.personality.humor).toBeLessThanOrEqual(20);
+    expect(result.personality).toBe(personality);
+    expect(result.personality.humor).toBe(80);
   });
 
-  it("keeps repairing controlled instead of restoring normal closeness", () => {
+  it("locks repairing without mutating response personality", () => {
     const result = applyConversationStateAuthority(personality, state("repairing"));
-    expect(result.personality.humor).toBe(0);
+    expect(result.locked).toBe(true);
+    expect(result.personality).toBe(personality);
+    expect(result.personality.humor).toBe(80);
   });
 
-  it("makes disengaged a hard post-transition lock", () => {
+  it("makes disengaged a hard state lock without mutating response personality", () => {
     const result = applyConversationStateAuthority(personality, state("disengaged"));
-    expect(result.personality.humor).toBe(0);
+    expect(result.locked).toBe(true);
+    expect(result.personality).toBe(personality);
+    expect(result.personality.humor).toBe(80);
   });
 });

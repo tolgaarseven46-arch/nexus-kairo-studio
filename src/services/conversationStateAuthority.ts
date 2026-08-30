@@ -14,44 +14,29 @@ export function applyConversationStateAuthority(
   dynamicState?: DroitDynamicState | null,
 ): ConversationStateAuthorityResult {
   const state = (dynamicState?.relationship?.conversationState ?? "active") as ConversationAuthorityState;
-
   if (state === "active") {
-    return { state, personality, locked: false, reason: "İlişki aktif; post-transition override yok." };
+    return { state, personality, locked: false, reason: "İlişki aktif; state lock yok." };
   }
-
-  const base: DroitPersonalityTraits = { ...personality };
-
   if (state === "disengaged") {
     return {
       state,
+      personality,
       locked: true,
-      reason: "KDM ilişki reducer'ı disengaged üretti; önceki client davranış kararı geçersiz kılındı.",
-      personality: {
-        ...base,
-        humor: 0,
-      },
+      reason: "KDM ilişki reducer'ı disengaged üretti; WHAT/WHETHER kapanışı BehaviorContract ve KairaResponsePlan tarafından uygulanır.",
     };
   }
-
   if (state === "repairing") {
     return {
       state,
+      personality,
       locked: true,
-      reason: "KDM ilişki reducer'ı repairing üretti; normal yakınlık ve mizah yeniden açılamaz.",
-      personality: {
-        ...base,
-        humor: 0,
-      },
+      reason: "KDM ilişki reducer'ı repairing üretti; yakınlık ve mizah izinleri canonical plan tarafından sınırlandırılır.",
     };
   }
-
   return {
     state,
+    personality,
     locked: true,
-    reason: "KDM ilişki reducer'ı distancing üretti; sıcak/oyuncu client kararı bastırıldı.",
-    personality: {
-      ...base,
-      humor: Math.min(20, base.humor ?? 0),
-    },
+    reason: "KDM ilişki reducer'ı distancing üretti; davranış izinleri canonical plan tarafından sınırlandırılır.",
   };
 }

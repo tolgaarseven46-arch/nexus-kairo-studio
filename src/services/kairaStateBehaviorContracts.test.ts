@@ -78,7 +78,7 @@ describe("Kaira state -> behavior architecture contracts", () => {
     const behavior = buildBehaviorContract(dynamicState);
 
     expect(authority.locked).toBe(true);
-    expect(authority.personality.humor).toBe(0);
+    expect(authority.personality).toBe(personality);
     expect(behavior.continueConversation).toBe(false);
     expect(behavior.questions).toBe("forbidden");
     expect(behavior.playfulness).toBe("forbidden");
