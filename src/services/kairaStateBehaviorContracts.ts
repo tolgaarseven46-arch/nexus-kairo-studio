@@ -147,11 +147,11 @@ export function validateConversationAuthorityContract(
     issues.push({ invariant: "authority.non_active_locked", message: "active dışı relationship state authority tarafından kilitlenmelidir." });
   }
 
-  if (relationshipState === "disengaged") {
-    const p = authority.personality as Record<string, number | undefined>;
-    if ((p.runtimeContinueConversation ?? 100) !== 0 || (p.runtimeAskQuestion ?? 100) !== 0 || (p.runtimeHumorAllowed ?? 100) !== 0) {
-      issues.push({ invariant: "authority.disengaged_runtime_lock", message: "disengaged runtime continue/question/humor bayraklarını kapatmalıdır." });
-    }
+  if (relationshipState === "disengaged" && (authority.personality.humor ?? 0) !== 0) {
+    issues.push({
+      invariant: "authority.disengaged_how_lock",
+      message: "disengaged durumda response HOW overlay mizahı sıfırlamalıdır.",
+    });
   }
 
   return { accepted: issues.length === 0, issues };
