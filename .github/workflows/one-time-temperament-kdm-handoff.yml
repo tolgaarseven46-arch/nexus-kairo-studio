@@ -1,0 +1,54 @@
+name: One-time temperament KDM handoff
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-temperament-kdm-handoff.yml"
+      - "src/services/kairaTemperamentBeforeKdmContracts.test.ts"
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply temperament state handoff
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/services/droitChatService.ts')
+          text = p.read_text()
+          old = 'behaviorPressures: integrationRuntime.pressures, dynamicState, history:'
+          new = 'behaviorPressures: integrationRuntime.pressures, dynamicState: temperamentAdjustedState ?? dynamicState, history:'
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit('temperament KDM payload patch target missing')
+          p.write_text(text)
+          PY
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Authority contract
+        run: npm test -- --run src/services/kairaTemperamentBeforeKdmContracts.test.ts
+      - name: TypeScript check
+        run: npm run lint
+      - name: Full tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit integration
+        run: |
+          if git diff --quiet -- src/services/droitChatService.ts; then
+            echo "temperament KDM handoff already applied"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/droitChatService.ts
+          git commit -m "fix(kaira): hand temperament state into KDM"
+          git pull --rebase origin main
+          git push origin main
