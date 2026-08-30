@@ -31,12 +31,13 @@ export interface CanonicalWorldEvent {
 }
 
 const REPORTING_RE = /\b(?:dedi|demiş|diyor|diyordu|söyledi|söylemiş|söylüyor)\b/iu;
+const EXPLICIT_APOLOGY_ACTION_RE = /\bözür\s+diledi\b/iu;
 
-function eventTypeFromSemantic(event: SemanticEvent): WorldEventType {
+function eventTypeFromSemantic(event: SemanticEvent, message: string): WorldEventType {
   if (event.insult || event.intent === "insult") return "insult";
   if (event.intent === "support") return "support";
   if (event.intent === "compliment") return "compliment";
-  if (event.intent === "apology") return "apology";
+  if (event.intent === "apology" || EXPLICIT_APOLOGY_ACTION_RE.test(message)) return "apology";
   if (event.intent === "repair" || event.repairAttempt) return "repair";
   if (event.intent === "command") return "command";
   if (event.intent === "rejection") return "rejection";
@@ -100,9 +101,6 @@ export function buildCanonicalWorldEvent(
       evidence.push(`target:${secondPerson.surface}`);
     }
   } else {
-    // If a message contains exactly one explicit third-party name together with
-    // a first-person target ("Ayşe bana özür diledi"), the named person is the
-    // actor regardless of the semantic target label.
     const explicitThirdPartyActor = unresolvedNamed.length === 1 && Boolean(firstPerson);
 
     if (explicitThirdPartyActor && firstPerson) {
@@ -148,7 +146,7 @@ export function buildCanonicalWorldEvent(
 
   return {
     raw: message,
-    eventType: eventTypeFromSemantic(semantic),
+    eventType: eventTypeFromSemantic(semantic, message),
     actor,
     target,
     reportedSpeech,
