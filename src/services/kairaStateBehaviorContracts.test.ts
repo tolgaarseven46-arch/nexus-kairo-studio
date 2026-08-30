@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DroitDynamicState, DroitPersonalityTraits } from "../types/nexus";
 import { buildBehaviorContract } from "./behaviorContract";
-import { applyConversationStateAuthority } from "./conversationStateAuthority";
+import { projectConversationStateLock } from "./conversationStateLock";
 import {
   validateDynamicStateContract,
   validateStateBehaviorSeam,
@@ -64,9 +64,9 @@ describe("Kaira state -> behavior architecture contracts", () => {
   for (const conversationState of ["active", "distancing", "disengaged", "repairing"] as const) {
     it(`keeps ${conversationState} state aligned across authority and behavior policy`, () => {
       const dynamicState = state(conversationState);
-      const authority = applyConversationStateAuthority(personality, dynamicState);
+      const stateLock = projectConversationStateLock(dynamicState);
       const behavior = buildBehaviorContract(dynamicState);
-      const report = validateStateBehaviorSeam({ state: dynamicState, behavior, authority });
+      const report = validateStateBehaviorSeam({ state: dynamicState, behavior, stateLock });
       expect(report.issues).toEqual([]);
       expect(report.accepted).toBe(true);
     });
@@ -74,12 +74,11 @@ describe("Kaira state -> behavior architecture contracts", () => {
 
   it("locks conversation reopening in disengaged state", () => {
     const dynamicState = state("disengaged");
-    const authority = applyConversationStateAuthority(personality, dynamicState);
+    const stateLock = projectConversationStateLock(dynamicState);
     const behavior = buildBehaviorContract(dynamicState);
 
-    expect(authority.locked).toBe(true);
-    expect(authority.personality).toBe(personality);
-    expect(behavior.continueConversation).toBe(false);
+    expect(stateLock.locked).toBe(true);
+        expect(behavior.continueConversation).toBe(false);
     expect(behavior.questions).toBe("forbidden");
     expect(behavior.playfulness).toBe("forbidden");
   });

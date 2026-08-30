@@ -1,6 +1,6 @@
 import type { DroitDynamicState, RelationshipState } from "../types/nexus";
 import type { BehaviorContract } from "./behaviorContract";
-import type { ConversationStateAuthorityResult } from "./conversationStateAuthority";
+import type { ConversationStateLockResult } from "./conversationStateLock";
 
 export interface StateBehaviorInvariantIssue {
   invariant: string;
@@ -126,25 +126,25 @@ export function validateBehaviorContractConsistency(
   return { accepted: issues.length === 0, issues };
 }
 
-export function validateConversationAuthorityContract(
+export function validateConversationStateLockContract(
   state: DroitDynamicState,
-  authority: ConversationStateAuthorityResult,
+  stateLock: ConversationStateLockResult,
 ): StateBehaviorContractReport {
   const issues: StateBehaviorInvariantIssue[] = [];
   const relationshipState = state.relationship?.conversationState ?? "active";
 
-  if (authority.state !== relationshipState) {
+  if (stateLock.state !== relationshipState) {
     issues.push({
-      invariant: "authority.state_match",
-      message: `Authority state=${authority.state}, relationship state=${relationshipState}.`,
+      invariant: "stateLock.state_match",
+      message: `State lock=${stateLock.state}, relationship state=${relationshipState}.`,
     });
   }
 
-  if (relationshipState === "active" && authority.locked) {
-    issues.push({ invariant: "authority.active_unlocked", message: "active durumda authority lock olmamalıdır." });
+  if (relationshipState === "active" && stateLock.locked) {
+    issues.push({ invariant: "authority.active_unlocked", message: "active durumda state lock olmamalıdır." });
   }
-  if (relationshipState !== "active" && !authority.locked) {
-    issues.push({ invariant: "authority.non_active_locked", message: "active dışı relationship state authority tarafından kilitlenmelidir." });
+  if (relationshipState !== "active" && !stateLock.locked) {
+    issues.push({ invariant: "authority.non_active_locked", message: "active dışı relationship state state lock tarafından kilitlenmelidir." });
   }
 
 
@@ -154,12 +154,12 @@ export function validateConversationAuthorityContract(
 export function validateStateBehaviorSeam(input: {
   state: DroitDynamicState;
   behavior: BehaviorContract;
-  authority: ConversationStateAuthorityResult;
+  stateLock: ConversationStateLockResult;
 }): StateBehaviorContractReport {
   const reports = [
     validateDynamicStateContract(input.state),
     validateBehaviorContractConsistency(input.state, input.behavior),
-    validateConversationAuthorityContract(input.state, input.authority),
+    validateConversationStateLockContract(input.state, input.stateLock),
   ];
   const issues = reports.flatMap((report) => report.issues);
   return { accepted: issues.length === 0, issues };

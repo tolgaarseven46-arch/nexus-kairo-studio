@@ -5,7 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
 import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
 import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
-import { applyConversationStateAuthority } from "./src/services/conversationStateAuthority";
+import { projectConversationStateLock } from "./src/services/conversationStateLock";
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
 import { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";
 import { buildKairaResponsePlan, findKairaResponsePlanIssues, kairaResponsePlanInstruction } from "./src/services/kairaResponsePlan";
@@ -576,12 +576,12 @@ app.post("/api/chat", async (req, res) => {
         canonicalSemantic.event,
         behaviorPolicy,
       ),
-      conversationAuthority = applyConversationStateAuthority(responsePersonality, kdm.nextDynamicState),
-      authoritativePersonality = conversationAuthority.personality,
+      conversationStateLock = projectConversationStateLock(kdm.nextDynamicState),
+      responseStylePersonality = responsePersonality,
       behaviorContract = buildBehaviorContract(kdm.nextDynamicState, kdm.trace),
       behaviorProfile = kdm.behaviorProfile,
       speech = computeKairoSpeechIdentity(
-        authoritativePersonality,
+        responseStylePersonality,
         kdm.nextDynamicState,
         kdm.trace,
       ),
@@ -601,7 +601,7 @@ app.post("/api/chat", async (req, res) => {
       },
       local = tryLocalKairoReply(
         userMessage,
-        authoritativePersonality,
+        responseStylePersonality,
         kdm.nextDynamicState,
         kdm.trace,
         stateUserId,
@@ -766,7 +766,7 @@ app.post("/api/chat", async (req, res) => {
         },
         enforcement: enforced,
         speechIdentity: speech,
-        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, behaviorProfile, responsePlan, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
+        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, behaviorProfile, responsePlan, conversationAuthority: { state: conversationStateLock.state, locked: conversationStateLock.locked, reason: conversationStateLock.reason } },
         consistency,
         dialogue: dialogueAnalysis,
         timings,
@@ -1035,7 +1035,7 @@ app.post("/api/chat", async (req, res) => {
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, behaviorProfile, responsePlan, conversationAuthority: { state: conversationAuthority.state, locked: conversationAuthority.locked, reason: conversationAuthority.reason } },
+      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, behaviorProfile, responsePlan, conversationAuthority: { state: conversationStateLock.state, locked: conversationStateLock.locked, reason: conversationStateLock.reason } },
       consistency,
       dialogue: dialogueAnalysis,
       dialogueDecision,
