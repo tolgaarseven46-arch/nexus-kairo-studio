@@ -16,6 +16,7 @@ describe("Kaira contract registry", () => {
       "entity-resolution",
       "canonical-world-event",
       "event-modality",
+      "plan-lifecycle",
       "world-model-ownership",
       "world-event-retrieval",
       "temporal-reference-resolution",
@@ -50,6 +51,10 @@ describe("Kaira contract registry", () => {
 
   it("registers bounded modality semantics", () => {
     expect(activeContractVersion("event-modality")?.version).toBe(1);
+  });
+
+  it("registers immutable plan lifecycle semantics", () => {
+    expect(activeContractVersion("plan-lifecycle")?.version).toBe(1);
   });
 
   it("does not allow anonymous contracts without consumers", () => {
