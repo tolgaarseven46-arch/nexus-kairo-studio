@@ -429,3 +429,14 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `3776fbf` (`fix(kaira): enforce personality trait ranges`). Personality contracts, TypeScript, full regression ve production build başarıyla geçti.
 - Geçici migration workflow/script kaldırıldı.
 - Sonraki audit adayı: `NEUTRAL_DROIT_PERSONALITY` ve `droitPersonalityService.DEFAULT_PERSONALITY_TRAITS` aynı 50-default listesini iki yerde tutuyor; drift riski yaratıp yaratmadığı ve tek lightweight source-of-truth'a bağlanıp bağlanamayacağı koddan doğrulanacak.
+
+
+## 40. Canonical personality default source consolidation — 2026-08-31
+- `NEUTRAL_DROIT_PERSONALITY` ve `droitPersonalityService.DEFAULT_PERSONALITY_TRAITS` aynı 19 trait için ayrı ayrı 50-listesi tutuyordu; bu iki sabitin zamanla drift etme riski kaldırıldı.
+- Lightweight canonical kaynak `droitPersonalityNormalizer.ts` içindeki `NEUTRAL_DROIT_PERSONALITY` olarak kaldı. Bu modül Firebase bağımlılığı taşımaz ve server runtime tarafından güvenle kullanılabilir.
+- `droitPersonalityService` public `DEFAULT_PERSONALITY_TRAITS` export adını korur ancak artık `{ ...NEUTRAL_DROIT_PERSONALITY }` üzerinden türetir; UI/persistence API compatibility bozulmaz.
+- Bağımlılık yönü yalnız persistence service → lightweight normalizer şeklindedir; server normalizer → Firebase bağımlılığı oluşmadı.
+- `kairaPersonalityDefaultSourceContracts.test.ts` canonical neutral kaynağın lightweight kalmasını ve persistence default'unun trait listesini yeniden kopyalamamasını kalıcı olarak doğrular.
+- Entegrasyon commit'i: `a50e8da` (`refactor(kaira): consolidate personality defaults`). Default-source contract, normalizer contract, TypeScript, full regression ve production build başarıyla geçti.
+- Geçici migration workflow/script kaldırıldı.
+- Sonraki audit adayı: Firestore'dan yüklenen/eski personality kayıtları `structuredPersonalityToTraits` içinde normalize edilmeden UI'a dönebiliyor; persisted legacy/out-of-range/non-finite değerlerin canonical normalizer boundary'sinden geçmesi gerekip gerekmediği koddan doğrulanacak.
