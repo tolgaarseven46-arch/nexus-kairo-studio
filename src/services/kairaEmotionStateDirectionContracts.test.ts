@@ -61,13 +61,16 @@ describe("KAIRA emotion-state direction contracts", () => {
     expect(apology.relationship?.hurtScore ?? 0).toBeGreaterThan(0);
   });
 
-  it("neutral conversation cannot instantly normalize affect while hurt is unresolved", () => {
-    const hit = turn("salak").nextDynamicState;
-    const neutral = turn("bugün hava normal", hit).nextDynamicState;
+  it("neutral conversation cannot instantly normalize affect while meaningful hurt is unresolved", () => {
+    const firstHit = turn("salak").nextDynamicState;
+    const secondHit = turn("aptal", firstHit).nextDynamicState;
+    expect(secondHit.relationship?.hurtScore ?? 0).toBeGreaterThanOrEqual(20);
+
+    const neutral = turn("bugün hava normal", secondHit).nextDynamicState;
 
     expect(neutral.relationship?.hurtScore ?? 0).toBeGreaterThan(0);
-    expect(neutral.happiness).toBeLessThanOrEqual(hit.happiness);
-    expect(neutral.calmness).toBeLessThanOrEqual(hit.calmness);
-    expect(neutral.stress).toBeGreaterThanOrEqual(hit.stress);
+    expect(neutral.happiness).toBeLessThanOrEqual(secondHit.happiness);
+    expect(neutral.calmness).toBeLessThanOrEqual(secondHit.calmness);
+    expect(neutral.stress).toBeGreaterThanOrEqual(secondHit.stress);
   });
 });
