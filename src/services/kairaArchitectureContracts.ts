@@ -44,6 +44,8 @@ export const KAIRA_ARCHITECTURE_CONTRACTS_V1 = {
     "CanonicalWorldEvent ham mesajı kaybetmez.",
     "certainty 0..1 aralığındadır.",
     "Participant objeleri undefined değer serialize etmez.",
+    "Yeni canonical event V2 proposition/polarity/temporal alanlarını taşır.",
+    "Proposition predicate eventType ile aynı semantic kimliği temsil eder.",
     "Recall/query mesajları kalıcı dünya olayı olarak değerlendirilmemelidir.",
   ],
   retrieval: [
@@ -173,6 +175,30 @@ export function validateWorldEventContract(
       layer: "world_event",
       invariant: "world_event.firestore_safe_participants",
       message: "World event participant objesinde undefined alan var.",
+    });
+  }
+
+  if (!event.proposition?.key || event.proposition.predicate !== event.eventType) {
+    issues.push({
+      layer: "world_event",
+      invariant: "world_event.v2_proposition_identity",
+      message: "Canonical World Event V2 proposition eksik veya predicate eventType ile uyumsuz.",
+    });
+  }
+
+  if (!event.polarity || !["positive", "negative", "unknown"].includes(event.polarity)) {
+    issues.push({
+      layer: "world_event",
+      invariant: "world_event.v2_polarity",
+      message: "Canonical World Event V2 polarity eksik/geçersiz.",
+    });
+  }
+
+  if (!event.temporal || !["past", "present", "future", "unspecified"].includes(event.temporal.relation)) {
+    issues.push({
+      layer: "world_event",
+      invariant: "world_event.v2_temporal_reference",
+      message: "Canonical World Event V2 temporal reference eksik/geçersiz.",
     });
   }
 
