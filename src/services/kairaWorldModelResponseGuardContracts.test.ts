@@ -124,6 +124,43 @@ describe("world-model response guard contracts", () => {
     expect(findWorldModelResponseIssues("Bana daha önce Ali yarın istifa edecek demiştin.", retrieved)).toEqual([]);
   });
 
+  it("does not invent user-source attribution for direct interaction evidence", () => {
+    const retrieved = rankWorldEventObservations(
+      "Ali ne yapacaktı?",
+      [row({
+        id: "direct",
+        raw: "Ali yarın istifa edecek",
+        at: "2026-08-30T10:00:00.000Z",
+        kind: "direct_interaction",
+      })],
+      5,
+    );
+
+    const issues = findWorldModelResponseIssues("Ali yarın istifa edecek.", retrieved);
+    expect(issues.some((issue) => issue.code === "reported_attribution_lost")).toBe(false);
+    expect(issues.some((issue) => issue.code === "epistemic_qualifier_lost")).toBe(true);
+
+    const guarded = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved);
+    expect(guarded.changed).toBe(true);
+    expect(guarded.reply).toMatch(/Hatırladığım kayda göre/iu);
+    expect(guarded.reply).not.toMatch(/Bana daha önce/iu);
+  });
+
+  it("accepts qualified direct interaction recall without reported attribution", () => {
+    const retrieved = rankWorldEventObservations(
+      "Ali ne yapacaktı?",
+      [row({
+        id: "direct-ok",
+        raw: "Ali yarın istifa edecek",
+        at: "2026-08-30T10:00:00.000Z",
+        kind: "direct_interaction",
+      })],
+      5,
+    );
+
+    expect(findWorldModelResponseIssues("Hatırladığım kayda göre Ali yarın istifa edecek.", retrieved)).toEqual([]);
+  });
+
   it("uses appraisal conflict posture for historical recall without projected state", () => {
     const retrieved = rankWorldEventObservations(
       "Ali ne demişti?",
