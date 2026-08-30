@@ -4,6 +4,7 @@ import type {
   ReasoningTrace,
 } from "../types/nexus";
 import type { DialogueMove } from "./kairoDialogueDecisionEngine";
+import type { KairaResponsePlan } from "./kairaResponsePlan";
 import { classifyLocalEmotionalIntent } from "./kairoEmotionalLanguage";
 import { chooseLanguageReply, learnLanguageReply } from "./kairoLanguageMemory";
 import { normalizeKairoLanguageInput } from "./kairoLanguageNormalizer";
@@ -53,16 +54,20 @@ export function tryLocalKairoReply(
   trace: ReasoningTrace,
   userId = "anonymous",
   dialogueMove?: DialogueMove,
+  responsePlan?: KairaResponsePlan,
 ): LocalLanguageResult {
   const normalization = normalizeKairoLanguageInput(message);
   const intent = detectIntent(message, dialogueMove);
   if (!intent) return { handled: false, confidence: 0, source: "ai", normalization };
 
-  const continueConversation = runtimeFlag(personality, "runtimeContinueConversation", true);
-  const allowQuestions = runtimeFlag(personality, "runtimeAskQuestion", true);
-  const allowHumor = runtimeFlag(personality, "runtimeHumorAllowed", true);
+  const continueConversation = responsePlan?.continueConversation
+    ?? runtimeFlag(personality, "runtimeContinueConversation", true);
+  const allowQuestions = responsePlan?.allowQuestion
+    ?? runtimeFlag(personality, "runtimeAskQuestion", true);
+  const allowHumor = responsePlan?.allowHumor
+    ?? runtimeFlag(personality, "runtimeHumorAllowed", true);
 
-  // A local shortcut must never reopen a turn the central engine explicitly closed.
+  // Local language is a verbalizer only. It may narrow a plan, never reopen it.
   if (!continueConversation) return { handled: false, confidence: 0, source: "ai", normalization };
 
   const rel = state.relationship;
@@ -71,7 +76,7 @@ export function tryLocalKairoReply(
   const warmth = rel?.warmth ?? 50;
   const angry = state.anger >= 55 || conflict >= 45;
   const hurtMode = hurt >= 35;
-  const relationshipLevel = resolveKairoRelationshipLevel(state);
+  const relationshipLevel = responsePlan?.relationshipLevel ?? resolveKairoRelationshipLevel(state);
   const familiar = relationshipLevel !== "new";
   const close = relationshipLevel === "close";
   const funny = allowHumor && personality.humor >= 65 && !angry && !hurtMode;
@@ -118,7 +123,11 @@ export function tryLocalKairoReply(
   if (intent === "goodbye") pool = close ? ["görüşürüz kanka", "hadi görüşürüz", "kendine iyi bak", "hadi kaçarım ben"] : familiar ? ["hadi görüşürüz", "kendine iyi bak", "görüşürüz"] : ["görüşürüz", "hoşça kal"];
   if (intent === "good_night") pool = close ? ["iyi geceler kanka", "geceler", "iyi uyu", "hadi iyi geceler"] : familiar ? ["geceler", "iyi uyu", "hadi iyi geceler"] : ["iyi geceler", "iyi uykular"];
 
-  const reply = chooseLanguageReply(userId, pool, `${intent}|${normalization.canonical}|${state.anger}|${warmth}|${hurt}|${trace.decision.chosenTone}|q${allowQuestions ? 1 : 0}`);
+  const reply = chooseLanguageReply(
+    userId,
+    pool,
+    `${intent}|${normalization.canonical}|${state.anger}|${warmth}|${hurt}|${trace.decision.chosenTone}|q${allowQuestions ? 1 : 0}|h${allowHumor ? 1 : 0}`,
+  );
   learnLanguageReply(userId, reply);
   return { handled: true, intent, reply, confidence: intent === "emotional_opening" ? 0.96 : 0.97, source: "local_language", normalization };
 }
