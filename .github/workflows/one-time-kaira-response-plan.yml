@@ -1,0 +1,37 @@
+name: One-time Kaira response plan integration
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-kaira-response-plan.yml"
+      - "scripts/applyKairaResponsePlanIntegration.mjs"
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply response plan integration
+        run: node scripts/applyKairaResponsePlanIntegration.mjs
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: TypeScript check
+        run: npm run lint
+      - name: Tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit integration
+        run: |
+          if git diff --quiet -- server.ts src/services/droitChatService.ts src/services/kdmPersistenceService.ts; then
+            echo "response plan integration already applied"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts src/services/droitChatService.ts src/services/kdmPersistenceService.ts
+          git commit -m "feat(kaira): integrate canonical response plan"
+          git push
