@@ -22,6 +22,7 @@ describe("Kaira contract registry", () => {
       "temporal-event-graph",
       "discourse-temporal-anchor",
       "explicit-temporal-event-anchor",
+      "proposition-temporal-event-anchor",
       "temporal-evidence",
       "contradiction-evidence",
       "relationship-state",
