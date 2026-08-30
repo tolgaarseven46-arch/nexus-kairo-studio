@@ -69,7 +69,6 @@ export function buildCanonicalWorldEvent(
   semantic: SemanticEvent,
   entities: EntityResolutionResult,
 ): CanonicalWorldEvent {
-  const reportedSpeech = REPORTING_RE.test(message);
   const ambiguities = [...entities.ambiguities];
   const evidence: string[] = [];
 
@@ -78,6 +77,13 @@ export function buildCanonicalWorldEvent(
   const explicitNamed = entities.references.filter((ref) => ref.role === "named_person");
   const unresolvedNamed = explicitNamed.filter((ref) => !ref.resolvedId);
   const explicitCurrentUserName = explicitNamed.find((ref) => ref.resolvedId === "current_user");
+
+  // `reportedSpeech` is the historical compatibility flag used by the world
+  // model to mean "the user is reporting an external claim", not only quoted
+  // speech. A single explicit third-party actor acting on first-person target
+  // ("Ayşe bana özür diledi") is therefore a reported claim as well.
+  const reportsExplicitThirdPartyAction = unresolvedNamed.length === 1 && Boolean(firstPerson);
+  const reportedSpeech = REPORTING_RE.test(message) || reportsExplicitThirdPartyAction;
 
   let actor: WorldEventParticipant | undefined;
   let target: WorldEventParticipant | undefined;
@@ -101,39 +107,30 @@ export function buildCanonicalWorldEvent(
       evidence.push(`target:${secondPerson.surface}`);
     }
   } else {
-    const explicitThirdPartyActor = unresolvedNamed.length === 1 && Boolean(firstPerson);
+    if (entities.speaker.name || entities.speaker.id) {
+      actor = {
+        id: entities.speaker.id,
+        name: entities.speaker.name,
+        source: "first_person",
+        confidence: 1,
+      };
+      evidence.push("actor:current_speaker");
+    }
 
-    if (explicitThirdPartyActor && firstPerson) {
-      actor = toParticipant(unresolvedNamed[0], "explicit_name");
+    if (semantic.target === "kaira") {
+      target = {
+        id: entities.addressee.id,
+        name: entities.addressee.name,
+        source: "semantic_target",
+        confidence: 0.98,
+      };
+      evidence.push("target:kaira");
+    } else if (firstPerson) {
       target = toParticipant(firstPerson, "first_person");
-      evidence.push(`actor:${unresolvedNamed[0].surface}`);
       evidence.push(`target:${firstPerson.surface}`);
-    } else {
-      if (entities.speaker.name || entities.speaker.id) {
-        actor = {
-          id: entities.speaker.id,
-          name: entities.speaker.name,
-          source: "first_person",
-          confidence: 1,
-        };
-        evidence.push("actor:current_speaker");
-      }
-
-      if (semantic.target === "kaira") {
-        target = {
-          id: entities.addressee.id,
-          name: entities.addressee.name,
-          source: "semantic_target",
-          confidence: 0.98,
-        };
-        evidence.push("target:kaira");
-      } else if (firstPerson) {
-        target = toParticipant(firstPerson, "first_person");
-        evidence.push(`target:${firstPerson.surface}`);
-      } else if (unresolvedNamed.length === 1) {
-        target = toParticipant(unresolvedNamed[0], "explicit_name");
-        evidence.push(`target:${unresolvedNamed[0].surface}`);
-      }
+    } else if (unresolvedNamed.length === 1) {
+      target = toParticipant(unresolvedNamed[0], "explicit_name");
+      evidence.push(`target:${unresolvedNamed[0].surface}`);
     }
   }
 
