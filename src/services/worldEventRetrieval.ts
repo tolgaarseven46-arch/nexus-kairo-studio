@@ -13,6 +13,7 @@ const tokens = (value: string) =>
   normalize(value).split(/[^\p{L}\p{N}_]+/u).filter((token) => token.length >= 2);
 
 const RECALL_RE = /\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor musun|hatırladın mı|hakkında ne biliyorsun|kimdi|kime|kimi)\b/iu;
+const REPORTED_SPEECH_RE = /\b(?:ne demişti|ne dedi|demişti|dedi|söylemişti|söyledi)\b/iu;
 
 export function shouldRetrieveWorldEvents(message: string): boolean {
   const text = normalize(message);
@@ -26,6 +27,7 @@ export function rankWorldEventObservations(
   maxItems = 5,
 ): RetrievedWorldEvent[] {
   const queryTokens = new Set(tokens(message));
+  const asksReportedSpeech = REPORTED_SPEECH_RE.test(normalize(message));
   const ranked = observations.map((observation) => {
     const reasons: string[] = [];
     let score = 0;
@@ -51,6 +53,11 @@ export function rankWorldEventObservations(
       reasons.push(`token_overlap:${overlap}`);
     }
 
+    if (asksReportedSpeech && observation.kind === "reported_claim") {
+      score += 1.5;
+      reasons.push("reported_speech_match");
+    }
+
     if (observation.kind === "direct_interaction") {
       score += 1.25;
       reasons.push("direct_interaction");
@@ -67,9 +74,19 @@ export function rankWorldEventObservations(
     return { observation, score, reasons };
   });
 
-  return ranked
-    .filter((item) => item.score >= 2)
-    .sort((a, b) => b.score - a.score)
+  const aboveThreshold = ranked.filter((item) => item.score >= 2);
+  const hasExplicitNameMatch = aboveThreshold.some((item) =>
+    item.reasons.some((reason) => reason.startsWith("name:")),
+  );
+  const relevant = hasExplicitNameMatch
+    ? aboveThreshold.filter((item) => item.reasons.some((reason) => reason.startsWith("name:")))
+    : aboveThreshold;
+
+  return relevant
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return Date.parse(b.observation.createdAt) - Date.parse(a.observation.createdAt);
+    })
     .slice(0, Math.max(1, Math.min(maxItems, 10)));
 }
 
@@ -86,5 +103,5 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
     return `- [${epistemic}; ${certainty}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
   });
 
-  return `WORLD MODEL HAFIZASI:\n${lines.join("\n")}\nKURAL: reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma.`;
+  return `WORLD MODEL HAFIZASI:\n${lines.join("\n")}\nKURAL: reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; çelişkiyi açıkça koru.`;
 }
