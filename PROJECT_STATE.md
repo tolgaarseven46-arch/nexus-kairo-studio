@@ -385,3 +385,14 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `d1786f1` (`refactor(kaira): remove response style personality alias`). Ownership contract, TypeScript, full regression ve production build başarıyla geçti.
 - Geçici alias-removal workflow/script kaldırıldı.
 - Sonraki audit adayı: `responsePersonality = (incomingResponsePersonality || personality)` fallback'ı bilinçli backward compatibility mi, yoksa sessiz/implicit API davranışı mı? Client/server contract ve call-site'lar koddan doğrulanmadan değiştirilmeyecek.
+
+
+## 36. Response personality fallback contract — 2026-08-31
+- Normal Studio/client akışı `droitChatService` üzerinden her `/api/chat` isteğinde base `personality` ile birlikte `responsePersonality: runtimePersonality` gönderir; bu yüzden server fallback'ı normal canlı client yolunda kullanılmaz.
+- Server fallback'ı doğrudan/legacy çağrılar için korunmuştur ancak semantiği daraltılmıştır: `incomingResponsePersonality || personality` yerine `incomingResponsePersonality ?? personality` kullanılır.
+- Böylece fallback yalnız overlay gerçekten eksik (`undefined`) veya açıkça `null` olduğunda base personality'ye düşer; genel falsy değerleri sessizce compatibility gibi yorumlamaz.
+- `kairaBasePersonalityOwnershipContracts.test.ts` canonical nullish fallback'ı ve broad `||` fallback'ın geri gelmemesini doğrular.
+- KDM ownership değişmedi: base personality reducer girdisidir; response personality yalnız KDM sonrası HOW shaping tüketicilerine gider.
+- Entegrasyon commit'i: `3820510` (`refactor(kaira): narrow response personality fallback`). Ownership contract, TypeScript, full regression ve production build başarıyla geçti.
+- Geçici migration workflow/script kaldırıldı.
+- Sonraki audit adayı: `/api/chat` request destructuring içindeki `personality = {}` default'u gerçekten desteklenen opsiyonel API davranışı mı, yoksa eksik base personality'yi sessizce kabul eden bir contract açığı mı? Koddan doğrulanmadan değiştirilmeyecek.
