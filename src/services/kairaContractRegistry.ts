@@ -201,8 +201,16 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     version: 1,
     status: "active",
     ownerLayer: "contradiction-resolution",
-    consumerLayers: ["retrieval", "response-generation"],
+    consumerLayers: ["retrieval", "world-model-projection", "response-generation"],
     summary: "Opposite explicit polarities for the same canonical proposition are marked conflicting; source observations remain separate and newest evidence is not promoted to verified truth.",
+  },
+  {
+    id: "world-model-projection",
+    version: 1,
+    status: "active",
+    ownerLayer: "world-model-projection",
+    consumerLayers: ["retrieval", "response-generation", "future-reasoning-policy"],
+    summary: "Immutable world evidence is projected into bounded per-instance proposition state combining contradiction status, latest evidence polarity and current plan lifecycle without deleting or rewriting source observations; conflicting evidence remains conflicting instead of becoming truth by recency.",
   },
   {
     id: "relationship-state",
