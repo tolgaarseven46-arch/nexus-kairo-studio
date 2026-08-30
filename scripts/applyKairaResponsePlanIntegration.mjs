@@ -82,6 +82,12 @@ persistence = persistence.replaceAll(
   '      worldMemoryGuard: payload.metadata?.worldMemoryGuard,',
   '      worldMemoryGuard: payload.metadata?.worldMemoryGuard,\n      responsePlan: payload.metadata?.responsePlan,',
 );
+persistence = replaceOrThrow(
+  persistence,
+  '        lastWorldMemoryGuard: lastTurn?.metadata?.worldMemoryGuard,\n      };',
+  '        lastWorldMemoryGuard: lastTurn?.metadata?.worldMemoryGuard,\n        lastResponsePlan: lastTurn?.metadata?.responsePlan,\n      };',
+  'responsePlan hydration',
+);
 fs.writeFileSync('src/services/kdmPersistenceService.ts', persistence);
 
 let nexus = fs.readFileSync('src/types/nexus.ts', 'utf8');
