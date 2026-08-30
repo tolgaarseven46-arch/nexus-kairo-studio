@@ -1,0 +1,37 @@
+name: One-time project state runtime state lock
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-runtime-state-lock.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 34. Runtime conversation state-lock projection removal — 2026-08-31\n- `conversationStateLock` saf projection katmanı korunur ancak canlı `server.ts` artık her tur `projectConversationStateLock(...)` çağırmaz; compatibility response kaldırıldıktan sonra bu nesnenin runtime consumer'ı kalmamıştı.\n- State-lock projection architecture seam/property/sequence testlerinde bağımsız doğrulama aracı olarak yaşamaya devam eder. `conversationStateLock.ts` silinmedi.\n- Base personality ownership ve world-state appraisal contract markerları runtime state-lock değişkeninden ayrıştırıldı; KDM sınırı artık doğrudan sonraki gerçek runtime aşama olan `responseStylePersonality` ile delimiter kullanır.\n- `kairaConversationStateLockContracts.test.ts` canlı server yolunda `projectConversationStateLock` / `conversationStateLock =` geri gelmesini yasaklar.\n- Entegrasyon commit'i: `7bde253` (`refactor(kaira): keep conversation state lock out of runtime path`). State-lock contract, TypeScript, full regression ve production build başarıyla geçti.\n- Geçici migration workflow/script kaldırıldı.\n- Sonraki audit adayı: `responseStylePersonality = responsePersonality` alias'ı yalnız isimlendirme passthrough'u mu, yoksa ayrı bir ownership boundary olarak testlerde anlam taşıyor mu? Koddan doğrulanmadan sadeleştirilmeyecek.\n'''
+          if '## 34. Runtime conversation state-lock projection removal — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record runtime state-lock projection removal"
+          git pull --rebase origin main
+          git push origin main
