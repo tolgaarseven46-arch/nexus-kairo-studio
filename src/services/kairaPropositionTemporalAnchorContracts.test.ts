@@ -12,10 +12,12 @@ function observation(input: {
   target: "current_user" | "kaira";
   eventType?: "insult" | "apology";
   polarity?: "positive" | "negative";
+  contentKey?: string;
   referenceId?: string;
   direction?: "before" | "after";
 }): WorldEventObservation {
   const eventType = input.eventType || "insult";
+  const contentKey = input.contentKey || (eventType === "insult" ? "salak" : "apology");
   return {
     id: input.id,
     userId: "user-1",
@@ -25,7 +27,7 @@ function observation(input: {
     createdAt: input.createdAt,
     ...(input.referenceId ? { temporalReferenceObservationId: input.referenceId } : {}),
     event: {
-      raw: `${input.actor} event ${input.id}`,
+      raw: `${input.actor} ${contentKey} event ${input.id}`,
       eventType,
       actor: {
         name: input.actor,
@@ -50,10 +52,11 @@ function observation(input: {
       ambiguities: [],
       evidence: [],
       proposition: {
-        key: `${input.actor.toLocaleLowerCase("tr-TR")}|${eventType}|${input.target}`,
+        key: `${input.actor.toLocaleLowerCase("tr-TR")}|${eventType}|${input.target}|${contentKey}`,
         predicate: eventType,
         actorKey: input.actor.toLocaleLowerCase("tr-TR"),
         targetKey: input.target,
+        contentKey,
       },
       polarity: input.polarity || "positive",
       temporal: {
@@ -84,18 +87,8 @@ function observation(input: {
 
 describe("Kaira proposition temporal anchor contracts", () => {
   it("uses first-person target to disambiguate same actor and event type", () => {
-    const toUser = observation({
-      id: "to-user",
-      createdAt: "2026-08-20T10:00:00.000Z",
-      actor: "Ayşe",
-      target: "current_user",
-    });
-    const toKaira = observation({
-      id: "to-kaira",
-      createdAt: "2026-08-20T11:00:00.000Z",
-      actor: "Ayşe",
-      target: "kaira",
-    });
+    const toUser = observation({ id: "to-user", createdAt: "2026-08-20T10:00:00.000Z", actor: "Ayşe", target: "current_user" });
+    const toKaira = observation({ id: "to-kaira", createdAt: "2026-08-20T11:00:00.000Z", actor: "Ayşe", target: "kaira" });
 
     const result = resolvePropositionTemporalEventAnchor({
       message: "Ayşe bana salak dedikten sonra ne oldu?",
@@ -106,22 +99,28 @@ describe("Kaira proposition temporal anchor contracts", () => {
     expect(result.status).toBe("resolved");
     expect(result.anchorObservationId).toBe("to-user");
     expect(result.matchedEventType).toBe("insult");
+    expect(result.matchedContentKey).toBe("salak");
     expect(result.firstPersonTarget).toBe(true);
   });
 
-  it("preserves ambiguity when the same proposition occurs more than once", () => {
-    const a = observation({
-      id: "a",
-      createdAt: "2026-08-20T10:00:00.000Z",
-      actor: "Ayşe",
-      target: "current_user",
+  it("uses content identity to disambiguate same actor target and event type", () => {
+    const salak = observation({ id: "salak", createdAt: "2026-08-20T10:00:00.000Z", actor: "Ayşe", target: "current_user", contentKey: "salak" });
+    const aptal = observation({ id: "aptal", createdAt: "2026-08-20T11:00:00.000Z", actor: "Ayşe", target: "current_user", contentKey: "aptal" });
+
+    const result = resolvePropositionTemporalEventAnchor({
+      message: "Ayşe bana aptal dedikten sonra ne oldu?",
+      sessionId: "session-1",
+      observations: [salak, aptal],
     });
-    const b = observation({
-      id: "b",
-      createdAt: "2026-08-21T10:00:00.000Z",
-      actor: "Ayşe",
-      target: "current_user",
-    });
+
+    expect(result.status).toBe("resolved");
+    expect(result.anchorObservationId).toBe("aptal");
+    expect(result.matchedContentKey).toBe("aptal");
+  });
+
+  it("preserves ambiguity when the same full proposition occurs more than once", () => {
+    const a = observation({ id: "a", createdAt: "2026-08-20T10:00:00.000Z", actor: "Ayşe", target: "current_user" });
+    const b = observation({ id: "b", createdAt: "2026-08-21T10:00:00.000Z", actor: "Ayşe", target: "current_user" });
 
     const result = resolvePropositionTemporalEventAnchor({
       message: "Ayşe bana salak dedikten sonra ne oldu?",
@@ -134,20 +133,8 @@ describe("Kaira proposition temporal anchor contracts", () => {
   });
 
   it("uses polarity and never anchors a negated proposition to positive evidence", () => {
-    const positive = observation({
-      id: "positive",
-      createdAt: "2026-08-20T10:00:00.000Z",
-      actor: "Ayşe",
-      target: "current_user",
-      polarity: "positive",
-    });
-    const negative = observation({
-      id: "negative",
-      createdAt: "2026-08-21T10:00:00.000Z",
-      actor: "Ayşe",
-      target: "current_user",
-      polarity: "negative",
-    });
+    const positive = observation({ id: "positive", createdAt: "2026-08-20T10:00:00.000Z", actor: "Ayşe", target: "current_user", polarity: "positive" });
+    const negative = observation({ id: "negative", createdAt: "2026-08-21T10:00:00.000Z", actor: "Ayşe", target: "current_user", polarity: "negative" });
 
     const result = resolvePropositionTemporalEventAnchor({
       message: "Ayşe bana salak demedikten sonra ne oldu?",
@@ -161,21 +148,8 @@ describe("Kaira proposition temporal anchor contracts", () => {
   });
 
   it("retrieves graph neighbors only after a unique proposition anchor resolves", () => {
-    const anchor = observation({
-      id: "anchor",
-      createdAt: "2026-08-20T10:00:00.000Z",
-      actor: "Ayşe",
-      target: "current_user",
-    });
-    const next = observation({
-      id: "next",
-      createdAt: "2026-08-21T10:00:00.000Z",
-      actor: "Merve",
-      target: "current_user",
-      eventType: "apology",
-      referenceId: "anchor",
-      direction: "after",
-    });
+    const anchor = observation({ id: "anchor", createdAt: "2026-08-20T10:00:00.000Z", actor: "Ayşe", target: "current_user" });
+    const next = observation({ id: "next", createdAt: "2026-08-21T10:00:00.000Z", actor: "Merve", target: "current_user", eventType: "apology", referenceId: "anchor", direction: "after" });
 
     const result = retrievePropositionTemporalEventNeighbors({
       message: "Ayşe bana salak dedikten sonra ne oldu?",
