@@ -365,3 +365,13 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `dd85d0b` (`refactor(kaira): remove conversation authority compatibility name`). State-lock contract, TypeScript, full regression ve production build başarıyla geçti.
 - Geçici compatibility migration workflow/script kaldırıldı.
 - Sonraki audit adayı: `conversationStateLock` projection'ının yalnız state→behavior seam için mi gerekli olduğu, yoksa gereksiz response/persistence/observability serialization'ı kalıp kalmadığı. Koddan doğrulanmadan kaldırılmayacak.
+
+
+## 34. Runtime conversation state-lock projection removal — 2026-08-31
+- `conversationStateLock` saf projection katmanı korunur ancak canlı `server.ts` artık her tur `projectConversationStateLock(...)` çağırmaz; compatibility response kaldırıldıktan sonra bu nesnenin runtime consumer'ı kalmamıştı.
+- State-lock projection architecture seam/property/sequence testlerinde bağımsız doğrulama aracı olarak yaşamaya devam eder. `conversationStateLock.ts` silinmedi.
+- Base personality ownership ve world-state appraisal contract markerları runtime state-lock değişkeninden ayrıştırıldı; KDM sınırı artık doğrudan sonraki gerçek runtime aşama olan `responseStylePersonality` ile delimiter kullanır.
+- `kairaConversationStateLockContracts.test.ts` canlı server yolunda `projectConversationStateLock` / `conversationStateLock =` geri gelmesini yasaklar.
+- Entegrasyon commit'i: `7bde253` (`refactor(kaira): keep conversation state lock out of runtime path`). State-lock contract, TypeScript, full regression ve production build başarıyla geçti.
+- Geçici migration workflow/script kaldırıldı.
+- Sonraki audit adayı: `responseStylePersonality = responsePersonality` alias'ı yalnız isimlendirme passthrough'u mu, yoksa ayrı bir ownership boundary olarak testlerde anlam taşıyor mu? Koddan doğrulanmadan sadeleştirilmeyecek.
