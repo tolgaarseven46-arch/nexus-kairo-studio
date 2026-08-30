@@ -7,6 +7,7 @@ import {
   computeBehaviorProfile,
   BehaviorLayerProfile,
 } from "./droitBehaviorEngine";
+import { normalizeDroitPersonality } from "./droitPersonalityNormalizer";
 import { normalizeKairoLanguageInput } from "./kairoLanguageNormalizer";
 import { hasLocalLowMoodExpression } from "./kairoEmotionalLanguage";
 import { isConfusionOrChallenge } from "./kairoDialogueChaosEngine";
@@ -278,7 +279,7 @@ const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
 
 export function analyzeKdmInteraction(
   userMessage: string,
-  personality?: DroitPersonalityTraits | null,
+  personality?: Partial<DroitPersonalityTraits> | null,
   currentDynamicState?: DroitDynamicState | null,
   canonicalSemanticEvent?: SemanticEvent | null,
   behaviorPolicy?: BehaviorPolicyInput | null,
@@ -288,15 +289,16 @@ export function analyzeKdmInteraction(
     ...(currentDynamicState || {}),
   };
   const semanticEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage);
-  const baseBehaviorProfile = computeBehaviorProfile(personality || undefined, userMessage);
+  const normalizedPersonality = normalizeDroitPersonality(personality);
+  const baseBehaviorProfile = computeBehaviorProfile(normalizedPersonality, userMessage);
   const intent = semanticIntentToKdm(semanticEvent);
   const sentiment = semanticSentimentToKdm(semanticEvent);
 
-  const patience = trait(personality, "patience");
-  const sensitivity = trait(personality, "emotionalSensitivity");
-  const angerTrait = trait(personality, "anger");
-  const empathy = trait(personality, "empathy");
-  const loyalty = trait(personality, "loyalty");
+  const patience = trait(normalizedPersonality, "patience");
+  const sensitivity = trait(normalizedPersonality, "emotionalSensitivity");
+  const angerTrait = trait(normalizedPersonality, "anger");
+  const empathy = trait(normalizedPersonality, "empathy");
+  const loyalty = trait(normalizedPersonality, "loyalty");
 
   const negativeSensitivity = Math.max(
     0.55,
