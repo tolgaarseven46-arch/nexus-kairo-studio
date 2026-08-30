@@ -9,6 +9,8 @@ on:
       - "src/services/kairaConversationStateLockContracts.test.ts"
       - "src/services/kairaPropertyContracts.test.ts"
       - "src/services/kairaStateSequenceContracts.test.ts"
+      - "src/services/kairaBasePersonalityOwnershipContracts.test.ts"
+      - "src/services/kairaWorldStateAppraisalIntegrationContracts.test.ts"
 
 permissions:
   contents: write
