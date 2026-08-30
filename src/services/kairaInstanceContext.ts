@@ -11,6 +11,7 @@ export interface KairaInstanceContext {
 export interface KairaInstancePolicy {
   persistentIdentity: boolean;
   persistentAutobiography: boolean;
+  persistentWorldModel: boolean;
   persistentRelationship: boolean;
   persistentUserMemory: boolean;
   canConsolidateCoreMemories: boolean;
@@ -39,6 +40,7 @@ export function instancePolicy(type: KairaInstanceType): KairaInstancePolicy {
     return {
       persistentIdentity: false,
       persistentAutobiography: false,
+      persistentWorldModel: false,
       persistentRelationship: false,
       persistentUserMemory: false,
       canConsolidateCoreMemories: false,
@@ -49,6 +51,7 @@ export function instancePolicy(type: KairaInstanceType): KairaInstancePolicy {
     return {
       persistentIdentity: true,
       persistentAutobiography: true,
+      persistentWorldModel: true,
       persistentRelationship: true,
       persistentUserMemory: true,
       canConsolidateCoreMemories: true,
@@ -58,6 +61,7 @@ export function instancePolicy(type: KairaInstanceType): KairaInstancePolicy {
   return {
     persistentIdentity: true,
     persistentAutobiography: true,
+    persistentWorldModel: true,
     persistentRelationship: true,
     persistentUserMemory: true,
     canConsolidateCoreMemories: true,
