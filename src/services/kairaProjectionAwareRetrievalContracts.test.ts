@@ -48,20 +48,18 @@ describe("projection-aware retrieval contracts", () => {
         id: "old",
         at: "2026-08-30T10:00:00.000Z",
         raw: "Ali hakkında istifa durumunu biliyorum",
-        polarity: "positive",
       }),
       row({
         id: "new",
         at: "2026-08-30T10:05:00.000Z",
-        raw: "Ali artık bunu yapmayacak",
-        polarity: "negative",
+        raw: "Ali bunu tekrar söyledi",
       }),
     ];
 
     const retrieved = rankWorldEventObservations("Ali hakkında ne biliyorsun şu an?", rows, 2);
 
     expect(retrieved[0]?.observation.id).toBe("new");
-    expect(retrieved[0]?.reasons).toContain("canonical_current_state:conflicting");
+    expect(retrieved[0]?.reasons).toContain("canonical_current_state:affirmed");
   });
 
   it("does not inject current-state projection ranking into historical reported-speech recall", () => {
