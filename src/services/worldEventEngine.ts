@@ -102,31 +102,44 @@ export function buildCanonicalWorldEvent(
       evidence.push(`target:${secondPerson.surface}`);
     }
   } else {
-    // Direct utterances are authored by the current speaker.
-    if (entities.speaker.name || entities.speaker.id) {
-      actor = {
-        id: entities.speaker.id,
-        name: entities.speaker.name,
-        source: "first_person",
-        confidence: 1,
-      };
-      evidence.push("actor:current_speaker");
-    }
+    // A described third-party action such as "Ayşe bana özür diledi" is not
+    // reported speech, but the explicit named person is still the actor and
+    // first person is the target. Do not fall back to current speaker here.
+    const explicitThirdPartyActor =
+      unresolvedNamed.length === 1 && Boolean(firstPerson) && semantic.target === "third_party";
 
-    if (semantic.target === "kaira") {
-      target = {
-        id: entities.addressee.id,
-        name: entities.addressee.name,
-        source: "semantic_target",
-        confidence: 0.98,
-      };
-      evidence.push("target:kaira");
-    } else if (firstPerson) {
+    if (explicitThirdPartyActor && firstPerson) {
+      actor = toParticipant(unresolvedNamed[0], "explicit_name");
       target = toParticipant(firstPerson, "first_person");
+      evidence.push(`actor:${unresolvedNamed[0].surface}`);
       evidence.push(`target:${firstPerson.surface}`);
-    } else if (unresolvedNamed.length === 1) {
-      target = toParticipant(unresolvedNamed[0], "explicit_name");
-      evidence.push(`target:${unresolvedNamed[0].surface}`);
+    } else {
+      // Direct utterances are authored by the current speaker.
+      if (entities.speaker.name || entities.speaker.id) {
+        actor = {
+          id: entities.speaker.id,
+          name: entities.speaker.name,
+          source: "first_person",
+          confidence: 1,
+        };
+        evidence.push("actor:current_speaker");
+      }
+
+      if (semantic.target === "kaira") {
+        target = {
+          id: entities.addressee.id,
+          name: entities.addressee.name,
+          source: "semantic_target",
+          confidence: 0.98,
+        };
+        evidence.push("target:kaira");
+      } else if (firstPerson) {
+        target = toParticipant(firstPerson, "first_person");
+        evidence.push(`target:${firstPerson.surface}`);
+      } else if (unresolvedNamed.length === 1) {
+        target = toParticipant(unresolvedNamed[0], "explicit_name");
+        evidence.push(`target:${unresolvedNamed[0].surface}`);
+      }
     }
   }
 
