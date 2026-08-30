@@ -46,8 +46,16 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     version: 1,
     status: "active",
     ownerLayer: "retrieval",
-    consumerLayers: ["response-generation"],
+    consumerLayers: ["response-generation", "temporal-evidence"],
     summary: "Recall returns a bounded evidence set, not a generated answer; explicit compared people retain coverage.",
+  },
+  {
+    id: "temporal-evidence",
+    version: 1,
+    status: "active",
+    ownerLayer: "temporal-evidence",
+    consumerLayers: ["retrieval", "response-generation", "future-contradiction-resolution"],
+    summary: "For latest recall, valid timestamps are authoritative; historical evidence and epistemic status are preserved instead of destructively merged.",
   },
   {
     id: "relationship-state",
