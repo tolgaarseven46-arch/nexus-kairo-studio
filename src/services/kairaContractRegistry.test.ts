@@ -18,6 +18,10 @@ describe("Kaira contract registry", () => {
       "event-modality",
       "plan-lifecycle",
       "world-model-ownership",
+      "instance-state-ownership",
+      "instance-provisioning",
+      "identity-memory-truth",
+      "epistemic-access",
       "world-event-retrieval",
       "temporal-reference-resolution",
       "relative-temporal-reference",
@@ -58,6 +62,15 @@ describe("Kaira contract registry", () => {
     expect(
       KAIRA_CONTRACT_REGISTRY.find(
         (item) => item.id === "plan-lifecycle" && item.version === 1,
+      )?.status,
+    ).toBe("superseded");
+  });
+
+  it("activates user+Kaira world-model ownership v2", () => {
+    expect(activeContractVersion("world-model-ownership")?.version).toBe(2);
+    expect(
+      KAIRA_CONTRACT_REGISTRY.find(
+        (item) => item.id === "world-model-ownership" && item.version === 1,
       )?.status,
     ).toBe("superseded");
   });
