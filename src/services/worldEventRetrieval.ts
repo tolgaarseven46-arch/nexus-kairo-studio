@@ -1,5 +1,9 @@
 import type { WorldEventObservation } from "./worldModelEventStore";
 import { compareObservationRecency } from "./temporalEvidencePolicy";
+import {
+  observationPropositionKey,
+  resolveContradictionEvidence,
+} from "./worldEventContradictionResolver";
 
 export interface RetrievedWorldEvent {
   observation: WorldEventObservation;
@@ -106,9 +110,6 @@ export function rankWorldEventObservations(
     : aboveThreshold;
 
   const sorted = relevant.sort((a, b) => {
-    // "En son" is a temporal contract: after entity relevance has bounded the
-    // candidate set, recency is authoritative. Retrieval score must not let an
-    // older lexical match outrank a newer observation for the same recall.
     if (asksLatest) {
       const temporal = compareObservationRecency(a.observation, b.observation);
       if (temporal !== 0) return temporal;
@@ -148,6 +149,11 @@ export function rankWorldEventObservations(
 
 export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): string {
   if (!items.length) return "";
+  const contradictionSets = resolveContradictionEvidence(items.map((item) => item.observation));
+  const contradictionByKey = new Map(
+    contradictionSets.map((set) => [set.propositionKey, set]),
+  );
+
   const lines = items.map(({ observation }, index) => {
     const event = observation.event;
     const actor = event.actor?.name || "çözülmedi";
@@ -156,8 +162,11 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
       ? "KULLANICININ AKTARDIĞI İDDİA"
       : "DOĞRUDAN ETKİLEŞİM";
     const certainty = observation.status === "grounded" ? "grounded" : "ambiguous";
-    return `- #${index + 1} [${epistemic}; ${certainty}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
+    const contradiction = contradictionByKey.get(observationPropositionKey(observation));
+    const conflictLabel = contradiction?.status === "conflicting" ? "; ÇELİŞEN KANIT" : "";
+    const polarity = event.polarity ? `; polarity=${event.polarity}` : "";
+    return `- #${index + 1} [${epistemic}; ${certainty}${polarity}${conflictLabel}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
   });
 
-  return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır; bu seçim timestamp ile belirlenir, lexical score eski kaydı öne geçiremez.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen veya zaman içinde değişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; kayıtları ayrı kanıtlar olarak koru.`;
+  return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır; bu seçim timestamp ile belirlenir, lexical score eski kaydı öne geçiremez.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- ÇELİŞEN KANIT etiketi varsa aynı canonical proposition için zıt polarity kayıtları vardır. En yeni kaydı güncel kanıt olarak kullanabilirsin ama onu otomatik doğrulanmış gerçek sayma; gerektiğinde önceki ve sonraki iddiayı ayrı belirt.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen veya zaman içinde değişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; kayıtları ayrı kanıtlar olarak koru.`;
 }
