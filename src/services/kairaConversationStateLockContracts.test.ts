@@ -45,7 +45,7 @@ describe("pure conversation state lock projection", () => {
     expect(server).not.toContain("authoritativePersonality");
   });
 
-  it("keeps external debug compatibility metadata while sourcing it from the pure lock projection", () => {
-    expect(server).toContain("conversationAuthority: { state: conversationStateLock.state, locked: conversationStateLock.locked, reason: conversationStateLock.reason }");
+  it("does not expose the retired conversationAuthority compatibility name", () => {
+    expect(server).not.toContain("conversationAuthority:");
   });
 });
