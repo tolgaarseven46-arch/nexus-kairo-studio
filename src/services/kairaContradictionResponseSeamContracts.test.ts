@@ -53,7 +53,7 @@ describe("Kaira contradiction retrieval -> response seam", () => {
 
     expect(text).toContain("Ayşe bana salak dedi");
     expect(text).toContain("Ayşe bana salak demedi");
-    expect(text.match(/ÇELİŞEN KANIT/g)?.length).toBe(2);
+    expect(text.match(/; ÇELİŞEN KANIT; güven=/g)?.length).toBe(2);
     expect(text).toContain("polarity=positive");
     expect(text).toContain("polarity=negative");
     expect(text).toContain("güncel kanıt");
