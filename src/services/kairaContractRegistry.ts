@@ -11,11 +11,6 @@ export interface KairaContractVersion {
   revisionReason?: string;
 }
 
-/**
- * Contract ids are stable semantic promises, not implementation names.
- * A breaking semantic revision creates a new version and marks the previous
- * version as superseded instead of silently changing regression expectations.
- */
 export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
   {
     id: "semantic-event",
@@ -74,6 +69,14 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     ownerLayer: "world-model-store",
     consumerLayers: ["temporal-evidence", "retrieval", "response-generation"],
     summary: "Resolvable relative/explicit time expressions are anchored at observation persistence time into bounded intervals; vague references remain unresolved rather than guessed.",
+  },
+  {
+    id: "relative-temporal-reference",
+    version: 1,
+    status: "active",
+    ownerLayer: "world-event",
+    consumerLayers: ["temporal-reference-resolution", "world-model-store", "retrieval"],
+    summary: "Measurable offsets resolve against an explicit anchor; previous-event relations remain explicit dependencies until a referenced event interval is supplied.",
   },
   {
     id: "temporal-evidence",
