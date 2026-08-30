@@ -9,6 +9,11 @@ import {
   rankPlanRecallObservations,
 } from "./worldEventPlanRecallPolicy";
 import {
+  isPlanOutcomeRecallQuery,
+  resolvePlanOutcomeRecall,
+} from "./worldEventOutcomeRecallPolicy";
+import type { PlanLifecycleResolution } from "./worldEventLifecycle";
+import {
   detectTemporalDiscourseDirection,
   retrieveTemporalDiscourseNeighbors,
   type DiscourseTemporalAnchorResolution,
@@ -23,7 +28,7 @@ import {
   type PropositionTemporalAnchorResolution,
 } from "./propositionTemporalEventAnchorResolver";
 
-export type WorldEventRetrievalMode = "none" | "ranked_recall" | "plan_recall" | "temporal_graph";
+export type WorldEventRetrievalMode = "none" | "ranked_recall" | "plan_recall" | "plan_outcome" | "temporal_graph";
 
 export interface CoordinatedWorldEventRetrieval {
   mode: WorldEventRetrievalMode;
@@ -31,11 +36,13 @@ export interface CoordinatedWorldEventRetrieval {
   discourseResolution?: DiscourseTemporalAnchorResolution;
   explicitAnchorResolution?: ExplicitTemporalAnchorResolution;
   propositionAnchorResolution?: PropositionTemporalAnchorResolution;
+  planLifecycleResolution?: PlanLifecycleResolution;
 }
 
 export function shouldCoordinateWorldEventRetrieval(message: string): boolean {
   return Boolean(detectExplicitTemporalRelationDirection(message)) ||
     Boolean(detectTemporalDiscourseDirection(message)) ||
+    isPlanOutcomeRecallQuery(message) ||
     isPlanRecallQuery(message) ||
     shouldRetrieveWorldEvents(message);
 }
@@ -58,11 +65,32 @@ function graphItems(
   }));
 }
 
+function lifecycleItems(
+  observations: WorldEventObservation[],
+  resolution: PlanLifecycleResolution | undefined,
+  maxItems: number,
+): RetrievedWorldEvent[] {
+  if (!resolution) return [];
+  const ids = new Set(resolution.evidenceObservationIds);
+  return observations
+    .filter((item) => Boolean(item.id && ids.has(item.id)))
+    .slice(0, maxItems)
+    .map((observation) => ({
+      observation,
+      score: 100,
+      reasons: [
+        "plan_lifecycle_evidence",
+        `lifecycle_state:${resolution.state}`,
+        `proposition:${resolution.propositionKey || "unresolved"}`,
+      ],
+    }));
+}
+
 /**
  * Single policy seam for world-model retrieval. Temporal event questions are
  * graph-only. Full proposition anchors have highest priority, followed by the
- * coarser named/event anchor, then the conservative latest-turn discourse
- * resolver. Ambiguous temporal anchors never fall back to lexical ranking.
+ * coarser named/event anchor, then conservative discourse resolution. Plan
+ * outcome recall is lifecycle-only and never falls back to lexical guessing.
  */
 export function coordinateWorldEventRetrieval(input: {
   message: string;
@@ -130,6 +158,18 @@ export function coordinateWorldEventRetrieval(input: {
         maxItems,
         "discourse_anchor",
       ),
+    };
+  }
+
+  if (isPlanOutcomeRecallQuery(input.message)) {
+    const outcome = resolvePlanOutcomeRecall({
+      message: input.message,
+      observations: input.observations,
+    });
+    return {
+      mode: "plan_outcome",
+      ...(outcome.resolution ? { planLifecycleResolution: outcome.resolution } : {}),
+      items: lifecycleItems(input.observations, outcome.resolution, maxItems),
     };
   }
 
