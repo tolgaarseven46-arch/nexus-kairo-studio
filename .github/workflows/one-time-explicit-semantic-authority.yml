@@ -1,4 +1,5 @@
 name: One-time explicit semantic authority
+# rerun-with-stop-talking-fix
 
 on:
   push:
@@ -21,6 +22,8 @@ jobs:
       - run: npm install
       - name: Add explicit semantic authority contracts
         run: node scripts/addExplicitSemanticAuthorityContracts.mjs
+      - name: Apply explicit stop-talking fix
+        run: node scripts/applyExplicitStopTalkingFix.mjs
       - name: Targeted contracts
         run: npx vitest run src/services/kairaExplicitSemanticAuthorityContracts.test.ts src/services/semanticEventEngine.test.ts src/services/behaviorIntegrationEngine.test.ts src/services/kairaCrossFamilyAuthorityContracts.test.ts
       - name: TypeScript
@@ -29,12 +32,12 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
-      - name: Commit contracts
+      - name: Commit product and contracts
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/services/kairaExplicitSemanticAuthorityContracts.test.ts
+          git add src/services/behaviorIntegrationEngine.ts src/services/kairaExplicitSemanticAuthorityContracts.test.ts
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "test(kaira): lock explicit semantic authority"
+          git commit -m "fix(kaira): honor explicit stop-talking command"
           git pull --rebase origin main
           git push origin main
