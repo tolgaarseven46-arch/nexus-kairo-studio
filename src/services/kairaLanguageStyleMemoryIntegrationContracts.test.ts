@@ -6,11 +6,11 @@ const persistence = readFileSync('src/services/kdmPersistenceService.ts', 'utf8'
 const languageMemory = readFileSync('src/services/kairoLanguageMemory.ts', 'utf8');
 
 describe('learned language HOW server integration contracts', () => {
-  it('derives the signal only after language-memory hydration and injects HOW below SpeechIdentity', () => {
+  it('derives the signal only after policy-gated language-memory hydration and injects HOW below SpeechIdentity', () => {
     const hydrate = server.indexOf('hydrateLanguageMemory(stateUserId)');
-    const signal = server.indexOf('languageStyleMemory = languageStyleMemorySignal(stateUserId)');
+    const signal = server.indexOf('languageStyleMemory = languageStyleMemorySignal(stateUserId, kairaPolicy.persistentUserMemory)');
     const speechPrompt = server.indexOf('${speechIdentityPrompt(speech)}');
-    const learnedPrompt = server.indexOf('${languageStyleMemoryInstruction(stateUserId)}');
+    const learnedPrompt = server.indexOf('${languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)}');
     const socialStyle = server.indexOf('${socialStyle}');
 
     expect(hydrate).toBeGreaterThan(-1);
@@ -32,6 +32,7 @@ describe('learned language HOW server integration contracts', () => {
     expect(languageMemory).toContain('ÖĞRENİLMİŞ YAZIM ALIŞKANLIĞI (HOW-ONLY, DÜŞÜK OTORİTE)');
     expect(languageMemory).toContain('içerik, anı, olay, niyet veya davranış izni üretmez');
     expect(languageMemory).toContain('ResponsePlan izinleri ile SpeechIdentity ilişki/register sınırları her zaman üstündür');
-    expect(languageMemory).toContain("if(signal.maturity==='cold')return''");
+    expect(languageMemory).toMatch(/if\s*\(signal\.maturity\s*===\s*'cold'\)\s*return\s*''/u);
+    expect(languageMemory).toContain('languageStyleMemorySignal(userId, useLearnedMemory)');
   });
 });
