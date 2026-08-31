@@ -1,5 +1,5 @@
 name: One-time social downstream coverage
-# rerun-after-consistent-relationship-fixture
+# rerun-with-relative-betrayal-distance-contract
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
       - run: npm install
       - name: Add social downstream coverage contracts
         run: node scripts/addSocialDownstreamCoverageContracts.mjs
-      - name: Correct relationship-consistent betrayal fixture
+      - name: Correct betrayal fixture and use relative downstream contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -33,7 +33,7 @@ jobs:
               "function integrate(social: any, semanticEvent: any = {}, dynamicState: any = { anger: 0, stress: 0, relationship: { hurtScore: 0, conflictScore: 0, conversationState: 'active' } }) {\n  return integrateBehaviorLayers({\n    personality: { humor: 50, authority: 50, empathy: 50, patience: 50, seriousness: 50, communication: 50 } as any,\n    dynamicState,"
           )
           old = """  it('does not let high social openness erase betrayal-driven distance', () => {\n    const response = computeSocialOrientationResponse({ warmth: 100, empathy: 100, closenessDrive: 100, dominance: 50, initiative: 100, compliance: 100, initialTrust: 100, disclosure: 100 }, sit({ betrayalSignal: 1 }), {\n      anger: 20, stress: 20, calmness: 50, happiness: 40, confidence: 50, surprise: 10, lastStatus: 'test',\n      relationship: { warmth: 30, trust: 20, hurtScore: 80, conflictScore: 60, interactionCount: 30, repeatedNegativeCount: 3, conversationState: 'active' }\n    } as any);\n    expect(response.behaviorSignals.socialDistancePressure).toBeGreaterThan(0.5);\n    expect(integrate(response).decision.distance).toBeGreaterThan(0.2);\n  });"""
-          new = """  it('does not let high social openness erase betrayal-driven distance', () => {\n    const damagedState = {\n      anger: 20, stress: 20, calmness: 50, happiness: 40, confidence: 50, surprise: 10, lastStatus: 'test',\n      relationship: { warmth: 30, trust: 20, hurtScore: 80, conflictScore: 60, interactionCount: 30, repeatedNegativeCount: 3, conversationState: 'active' }\n    } as any;\n    const response = computeSocialOrientationResponse({ warmth: 100, empathy: 100, closenessDrive: 100, dominance: 50, initiative: 100, compliance: 100, initialTrust: 100, disclosure: 100 }, sit({ betrayalSignal: 1 }), damagedState);\n    expect(response.behaviorSignals.socialDistancePressure).toBeGreaterThan(0.5);\n    expect(integrate(response, {}, damagedState).decision.distance).toBeGreaterThan(0.2);\n  });"""
+          new = """  it('does not let high social openness erase betrayal-driven distance', () => {\n    const damagedState = {\n      anger: 20, stress: 20, calmness: 50, happiness: 40, confidence: 50, surprise: 10, lastStatus: 'test',\n      relationship: { warmth: 30, trust: 20, hurtScore: 80, conflictScore: 60, interactionCount: 30, repeatedNegativeCount: 3, conversationState: 'active' }\n    } as any;\n    const openProfile = { warmth: 100, empathy: 100, closenessDrive: 100, dominance: 50, initiative: 100, compliance: 100, initialTrust: 100, disclosure: 100 };\n    const safe = computeSocialOrientationResponse(openProfile, sit({ betrayalSignal: 0 }), damagedState);\n    const betrayed = computeSocialOrientationResponse(openProfile, sit({ betrayalSignal: 1 }), damagedState);\n    expect(betrayed.behaviorSignals.socialDistancePressure).toBeGreaterThan(safe.behaviorSignals.socialDistancePressure);\n    expect(integrate(betrayed, {}, damagedState).decision.distance).toBeGreaterThan(integrate(safe, {}, damagedState).decision.distance);\n  });"""
           if old not in text:
               raise SystemExit('betrayal fixture marker missing')
           p.write_text(text.replace(old, new))
