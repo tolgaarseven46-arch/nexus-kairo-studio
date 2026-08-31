@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DroitDynamicState } from '../types/nexus';
 
 vi.mock('../lib/firebase', () => ({ auth: { currentUser: null } }));
 vi.mock('./testSessionLayerAuditService', () => ({ saveTestSessionLayerAudit: vi.fn() }));
@@ -12,17 +13,18 @@ import { droitChatService } from './droitChatService';
 import { NEUTRAL_DROIT_PERSONALITY } from './droitPersonalityNormalizer';
 import { clearKairaChatRetryIdentityForTests } from './kairaChatRetryIdentity';
 
-const state = {
+const state: DroitDynamicState = {
   calmness: 70,
   anger: 10,
   stress: 20,
   happiness: 70,
   confidence: 70,
   surprise: 10,
+  lastStatus: 'Sakin',
   relationship: {
     interactionCount: 3,
     lastInteractionAt: '2026-09-01T10:00:00.000Z',
-    conversationState: 'neutral' as const,
+    conversationState: 'repairing',
     hurtScore: 0,
     conflictScore: 0,
   },
