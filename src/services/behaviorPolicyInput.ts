@@ -2,15 +2,23 @@ import type {
   BehaviorIntegrationResult,
   IntegratedBehaviorDecision,
 } from "./behaviorIntegrationEngine";
+import type { ExpressionStyleResponse } from "./expressionStyleEngine";
 
 export const BEHAVIOR_POLICY_SCHEMA_VERSION = "behavior-policy@1" as const;
 export const CLIENT_BEHAVIOR_POLICY_SOURCE = "client_behavior_integration" as const;
+
+export interface ExpressionStylePolicyHints {
+  humorMode: ExpressionStyleResponse["humor"]["dominantMode"];
+  informality: number;
+  emotionalDisplay: number;
+}
 
 export interface BehaviorPolicyInput {
   schemaVersion: typeof BEHAVIOR_POLICY_SCHEMA_VERSION;
   source: typeof CLIENT_BEHAVIOR_POLICY_SOURCE;
   decision: IntegratedBehaviorDecision;
   pressures?: BehaviorIntegrationResult["pressures"];
+  expressionStyle?: ExpressionStylePolicyHints;
 }
 
 const PRIORITIES = new Set<IntegratedBehaviorDecision["priority"]>([
@@ -33,6 +41,16 @@ const LENGTHS = new Set<IntegratedBehaviorDecision["responseLength"]>([
   "medium",
   "long",
 ]);
+const HUMOR_MODES = new Set<Exclude<ExpressionStyleResponse["humor"]["dominantMode"], null>>([
+  "absurd",
+  "irony",
+  "sarcasm",
+  "dark",
+  "affiliative",
+  "aggressive",
+  "selfDirected",
+  "wordplay",
+]);
 
 const finite01 = (value: unknown, fallback = 0) => {
   const number = typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -45,12 +63,22 @@ const bool = (value: unknown, fallback: boolean) =>
 export function createClientBehaviorPolicy(
   decision: IntegratedBehaviorDecision,
   pressures?: BehaviorIntegrationResult["pressures"],
+  expressionStyle?: ExpressionStyleResponse,
 ): BehaviorPolicyInput {
   return {
     schemaVersion: BEHAVIOR_POLICY_SCHEMA_VERSION,
     source: CLIENT_BEHAVIOR_POLICY_SOURCE,
     decision,
     ...(pressures ? { pressures } : {}),
+    ...(expressionStyle
+      ? {
+          expressionStyle: {
+            humorMode: expressionStyle.humor.dominantMode,
+            informality: finite01(expressionStyle.speech.informality, 0.5),
+            emotionalDisplay: finite01(expressionStyle.speech.emotionalDisplay, 0.5),
+          },
+        }
+      : {}),
   };
 }
 
@@ -95,10 +123,23 @@ export function normalizeBehaviorPolicyInput(value: unknown): BehaviorPolicyInpu
       }
     : undefined;
 
+  const rawExpressionStyle = raw.expressionStyle && typeof raw.expressionStyle === "object"
+    ? raw.expressionStyle as Record<string, any>
+    : undefined;
+  const rawHumorMode = rawExpressionStyle?.humorMode;
+  const expressionStyle: ExpressionStylePolicyHints | undefined = rawExpressionStyle
+    ? {
+        humorMode: rawHumorMode === null || HUMOR_MODES.has(rawHumorMode) ? rawHumorMode : null,
+        informality: finite01(rawExpressionStyle.informality, 0.5),
+        emotionalDisplay: finite01(rawExpressionStyle.emotionalDisplay, 0.5),
+      }
+    : undefined;
+
   return {
     schemaVersion: BEHAVIOR_POLICY_SCHEMA_VERSION,
     source: CLIENT_BEHAVIOR_POLICY_SOURCE,
     decision: normalizedDecision,
     ...(pressures ? { pressures } : {}),
+    ...(expressionStyle ? { expressionStyle } : {}),
   };
 }

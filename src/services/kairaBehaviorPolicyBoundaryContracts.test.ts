@@ -16,7 +16,7 @@ describe("explicit behavior policy boundary", () => {
   });
 
   it("sends integrated behavior as explicit policy instead of standalone hidden decision fields", () => {
-    expect(client).toMatch(/createClientBehaviorPolicy\(\s*integrationRuntime\.decision,\s*integrationRuntime\.pressures,?\s*\)/u);
+    expect(client).toMatch(/createClientBehaviorPolicy\(\s*integrationRuntime\.decision,\s*integrationRuntime\.pressures(?:,\s*expressionRuntime\.response)?[,]?\s*\)/u);
     expect(client).toContain("behaviorPolicy,");
     expect(client).not.toContain("behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures");
   });

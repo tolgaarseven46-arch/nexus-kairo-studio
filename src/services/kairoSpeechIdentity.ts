@@ -3,6 +3,7 @@ import type {
   DroitPersonalityTraits,
   ReasoningTrace,
 } from "../types/nexus";
+import type { ExpressionStylePolicyHints } from "./behaviorPolicyInput";
 
 export type KairoRelationshipLevel = "new" | "familiar" | "close";
 
@@ -23,6 +24,9 @@ export interface KairoSpeechIdentity {
   emojiLevel: number;
   warmthLevel: number;
   directness: number;
+  informalityLevel: number;
+  emotionalDisplayLevel: number;
+  humorMode: ExpressionStylePolicyHints["humorMode"];
   rhythm: KairoWritingRhythm;
   instructions: string[];
 }
@@ -53,6 +57,7 @@ export function computeKairoSpeechIdentity(
   personality: DroitPersonalityTraits,
   state: DroitDynamicState,
   trace: ReasoningTrace,
+  expressionStyle?: ExpressionStylePolicyHints,
 ): KairoSpeechIdentity {
   const relationship = state.relationship;
   const negative = trace.messageInterpretation.sentiment === "negatif";
@@ -64,7 +69,9 @@ export function computeKairoSpeechIdentity(
   // Speech identity owns HOW only. It describes style from stable personality +
   // current social/emotional context; behavior permissions live in KairaResponsePlan.
   const humor = clamp(personality.humor - (negative ? 35 : 0) - hurt * 0.25);
-  const coreSlang = clamp(35 + personality.communication * 0.25 + personality.humor * 0.2 - personality.seriousness * 0.25);
+  const informalityLevel = clamp((expressionStyle?.informality ?? 0.5) * 100);
+  const emotionalDisplayLevel = clamp((expressionStyle?.emotionalDisplay ?? 0.5) * 100);
+  const coreSlang = clamp(35 + personality.communication * 0.25 + personality.humor * 0.2 - personality.seriousness * 0.25 + (informalityLevel - 50) * 0.5);
   const slangGate = relationshipLevel === "close" ? 1 : relationshipLevel === "familiar" ? 0.55 : 0.2;
   const slang = clamp(coreSlang * slangGate);
   const directness = clamp(45 + personality.authority * 0.3 + personality.decisionMaking * 0.2 + (negative ? 15 : 0));
@@ -91,6 +98,15 @@ export function computeKairoSpeechIdentity(
       ? "İlişki dili rahat ama ölçülü olsun; aşırı samimi lakap ve sert küfür kullanma."
       : "İlişki dili yeni/tanıdık başlangıcı gibi kalsın; aşırı samimi lakap ve sert küfür kullanma.";
 
+  const humorModeInstruction = expressionStyle?.humorMode
+    ? `Mizah izni açılırsa tercih edilen mizah biçimi: ${expressionStyle.humorMode}. Bu biçimi zorla kullanma.`
+    : "Belirli bir mizah biçimini zorla seçme.";
+  const emotionalDisplayInstruction = emotionalDisplayLevel >= 70
+    ? "Duyguyu dilde belirgin ama teatral olmayan biçimde görünür kıl."
+    : emotionalDisplayLevel <= 30
+      ? "Duyguyu dilde fazla teşhir etme; daha kontrollü ve örtük ifade et."
+      : "Duygu gösterimini doğal ve orta düzeyde tut.";
+
   const instructions = [
     "Bir yapay zeka asistanı gibi değil, tekil ve tutarlı bir kişi gibi yaz.",
     "Kurumsal müşteri hizmetleri dili, yapay nezaket, gereksiz açıklama ve sonuç özeti kullanma.",
@@ -112,12 +128,14 @@ export function computeKairoSpeechIdentity(
           ? "Kırgınlık açıklama raporuna dönüşmesin; ritim daha kısa ve mesafeli olsun."
           : "Kelime seçimi rahat ama ölçülü olsun.",
     humor >= 65 ? "Mizah kullanılmasına davranış planı izin verirse, espriyi açıklamadan kısa ve gündelik tut." : "Mizah tonu gerekiyorsa bile zorlamadan hafif tut.",
+    humorModeInstruction,
+    emotionalDisplayInstruction,
     "Emoji kullanılmasına davranış planı izin verirse seyrek kullan; stil eğilimi düşük kalsın.",
     "Davranış kararını açıklama; yalnızca verilen cevabın dilini ve ritmini biçimlendir.",
     "Aynı cümle kalıplarını sürekli tekrar etme; kelime ve ritim varyasyonunu bağlama göre değiştir.",
   ];
 
-  return { register, relationshipLevel, sentenceLength, slangLevel: slang, humorLevel: humor, emojiLevel, warmthLevel, directness, rhythm: KAIRA_WRITING_RHYTHM, instructions };
+  return { register, relationshipLevel, sentenceLength, slangLevel: slang, humorLevel: humor, emojiLevel, warmthLevel, directness, informalityLevel, emotionalDisplayLevel, humorMode: expressionStyle?.humorMode ?? null, rhythm: KAIRA_WRITING_RHYTHM, instructions };
 }
 
 export function speechIdentityPrompt(speech: KairoSpeechIdentity): string {
@@ -130,6 +148,9 @@ Mizah stili eğilimi: %${speech.humorLevel}
 Emoji stili eğilimi: %${speech.emojiLevel}
 Sıcaklık: %${speech.warmthLevel}
 Doğrudanlık: %${speech.directness}
+Samimiyet / argo eğilimi: %${speech.informalityLevel}
+Duygu gösterimi: %${speech.emotionalDisplayLevel}
+Tercih edilen mizah biçimi: ${speech.humorMode ?? "yok"}
 Ritim: kısa-öncelikli, gerektiğinde bölünmüş, gündelik sohbette az noktalı
 Bu katman yalnızca HOW belirler; soru/mizah/affetme/yakınlaşma/konuşmayı sürdürme izni vermez.
 ${speech.instructions.map((instruction) => `- ${instruction}`).join("\n")}`;

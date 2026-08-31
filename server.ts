@@ -581,6 +581,7 @@ app.post("/api/chat", async (req, res) => {
         responsePersonality,
         kdm.nextDynamicState,
         kdm.trace,
+        behaviorPolicy?.expressionStyle,
       ),
       responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech),
       responsePlanInstruction = kairaResponsePlanInstruction(responsePlan),

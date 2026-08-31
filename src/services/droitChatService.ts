@@ -226,6 +226,7 @@ export const droitChatService = {
     const behaviorPolicy = createClientBehaviorPolicy(
       integrationRuntime.decision,
       integrationRuntime.pressures,
+      expressionRuntime.response,
     );
     const clientPrepMs = Math.round(performance.now() - prepStart);
 
