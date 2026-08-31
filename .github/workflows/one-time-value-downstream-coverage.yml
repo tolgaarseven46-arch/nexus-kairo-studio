@@ -38,3 +38,5 @@ jobs:
           git commit -m "test(kaira): lock value downstream coverage"
           git pull --rebase origin main
           git push origin main
+
+# rerun after helper escaping fix
