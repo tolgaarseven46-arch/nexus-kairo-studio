@@ -1,0 +1,21 @@
+name: One-time language-memory turnover state recorder
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: node scripts/record-language-memory-112-113.mjs
+      - run: |
+          rm scripts/record-language-memory-112-113.mjs .github/workflows/one-time-record-language-memory-112-113.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md scripts/record-language-memory-112-113.mjs .github/workflows/one-time-record-language-memory-112-113.yml
+          git commit -m "docs(kaira): record language-memory turnover state"
+          git push
