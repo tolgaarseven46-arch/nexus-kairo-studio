@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { DroitDynamicState } from '../types/nexus';
 import {
   acquireKairaChatRequestIdentity,
   buildKairaChatRetryFingerprint,
@@ -6,17 +7,18 @@ import {
   clearKairaChatRetryIdentityForTests,
 } from './kairaChatRetryIdentity';
 
-const baseState = {
+const baseState: DroitDynamicState = {
   calmness: 70,
   anger: 10,
   stress: 20,
   happiness: 70,
   confidence: 70,
   surprise: 10,
+  lastStatus: 'Sakin',
   relationship: {
     interactionCount: 4,
     lastInteractionAt: '2026-09-01T10:00:00.000Z',
-    conversationState: 'neutral' as const,
+    conversationState: 'repairing',
     hurtScore: 0,
     conflictScore: 0,
   },
