@@ -4,7 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
 import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
-import { claimKairaChatRequest, completeKairaChatRequest, failKairaChatRequest } from "./src/services/kairaChatIdempotency";
+import { claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";
 import { normalizeDroitPersonality } from "./src/services/droitPersonalityNormalizer";
 import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
@@ -533,7 +533,7 @@ app.post("/api/chat", async (req, res) => {
     const requestId = typeof incomingRequestId === "string" ? incomingRequestId.trim().slice(0, 160) : "";
     idempotencyKey = requestId ? `${stateUserId}::${kairaInstance.instanceId}::${requestId}` : "";
     if (idempotencyKey) {
-      const claim = claimKairaChatRequest<any>(idempotencyKey);
+      const claim = await claimCoordinatedKairaChatRequest<any>(idempotencyKey);
       if (claim.kind === "replay") return res.json(claim.payload);
       if (claim.kind === "wait") {
         const outcome = await claim.outcome;
@@ -542,9 +542,9 @@ app.post("/api/chat", async (req, res) => {
       }
       ownsIdempotencyClaim = true;
     }
-    const sendChatPayload = (payload: any) => {
+    const sendChatPayload = async (payload: any) => {
       if (idempotencyKey && ownsIdempotencyClaim) {
-        completeKairaChatRequest(idempotencyKey, payload);
+        await completeCoordinatedKairaChatRequest(idempotencyKey, payload);
         ownsIdempotencyClaim = false;
       }
       return res.json(payload);
@@ -830,7 +830,7 @@ app.post("/api/chat", async (req, res) => {
           postProcessMs,
           serverTotalMs: Math.round(now() - serverStart),
         };
-      sendChatPayload({
+      await sendChatPayload({
         sessionId,
         turnId: savedTurnId,
         requestId: requestId || undefined,
@@ -1162,7 +1162,7 @@ app.post("/api/chat", async (req, res) => {
         postProcessMs,
         serverTotalMs: Math.round(now() - serverStart),
       };
-    sendChatPayload({
+    await sendChatPayload({
       sessionId,
       turnId: savedTurnId,
       requestId: requestId || undefined,
@@ -1181,7 +1181,7 @@ app.post("/api/chat", async (req, res) => {
   } catch (e: any) {
     console.error(e);
     if (idempotencyKey && ownsIdempotencyClaim) {
-      failKairaChatRequest(idempotencyKey, e);
+      await failCoordinatedKairaChatRequest(idempotencyKey, e);
       ownsIdempotencyClaim = false;
     }
     if (!res.headersSent)
