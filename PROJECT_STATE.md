@@ -91,7 +91,7 @@ Doğrulanmış persistence davranışı:
 - `kairoSpeechIdentity.ts` register, cümle uzunluğu, argo, mizah, emoji, sıcaklık ve doğrudanlık üretir.
 - Bu katman AI promptuna talimat olarak aktarılıyor.
 - Yerel Dil Motorunda ise etkisi henüz sınırlı cevap havuzu üzerinden gerçekleşiyor.
-- Konuşma kimliğinin gerçekten Kaira'ya özgü bir dil parmak izi oluşturup oluşturmadığı henüz baseline testleriyle kanıtlanmadı.
+- Sosyal speech fingerprint generic/formal assistant drift guard ile korunur; relationship-level HOW regressionları new/familiar/close için slang/warmth yüzeylerinin ayırt edilebilir olduğunu doğrular.
 
 ## 9. Hafıza
 Mevcut farklı hafıza parçaları:
@@ -1032,3 +1032,15 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Verify HOW differentiation across relationship levels: for the same safe social intent and same canonical WHAT, new/familiar/close users should produce observably distinct warmth/slang/directness surfaces without changing permissions or semantic intent.
+
+
+## 102. Relationship-level HOW differentiation and local/AI parity — 2026-08-31
+- SpeechIdentity remains the single relationship-level HOW source. KairaResponsePlan copies speech.relationshipLevel directly; server gives the same canonical plan to both local and AI response paths. No second relationship-level authority was found.
+- The local how_are_you and what_doing verbalizer pools now gate relaxed/slang wording by relationship level instead of letting high humor make new users sound familiar.
+- New relationships stay measured; familiar relationships may use light ya/be-style casualness; close relationships may naturally surface kanka-level closeness.
+- The same differentiation is preserved when allowQuestion=false: question/follow-up permission remains blocked while relationship HOW remains distinct.
+- Permanent regression verifies SpeechIdentity slang/warmth ordering new < familiar < close and local surface differentiation under both question-allowed and question-blocked plans.
+- Product commits: 959d8a0 and e36e8eb; final regression commit d76c6df. CI #1162 passed architecture contracts, full tests, TypeScript and production build.
+
+### Next verified development question
+- Bound persistent language-memory growth: recentReplies is bounded but wordWeights and phraseWeights currently accumulate keys indefinitely, so long-lived accepted AI/local learning may eventually bloat the Firestore document.
