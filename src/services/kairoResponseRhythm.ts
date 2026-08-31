@@ -13,6 +13,7 @@ const RHYTHM_SENSITIVE_MOVES = new Set<DialogueMove>([
 
 const GENERIC_ASSISTANT_DRIFT_RE = /\b(?:elbette|memnuniyetle|size yardımcı|yardımcı olmaktan memnun|nasıl yardımcı olabilirim|başka bir konuda yardımcı|bu konuda size|dilerseniz|arzu ederseniz|özetlemek gerekirse|sonuç olarak|bu bağlamda)\b/iu;
 const SOCIAL_LIST_DRIFT_RE = /(?:^|\n)\s*(?:[-*•]|\d+[.)])\s+/u;
+const CLOSE_ONLY_ADDRESS_RE = /\bkanka\b/iu;
 
 function normalizeReply(text: string): string {
   return String(text || "")
@@ -30,6 +31,7 @@ export function findKairoResponseRhythmIssues(
   reply: string,
   history: ConversationTurn[],
   move?: DialogueMove,
+  relationshipLevel?: "new" | "familiar" | "close",
 ): string[] {
   if (move && !RHYTHM_SENSITIVE_MOVES.has(move)) return [];
 
@@ -46,6 +48,11 @@ export function findKairoResponseRhythmIssues(
     issues.push("Kaira doğal sosyal tepkiyi liste/rapor formatına çevirdi");
   }
   SOCIAL_LIST_DRIFT_RE.lastIndex = 0;
+
+  if (relationshipLevel && relationshipLevel !== "close" && CLOSE_ONLY_ADDRESS_RE.test(raw)) {
+    issues.push("Kaira ilişki seviyesi close olmadan aşırı samimi hitap kullandı");
+  }
+  CLOSE_ONLY_ADDRESS_RE.lastIndex = 0;
 
   if (!normalized || normalized.length < 18 || wordCount(normalized) < 4) return issues;
 
