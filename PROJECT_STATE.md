@@ -565,3 +565,15 @@ Yeni sohbet açıldığında:
 - Integration commit: `1ccc939` (`fix(kaira): wire social compliance and disclosure downstream`).
 - Temporary migration workflow and helper script were removed after integration.
 - Next deep-audit focus: preference signals and the remaining motivation/social dimensions should be tested at the final integrated behavior boundary rather than accepted merely because their engine-local outputs change.
+
+
+## 52. Preference overstimulation downstream wiring — 2026-08-31
+- Deep preference audit verified novelty, complexity, depth, playfulness and competition already reach final integrated behavior through `engagementDrive` and/or `depthDrive`; they are not key-level no-ops.
+- The audit found one genuine dropped preference signal: `overstimulationPressure`. The preference engine correctly detected when incoming intensity exceeded Kaira's stable intensity preference, but behavior integration never consumed the signal and the later personality bridge could not preserve its intended avoidance semantics.
+- `behaviorIntegrationEngine` now reduces preference engagement in proportion to overstimulation pressure and selects a short response when overstimulation is high. This models lower eagerness / shorter participation under excessive intensity without turning a preference mismatch into a boundary violation, social distance, or disengagement.
+- Calm/low-intensity contexts do not create overstimulation behavior, so a low intensity preference is not a general short-answer command.
+- Added `kairaPreferenceOverstimulationWiringContracts.test.ts` to verify CharacterTab intensity mapping, contextual overstimulation differentiation, reduced final engagement, short-response behavior under actual excessive intensity, unchanged distance, continued conversation, and no overstimulation behavior in calm context.
+- Targeted contracts, TypeScript, full regression and production build all passed.
+- Integration commit: `dd265e3` (`fix(kaira): wire preference overstimulation downstream`).
+- Temporary migration workflow and helper script were removed after integration.
+- Motivation and social follow-up audit found no additional obvious dropped final signals after recognition, compliance and disclosure wiring. Next audit focus should move to the next CharacterTab fine-tune family and continue using final integrated behavior as the acceptance boundary.
