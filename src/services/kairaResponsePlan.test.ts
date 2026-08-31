@@ -92,32 +92,39 @@ describe("KairaResponsePlan", () => {
     expect(plan.allowHumor).toBe(true);
   });
 
-  it("lets dialogue authority narrow humor for first emotional opening", () => {
+  it("lets dialogue authority narrow humor and affection for first emotional opening", () => {
     const contract = buildBehaviorContract(state("active"));
+    const permissiveContract = { ...contract, affection: "allowed" as const };
     const plan = buildKairaResponsePlan(
-      contract,
+      permissiveContract,
       dialogue({ move: "invite_emotional_context", allowFollowUpQuestion: true, maxSentences: 1, maxWords: 4 }),
       speech({ humorLevel: 100 }),
     );
 
-    expect(contract.playfulness).toBe("allowed");
+    expect(permissiveContract.playfulness).toBe("allowed");
     expect(plan.allowQuestion).toBe(true);
     expect(plan.allowHumor).toBe(false);
+    expect(plan.allowAffection).toBe(false);
     expect(findKairaResponsePlanIssues("şaka yapıyorum hehe", plan)).toContain(
       "response_plan_humor_blocked",
     );
+    expect(findKairaResponsePlanIssues("gel sarılayım", plan)).toContain(
+      "response_plan_affection_blocked",
+    );
   });
 
-  it("lets dialogue authority narrow humor for repair and grounded recall moves", () => {
+  it("lets dialogue authority narrow humor and affection for focused repair/recall moves", () => {
     const contract = buildBehaviorContract(state("active"));
+    const permissiveContract = { ...contract, affection: "allowed" as const };
 
     for (const move of ["repair_or_rephrase", "grounded_recall", "follow_previous_answer", "acknowledge_correction"] as const) {
       const plan = buildKairaResponsePlan(
-        contract,
+        permissiveContract,
         dialogue({ move }),
         speech({ humorLevel: 100 }),
       );
       expect(plan.allowHumor, move).toBe(false);
+      expect(plan.allowAffection, move).toBe(false);
     }
   });
 
