@@ -229,15 +229,15 @@ export function languageStyleMemoryInstruction(userId: string, useLearnedMemory 
   return `ÖĞRENİLMİŞ YAZIM ALIŞKANLIĞI (HOW-ONLY, DÜŞÜK OTORİTE):\nOlgunluk=${signal.maturity}; örnek=${signal.interactionCount}; tipik uzunluk=${signal.lengthPreference} (~${signal.averageWords} kelime); güvenli tekrar eden discourse markerları=${markers}.\nBu sinyal yalnız yazım ritmi/kelime tercihini hafifçe etkiler; içerik, anı, olay, niyet veya davranış izni üretmez. Markerları zorla kullanma ve ham geçmiş cevapları/konuları yeniden üretme. ResponsePlan izinleri ile SpeechIdentity ilişki/register sınırları her zaman üstündür.`;
 }
 
-export function languageMemorySummary(userId: string) {
-  const profile = getLanguageMemory(userId);
+export function languageMemorySummary(userId: string, useLearnedMemory = true) {
+  const profile = useLearnedMemory ? getLanguageMemory(userId) : createProfile();
   return {
     interactionCount: profile.interactionCount,
-    persistent: hydrated.has(userId),
+    persistent: useLearnedMemory && hydrated.has(userId),
     favoriteWords: Object.entries(profile.wordWeights)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([word, weight]) => ({ word, weight: Number(weight.toFixed(2)) })),
-    recentReplies: profile.recentReplies.slice(0, 5),
+    recentReplies: useLearnedMemory ? profile.recentReplies.slice(0, 5) : [],
   };
 }

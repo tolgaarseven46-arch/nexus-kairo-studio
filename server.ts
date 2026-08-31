@@ -395,9 +395,15 @@ app.get("/api/kaira/language-memory", async (q, r) => {
   const userId = typeof q.query.userId === "string" ? q.query.userId : "test_user_x";
   const kairaInstanceId = typeof q.query.kairaInstanceId === "string" ? q.query.kairaInstanceId : undefined;
   const instance = resolveKairaInstanceContext({ instanceId: kairaInstanceId });
+  const policy = instancePolicy(instance.instanceType);
   const scopedUserId = stateOwnerScope(userId, instance.instanceId);
-  await hydrateLanguageMemory(scopedUserId);
-  r.json({ ok: true, userId, kairaInstanceId: instance.instanceId, ...languageMemorySummary(scopedUserId) });
+  if (policy.persistentUserMemory) await hydrateLanguageMemory(scopedUserId);
+  r.json({
+    ok: true,
+    userId,
+    kairaInstanceId: instance.instanceId,
+    ...languageMemorySummary(scopedUserId, policy.persistentUserMemory),
+  });
 });
 app.get("/api/test-sessions/active", async (q, r) => {
   try {
