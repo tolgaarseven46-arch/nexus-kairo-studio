@@ -110,6 +110,16 @@ describe("relationship-dependent qualitative reaction characterization", () => {
     expect(damaged.behaviorProfile.behaviorDirectives.some((item) => item.includes("Nitel tepki withdrawn"))).toBe(true);
   });
 
+  it("exposes the qualitative mode through the canonical relationship instruction used by the AI prompt", () => {
+    const fresh = analyzeKdmInteraction("salak", undefined, newRelationship);
+    const close = analyzeKdmInteraction("salak", undefined, healthyEstablished);
+    const damaged = analyzeKdmInteraction("salak", undefined, alreadyDamaged);
+
+    expect(fresh.behaviorProfile.relationshipInstruction).toContain("Nitel tepki irritated");
+    expect(close.behaviorProfile.relationshipInstruction).toContain("Nitel tepki hurt");
+    expect(damaged.behaviorProfile.relationshipInstruction).toContain("Nitel tepki withdrawn");
+  });
+
   it("keeps red-line violations severe and withdrawn even in a healthy established relationship", () => {
     const result = analyzeKdmInteraction("orospu", undefined, healthyEstablished);
     expect(result.nextDynamicState.relationship?.conversationState).toBe("disengaged");
@@ -123,6 +133,7 @@ describe("relationship-dependent qualitative reaction characterization", () => {
     expect(result.nextDynamicState.reactionMode).toBe("repairing");
     expect(result.trace.currentMood.reactionMode).toBe("repairing");
     expect(result.behaviorProfile.behaviorDirectives.some((item) => item.includes("Nitel tepki repairing"))).toBe(true);
+    expect(result.behaviorProfile.relationshipInstruction).toContain("Nitel tepki repairing");
   });
 
   it("still produces distinct relationship behavior instructions from the same insult", () => {
