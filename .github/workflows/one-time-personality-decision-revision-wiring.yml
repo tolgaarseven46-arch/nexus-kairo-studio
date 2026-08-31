@@ -1,0 +1,40 @@
+name: One-time personality decision revision wiring
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-personality-decision-revision-wiring.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Apply personality decision revision wiring
+        run: node scripts/applyPersonalityDecisionRevisionWiringFix.mjs
+      - name: Targeted contracts
+        run: npx vitest run src/services/kairaPersonalityDecisionRevisionWiringContracts.test.ts src/services/personalityTendencyEngine.test.ts src/services/behaviorIntegrationEngine.test.ts
+      - name: TypeScript
+        run: npm run lint
+      - name: Full regression
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/personalityTendencyEngine.ts src/services/kairaPersonalityDecisionRevisionWiringContracts.test.ts
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "fix(kaira): wire personality decision and revision downstream"
+          git pull --rebase origin main
+          git push origin main
