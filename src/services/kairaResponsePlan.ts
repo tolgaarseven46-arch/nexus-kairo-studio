@@ -56,7 +56,7 @@ export function buildKairaResponsePlan(
     contract.questions === "allowed" &&
     dialogue.allowFollowUpQuestion;
   // Speech identity is HOW-only: style cannot grant/veto behavior permissions.
-  // Dialogue authority may narrow permissions for focused factual/minimal/repair moves.
+  // Dialogue authority may narrow social permissions for focused factual/minimal/repair moves.
   const dialogueFocused = DIALOGUE_FOCUSED_MOVES.has(dialogue.move);
   const allowHumor =
     continueConversation &&
@@ -66,9 +66,13 @@ export function buildKairaResponsePlan(
     continueConversation &&
     contract.affection === "allowed" &&
     !dialogueFocused;
-  const allowForgiveness = contract.forgivenessGranted;
+  const allowForgiveness =
+    contract.forgivenessGranted &&
+    !dialogueFocused;
   const allowReopeningCloseness =
-    continueConversation && contract.reopeningCloseness === "allowed";
+    continueConversation &&
+    contract.reopeningCloseness === "allowed" &&
+    !dialogueFocused;
   const contractSentenceBudget = contract.maxResponseLength === "short" ? 1 : 2;
   const maxSentences = Math.max(
     1,
