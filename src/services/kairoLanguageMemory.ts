@@ -37,6 +37,7 @@ const MAX_LEARNED_WORD_DELTA = 2.1;
 const RECENCY_PENALTIES = [12, 8, 5, 3, 2, 1, 1, 1];
 const LEARNED_MARKER_DELTA = 0.69;
 const LEARNED_WORD_RETENTION = 0.9;
+const LEARNED_PHRASE_SELECTION_RETENTION = 0.9;
 const MIN_LEARNED_WEIGHT = 0.05;
 const STYLE_DECAY_GRACE_REPLIES = 3;
 
@@ -170,11 +171,18 @@ function repetitionPenalty(profile: LanguageMemoryProfile, reply: string) {
   return index >= 0 ? (RECENCY_PENALTIES[index] ?? 1) : 0;
 }
 
+function phraseSelectionFreshness(profile: LanguageMemoryProfile, normalized: string, phraseWeight: number) {
+  if (profile.recentReplies.some((reply) => normalizeLanguageText(reply) === normalized)) return 1;
+  const acceptedWithoutPhrase = Math.max(0, profile.interactionCount - phraseWeight);
+  return Math.pow(LEARNED_PHRASE_SELECTION_RETENTION, acceptedWithoutPhrase);
+}
+
 function affinityForProfile(profile: LanguageMemoryProfile, reply: string) {
   const normalized = normalizeLanguageText(reply);
   const words = normalized.split(/\s+/).filter(Boolean);
   const wordScore = words.reduce((sum, word) => sum + (profile.wordWeights[word] ?? 0), 0) / Math.max(1, words.length);
-  const phraseScore = Math.min(3, profile.phraseWeights[normalized] ?? 0);
+  const phraseWeight = profile.phraseWeights[normalized] ?? 0;
+  const phraseScore = Math.min(3, phraseWeight) * phraseSelectionFreshness(profile, normalized, phraseWeight);
   return wordScore + phraseScore * 0.8;
 }
 
