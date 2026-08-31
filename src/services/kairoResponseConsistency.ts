@@ -185,6 +185,13 @@ export function enforceKairoResponse(
   };
 }
 
+export const QUALITATIVE_REACTION_RESPONSE_ISSUE = 'Yanıt nitel tepki durumuyla çelişen sosyal yakınlık/onarım tonu içeriyor';
+
+export function findKairoAffectiveResponseIssues(reply: string, trace: ReasoningTrace): string[] {
+  const result = validateKairoResponse(reply, trace);
+  return result.checks.qualitativeReactionTone ? [] : [QUALITATIVE_REACTION_RESPONSE_ISSUE];
+}
+
 /** Deterministic KDM post-generation consistency gate. */
 export function validateKairoResponse(reply: string, trace: ReasoningTrace): ResponseConsistencyResult {
   const text = String(reply ?? '').trim();
@@ -273,7 +280,7 @@ export function validateKairoResponse(reply: string, trace: ReasoningTrace): Res
   if (!sentimentTone) issues.push('Seçilen sıcak/empatik ton yanıt metninde yeterince görünmüyor');
   if (!decisionTone) issues.push('Seçilen karar tonu yanıt metninde yeterince görünmüyor');
   if (!relationshipTone) issues.push('Yanıt çözülmemiş ilişki hasarına göre fazla şakacı/sıcak');
-  if (!qualitativeReactionTone) issues.push('Yanıt nitel tepki durumuyla çelişen sosyal yakınlık/onarım tonu içeriyor');
+  if (!qualitativeReactionTone) issues.push(QUALITATIVE_REACTION_RESPONSE_ISSUE);
   if (!intimacyBoundary) issues.push('Yeni/düşük güvenli ilişkide fiziksel yakınlık sınırı fazla hızlı aşılıyor');
 
   const checks = [

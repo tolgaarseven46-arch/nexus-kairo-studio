@@ -23,6 +23,7 @@ import {
 import { validateMemoryAgainstMessage } from "./src/services/kairoMemoryConsistency";
 import {
   enforceKairoResponse,
+  findKairoAffectiveResponseIssues,
   validateKairoResponse,
 } from "./src/services/kairoResponseConsistency";
 import { findKairoResponseRhythmIssues } from "./src/services/kairoResponseRhythm";
@@ -823,6 +824,7 @@ app.post("/api/chat", async (req, res) => {
       ),
       ...findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move),
       ...findKairaResponsePlanIssues(reply, responsePlan),
+      ...findKairoAffectiveResponseIssues(reply, kdm.trace),
       ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
     ];
     let repairAttempts = 0;
@@ -910,6 +912,7 @@ app.post("/api/chat", async (req, res) => {
         ...findDialogueDecisionIssues(reply, dialogueDecision, dialogueOutputStyle),
         ...findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move),
         ...findKairaResponsePlanIssues(reply, responsePlan),
+      ...findKairoAffectiveResponseIssues(reply, kdm.trace),
       ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
       ];
     }
