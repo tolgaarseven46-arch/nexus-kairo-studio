@@ -1,0 +1,37 @@
+name: One-time project state personality decision revision
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-personality-decision-revision.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 53. Personality decision/revision downstream wiring — 2026-08-31\n- Deep personality-tendency audit confirmed CharacterTab key mapping was already correct, but two semantic runtime signals did not survive to final integrated behavior: `decisionPressure` and `revisionReadiness`.\n- Decisiveness now contributes a small bounded increase to `assertivePressure` only when the current turn actually contains a decision demand. The default neutral decision-demand baseline is normalized out, so high decisiveness does not become general-purpose directness in ordinary chat.\n- Revision readiness now reduces `assertivePressure` only in an actual correction context. High cognitive flexibility plus low stubbornness can therefore make Kaira measurably less forceful when the user corrects her, while no correction signal means no generic softening.\n- The integration path remains unchanged: `behaviorIntegrationEngine` still consumes `assertivePressure`; the personality engine now ensures decision/revision semantics are contextually folded into that established signal rather than adding another competing behavior authority.\n- Added `kairaPersonalityDecisionRevisionWiringContracts.test.ts` to verify persisted key mapping, decision-context final directness differentiation, neutral-context non-effect for decisiveness, and correction-context directness softening for high revision readiness.\n- Targeted contracts, TypeScript, full regression and production build all passed.\n- Integration commit: `8337707` (`fix(kaira): wire personality decision and revision downstream`).\n- Temporary migration workflow and helper script were removed after integration.\n- Next deep-audit candidate: values `protectivePressure` is calculated but not directly consumed by behavior integration. Because compassion still affects `moralObjection`, this is not automatically a slider no-op; the next step is to test whether the intended protective/care semantic is measurably lost at the final behavior boundary before changing code.\n'''
+          if '## 53. Personality decision/revision downstream wiring — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record personality decision revision wiring"
+          git pull --rebase origin main
+          git push origin main
