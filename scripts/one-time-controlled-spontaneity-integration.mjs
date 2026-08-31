@@ -17,8 +17,8 @@ if (!source.includes('spontaneityDecision = decideKairaControlledSpontaneity')) 
   source = source.replace(planNeedle, planReplacement);
 }
 
-const promptNeedle = `\${behaviorContractInstruction(behaviorContract)}\\\n\${responsePlanInstruction}\\\nKDM:`;
-const promptReplacement = `\${behaviorContractInstruction(behaviorContract)}\\\n\${responsePlanInstruction}\\\n\${spontaneityInstruction}\\\nKDM:`;
+const promptNeedle = '${responsePlanInstruction}\\\nKDM:';
+const promptReplacement = '${responsePlanInstruction}\\\n${spontaneityInstruction}\\\nKDM:';
 if (!source.includes('${spontaneityInstruction}\\')) {
   if (!source.includes(promptNeedle)) throw new Error('system prompt seam not found');
   source = source.replace(promptNeedle, promptReplacement);
