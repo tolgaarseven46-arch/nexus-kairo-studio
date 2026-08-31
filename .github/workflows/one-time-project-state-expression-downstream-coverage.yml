@@ -1,0 +1,37 @@
+name: One-time project state expression downstream coverage
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-expression-downstream-coverage.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 57. Expression full downstream coverage — 2026-08-31\n- The CharacterTab expression family was audited as a complete downstream system rather than through isolated engine-local tests. All thirteen expression sliders are now covered: eight humor modes, context inhibition, verbosity, informality, emotional display and question drive.\n- Added permanent `kairaExpressionDownstreamCoverageContracts.test.ts`. The contract verifies exact CharacterTab key mapping, humor-mode dominance and integrated humor pressure, context inhibition, final response-length effects, final ask-question effects, and transport of informality/emotional-display/humor-mode through the client behavior-policy seam.\n- Humor preferences remain context-gated: serious contexts can inhibit even a high dark-humor preference rather than allowing the slider to override higher-order context. Context inhibition suppresses humor without manufacturing unrelated boundary distance.\n- No additional expression no-op was found; no product behavior patch was required.\n- Targeted contracts, TypeScript, full regression and production build all passed.\n- Permanent coverage commit: `d11f5c6` (`test(kaira): lock expression downstream coverage`).\n- Temporary verification workflow and generator helper were removed after the successful run.\n- Next audit focus: complete the all-fine-tune family matrix and identify which remaining families still lack whole-family downstream coverage, especially boundaries, motivations, preferences, social orientation and personality where some fixes are currently protected by targeted contracts rather than complete matrices.\n'''
+          if '## 57. Expression full downstream coverage — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record expression downstream coverage"
+          git pull --rebase origin main
+          git push origin main
