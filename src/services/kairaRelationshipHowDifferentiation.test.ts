@@ -81,7 +81,10 @@ function collect(
     );
     expect(result.handled).toBe(true);
     expect(result.intent).toBe('how_are_you');
-    replies.push(result.reply || '');
+    const reply = result.reply || '';
+    replies.push(reply);
+    // Mirrors the server's final accepted local-delivery learning seam.
+    learnLanguageReply(userId, reply);
   }
   return replies;
 }
@@ -159,7 +162,9 @@ describe('relationship-level HOW differentiation', () => {
         interpretSemanticEvent('naber'),
       );
       expect(result.handled).toBe(true);
-      replies.push(result.reply || '');
+      const reply = result.reply || '';
+      replies.push(reply);
+      learnLanguageReply(userId, reply);
     }
 
     expect(replies.every((reply) => !/\bkanka\b/u.test(reply))).toBe(true);
