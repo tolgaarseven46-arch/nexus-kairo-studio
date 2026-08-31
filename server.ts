@@ -596,6 +596,7 @@ app.post("/api/chat", async (req, res) => {
       dialogueOutputStyle = {
         emojiLevel: speech.emojiLevel,
         userMessage,
+        allowQuestion: responsePlan.allowQuestion,
       },
       local = tryLocalKairoReply(
         userMessage,
@@ -862,6 +863,7 @@ app.post("/api/chat", async (req, res) => {
         userMessage,
         userName,
         dialogueAnalysis,
+        responsePlan.allowQuestion,
       );
       if (fallback) {
         const fallbackIssues = [
