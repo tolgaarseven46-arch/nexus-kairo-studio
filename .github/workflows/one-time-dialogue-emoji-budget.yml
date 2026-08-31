@@ -1,0 +1,85 @@
+name: One-time canonical dialogue emoji budget
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Make ResponsePlan emoji budget authoritative
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          rp = Path('src/services/kairaResponsePlan.ts')
+          s = rp.read_text()
+          old = '''  const emojiBudget =\n    continueConversation && speech.emojiLevel > 0 && contract.stance === "open" ? 1 : 0;'''
+          new = '''  const dialogueEmojiBlocked = dialogueFocused || dialogue.move === "join_banter";\n  const emojiBudget =\n    continueConversation &&\n    !dialogueEmojiBlocked &&\n    speech.emojiLevel > 0 &&\n    contract.stance === "open"\n      ? 1\n      : 0;'''
+          if old not in s:
+              raise SystemExit('response plan emoji marker not found')
+          rp.write_text(s.replace(old, new, 1))
+
+          de = Path('src/services/kairoDialogueDecisionEngine.ts')
+          ds = de.read_text()
+          old_iface = '''export interface DialogueOutputStyle {\n  emojiLevel?: number;\n  userMessage?: string;\n  allowQuestion?: boolean;\n}'''
+          new_iface = '''export interface DialogueOutputStyle {\n  emojiLevel?: number;\n  emojiBudget?: number;\n  userMessage?: string;\n  allowQuestion?: boolean;\n  maxSentences?: number;\n  maxWords?: number;\n}'''
+          if old_iface not in ds:
+              raise SystemExit('DialogueOutputStyle marker not found')
+          ds = ds.replace(old_iface, new_iface, 1)
+          old_budget = '''  const emojiBudget =\n    plan.move === "join_banter"\n      ? 0\n      : style?.emojiLevel === undefined\n        ? 1\n        : style.emojiLevel >= 15\n          ? 1\n          : 0;'''
+          new_budget = '''  const emojiBudget = style?.emojiBudget ?? (\n    plan.move === "join_banter"\n      ? 0\n      : style?.emojiLevel === undefined\n        ? 1\n        : style.emojiLevel >= 15\n          ? 1\n          : 0\n  );\n  const effectiveMaxSentences = style?.maxSentences ?? plan.maxSentences;\n  const effectiveMaxWords = style?.maxWords ?? plan.maxWords;'''
+          if old_budget not in ds:
+              raise SystemExit('dialogue emoji budget marker not found')
+          ds = ds.replace(old_budget, new_budget, 1)
+          ds = ds.replace('if (responseUnitCount(reply) > plan.maxSentences) {', 'if (responseUnitCount(reply) > effectiveMaxSentences) {', 1)
+          ds = ds.replace('`Diyalog kararı ${plan.maxSentences} kısa cümle sınırını aştı`,', '`Diyalog kararı ${effectiveMaxSentences} kısa cümle sınırını aştı`,', 1)
+          ds = ds.replace('if (plan.maxWords && wordCount > plan.maxWords) {\n    issues.push(`Diyalog kararı ${plan.maxWords} kelime sınırını aştı`);\n  }', 'if (effectiveMaxWords && wordCount > effectiveMaxWords) {\n    issues.push(`Diyalog kararı ${effectiveMaxWords} kelime sınırını aştı`);\n  }', 1)
+          de.write_text(ds)
+
+          server = Path('server.ts')
+          ss = server.read_text()
+          old_style = '''      dialogueOutputStyle = {\n        emojiLevel: speech.emojiLevel,\n        userMessage,\n        allowQuestion: responsePlan.allowQuestion,\n      },'''
+          new_style = '''      dialogueOutputStyle = {\n        emojiLevel: speech.emojiLevel,\n        emojiBudget: responsePlan.emojiBudget,\n        userMessage,\n        allowQuestion: responsePlan.allowQuestion,\n        maxSentences: responsePlan.maxSentences,\n        maxWords: responsePlan.maxWords,\n      },'''
+          if old_style not in ss:
+              raise SystemExit('server dialogueOutputStyle marker not found')
+          server.write_text(ss.replace(old_style, new_style, 1))
+
+          rpt = Path('src/services/kairaResponsePlan.test.ts')
+          rt = rpt.read_text()
+          marker = '''  it("hard-closes disengaged state regardless of speech warmth", () => {\n'''
+          addition = '''  it("makes focused dialogue and banter emoji-free even when speech style prefers emoji", () => {\n    const contract = buildBehaviorContract(state("active"));\n    for (const move of ["invite_emotional_context", "grounded_recall", "repair_or_rephrase", "follow_previous_answer", "acknowledge_correction", "join_banter"] as const) {\n      const plan = buildKairaResponsePlan(\n        contract,\n        dialogue({ move }),\n        speech({ emojiLevel: 100 }),\n      );\n      expect(plan.emojiBudget, move).toBe(0);\n    }\n  });\n\n  it("keeps emoji as HOW quantity when an unrestricted move and open contract allow it", () => {\n    const contract = buildBehaviorContract(state("active"));\n    const plan = buildKairaResponsePlan(\n      contract,\n      dialogue({ move: "natural_reaction" }),\n      speech({ emojiLevel: 10 }),\n    );\n    expect(plan.emojiBudget).toBe(1);\n  });\n\n'''
+          if marker not in rt:
+              raise SystemExit('response plan test insertion marker not found')
+          rpt.write_text(rt.replace(marker, addition + marker, 1))
+
+          dt = Path('src/services/kairoDialogueDecisionEngine.test.ts')
+          tt = dt.read_text()
+          marker2 = '''  it("bounds self-deprecating banter to one short everyday reaction", () => {\n'''
+          addition2 = '''  it("uses final ResponsePlan output budgets in dialogue validation", () => {\n    const plan = planDialogueResponse([], "bu konuda detaylı anlatır mısın?", "Mert");\n    const issues = findDialogueDecisionIssues(\n      "bir iki üç dört beş altı yedi 😄",\n      plan,\n      {\n        emojiLevel: 100,\n        emojiBudget: 0,\n        maxSentences: 1,\n        maxWords: 6,\n      },\n    );\n    expect(issues).toContain("Konuşma kimliği bu turda en fazla 0 emojiye izin veriyor");\n    expect(issues).toContain("Diyalog kararı 6 kelime sınırını aştı");\n  });\n\n'''
+          if marker2 not in tt:
+              raise SystemExit('dialogue test insertion marker not found')
+          dt.write_text(tt.replace(marker2, addition2 + marker2, 1))
+          PY
+          npm install
+          npx vitest run src/services/kairoDialogueDecisionEngine.test.ts src/services/kairaResponsePlan.test.ts src/services/kairaEmotionalQuestionPermissionContracts.test.ts
+          npx tsc --noEmit
+          npm test
+          npm run build
+          rm .github/workflows/one-time-dialogue-emoji-budget.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kairaResponsePlan.ts src/services/kairaResponsePlan.test.ts src/services/kairoDialogueDecisionEngine.ts src/services/kairoDialogueDecisionEngine.test.ts server.ts .github/workflows/one-time-dialogue-emoji-budget.yml
+          git commit -m "fix(kaira): make response plan output budgets authoritative"
+          git push
