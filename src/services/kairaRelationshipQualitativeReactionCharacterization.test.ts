@@ -100,6 +100,37 @@ describe("relationship-dependent qualitative reaction characterization", () => {
     expect(damaged.trace.currentMood.reactionMode).toBe("withdrawn");
   });
 
+  it("keeps hurt across the first unrelated neutral follow-up while residual injury remains", () => {
+    const insult = analyzeKdmInteraction("salak", undefined, healthyEstablished);
+    const neutral = analyzeKdmInteraction("selam", undefined, insult.nextDynamicState);
+
+    expect(insult.nextDynamicState.reactionMode).toBe("hurt");
+    expect(neutral.nextDynamicState.reactionMode).toBe("hurt");
+    expect(neutral.nextDynamicState.relationship?.hurtScore ?? 0).toBeGreaterThan(0);
+  });
+
+  it("keeps irritated across the first unrelated neutral follow-up while residual injury remains", () => {
+    const insult = analyzeKdmInteraction("salak", undefined, newRelationship);
+    const neutral = analyzeKdmInteraction("selam", undefined, insult.nextDynamicState);
+
+    expect(insult.nextDynamicState.reactionMode).toBe("irritated");
+    expect(neutral.nextDynamicState.reactionMode).toBe("irritated");
+    expect(neutral.nextDynamicState.relationship?.conflictScore ?? 0).toBeGreaterThan(0);
+  });
+
+  it("lets a low-level reaction decay to neutral after enough calm neutral interaction", () => {
+    const insult = analyzeKdmInteraction("salak", undefined, healthyEstablished);
+    let current = insult.nextDynamicState;
+
+    for (let i = 0; i < 40 && current.reactionMode !== "neutral"; i += 1) {
+      current = analyzeKdmInteraction("tamam", undefined, current).nextDynamicState;
+    }
+
+    expect(current.reactionMode).toBe("neutral");
+    expect(current.relationship?.hurtScore ?? 0).toBeLessThan(2);
+    expect(current.relationship?.conflictScore ?? 0).toBeLessThan(2);
+  });
+
   it("feeds the qualitative mode into HOW-only relationship behavior directives", () => {
     const fresh = analyzeKdmInteraction("salak", undefined, newRelationship);
     const close = analyzeKdmInteraction("salak", undefined, healthyEstablished);
