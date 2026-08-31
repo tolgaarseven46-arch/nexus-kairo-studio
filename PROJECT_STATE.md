@@ -516,3 +516,14 @@ Yeni sohbet açıldığında:
 - Geçici temperament migration workflow/script kaldırıldı.
 - Registry auditinde motivation, values, preferences ve social bloklarının UI key'leri runtime reader'larla birebir eşleşti; bu bloklarda no-op bulunmadı. `personality.cognition.deciveness` legacy typo'su UI/engine/persisted contract boyunca aynı kullanıldığı için compatibility migration olmadan rename edilmedi.
 - Sonraki audit adayı: CharacterTab `boundaries` ve kalan personality/expression parametrelerinin tamamını runtime tüketicilerle birebir karşılaştırmak; yalnız gerçek no-op veya ters semantik bulunan noktaları minimum patch ile kapatmak.
+
+
+## 48. CharacterTab fine-tune registry audit complete — 2026-08-31
+- CharacterTab `LAYERS` registry ile runtime fine-tune tüketicileri blok blok karşılaştırıldı: temperament, personality, motivation, values, preferences, social, boundaries ve expression.
+- Motivation, values, preferences ve social bloklarında UI key'leri runtime reader'larla birebir eşleşiyor; no-op bulunmadı.
+- Boundaries bloğundaki altı slider (`disrespect`, `manipulation`, `privacy`, `assertiveness`, `escalation`, `forgiveness`) `boundaryEngine.boundariesFromFineTune(...)` tarafından doğrudan okunuyor ve violation/assertion/escalation/repair/disengagement davranış sinyallerine giriyor.
+- Expression bloğunda wordplay 46. kayıtta düzeltildikten sonra kalan tüm humor ve speech sliderları `expressionStyleFromFineTune(...)` tarafından doğrudan okunuyor; yeni no-op bulunmadı.
+- Personality bloğundaki altı slider (`confidence`, `directness`, `stubbornness`, `analysisDepth`, `flexibility`, legacy persisted `deciveness`) `personalityTendenciesFromFineTune(...)` tarafından doğrudan okunuyor ve assertive/analysis/revision/decision davranış sinyallerine giriyor.
+- `personality.cognition.deciveness` yazımı typo olsa da CharacterTab, runtime engine ve persisted localStorage contract'ında aynı key olduğu için mevcut profilleri kırmamak adına rename edilmedi.
+- Temperament bloğunda bulunan gerçek registry sorunları 47. kayıtta kapatıldı: `uncertaintyTolerance` ve `approachDrive` no-op olmaktan çıkarıldı; `reactivity.threshold` ters semantiği düzeltildi.
+- Sonuç: CharacterTab'da kullanıcıya gösterilen fine-tune davranış sliderları içinde şu an bilinen sessiz no-op key kalmadı. Bundan sonraki audit odağı key wiring değil, sliderların ürettiği davranış etkisinin büyüklük/yön/doğallık açısından baseline örneklerle doğrulanması olmalıdır.
