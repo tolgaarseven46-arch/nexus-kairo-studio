@@ -24,6 +24,8 @@ export interface KairoResponseEnforcementRules {
   askQuestion?: boolean;
   emojiLevel?: number;
   emojiBudget?: number;
+  maxSentences?: number;
+  maxWords?: number;
   conversationState?: string;
   behaviorContract?: BehaviorContract;
 }
@@ -62,6 +64,18 @@ function removeQuestionSentences(text: string): string {
     .filter(Boolean)
     .filter((part) => !part.includes('?'));
   return parts.join(' ').trim();
+}
+
+function responseUnits(text: string): string[] {
+  return String(text || '')
+    .trim()
+    .split(/\n+|(?<=[.!?…])\s+/u)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function trimToWordBudget(text: string, maxWords: number): string {
+  return String(text || '').trim().split(/\s+/u).filter(Boolean).slice(0, maxWords).join(' ');
 }
 
 /**
@@ -123,6 +137,24 @@ export function enforceKairoResponse(
     const withoutQuestions = removeQuestionSentences(text);
     text = withoutQuestions || (continueConversation ? 'tamam' : fallbackForTrace(trace));
     reasons.push('question_blocked');
+  }
+
+  const maxSentences = Number.isFinite(rules.maxSentences)
+    ? Math.max(1, Math.floor(Number(rules.maxSentences)))
+    : Number.POSITIVE_INFINITY;
+  const units = responseUnits(text);
+  if (units.length > maxSentences) {
+    text = units.slice(0, maxSentences).join(' ').trim();
+    reasons.push('sentence_budget_enforced');
+  }
+
+  const maxWords = Number.isFinite(rules.maxWords)
+    ? Math.max(1, Math.floor(Number(rules.maxWords)))
+    : Number.POSITIVE_INFINITY;
+  const words = String(text || '').trim().split(/\s+/u).filter(Boolean);
+  if (words.length > maxWords) {
+    text = trimToWordBudget(text, maxWords);
+    reasons.push('word_budget_enforced');
   }
 
   const hardClosed = disengaged || !continueConversation;
