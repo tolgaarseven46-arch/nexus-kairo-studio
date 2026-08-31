@@ -404,9 +404,14 @@ export function analyzeKdmInteraction(
 
   if (kind === "negative") {
     const severityBoost = semanticEvent.redLine ? 1.35 : semanticEvent.severity >= 0.8 ? 1.15 : 1;
-    conflictAfter = clamp(conflictAfter + 8 * repeatEscalation * personalityImpact * severityBoost);
-    hurtAfter = clamp(hurtAfter + 12 * repeatEscalation * personalityImpact * severityBoost);
-    repairAfter = clamp(repairAfter - 8 * repeatEscalation * personalityImpact * severityBoost);
+    // Established, healthy relationships may absorb ordinary conflict better, but
+    // red-line violations remain strongly injurious regardless of familiarity.
+    const relationshipInjuryMultiplier = semanticEvent.redLine
+      ? Math.max(0.85, toleranceMultiplier)
+      : Math.max(0.5, toleranceMultiplier);
+    conflictAfter = clamp(conflictAfter + 8 * repeatEscalation * personalityImpact * severityBoost * relationshipInjuryMultiplier);
+    hurtAfter = clamp(hurtAfter + 12 * repeatEscalation * personalityImpact * severityBoost * relationshipInjuryMultiplier);
+    repairAfter = clamp(repairAfter - 8 * repeatEscalation * personalityImpact * severityBoost * relationshipInjuryMultiplier);
     lastConflictAt = interactionAt;
     if (pattern) {
       lastNegativePattern = pattern;
