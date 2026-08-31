@@ -910,3 +910,21 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Audit response-consistency enforcement for qualitative HOW: ensure generated replies cannot contradict hurt/irritated/withdrawn/repairing state even when permissions remain otherwise valid.
+
+
+## 88. Qualitative reaction response consistency — 2026-08-31
+- Response consistency now evaluates canonical reactionMode in addition to numeric relationship damage.
+- Low-score hurt/irritated states can therefore reject replies that reopen excessive familiarity, humor or premature closure even when old hurt/conflict thresholds are not crossed.
+- withdrawn also rejects active social reopening language; repairing rejects premature forgiveness/return-to-normal language.
+- neutral mode does not inherit these qualitative restrictions.
+- Regression covers hurt, irritated, withdrawn, repairing and neutral cases.
+
+## 89. Qualitative reaction repair wiring — 2026-08-31
+- The qualitative HOW issue is routed into the existing AI repair issue list before delivery and after world-response guard rewriting.
+- This is intentionally scoped to the qualitative reaction issue; the entire response validator was not promoted into a new behavior authority.
+- BehaviorContract remains the permission authority while reaction consistency remains a HOW repair signal.
+- Integration contracts lock the server repair seam.
+- Combined CI #1110 passed architecture contracts, full tests, TypeScript and production build.
+
+### Next verified development question
+- Verify repair-failure final delivery: if the model still violates qualitative reaction HOW after repair attempts, ensure the invalid draft cannot be delivered unchanged.
