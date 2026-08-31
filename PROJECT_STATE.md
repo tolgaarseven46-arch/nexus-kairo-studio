@@ -969,3 +969,22 @@ Yeni sohbet açıldığında:
 
 ### Next development phase
 - Baseline now permits implementation of controlled spontaneity at behavior-choice level. Spontaneity must never override ResponsePlan/BehaviorContract permissions and every random choice must be observable/persisted as an actual event.
+
+
+## 95. Controlled spontaneity behavior-choice core — 2026-08-31
+- Added a lower-authority controlled spontaneity choice layer for open, neutral natural_reaction turns only.
+- The first mode is recent_topic_nudge and may reference only a safe, already-spoken recent user topic. It cannot invent events, memories, plans or unsupported details.
+- Selection probability is relationship-aware and deliberately low: close 0.12, familiar 0.07, new 0.03.
+- Factual/question moves, non-open conversations, active qualitative reaction states and insufficient response budgets are hard-ineligible.
+- The instruction explicitly cannot grant permissions that ResponsePlan/BehaviorContract denied.
+- CI #1130 passed architecture contracts, full tests, TypeScript and production build for the core behavior-choice engine.
+
+## 96. Controlled spontaneity server integration and observability — 2026-08-31
+- Server decides spontaneity only after canonical ResponsePlan construction and composes its instruction beneath the ResponsePlan instruction.
+- Local-language short-circuit explicitly records mode=none; AI turns retain the full decision including eligible, probability, roll, sourceText/sourceParticipant and reason.
+- The decision is persisted in KNT traces, stored in test-session metadata, returned in the API KDM payload and projected through droitChatService.
+- Canonical persistence metadata types include controlledSpontaneity, preventing TypeScript drift.
+- CI #1143 passed architecture contracts, full tests, TypeScript and production build on the final integrated/observable main state.
+
+### Next verified development question
+- Measure controlled spontaneity in multi-turn simulations for frequency, duplicate-topic pressure and permission-boundary preservation before adding any new spontaneity mode.
