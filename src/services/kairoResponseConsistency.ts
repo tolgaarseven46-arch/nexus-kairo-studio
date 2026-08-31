@@ -121,7 +121,7 @@ export function enforceKairoResponse(
 
   if (!askQuestion && text.includes('?')) {
     const withoutQuestions = removeQuestionSentences(text);
-    text = withoutQuestions || fallbackForTrace(trace);
+    text = withoutQuestions || (continueConversation ? 'tamam' : fallbackForTrace(trace));
     reasons.push('question_blocked');
   }
 
