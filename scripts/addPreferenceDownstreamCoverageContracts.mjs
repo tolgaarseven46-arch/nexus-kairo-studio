@@ -44,8 +44,8 @@ describe('preference downstream coverage', () => {
     expect(integrate(high).pressures.engagement).toBeGreaterThan(integrate(low).pressures.engagement);
   });
 
-  it('keeps complexity live through depth and final response length', () => {
-    const active = sit({ complexityOpportunity: 1 });
+  it('keeps complexity live through depth and final response length when depth is actually available', () => {
+    const active = sit({ complexityOpportunity: 1, depthOpportunity: 1 });
     const low = computePreferenceResponse({ ...neutral, complexity: 10 }, active);
     const high = computePreferenceResponse({ ...neutral, complexity: 100 }, active);
     expect(high.behaviorSignals.depthDrive).toBeGreaterThan(low.behaviorSignals.depthDrive);
