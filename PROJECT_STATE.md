@@ -739,3 +739,15 @@ Yeni sohbet açıldığında:
 - Bu auditte ürün kodu değişikliği gerekmedi; mevcut `behaviorIntegrationEngine` otorite semantiği beklenen contractları zaten sağlıyordu.
 - Entegrasyon commit'i: `e156c47` (`test(kaira): lock value boundary repair authority`). Normal CI architecture contracts, full tests, TypeScript ve production build ile tamamen yeşil geçti.
 - Repo açık issue taşımıyor ve TODO code search'te açık kayıt bulunmadı. Section 65'te kayıtlı mevcut cross-family authority audit dalının bilinen açık işleri bu bölümle tamamlandı.
+
+
+## 67. Focused dialogue social-permission intersection + emotional question parity — 2026-08-31
+- Gerçek konuşma baseline auditinde `DialogueDecisionPlan` ile final `KairaResponsePlan` arasında iki otorite kaçağı bulundu ve kapatıldı.
+- `invite_emotional_context`, `grounded_recall`, `repair_or_rephrase`, `follow_previous_answer` ve `acknowledge_correction` odaklı hamleleri artık active/permissive BehaviorContract altında bile yeni sosyal anlam üretemez: humor, affection, forgiveness ve reopening-closeness izinleri final ResponsePlan'da daraltılır. Speech identity HOW-only kalır ve bu izinleri açamaz/kapatamaz.
+- İlk duygusal açılışta ikinci kaçak AI/local parity sınırındaydı: BehaviorContract/ResponsePlan soru iznini kapattığında Yerel Dil Motoru kısa kabul tepkisine (`hmm`, `anladım`, `hee`) düşerken AI dialogue validator ve fallback hâlâ merak sorusu (`hmm niye`) zorluyordu.
+- `DialogueOutputStyle.allowQuestion` effective final izin olarak dialogue validator'a taşındı. `invite_emotional_context` validasyonu soru açıksa minimal curiosity, soru kapalıysa minimal acknowledgement kabul eder. Grounded fallback da aynı effective izne göre `hmm niye` veya `hmm` üretir.
+- `server.ts` AI validation/fallback seam'i final `responsePlan.allowQuestion` değerini kullanır; böylece local ve AI aynı WHAT/WHETHER otoritesine bağlandı.
+- Kalıcı regression coverage: `kairaResponsePlan.test.ts` ve yeni `kairaEmotionalQuestionPermissionContracts.test.ts`.
+- İlgili commitler: `eddec110` (focused social permission narrowing), `728e346` (focused permission tests), `a8d1ed85` (effective emotional question permission), `14ba9827` (parity contract), final server entegrasyonu `780f997` (`fix(kaira): align emotional question permission seam`).
+- One-time entegrasyon run'ında targeted 10/10 test, full regression 657/657 test, TypeScript ve production build başarıyla geçti. Geçici workflow entegrasyon commit'inde silindi.
+- Sonraki baseline audit adayı: `buildDialogueDecisionInstruction(...)` final ResponsePlan oluşmadan hazırlanıyor. Dialogue plan soru iznine izin verirken final ResponsePlan bunu kapatırsa model prompt'una çelişkili takip-sorusu talimatı yazılıp yazılmadığı koddan doğrulanacak; validator düzeldi diye prompt contradiction varsayılmayacak.
