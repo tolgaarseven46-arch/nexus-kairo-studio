@@ -23,6 +23,16 @@ describe('mixed local / AI provider state continuity contracts', () => {
     expect(count('relationshipState:\n          kdm.nextDynamicState.relationship || kdm.trace.relationship,')).toBeGreaterThanOrEqual(1);
   });
 
+  it('records canonical effective pre-turn state rather than a default request snapshot', () => {
+    expect(count('dynamicStateBefore: effective,')).toBe(2);
+    expect(count('dynamicStateBefore: requestState,')).toBe(0);
+
+    const persistedFallback = server.indexOf('effective = dynamicState?.relationship');
+    const localBranch = server.indexOf('if (local.handled && local.reply)');
+    expect(persistedFallback).toBeGreaterThan(-1);
+    expect(localBranch).toBeGreaterThan(persistedFallback);
+  });
+
   it('returns the same canonical state envelope to clients regardless of provider path', () => {
     const localBranch = server.indexOf('if (local.handled && local.reply)');
     const aiBranch = server.indexOf('const relationship = kdm.trace.relationship;', localBranch);
