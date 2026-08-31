@@ -8,12 +8,12 @@ import {
 describe('language-memory stale exact-phrase selection pressure', () => {
   it('does not let a historically over-trained exact phrase monopolize later selection after sustained style change', () => {
     const userId = 'stale-phrase-selection';
-    const stale = 'iyidir kanka senden';
-    const currentA = 'iyiyim sen';
-    const currentB = 'iyi valla sen nasılsın';
+    const stale = 'tamamdır harbi böyle';
+    const currentA = 'anladım peki';
+    const currentB = 'olur tamamdır';
 
     for (let i = 0; i < 12; i += 1) learnLanguageReply(userId, stale);
-    for (let i = 0; i < 32; i += 1) learnLanguageReply(userId, `tamam anladım ${i}`);
+    for (let i = 0; i < 32; i += 1) learnLanguageReply(userId, `başka biçim ${i}`);
 
     const profile = getLanguageMemory(userId);
     expect(profile.phraseWeights[stale]).toBeGreaterThan(0);
