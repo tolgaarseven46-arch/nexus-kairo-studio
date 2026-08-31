@@ -634,3 +634,15 @@ Yeni sohbet açıldığında:
 - Permanent coverage commit: `d11f5c6` (`test(kaira): lock expression downstream coverage`).
 - Temporary verification workflow and generator helper were removed after the successful run.
 - Next audit focus: complete the all-fine-tune family matrix and identify which remaining families still lack whole-family downstream coverage, especially boundaries, motivations, preferences, social orientation and personality where some fixes are currently protected by targeted contracts rather than complete matrices.
+
+
+## 58. Boundary full downstream coverage — 2026-08-31
+- The CharacterTab boundary family was audited as a complete downstream system. All six boundary sliders are now explicitly covered: disrespect sensitivity, manipulation sensitivity, privacy sensitivity, assertiveness, escalation and forgiveness.
+- Added permanent `kairaBoundaryDownstreamCoverageContracts.test.ts`. It verifies exact CharacterTab key mapping and proves each slider reaches the final integrated boundary behavior in a semantically matching context.
+- Disrespect, manipulation and privacy sensitivities each change their matching violation signal and final integrated boundary pressure. Assertiveness remains live under coercion through coercion violation, boundary assertion, final boundary pressure and final directness.
+- Escalation increases escalation/disengagement pressure only after a real violation and cannot manufacture a boundary event in a neutral context. Forgiveness increases repair openness and reduces distance during genuine apology/repair, but cannot override a hard red line; hard-stop still forces disengagement with zero repair openness.
+- No additional boundary no-op was found, so no product behavior patch was required.
+- Targeted contracts, TypeScript, full regression and production build all passed.
+- Permanent coverage commit: `072ce7b` (`test(kaira): lock boundary downstream coverage`).
+- Temporary verification workflow and generator helper were removed after the successful run.
+- Next audit focus: motivation full downstream coverage, then preferences/social/personality whole-family matrices to complete the all-fine-tune coverage map.
