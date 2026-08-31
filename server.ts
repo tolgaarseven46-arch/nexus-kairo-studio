@@ -821,7 +821,7 @@ app.post("/api/chat", async (req, res) => {
         dialogueDecision,
         dialogueOutputStyle,
       ),
-      ...findKairoResponseRhythmIssues(reply, cleanHistory),
+      ...findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move),
       ...findKairaResponsePlanIssues(reply, responsePlan),
       ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
     ];
@@ -855,7 +855,7 @@ app.post("/api/chat", async (req, res) => {
             dialogueDecision,
             dialogueOutputStyle,
           ),
-          ...findKairoResponseRhythmIssues(repairedReply, cleanHistory),
+          ...findKairoResponseRhythmIssues(repairedReply, cleanHistory, dialogueDecision.move),
           ...findKairaResponsePlanIssues(repairedReply, responsePlan),
           ...findWorldModelResponseIssues(repairedReply, retrievedWorldEvents).map((issue) => issue.message),
         ];
@@ -891,7 +891,7 @@ app.post("/api/chat", async (req, res) => {
             dialogueDecision,
             dialogueOutputStyle,
           ),
-          ...findKairoResponseRhythmIssues(fallback, cleanHistory),
+          ...findKairoResponseRhythmIssues(fallback, cleanHistory, dialogueDecision.move),
           ...findKairaResponsePlanIssues(fallback, responsePlan),
           ...findWorldModelResponseIssues(fallback, retrievedWorldEvents).map((issue) => issue.message),
         ];
@@ -908,7 +908,7 @@ app.post("/api/chat", async (req, res) => {
         ...findKairoGroundingIssues(reply, cleanHistory, userMessage),
         ...findDialogueAttributionIssues(reply, cleanHistory, userMessage, userName, dialogueAnalysis),
         ...findDialogueDecisionIssues(reply, dialogueDecision, dialogueOutputStyle),
-        ...findKairoResponseRhythmIssues(reply, cleanHistory),
+        ...findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move),
         ...findKairaResponsePlanIssues(reply, responsePlan),
       ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
       ];
@@ -935,7 +935,7 @@ app.post("/api/chat", async (req, res) => {
           ...findKairoGroundingIssues(planSafeFallback, cleanHistory, userMessage),
           ...findDialogueAttributionIssues(planSafeFallback, cleanHistory, userMessage, userName, dialogueAnalysis),
           ...findDialogueDecisionIssues(planSafeFallback, dialogueDecision, dialogueOutputStyle),
-          ...findKairoResponseRhythmIssues(planSafeFallback, cleanHistory),
+          ...findKairoResponseRhythmIssues(planSafeFallback, cleanHistory, dialogueDecision.move),
           ...findKairaResponsePlanIssues(planSafeFallback, responsePlan),
           ...findWorldModelResponseIssues(planSafeFallback, retrievedWorldEvents).map((issue) => issue.message),
         ];
