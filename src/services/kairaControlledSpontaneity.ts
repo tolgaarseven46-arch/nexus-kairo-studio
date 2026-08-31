@@ -22,14 +22,44 @@ export interface KairaSpontaneityInput {
 }
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const TOPIC_STOP_WORDS = new Set([
+  'bugün', 'dün', 'yarın', 'biraz', 'baya', 'şey', 'işte', 'yani', 'falan', 'filan', 'ama', 'çok', 'daha', 'sonra',
+]);
+
+function topicTokens(text: string): string[] {
+  return Array.from(new Set(
+    String(text || '')
+      .toLocaleLowerCase('tr-TR')
+      .replace(/[^a-zçğıöşü0-9\s]/giu, ' ')
+      .split(/\s+/u)
+      .filter((token) => token.length >= 4 && !TOPIC_STOP_WORDS.has(token)),
+  ));
+}
+
+function topicWasRecentlyEchoed(text: string, recentKairaReplies: string[]): boolean {
+  const candidate = topicTokens(text);
+  if (!candidate.length) return false;
+  return recentKairaReplies.some((reply) => {
+    const replyTokens = new Set(topicTokens(reply));
+    const overlap = candidate.filter((token) => replyTokens.has(token)).length;
+    return overlap >= 2 && overlap / candidate.length >= 0.4;
+  });
+}
 
 function safeTopicCandidate(history: ConversationTurn[]): ConversationTurn | undefined {
-  return [...(Array.isArray(history) ? history : [])]
+  const turns = Array.isArray(history) ? history : [];
+  const recentKairaReplies = turns
+    .filter((turn) => turn?.sender === 'droit')
+    .slice(-3)
+    .map((turn) => String(turn.text || ''));
+
+  return [...turns]
     .reverse()
     .find((turn) => {
       if (turn?.sender !== 'user') return false;
       const text = String(turn.text || '').trim();
       if (text.length < 8 || text.includes('?')) return false;
+      if (topicWasRecentlyEchoed(text, recentKairaReplies)) return false;
       const event = interpretSemanticEvent(text);
       return (
         event.intent === 'general_chat' ||
