@@ -45,11 +45,8 @@ export function resolveKairoRelationshipLevel(state: DroitDynamicState): KairoRe
   const relationship = state.relationship;
   if (!relationship) return "new";
   const trust = relationship.trust ?? 50;
-  const conflict = relationship.conflictScore ?? 0;
-  const hurt = relationship.hurtScore ?? 0;
-  const safeRelationship = conflict < 30 && hurt < 30;
-  if (safeRelationship && relationship.warmth >= 65 && trust >= 65 && (relationship.familiarityDays >= 30 || relationship.interactionCount >= 40)) return "close";
-  if (safeRelationship && relationship.warmth >= 50 && trust >= 50 && (relationship.familiarityDays >= 7 || relationship.interactionCount >= 12)) return "familiar";
+  if (relationship.warmth >= 65 && trust >= 65 && (relationship.familiarityDays >= 30 || relationship.interactionCount >= 40)) return "close";
+  if (relationship.warmth >= 50 && trust >= 50 && (relationship.familiarityDays >= 7 || relationship.interactionCount >= 12)) return "familiar";
   return "new";
 }
 
