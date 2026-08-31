@@ -1,5 +1,5 @@
 name: One-time controlled spontaneity integration
-# retry: robust literal prompt seam
+# retry: compose into response-plan instruction
 
 on:
   push:
