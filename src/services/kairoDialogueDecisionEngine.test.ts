@@ -177,8 +177,10 @@ describe("Kaira dialogue decision engine", () => {
 
     expect(plan.allowFollowUpQuestion).toBe(true);
     expect(instruction).toContain("Takip sorusu: yasak");
-    expect(instruction).toContain("merak sorusu yerine yalnız kısa kabul tepkisi");
     expect(instruction).not.toContain("Takip sorusu: gerekiyorsa en fazla bir tane");
+    expect(instruction).not.toContain("hmm niye");
+    expect(instruction).not.toContain("ne oldu");
+    expect(instruction).toContain("hmm, anladım veya hee");
   });
 
   it("rejects all three failed real emotional-opening replies", () => {
