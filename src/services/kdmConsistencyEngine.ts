@@ -429,7 +429,7 @@ export function analyzeKdmInteraction(
     if (priorConversationState === "active") repairAfter = clamp(repairAfter + 3 * forgivenessFactor);
   } else {
     conflictAfter = clamp(conflictAfter - healingRate);
-    hurtAfter = clamp(hurtAfter - healingRate * 0.5);
+    hurtAfter = clamp(hurtAfter - Math.max(1, healingRate));
     repairAfter = baseRepair;
   }
 
