@@ -573,7 +573,7 @@ app.post("/api/chat", async (req, res) => {
         canonicalSemantic.event,
         behaviorPolicy,
       ),
-      behaviorContract = buildBehaviorContract(kdm.nextDynamicState, kdm.trace),
+      behaviorContract = buildBehaviorContract(kdm.nextDynamicState, kdm.trace, canonicalSemantic.event),
       behaviorProfile = kdm.behaviorProfile,
       speech = computeKairoSpeechIdentity(
         responsePersonality,
