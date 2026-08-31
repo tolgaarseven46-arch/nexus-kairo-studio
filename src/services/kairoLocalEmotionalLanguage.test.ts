@@ -77,4 +77,58 @@ describe("Kaira local emotional language", () => {
     expect(result.handled).toBe(false);
     expect(result.source).toBe("ai");
   });
+
+  it("keeps a close relationship locally reserved while canonical reaction mode is hurt even below the old hurt-score threshold", () => {
+    const hurtCloseState = {
+      ...state,
+      reactionMode: "hurt",
+      relationship: {
+        ...state.relationship,
+        interactionCount: 60,
+        familiarityDays: 30,
+        warmth: 80,
+        trust: 80,
+        hurtScore: 8,
+        conflictScore: 5,
+      },
+    } as DroitDynamicState;
+    const result = tryLocalKairoReply(
+      "selam",
+      DEFAULT_PERSONALITY_TRAITS,
+      hurtCloseState,
+      trace,
+      "local-hurt-close",
+    );
+
+    expect(result.handled).toBe(true);
+    expect(["selam", "hee selam"]).toContain(result.reply);
+    expect(result.reply).not.toMatch(/kanka|heyy|selammm/i);
+  });
+
+  it("uses repairing as a cautious local HOW state instead of immediately restoring close banter", () => {
+    const repairingCloseState = {
+      ...state,
+      reactionMode: "repairing",
+      relationship: {
+        ...state.relationship,
+        interactionCount: 60,
+        familiarityDays: 30,
+        warmth: 75,
+        trust: 70,
+        hurtScore: 15,
+        conflictScore: 10,
+      },
+    } as DroitDynamicState;
+    const result = tryLocalKairoReply(
+      "selam",
+      DEFAULT_PERSONALITY_TRAITS,
+      repairingCloseState,
+      trace,
+      "local-repairing-close",
+    );
+
+    expect(result.handled).toBe(true);
+    expect(["selam", "selam ya"]).toContain(result.reply);
+    expect(result.reply).not.toMatch(/kanka|heyy|selammm/i);
+  });
 });
