@@ -31,7 +31,25 @@ describe("KDM post-generation enforcement", () => {
   it("removes emoji when the speech decision forbids emoji", () => {
     const result = enforceKairoResponse("tamam sustum 😄", trace(), { emojiLevel: 0 });
     expect(result.reply).toBe("tamam sustum");
-    expect(result.reasons).toContain("emoji_blocked");
+    expect(result.reasons).toContain("emoji_budget_enforced");
+  });
+
+  it("enforces final ResponsePlan emoji budget even when speech emoji level is positive", () => {
+    const result = enforceKairoResponse("tamam 😄 🤝", trace(), {
+      emojiLevel: 50,
+      emojiBudget: 0,
+    });
+    expect(result.reply).toBe("tamam");
+    expect(result.reasons).toContain("emoji_budget_enforced");
+  });
+
+  it("keeps only the allowed number of emoji when the final budget is positive", () => {
+    const result = enforceKairoResponse("tamam 😄 🤝", trace(), {
+      emojiLevel: 50,
+      emojiBudget: 1,
+    });
+    expect((result.reply.match(/\p{Extended_Pictographic}/gu) || []).length).toBe(1);
+    expect(result.reasons).toContain("emoji_budget_enforced");
   });
 
   it("blocks questions when KDM askQuestion is false", () => {

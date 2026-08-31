@@ -23,6 +23,7 @@ export interface KairoResponseEnforcementRules {
   humorAllowed?: boolean;
   askQuestion?: boolean;
   emojiLevel?: number;
+  emojiBudget?: number;
   conversationState?: string;
   behaviorContract?: BehaviorContract;
 }
@@ -80,6 +81,11 @@ export function enforceKairoResponse(
   const humorAllowed = rules.humorAllowed !== false;
   const askQuestion = rules.askQuestion !== false;
   const emojiLevel = Number.isFinite(rules.emojiLevel) ? Number(rules.emojiLevel) : 100;
+  const emojiBudget = Number.isFinite(rules.emojiBudget)
+    ? Math.max(0, Math.floor(Number(rules.emojiBudget)))
+    : emojiLevel <= 0
+      ? 0
+      : Number.POSITIVE_INFINITY;
 
   const contract = rules.behaviorContract;
   if (contract) {
@@ -88,10 +94,21 @@ export function enforceKairoResponse(
     reasons.push(...checked.reasons);
   }
 
-  if (emojiLevel <= 0 && EMOJI_RE.test(text)) {
-    EMOJI_RE.lastIndex = 0;
-    text = text.replace(EMOJI_RE, '').replace(/\s{2,}/g, ' ').trim();
-    reasons.push('emoji_blocked');
+  const emojis = text.match(EMOJI_RE) || [];
+  EMOJI_RE.lastIndex = 0;
+  if (emojis.length > emojiBudget) {
+    let kept = 0;
+    text = text
+      .replace(EMOJI_RE, (emoji) => {
+        if (kept < emojiBudget) {
+          kept += 1;
+          return emoji;
+        }
+        return '';
+      })
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    reasons.push('emoji_budget_enforced');
   }
   EMOJI_RE.lastIndex = 0;
 

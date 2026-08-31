@@ -595,6 +595,7 @@ app.post("/api/chat", async (req, res) => {
         askQuestion: responsePlan.allowQuestion,
         behaviorContract,
         emojiLevel: speech.emojiLevel,
+        emojiBudget: responsePlan.emojiBudget,
         conversationState: kdm.nextDynamicState.relationship?.conversationState,
       },
       dialogueOutputStyle = {
