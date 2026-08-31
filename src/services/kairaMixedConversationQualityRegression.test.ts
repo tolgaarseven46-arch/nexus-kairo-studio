@@ -2,6 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DroitDynamicState } from '../types/nexus';
 import { analyzeKdmInteraction } from './kdmConsistencyEngine';
 import { tryLocalKairoReply } from './kairoLocalLanguageEngine';
+import { interpretSemanticEvent } from './semanticEventEngine';
+import { buildBehaviorContract } from './behaviorContract';
+import { planDialogueResponse } from './kairoDialogueDecisionEngine';
+import type { ConversationTurn } from './kairoConversationGrounding';
+import { computeKairoSpeechIdentity } from './kairoSpeechIdentity';
+import { buildKairaResponsePlan, type KairaResponsePlan } from './kairaResponsePlan';
+import { NEUTRAL_DROIT_PERSONALITY } from './droitPersonalityNormalizer';
 import type { WorldEventObservation } from './worldModelEventStore';
 import { rankWorldEventObservations } from './worldEventRetrieval';
 import { appraiseRetrievedWorldState } from './worldStateAppraisal';
@@ -66,13 +73,15 @@ function reportedMertPlan(): WorldEventObservation {
 }
 
 describe('mixed local/AI + recall + relationship repair quality regression', () => {
-  it('keeps routing, qualitative state and reported recall coherent across one 20-turn flow', () => {
+  it('keeps routing, canonical response plan, qualitative state and reported recall coherent across one 20-turn flow', () => {
     vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-08-31T18:00:00.000Z').getTime());
 
     let state: DroitDynamicState | undefined;
+    const history: ConversationTurn[] = [];
     const routes: Array<'local_language' | 'ai'> = [];
     const replies: Array<string | undefined> = [];
     const states: DroitDynamicState[] = [];
+    const responsePlans: KairaResponsePlan[] = [];
     const worldEvents: WorldEventObservation[] = [];
     const recallGuards: ReturnType<typeof enforceWorldModelRecallResponse>[] = [];
 
@@ -81,19 +90,43 @@ describe('mixed local/AI + recall + relationship repair quality regression', () 
       state = result.nextDynamicState;
       states.push(structuredClone(state));
 
+      const semanticEvent = interpretSemanticEvent(message);
+      const behaviorContract = buildBehaviorContract(state, result.trace, semanticEvent);
+      const dialogueDecision = planDialogueResponse(history, message, 'Ali', semanticEvent);
+      const speech = computeKairoSpeechIdentity(NEUTRAL_DROIT_PERSONALITY, state, result.trace);
+      const responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech);
+      responsePlans.push(responsePlan);
+
       const local = tryLocalKairoReply(
         message,
-        {} as any,
+        NEUTRAL_DROIT_PERSONALITY,
         state,
         result.trace,
         'mixed_quality_user',
-        undefined,
-        undefined,
-        undefined,
+        dialogueDecision.move,
+        responsePlan,
+        semanticEvent,
         false,
       );
       routes.push(local.handled ? 'local_language' : 'ai');
       replies.push(local.reply);
+
+      history.push({
+        sender: 'user',
+        text: message,
+        participantId: 'mixed_quality_user',
+        participantName: 'Ali',
+      });
+      if (local.handled && local.reply) {
+        history.push({
+          sender: 'droit',
+          text: local.reply,
+          participantId: 'kaira_a',
+          participantName: 'Kaira',
+          replyToParticipantId: 'mixed_quality_user',
+          replyToParticipantName: 'Ali',
+        });
+      }
 
       if (message === 'Mert yarın istifa edeceğini söyledi') {
         worldEvents.push(reportedMertPlan());
@@ -109,6 +142,7 @@ describe('mixed local/AI + recall + relationship repair quality regression', () 
     }
 
     expect(states).toHaveLength(20);
+    expect(responsePlans).toHaveLength(20);
     expect(routes).toContain('local_language');
     expect(routes).toContain('ai');
 
@@ -125,13 +159,21 @@ describe('mixed local/AI + recall + relationship repair quality regression', () 
     expect(byMessage.get('kusura bakma')).toBe('ai');
     expect(byMessage.get('özür dilerim')).toBe('ai');
 
+    expect(responsePlans[10].move).toBe('grounded_recall');
+    expect(responsePlans[10].allowQuestion).toBe(false);
+    expect(responsePlans[18].move).toBe('grounded_recall');
+    expect(responsePlans[18].allowQuestion).toBe(false);
+
     const insultState = states[8];
     const postInsultGreetingState = states[9];
+    const postInsultGreetingPlan = responsePlans[9];
     const firstApologyState = states[13];
     const secondApologyState = states[14];
 
     expect(insultState.reactionMode).not.toBe('neutral');
     expect(postInsultGreetingState.reactionMode).not.toBe('neutral');
+    expect(postInsultGreetingPlan.allowHumor).toBe(false);
+    expect(postInsultGreetingPlan.allowReopeningCloseness).toBe(false);
     expect((replies[9] ?? '').toLocaleLowerCase('tr-TR')).not.toContain('kanka');
     expect(
       [firstApologyState.reactionMode, secondApologyState.reactionMode].some(
