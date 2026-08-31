@@ -1,0 +1,28 @@
+name: One-time response rhythm server wiring
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-response-rhythm-server.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Wire rhythm guard and clean helpers
+        run: |
+          node scripts/one-time-response-rhythm-server.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm scripts/one-time-response-rhythm-server.mjs
+          git rm .github/workflows/one-time-response-rhythm-server.yml
+          git add server.ts
+          git commit -m "fix(kaira): wire response rhythm into AI repair gate"
+          git push
