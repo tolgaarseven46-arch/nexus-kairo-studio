@@ -118,7 +118,7 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
     ? 0
     : repairingHold
       ? Math.min(0.24, clamp01(s.affiliationPressure * 0.18 + b.repairOpenness * 0.12))
-      : clamp01(s.affiliationPressure * 0.35 + s.carePressure * 0.3 + approachPressure * 0.2 + b.repairOpenness * 0.15 - distance * 0.55);
+      : clamp01(s.affiliationPressure * 0.32 + s.carePressure * 0.27 + approachPressure * 0.18 + s.disclosurePressure * 0.08 + b.repairOpenness * 0.15 - distance * 0.55);
   const stance: IntegratedBehaviorDecision["stance"] = freshDisengage
     ? "disengage"
     : persistentDisengage || repairingHold || distance >= 0.62
@@ -133,7 +133,8 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
   const askQuestion = !disengage && !repairingHold && !semanticEvent.stopQuestions && !semanticEvent.stopTalking && distance < 0.58 && e.speech.questionDrive >= 0.32 && b.escalationPressure < 0.45;
   const acknowledgeComplaint = semanticEvent.stopQuestions || semanticEvent.stopTalking || semanticEvent.intent === "complaint" || priorDisengaged || priorRepairing || valuePressure >= 0.28 || boundaryPressure >= 0.28 || s.carePressure >= 0.45;
   const repairAllowed = repairSignal && !input.boundaries.hardStop && (priorDisengaged || priorRepairing || b.repairOpenness >= 0.2);
-  const directness = clamp01(pt.assertivePressure * 0.35 + s.leadershipPressure * 0.2 + b.boundaryAssertion * 0.3 + valuePressure * 0.15 + (priorDisengaged ? 0.25 : priorRepairing ? 0.12 : 0));
+  const socialResistanceDirectness = clamp01(s.resistancePressure * clamp01(semanticEvent.coercion));
+  const directness = clamp01(pt.assertivePressure * 0.32 + s.leadershipPressure * 0.18 + socialResistanceDirectness * 0.15 + b.boundaryAssertion * 0.25 + valuePressure * 0.1 + (priorDisengaged ? 0.25 : priorRepairing ? 0.12 : 0));
   const responseLength: IntegratedBehaviorDecision["responseLength"] = disengage || repairingHold || semanticEvent.stopTalking || distance >= 0.6 || e.speech.brevity >= 0.65 ? "short" : pt.analysisPressure >= 0.62 || p.depthDrive >= 0.58 ? "long" : "medium";
 
   const explanation: string[] = [];
