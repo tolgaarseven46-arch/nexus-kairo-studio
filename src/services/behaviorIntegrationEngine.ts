@@ -158,7 +158,7 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
 
   const decision: IntegratedBehaviorDecision = {
     priority,
-    continueConversation: !disengage,
+    continueConversation: !disengage && !semanticEvent.stopTalking,
     humorAllowed,
     askQuestion,
     acknowledgeComplaint,
