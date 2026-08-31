@@ -180,7 +180,7 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
           ? "topic_shift"
           : "none";
   const emotionalLoad = LOW_MOOD_RE.test(text) ? 0.8 : emotionalShare ? 0.45 : 0;
-  const negative = insult || rejection || coercion > 0 || manipulation > 0 || privacyViolation > 0 || frustration > 0 || mockery;
+  const negative = insult || rejection || coercion > 0 || manipulation > 0 || privacyViolation > 0 || frustration > 0 || mockery || stopQuestions || stopTalking;
   const target = inferTarget(text, negative, insult, rejection, directCommand, relationalAct);
 
   let intent: SemanticIntent = "general_chat";
