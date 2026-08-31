@@ -1,0 +1,32 @@
+name: One-time dialogue baseline state record
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Record dialogue baseline fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          s = p.read_text()
+          s += '''\n\n## 67. Focused dialogue social-permission intersection + emotional question parity — 2026-08-31\n- Gerçek konuşma baseline auditinde `DialogueDecisionPlan` ile final `KairaResponsePlan` arasında iki otorite kaçağı bulundu ve kapatıldı.\n- `invite_emotional_context`, `grounded_recall`, `repair_or_rephrase`, `follow_previous_answer` ve `acknowledge_correction` odaklı hamleleri artık active/permissive BehaviorContract altında bile yeni sosyal anlam üretemez: humor, affection, forgiveness ve reopening-closeness izinleri final ResponsePlan'da daraltılır. Speech identity HOW-only kalır ve bu izinleri açamaz/kapatamaz.\n- İlk duygusal açılışta ikinci kaçak AI/local parity sınırındaydı: BehaviorContract/ResponsePlan soru iznini kapattığında Yerel Dil Motoru kısa kabul tepkisine (`hmm`, `anladım`, `hee`) düşerken AI dialogue validator ve fallback hâlâ merak sorusu (`hmm niye`) zorluyordu.\n- `DialogueOutputStyle.allowQuestion` effective final izin olarak dialogue validator'a taşındı. `invite_emotional_context` validasyonu soru açıksa minimal curiosity, soru kapalıysa minimal acknowledgement kabul eder. Grounded fallback da aynı effective izne göre `hmm niye` veya `hmm` üretir.\n- `server.ts` AI validation/fallback seam'i final `responsePlan.allowQuestion` değerini kullanır; böylece local ve AI aynı WHAT/WHETHER otoritesine bağlandı.\n- Kalıcı regression coverage: `kairaResponsePlan.test.ts` ve yeni `kairaEmotionalQuestionPermissionContracts.test.ts`.\n- İlgili commitler: `eddec110` (focused social permission narrowing), `728e346` (focused permission tests), `a8d1ed85` (effective emotional question permission), `14ba9827` (parity contract), final server entegrasyonu `780f997` (`fix(kaira): align emotional question permission seam`).\n- One-time entegrasyon run'ında targeted 10/10 test, full regression 657/657 test, TypeScript ve production build başarıyla geçti. Geçici workflow entegrasyon commit'inde silindi.\n- Sonraki baseline audit adayı: `buildDialogueDecisionInstruction(...)` final ResponsePlan oluşmadan hazırlanıyor. Dialogue plan soru iznine izin verirken final ResponsePlan bunu kapatırsa model prompt'una çelişkili takip-sorusu talimatı yazılıp yazılmadığı koddan doğrulanacak; validator düzeldi diye prompt contradiction varsayılmayacak.\n'''
+          p.write_text(s)
+          PY
+          rm .github/workflows/one-time-record-dialogue-baseline.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md .github/workflows/one-time-record-dialogue-baseline.yml
+          git commit -m "docs(kaira): record dialogue permission baseline fixes"
+          git push
