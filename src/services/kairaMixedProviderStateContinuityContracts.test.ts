@@ -13,7 +13,7 @@ describe('mixed local / AI provider state continuity contracts', () => {
     expect(kdm).toBeGreaterThan(-1);
     expect(local).toBeGreaterThan(kdm);
     expect(branch).toBeGreaterThan(local);
-    expect(count('analyzeKdmInteraction(')).toBe(2); // import usage + canonical chat call only
+    expect(count('kdm = analyzeKdmInteraction(')).toBe(1);
   });
 
   it('persists the same canonical nextDynamicState on both local and AI branches', () => {
