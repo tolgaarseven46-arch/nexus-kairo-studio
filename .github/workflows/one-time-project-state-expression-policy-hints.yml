@@ -1,0 +1,37 @@
+name: One-time project state expression policy hints
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-expression-policy-hints.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 49. Expression HOW hints end-to-end policy transport — 2026-08-31\n- CharacterTab fine-tune registry auditinde expression key'lerinin engine tarafından okunduğu doğrulanmıştı; daha derin client→policy→server→speech auditinde ise `expression.speech.informality`, `expression.speech.emotionalDisplay` ve seçilmiş mizah `dominantMode` sinyallerinin server konuşma kimliğine ulaşmadan kaybolduğu bulundu.\n- `questionDrive`, `brevity/verbosity` ve toplam mizah gücü zaten `behaviorIntegrationEngine` kararlarına dolaylı olarak etki ediyordu. Eksik olan yalnız HOW katmanına ait bu üç stil sinyali idi.\n- Mevcut `behavior-policy@1` schema versiyonu korunarak backward-compatible opsiyonel `expressionStyle` alanı eklendi. Alan yalnız `humorMode`, normalize `informality` ve normalize `emotionalDisplay` taşır; davranış izni vermez.\n- `createClientBehaviorPolicy(...)` expression runtime response'tan HOW hint'lerini explicit policy içine koyar. `normalizeBehaviorPolicyInput(...)` server boundary'de sayıları 0..1 aralığına clamp eder ve geçersiz humor mode değerlerini `null` yapar.\n- `computeKairoSpeechIdentity(...)` artık normalize HOW hint'lerini tüketir. Informality %50 nötr/backward-compatible merkezdir ve argo/samimiyet eğilimini iki yönde modüle eder. Emotional display yüksek olduğunda duygu dilde daha görünür, düşük olduğunda daha kontrollü/örtük olur. Humor mode yalnız davranış planı mizaha izin verirse tercih edilen biçim olarak prompt'a taşınır; mizahı zorla açmaz.\n- Bu ayrım korunmuştur: behavior integration / response plan WHAT ve izinleri belirler; expression HOW hint'leri yalnız dil/ritim/ifade biçimini yönlendirir. Böylece style sliderları permission katmanını bypass edemez.\n- `kairaExpressionPolicyHintsContracts.test.ts` schema sürümünün değişmediğini, style hint transport'unu, speech identity üzerindeki görünür farkı ve untrusted input clamp/invalid-mode davranışını doğrular. `kairaBehaviorPolicyBoundaryContracts.test.ts` de explicit behavior-policy mimarisini argüman sayısına gereksiz yere kilitlemeden opsiyonel style hint'i kabul edecek şekilde güncellendi.\n- İlk targeted run yalnız test fixture'ın humor engine'in `irony` seçim heuristiğini varsayması nedeniyle kırıldı; transport boundary fixture'ı doğrudan seçilmiş `ExpressionStyleResponse` ile düzeltildi. İkinci run targeted+TypeScript geçti ancak eski architecture regex'i iki argümanlı policy çağrısına kilitli olduğu için full regression'da kırıldı; mimari kuralı koruyacak şekilde contract güncellendi. Üçüncü run targeted contractlar, TypeScript, full regression ve production build tamamen yeşil geçti.\n- Entegrasyon commit'i: `41661f9` (`fix(kaira): carry expression style into speech identity`).\n- Geçici one-time workflow ve üç migration/test helper script kaldırıldı.\n- Sonraki audit odağı: key-level wiring'i geçmiş diğer fine-tune katmanlarında da semantik sinyalin end-to-end hayatta kalıp kalmadığını ölçmek. Özellikle motivation/preferences/social çıktılarında tek tek slider etkilerinin aggregate pressure veya responsePersonality içinde gerçekten ölçülebilir downstream fark üretip üretmediği kontrol edilmeli; raw alanın doğrudan taşınmaması tek başına bug sayılmamalı.\n'''
+          if '## 49. Expression HOW hints end-to-end policy transport — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record expression policy hint transport"
+          git pull --rebase origin main
+          git push origin main
