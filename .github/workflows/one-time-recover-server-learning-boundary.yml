@@ -1,0 +1,57 @@
+name: One-time recover server learning boundary
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore server from last intact commit and fix statement boundary
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          restored = subprocess.check_output([
+              'git', 'show', '90141777d685890fa1f3ea53484639901db79085:server.ts'
+          ], text=True)
+          old = '''        consistency = {
+          ...localBaseConsistency,
+          accepted: localBaseConsistency.accepted && localPlanIssues.length === 0,
+          score: Math.max(0, localBaseConsistency.score - localPlanIssues.length * 15),
+          issues: [...localBaseConsistency.issues, ...localPlanIssues],
+        },
+        if (kairaPolicy.persistentUserMemory && consistency.accepted) {
+          learnLanguageReply(stateUserId, reply);
+        }
+        postStart = now();'''
+          new = '''        consistency = {
+          ...localBaseConsistency,
+          accepted: localBaseConsistency.accepted && localPlanIssues.length === 0,
+          score: Math.max(0, localBaseConsistency.score - localPlanIssues.length * 15),
+          issues: [...localBaseConsistency.issues, ...localPlanIssues],
+        };
+      if (kairaPolicy.persistentUserMemory && consistency.accepted) {
+        learnLanguageReply(stateUserId, reply);
+      }
+      const postStart = now();'''
+          if old not in restored:
+              raise SystemExit('expected broken local learning block not found in intact source')
+          restored = restored.replace(old, new, 1)
+          Path('server.ts').write_text(restored)
+      - name: Commit recovery and self-clean
+        run: |
+          rm .github/workflows/one-time-recover-server-learning-boundary.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts .github/workflows/one-time-recover-server-learning-boundary.yml
+          git commit -m "fix(kaira): recover server and finalize local learning boundary"
+          git push
