@@ -1,0 +1,29 @@
+name: One-time runtime quality state record
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: python scripts/one-time-record-runtime-quality-phase.py
+      - name: Commit record and cleanup
+        run: |
+          rm scripts/one-time-record-runtime-quality-phase.py
+          rm .github/workflows/one-time-record-runtime-quality-phase.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md scripts/one-time-record-runtime-quality-phase.py .github/workflows/one-time-record-runtime-quality-phase.yml
+          git commit -m "docs(kaira): record runtime quality and provider resilience"
+          git push
