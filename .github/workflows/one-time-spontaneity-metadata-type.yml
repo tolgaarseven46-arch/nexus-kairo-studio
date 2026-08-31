@@ -1,0 +1,28 @@
+name: One-time spontaneity metadata type fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-spontaneity-metadata-type.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Add controlled spontaneity metadata type and clean helpers
+        run: |
+          node scripts/one-time-spontaneity-metadata-type.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm scripts/one-time-spontaneity-metadata-type.mjs
+          git rm .github/workflows/one-time-spontaneity-metadata-type.yml
+          git add src/services/kdmPersistenceService.ts
+          git commit -m "fix(kaira): type controlled spontaneity metadata"
+          git push
