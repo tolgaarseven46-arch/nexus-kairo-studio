@@ -1,0 +1,37 @@
+name: One-time project state cross-family authority
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-cross-family-authority.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 64. Cross-family authority + relationship-priority leak fix — 2026-08-31\n- After locking the complete 64-slider matrix, audited cross-family precedence with conflicting lower-layer signals. Permanent `kairaCrossFamilyAuthorityContracts.test.ts` now locks the intended priority order `boundary > values > relationship > goal > preference > expression`.\n- Hard-stop boundary remains absolute even when social warmth, approach motivation, answer depth, humor and repair openness are maximized; apology/repair signals cannot reopen an absolute hard stop.\n- Value conflict outranks goal/preference/expression without incorrectly forcing disengagement. Goal, preference and expression fallback order is also explicitly covered.\n- The audit found a real relationship-authority leak: with severe hurt/conflict and social-distance pressure, integration correctly selected `relationship` priority and disabled humor, but high affiliation/care/approach plus repair openness could still collapse final distance to about `0.074`, effectively erasing the relationship damage in the final behavior.\n- Fixed `behaviorIntegrationEngine.ts`: while `relationship` is the active priority, relationship pressure now establishes a minimum distance floor and an additional warmth penalty. This fix is scoped to active relationship priority; hard-stop, repairing/disengaged and non-relationship priority paths remain unchanged.\n- Cross-family targeted contracts, the existing integration suite, the all-fine-tune matrix, TypeScript, full regression and production build all passed after the fix.\n- Permanent product + contract commit: `0792022` (`fix(kaira): enforce relationship authority`).\n- Temporary verification workflow and both helper scripts were removed after the successful run.\n- Next audit focus: explicit user semantic commands versus family tendencies, especially stop-talking/stop-questions, value-vs-boundary overlap, and repair reopening under competing warmth/goal/expression signals.\n'''
+          if '## 64. Cross-family authority + relationship-priority leak fix — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record cross-family authority fix"
+          git pull --rebase origin main
+          git push origin main
