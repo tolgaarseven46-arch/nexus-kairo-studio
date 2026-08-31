@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const firestore = vi.hoisted(() => ({
   getDoc: vi.fn(),
   getDocs: vi.fn(),
+  setDoc: vi.fn(),
 }));
 
 vi.mock('firebase/firestore', () => ({
@@ -13,7 +14,7 @@ vi.mock('firebase/firestore', () => ({
   limit: vi.fn((value: number) => ({ kind: 'limit', value })),
   orderBy: vi.fn((...args: unknown[]) => ({ kind: 'orderBy', args })),
   query: vi.fn((...args: unknown[]) => ({ kind: 'query', args })),
-  setDoc: vi.fn(),
+  setDoc: firestore.setDoc,
   addDoc: vi.fn(),
   deleteDoc: vi.fn(),
   where: vi.fn((...args: unknown[]) => ({ kind: 'where', args })),
@@ -21,7 +22,7 @@ vi.mock('firebase/firestore', () => ({
 
 vi.mock('../lib/firebase', () => ({ db: { kind: 'mock-db' } }));
 
-import { loadTestSession } from './kdmPersistenceService';
+import { loadTestSession, saveTestSessionTurn } from './kdmPersistenceService';
 
 const olderState = {
   calmness: 48,
@@ -189,5 +190,65 @@ describe('runtime test-session turn hydration regression', () => {
     expect(restored?.lastWorldMemoryGuard).toEqual(latestWorldMemoryGuard);
     expect(restored?.lastProviderUsed).toBe('openrouter');
     expect(restored?.lastTimings).toEqual({ total: 120 });
+  });
+
+  it('round-trips canonical turn state and observability through the Firestore payload shape', async () => {
+    firestore.getDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ turnCount: 9 }),
+    });
+    firestore.setDoc.mockResolvedValue(undefined);
+
+    const saved = await saveTestSessionTurn({
+      sessionId: 'mixed_quality_session',
+      userId: 'mixed_quality_user',
+      userName: 'Ali',
+      userMessage: 'özür dilerim',
+      assistantReply: 'tamam, anladım',
+      intent: 'repair',
+      detectedEmotion: 'özür',
+      dynamicStateBefore: olderState,
+      dynamicStateAfter: latestState,
+      relationshipState: latestState.relationship,
+      metadata: {
+        providerUsed: 'openrouter',
+        timings: { total: 120 },
+        worldStateAppraisal: latestWorldStateAppraisal,
+        worldReasoningPolicy: latestWorldReasoningPolicy,
+        worldMemoryGuard: latestWorldMemoryGuard,
+        responsePlan: latestResponsePlan,
+      },
+    });
+
+    expect(saved.turnNumber).toBe(10);
+    expect(firestore.setDoc).toHaveBeenCalledTimes(2);
+
+    const persistedTurn = firestore.setDoc.mock.calls[0][1];
+    const persistedSummary = firestore.setDoc.mock.calls[1][1];
+
+    expect(persistedTurn.dynamicStateAfter).toEqual(latestState);
+    expect(persistedTurn.metadata.responsePlan).toEqual(latestResponsePlan);
+    expect(persistedTurn.metadata.worldReasoningPolicy).toEqual(latestWorldReasoningPolicy);
+    expect(persistedTurn.metadata.worldMemoryGuard).toEqual(latestWorldMemoryGuard);
+
+    firestore.getDoc.mockReset();
+    firestore.getDocs.mockReset();
+    firestore.getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => persistedSummary,
+    });
+    firestore.getDocs.mockResolvedValue({
+      docs: [{ id: saved.turnId, data: () => persistedTurn }],
+    });
+
+    const restored = await loadTestSession('mixed_quality_session');
+
+    expect(restored?.turns).toHaveLength(1);
+    expect(restored?.turns[0].turnNumber).toBe(10);
+    expect(restored?.lastDynamicState).toEqual(latestState);
+    expect(restored?.lastResponsePlan).toEqual(latestResponsePlan);
+    expect(restored?.lastWorldStateAppraisal).toEqual(latestWorldStateAppraisal);
+    expect(restored?.lastWorldReasoningPolicy).toEqual(latestWorldReasoningPolicy);
+    expect(restored?.lastWorldMemoryGuard).toEqual(latestWorldMemoryGuard);
   });
 });
