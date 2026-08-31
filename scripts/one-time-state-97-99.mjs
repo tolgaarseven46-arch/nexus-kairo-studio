@@ -1,0 +1,15 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+
+const path = 'PROJECT_STATE.md';
+let source = readFileSync(path, 'utf8');
+
+source = source.replace(
+  `Henüz tam doğrulanmamış:\n- Kalıcı dil hafızasının uzun süre sonra davranışı gerçekten değiştirmesi.\n- Çok sayıda typo ve doğal sosyal medya yazımında yanlış pozitif/yanlış negatif oranı.\n- Aynı niyette cevap çeşitliliğinin doğallığı.`,
+  `Henüz tam doğrulanmamış:\n- Çok sayıda typo ve doğal sosyal medya yazımında yanlış pozitif/yanlış negatif oranı.\n- Aynı niyette cevap çeşitliliğinin doğallığı.\n\nDoğrulanmış persistence davranışı:\n- Accepted AI/local cevap öğrenimi Firestore language-memory'ye yazılır.\n- Phrase/repetition anahtarları canonical normalizasyon kullanır; noktalama varyantı öğrenimi veya tekrar cezasını by-pass etmez.\n- Module/process reload simülasyonunda Firestore hydration interactionCount ve öğrenilmiş affinity'yi geri yükler.`,
+);
+
+if (!source.includes('## 97. Controlled spontaneity frequency and topic-pressure quality')) {
+  source += `\n\n## 97. Controlled spontaneity frequency and topic-pressure quality — 2026-08-31\n- Deterministic 100-roll quality regression locks configured selection rates exactly at close 12/100, familiar 7/100 and new 3/100.\n- Permission boundaries remain absolute across stress rolls: closed conversation and active irritated/hurt/withdrawn/repairing reaction states never select spontaneity.\n- A safe prior topic already echoed in recent Kaira replies is excluded from immediate reuse; selection falls back to another safe prior user topic when available.\n- CI #1147 passed architecture contracts, full tests, TypeScript and production build.\n\n## 98. Language-memory canonical phrase and repetition normalization — 2026-08-31\n- Learned phrase keys and affinity/repetition lookup now share one canonical reply normalizer.\n- Punctuation variants such as \`he tamam kanka!\` and \`he tamam kanka\` no longer split phrase learning or bypass recent-reply repetition pressure.\n- CI #1148 passed architecture contracts, full tests, TypeScript and production build.\n\n## 99. Language-memory reload/hydration preservation — 2026-08-31\n- Added a regression that learns replies, flushes the persistence timer, resets the imported module to simulate a cold process/module reload, then hydrates from mocked Firestore.\n- Before hydration the fresh runtime has neutral in-memory state; after hydration the persisted interactionCount and learned phrase affinity are restored.\n- The hydration regression also proves canonical punctuation variants retain the same learned affinity after reload.\n- CI #1149 passed architecture contracts, full tests, TypeScript and production build.\n\n### Next verified development question\n- Measure the local-language intent boundary on a larger typo/natural-social-message matrix: false positives, false negatives and near-neighbor intent collisions must be characterized before widening the local intent catalog.\n`;
+}
+
+writeFileSync(path, source);
