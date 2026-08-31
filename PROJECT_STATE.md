@@ -623,3 +623,14 @@ Yeni sohbet açıldığında:
 - Permanent coverage commit: `18985a1` (`test(kaira): lock temperament live coverage`).
 - Temporary verification workflow and generator helper were removed after the successful run.
 - Next audit focus: build an all-fine-tune coverage matrix across personality, temperament, motivations, values, preferences, social orientation, boundaries and expression. The matrix should distinguish key mapping, engine-local effect, final integrated effect and context gating so future sliders cannot regress into silent no-ops.
+
+
+## 57. Expression full downstream coverage — 2026-08-31
+- The CharacterTab expression family was audited as a complete downstream system rather than through isolated engine-local tests. All thirteen expression sliders are now covered: eight humor modes, context inhibition, verbosity, informality, emotional display and question drive.
+- Added permanent `kairaExpressionDownstreamCoverageContracts.test.ts`. The contract verifies exact CharacterTab key mapping, humor-mode dominance and integrated humor pressure, context inhibition, final response-length effects, final ask-question effects, and transport of informality/emotional-display/humor-mode through the client behavior-policy seam.
+- Humor preferences remain context-gated: serious contexts can inhibit even a high dark-humor preference rather than allowing the slider to override higher-order context. Context inhibition suppresses humor without manufacturing unrelated boundary distance.
+- No additional expression no-op was found; no product behavior patch was required.
+- Targeted contracts, TypeScript, full regression and production build all passed.
+- Permanent coverage commit: `d11f5c6` (`test(kaira): lock expression downstream coverage`).
+- Temporary verification workflow and generator helper were removed after the successful run.
+- Next audit focus: complete the all-fine-tune family matrix and identify which remaining families still lack whole-family downstream coverage, especially boundaries, motivations, preferences, social orientation and personality where some fixes are currently protected by targeted contracts rather than complete matrices.
