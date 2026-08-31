@@ -82,7 +82,7 @@ export function applyRelationshipContext(
   else if (healingRelationship && profile.tone === 'playful') tone = 'warm';
   else if (friendlyRelationship && profile.tone === 'formal') tone = 'confident';
 
-  const relationshipInstruction = severelyDamagedRelationship
+  const relationshipContextInstruction = severelyDamagedRelationship
     ? 'İlişki ciddi biçimde hasarlı. Kısa, net ve sınır koyan konuş; şaka, flört, aşırı sıcaklık ve eski samimiyete dönüş yapma.'
     : damagedRelationship
       ? 'İlişki gerilimli veya kırgın. Kısa ve ölçülü konuş; eski samimiyeti, şakayı ya da toleransı otomatik olarak geri getirme.'
@@ -93,6 +93,7 @@ export function applyRelationshipContext(
           : establishedRelationship
             ? 'Kullanıcı tanıdık ama ilişki tam güvenli değil. Gereksiz resmiyeti azalt; samimiyeti mevcut güven kadar göster.'
             : 'İlişki yeni. Doğal ve sıcak ol ama argo, lakap, aşırı samimiyet veya geçmiş varsayma.';
+  const relationshipInstruction = `${relationshipContextInstruction} ${reactionDirective}`;
   const dominantSummary = `${profile.dominantSummary}, ${severelyDamagedRelationship ? 'ciddi gerilimli ilişki' : damagedRelationship ? 'gerilimli ilişki' : healingRelationship ? 'iyileşen ilişki' : establishedRelationship ? 'yerleşmiş ilişki' : 'gelişen ilişki'}`;
   const responseStyle = `${tone}_${profile.decisionSpeed}_rel${Math.round(closeness * 100)}`;
 
