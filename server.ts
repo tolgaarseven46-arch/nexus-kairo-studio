@@ -843,9 +843,26 @@ app.post("/api/chat", async (req, res) => {
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
-    let reply = sanitizeKairoReplyText(
-      await generateText(system, msgs, 0.78, provider),
-    );
+    let reply = "";
+    let providerFailureFallbackUsed = false;
+    try {
+      reply = sanitizeKairoReplyText(
+        await generateText(system, msgs, 0.78, provider),
+      );
+    } catch (generationError) {
+      const providerFallback = buildGroundedDialogueFallback(
+        dialogueDecision,
+        cleanHistory,
+        userMessage,
+        userName,
+        dialogueAnalysis,
+        responsePlan.allowQuestion,
+      );
+      if (!providerFallback) throw generationError;
+      reply = providerFallback;
+      providerFailureFallbackUsed = true;
+      activeAiProviderUsed = "deterministic_fallback";
+    }
     let groundingIssues = [
       ...findKairoGroundingIssues(reply, cleanHistory, userMessage),
       ...findDialogueAttributionIssues(
@@ -1001,7 +1018,7 @@ app.post("/api/chat", async (req, res) => {
       issues: [...baseConsistency.issues, ...finalIssues],
       warnings: enforced.reasons,
     };
-    if (kairaPolicy.persistentUserMemory && consistency.accepted) {
+    if (kairaPolicy.persistentUserMemory && consistency.accepted && !providerFailureFallbackUsed) {
       learnLanguageReply(stateUserId, reply);
     }
     const postStart = now();
