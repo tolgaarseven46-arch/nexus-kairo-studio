@@ -18,8 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+      - run: npm install
       - name: Apply temperament panel wiring fix
         run: node scripts/applyTemperamentPanelWiringFix.mjs
       - name: Targeted contracts
