@@ -1,0 +1,28 @@
+name: One-time natural reaction quality fallback
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-natural-reaction-fallback.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply fallback and clean helpers
+        run: |
+          node scripts/one-time-natural-reaction-fallback.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm scripts/one-time-natural-reaction-fallback.mjs
+          git rm .github/workflows/one-time-natural-reaction-fallback.yml
+          git add src/services/kairoDialogueDecisionEngine.ts
+          git commit -m "fix(kaira): add safe natural reaction fallback"
+          git push
