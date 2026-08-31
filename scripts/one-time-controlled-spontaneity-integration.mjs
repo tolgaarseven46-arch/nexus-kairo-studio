@@ -11,17 +11,10 @@ if (!source.includes('decideKairaControlledSpontaneity,')) {
 }
 
 const planNeedle = `      responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech),\n      responsePlanInstruction = kairaResponsePlanInstruction(responsePlan),\n      dialogueDecisionInstruction = buildDialogueDecisionInstruction(`;
-const planReplacement = `      responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech),\n      responsePlanInstruction = kairaResponsePlanInstruction(responsePlan),\n      spontaneityDecision = decideKairaControlledSpontaneity({\n        responsePlan,\n        dynamicState: kdm.nextDynamicState,\n        history: cleanHistory,\n      }),\n      spontaneityInstruction = kairaControlledSpontaneityInstruction(spontaneityDecision, responsePlan),\n      dialogueDecisionInstruction = buildDialogueDecisionInstruction(`;
+const planReplacement = `      responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech),\n      spontaneityDecision = decideKairaControlledSpontaneity({\n        responsePlan,\n        dynamicState: kdm.nextDynamicState,\n        history: cleanHistory,\n      }),\n      responsePlanInstruction = [\n        kairaResponsePlanInstruction(responsePlan),\n        kairaControlledSpontaneityInstruction(spontaneityDecision, responsePlan),\n      ].join("\\n"),\n      dialogueDecisionInstruction = buildDialogueDecisionInstruction(`;
 if (!source.includes('spontaneityDecision = decideKairaControlledSpontaneity')) {
   if (!source.includes(planNeedle)) throw new Error('response plan seam not found');
   source = source.replace(planNeedle, planReplacement);
-}
-
-const promptNeedle = '${responsePlanInstruction}\\\nKDM:';
-const promptReplacement = '${responsePlanInstruction}\\\n${spontaneityInstruction}\\\nKDM:';
-if (!source.includes('${spontaneityInstruction}\\')) {
-  if (!source.includes(promptNeedle)) throw new Error('system prompt seam not found');
-  source = source.replace(promptNeedle, promptReplacement);
 }
 
 const localMetadataNeedle = `          metadata: {\n            providerUsed: "local_language",\n            speechIdentity: speech,`;
