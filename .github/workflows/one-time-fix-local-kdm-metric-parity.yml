@@ -1,0 +1,21 @@
+name: One-time local KDM metric parity fix
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: node scripts/fix-local-kdm-metric-parity.mjs
+      - run: |
+          rm scripts/fix-local-kdm-metric-parity.mjs .github/workflows/one-time-fix-local-kdm-metric-parity.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts scripts/fix-local-kdm-metric-parity.mjs .github/workflows/one-time-fix-local-kdm-metric-parity.yml
+          git commit -m "fix(kaira): record KDM metrics on local turns"
+          git push
