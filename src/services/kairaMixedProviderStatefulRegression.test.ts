@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { analyzeKdmInteraction } from './kdmConsistencyEngine';
 import { tryLocalKairoReply } from './kairoLocalLanguageEngine';
 import type { DroitDynamicState } from '../types/nexus';
@@ -17,6 +17,8 @@ const turns = [
   'salak mısın ya',
   'kusura bakma',
 ] as const;
+
+const FIXED_NOW = new Date('2026-08-31T21:00:00.000Z');
 
 function runKdmOnly() {
   let state: DroitDynamicState | undefined;
@@ -55,9 +57,16 @@ function runWithRouteInspection() {
   return { snapshots, routes };
 }
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('mixed local / AI stateful continuity', () => {
   it('keeps KDM state byte-equivalent when response routing is inspected every turn', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
     const baseline = runKdmOnly();
+    vi.setSystemTime(FIXED_NOW);
     const mixed = runWithRouteInspection();
 
     expect(mixed.snapshots).toEqual(baseline);
