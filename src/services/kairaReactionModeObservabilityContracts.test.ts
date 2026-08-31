@@ -15,6 +15,8 @@ describe("reaction-mode observability contracts", () => {
   it("shows the qualitative reaction explicitly in the TestLab current-state debug card", async () => {
     const source = await readFile("src/components/studio/tabs/TestLabTab.tsx", "utf8");
     expect(source).toContain("Tepki: {lastAnalysis.emotionAfter.reactionMode}");
-    expect(source).toContain("reactionMode?: string");
+    expect(source).toContain("AffectiveReactionMode");
+    expect(source).toContain("reactionMode?: AffectiveReactionMode");
+    expect(source).not.toContain("reactionMode?: string");
   });
 });
