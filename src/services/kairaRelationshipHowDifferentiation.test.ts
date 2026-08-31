@@ -36,13 +36,16 @@ const stateFor = (level: 'new' | 'familiar' | 'close') => {
   } as any;
 };
 
-const planFor = (relationshipLevel: 'new' | 'familiar' | 'close') => ({
+const planFor = (
+  relationshipLevel: 'new' | 'familiar' | 'close',
+  allowQuestion = true,
+) => ({
   move: 'natural_reaction',
   stance: 'open',
   register: 'casual',
   relationshipLevel,
   continueConversation: true,
-  allowQuestion: true,
+  allowQuestion,
   allowHumor: true,
   allowAffection: relationshipLevel === 'close',
   allowForgiveness: false,
@@ -53,8 +56,12 @@ const planFor = (relationshipLevel: 'new' | 'familiar' | 'close') => ({
   reasons: [],
 }) as any;
 
-function collect(level: 'new' | 'familiar' | 'close', count = 6): string[] {
-  const userId = `relationship-how-${level}`;
+function collect(
+  level: 'new' | 'familiar' | 'close',
+  count = 6,
+  allowQuestion = true,
+): string[] {
+  const userId = `relationship-how-${level}-q${allowQuestion ? 1 : 0}`;
   const memory = getLanguageMemory(userId);
   memory.wordWeights = { kanka: 8, ya: 7, valla: 5, aynen: 5, he: 3, iyidir: 4, takılıyorum: 4, senden: 4 };
   memory.phraseWeights = {};
@@ -69,7 +76,7 @@ function collect(level: 'new' | 'familiar' | 'close', count = 6): string[] {
       trace,
       userId,
       'natural_reaction',
-      planFor(level),
+      planFor(level, allowQuestion),
       interpretSemanticEvent('naber'),
     );
     expect(result.handled).toBe(true);
@@ -82,6 +89,7 @@ function collect(level: 'new' | 'familiar' | 'close', count = 6): string[] {
 describe('relationship-level HOW differentiation', () => {
   afterEach(() => {
     vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   it('keeps speech identity HOW observably ordered without changing semantic permissions', () => {
@@ -105,6 +113,22 @@ describe('relationship-level HOW differentiation', () => {
 
     expect(newReplies.some((reply) => /\bkanka\b|\bbe\b|\bya\b/u.test(reply))).toBe(false);
     expect(familiarReplies.some((reply) => /\bya\b|\bbe\b/u.test(reply))).toBe(true);
+    expect(familiarReplies.some((reply) => /\bkanka\b/u.test(reply))).toBe(false);
+    expect(closeReplies.some((reply) => /\bkanka\b/u.test(reply))).toBe(true);
+  });
+
+  it('preserves relationship HOW even when the canonical plan blocks follow-up questions', () => {
+    vi.useFakeTimers();
+    const newReplies = collect('new', 6, false);
+    const familiarReplies = collect('familiar', 6, false);
+    const closeReplies = collect('close', 6, false);
+
+    for (const reply of [...newReplies, ...familiarReplies, ...closeReplies]) {
+      expect(reply).not.toMatch(/[?？]/u);
+      expect(reply).not.toMatch(/\bsen\b|\bsenden\b|\bnaber\b|\bnasılsın\b/u);
+    }
+    expect(newReplies.some((reply) => /\bkanka\b|\bya\b/u.test(reply))).toBe(false);
+    expect(familiarReplies.some((reply) => /\bya\b/u.test(reply))).toBe(true);
     expect(familiarReplies.some((reply) => /\bkanka\b/u.test(reply))).toBe(false);
     expect(closeReplies.some((reply) => /\bkanka\b/u.test(reply))).toBe(true);
   });
