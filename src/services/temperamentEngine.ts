@@ -2,12 +2,15 @@ export interface TemperamentProfile {
   negativeSensitivity: number;
   frustrationSensitivity: number;
   threatSensitivity: number;
+  reactivityThreshold: number;
   rewardSensitivity: number;
   impulseStrength: number;
   inhibitoryControl: number;
   recoverySpeed: number;
   arousalBaseline: number;
   noveltySeeking: number;
+  uncertaintyTolerance: number;
+  approachDriveBias: number;
   attentionPersistence: number;
 }
 
@@ -55,12 +58,15 @@ export const DEFAULT_TEMPERAMENT_PROFILE: TemperamentProfile = {
   negativeSensitivity: 50,
   frustrationSensitivity: 50,
   threatSensitivity: 50,
+  reactivityThreshold: 50,
   rewardSensitivity: 50,
   impulseStrength: 50,
   inhibitoryControl: 50,
   recoverySpeed: 50,
   arousalBaseline: 50,
   noveltySeeking: 50,
+  uncertaintyTolerance: 50,
+  approachDriveBias: 50,
   attentionPersistence: 50,
 };
 
@@ -85,10 +91,8 @@ export const temperamentFromFineTune = (
       'temperament.sensitivity.frustration',
       'temperament.reactivity.intensity',
     ),
-    threatSensitivity: read(
-      'temperament.sensitivity.threat',
-      'temperament.reactivity.threshold',
-    ),
+    threatSensitivity: read('temperament.sensitivity.threat'),
+    reactivityThreshold: read('temperament.reactivity.threshold'),
     rewardSensitivity: read('temperament.sensitivity.reward'),
     impulseStrength: read('temperament.control.impulseStrength'),
     inhibitoryControl: read(
@@ -100,10 +104,9 @@ export const temperamentFromFineTune = (
       'temperament.regulation.recoveryRate',
     ),
     arousalBaseline: read('temperament.arousal.baseline'),
-    noveltySeeking: read(
-      'temperament.exploration.noveltySeeking',
-      'temperament.exploration.noveltySeeking',
-    ),
+    noveltySeeking: read('temperament.exploration.noveltySeeking'),
+    uncertaintyTolerance: read('temperament.exploration.uncertaintyTolerance'),
+    approachDriveBias: read('temperament.exploration.approachDrive'),
     attentionPersistence: read(
       'temperament.attention.persistence',
       'temperament.regulation.persistence',
@@ -130,29 +133,36 @@ export const computeTemperamentResponse = (
   const repetitionLoad = clamp01(input.repetitionLoad);
   const relationshipSafety = clamp01(input.relationshipSafety);
   const currentStress = clamp01(input.currentStress);
+  // 50 is neutral/backward-compatible. Higher panel threshold requires more pressure; lower threshold reacts more easily.
+  const thresholdFactor = 0.75 + (1 - n(profile.reactivityThreshold)) * 0.5;
 
   const negativeActivation = clamp01(
-    negativeLoad * (0.35 + n(profile.negativeSensitivity) * 0.65),
+    negativeLoad * (0.35 + n(profile.negativeSensitivity) * 0.65) * thresholdFactor,
   );
 
   const frustrationActivation = clamp01(
     frustrationLoad *
       (0.3 + n(profile.frustrationSensitivity) * 0.7) *
-      (0.75 + repetitionLoad * 0.25),
+      (0.75 + repetitionLoad * 0.25) *
+      thresholdFactor,
   );
 
   const threatActivation = clamp01(
     threatLoad *
       (0.3 + n(profile.threatSensitivity) * 0.7) *
-      (1 - relationshipSafety * 0.2),
+      (1 - relationshipSafety * 0.2) *
+      thresholdFactor,
   );
 
   const rewardActivation = clamp01(
     rewardLoad * (0.35 + n(profile.rewardSensitivity) * 0.65),
   );
 
-  const noveltyApproach = noveltyLoad * n(profile.noveltySeeking);
-  const threatAvoidance = threatActivation * (1 - relationshipSafety * 0.25);
+  const noveltyApproach =
+    noveltyLoad * n(profile.noveltySeeking) * (0.75 + n(profile.approachDriveBias) * 0.5);
+  const uncertaintyAvoidanceFactor = 1.15 - n(profile.uncertaintyTolerance) * 0.3;
+  const threatAvoidance =
+    threatActivation * (1 - relationshipSafety * 0.25) * uncertaintyAvoidanceFactor;
   const approachDrive = clamp01(rewardActivation * 0.55 + noveltyApproach * 0.45 - threatAvoidance * 0.35);
 
   const rawNegativePressure = clamp01(
