@@ -589,3 +589,14 @@ Yeni sohbet açıldığında:
 - Integration commit: `8337707` (`fix(kaira): wire personality decision and revision downstream`).
 - Temporary migration workflow and helper script were removed after integration.
 - Next deep-audit candidate: values `protectivePressure` is calculated but not directly consumed by behavior integration. Because compassion still affects `moralObjection`, this is not automatically a slider no-op; the next step is to test whether the intended protective/care semantic is measurably lost at the final behavior boundary before changing code.
+
+
+## 54. Value downstream coverage audit — 2026-08-31
+- Deep values audit focused on `protectivePressure`, which is calculated by `valueEngine` but is not consumed as a separate pressure by `behaviorIntegrationEngine`. This was treated as an audit candidate rather than automatically labeled a bug.
+- Added `kairaValueDownstreamCoverageContracts.test.ts` covering all eight CharacterTab value dimensions: honesty/deception, fairness/unfairness, loyalty/betrayal, compassion/harm, freedom/coercion, privacy/privacy-violation, respect/disrespect and responsibility/irresponsibility.
+- Every value dimension measurably changes final integrated `pressures.values` when its matching semantic context is present. Therefore the value sliders are behaviorally live at the final integration boundary; no product behavior patch was needed.
+- Compassion also changes both `protectivePressure` and `moralObjection`; because `moralObjection` is part of final aggregate value pressure, the absence of a dedicated `protectivePressure` consumer is not by itself a silent no-op. The same principle applies to aggregate architecture generally: a raw intermediate signal need not be transported separately when its intended slider semantics remain measurable downstream.
+- The first verification run failed before tests because the temporary generator helper interpolated `key` while generating the test source. The helper escaping was corrected and the second run passed targeted contracts, TypeScript, full regression and production build. No product code changed during this audit.
+- Permanent coverage contract commit: `25f2fc4` (`test(kaira): lock value downstream coverage`).
+- Temporary verification workflow and generator helper were removed after the successful run.
+- Next deep-audit candidate: temperament runtime semantics. `attentionPersistence` produces an intermediate `persistence` output that may not feed live chat state, and `recoverySpeed` may be ineffective because the current live-turn call supplies `minutesSinceEvent: 0`. These must be verified at the actual `droitChatService` consumption boundary before any patch.
