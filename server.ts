@@ -676,6 +676,9 @@ app.post("/api/chat", async (req, res) => {
           score: Math.max(0, localBaseConsistency.score - localPlanIssues.length * 15),
           issues: [...localBaseConsistency.issues, ...localPlanIssues],
         },
+        if (kairaPolicy.persistentUserMemory && consistency.accepted) {
+          learnLanguageReply(stateUserId, reply);
+        }
         postStart = now();
       let savedTurnId = "";
       await Promise.allSettled([

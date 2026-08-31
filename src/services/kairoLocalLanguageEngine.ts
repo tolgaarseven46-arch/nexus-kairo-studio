@@ -6,7 +6,7 @@ import type {
 import type { DialogueMove } from "./kairoDialogueDecisionEngine";
 import type { KairaResponsePlan } from "./kairaResponsePlan";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
-import { chooseLanguageReply, learnLanguageReply } from "./kairoLanguageMemory";
+import { chooseLanguageReply } from "./kairoLanguageMemory";
 import { normalizeKairoLanguageInput } from "./kairoLanguageNormalizer";
 import { resolveKairoRelationshipLevel } from "./kairoSpeechIdentity";
 
@@ -211,6 +211,5 @@ export function tryLocalKairoReply(
     pool,
     `${intent}|${normalization.canonical}|${state.anger}|${warmth}|${hurt}|${reactionMode}|${trace.decision.chosenTone}|q${allowQuestions ? 1 : 0}|h${allowHumor ? 1 : 0}`,
   );
-  learnLanguageReply(userId, reply);
   return { handled: true, intent, reply, confidence: intent === "emotional_opening" ? 0.96 : 0.97, source: "local_language", normalization };
 }
