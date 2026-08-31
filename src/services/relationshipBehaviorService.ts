@@ -74,8 +74,11 @@ export function applyRelationshipContext(
   ];
 
   let tone: BehaviorLayerProfile['tone'] = profile.tone;
-  if (severelyDamagedRelationship) tone = 'firm';
+  if (severelyDamagedRelationship || reactionMode === 'withdrawn') tone = 'firm';
+  else if (reactionMode === 'irritated' && (profile.tone === 'playful' || profile.tone === 'warm')) tone = 'firm';
   else if (damagedRelationship && (profile.tone === 'playful' || profile.tone === 'warm')) tone = 'calm';
+  else if (reactionMode === 'hurt' && profile.tone === 'playful') tone = 'calm';
+  else if (reactionMode === 'repairing' && profile.tone === 'playful') tone = 'warm';
   else if (healingRelationship && profile.tone === 'playful') tone = 'warm';
   else if (friendlyRelationship && profile.tone === 'formal') tone = 'confident';
 
