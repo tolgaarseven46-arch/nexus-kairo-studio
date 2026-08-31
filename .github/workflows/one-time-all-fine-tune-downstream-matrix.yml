@@ -1,0 +1,52 @@
+name: One-time all fine-tune downstream matrix
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-all-fine-tune-downstream-matrix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Add all fine-tune matrix contract
+        run: node scripts/addAllFineTuneDownstreamMatrixContracts.mjs
+      - name: Targeted all-family contracts
+        run: >-
+          npx vitest run
+          src/services/kairaAllFineTuneDownstreamMatrixContracts.test.ts
+          src/services/kairaTemperamentPanelWiringContracts.test.ts
+          src/services/kairaTemperamentLiveCoverageContracts.test.ts
+          src/services/kairaTemperamentRecoveryPersistenceWiringContracts.test.ts
+          src/services/kairaPersonalityDownstreamCoverageContracts.test.ts
+          src/services/kairaMotivationDownstreamCoverageContracts.test.ts
+          src/services/kairaValueDownstreamCoverageContracts.test.ts
+          src/services/kairaPreferenceDownstreamCoverageContracts.test.ts
+          src/services/kairaSocialDownstreamCoverageContracts.test.ts
+          src/services/kairaBoundaryDownstreamCoverageContracts.test.ts
+          src/services/kairaExpressionDownstreamCoverageContracts.test.ts
+      - name: TypeScript
+        run: npm run lint
+      - name: Full regression
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit matrix contract
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kairaAllFineTuneDownstreamMatrixContracts.test.ts
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "test(kaira): lock all fine-tune downstream matrix"
+          git pull --rebase origin main
+          git push origin main
