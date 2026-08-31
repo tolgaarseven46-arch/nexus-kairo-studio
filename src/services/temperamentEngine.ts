@@ -70,6 +70,35 @@ export const DEFAULT_TEMPERAMENT_PROFILE: TemperamentProfile = {
   attentionPersistence: 50,
 };
 
+export interface TemperamentRecoverableAffect {
+  anger: number;
+  stress: number;
+}
+
+/**
+ * Applies between-turn recovery to already-existing negative activation.
+ * recoverySpeed controls how quickly activation resolves; attentionPersistence
+ * controls how strongly the prior activation is retained. No elapsed time means
+ * no recovery, so these stable traits never rewrite the immediate event reaction.
+ */
+export const recoverTemperamentAffect = (
+  state: TemperamentRecoverableAffect,
+  profile: TemperamentProfile,
+  elapsedMinutes: number,
+): TemperamentRecoverableAffect => {
+  const elapsed = Math.max(0, elapsedMinutes);
+  if (elapsed <= 0) return { anger: clamp100(state.anger), stress: clamp100(state.stress) };
+
+  const recoveryRatePerMinute = 0.002 + n(profile.recoverySpeed) * 0.012;
+  const persistenceResistance = 0.7 + n(profile.attentionPersistence) * 0.6;
+  const decay = clamp01(Math.exp(-(elapsed * recoveryRatePerMinute) / persistenceResistance));
+
+  return {
+    anger: round1(clamp100(state.anger) * decay),
+    stress: round1(clamp100(state.stress) * decay),
+  };
+};
+
 /**
  * Converts the character panel's fine-tune profile into the first real
  * temperament model. Older panel keys are supported as fallbacks so this can

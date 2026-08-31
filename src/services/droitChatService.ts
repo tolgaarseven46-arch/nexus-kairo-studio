@@ -7,7 +7,7 @@ import {
 import type { BehaviorLayerProfile } from "./droitBehaviorEngine";
 import { validateKairoResponse, ResponseConsistencyResult } from "./kairoResponseConsistency";
 import { appraiseEventV0, type AppraisalEventKind } from "./appraisalEngine";
-import { computeTemperamentResponse, temperamentFromFineTune } from "./temperamentEngine";
+import { computeTemperamentResponse, recoverTemperamentAffect, temperamentFromFineTune } from "./temperamentEngine";
 import { applyPersonalityTendencies } from "./personalityTendencyEngine";
 import { applyMotivations } from "./motivationEngine";
 import { applyValues } from "./valueEngine";
@@ -142,6 +142,13 @@ function applyTemperamentBeforeKdm(
   const temperament = temperamentFromFineTune(fineTune);
   const event = appraisalEventFromSemantic(semanticEvent);
   const relationship = dynamicState.relationship;
+  const elapsedSinceInteractionMinutes = minutesBetween(relationship?.lastInteractionAt) ?? 0;
+  const recoveredAffect = recoverTemperamentAffect(
+    { anger: dynamicState.anger, stress: dynamicState.stress },
+    temperament,
+    elapsedSinceInteractionMinutes,
+  );
+  const recoveredState = { ...dynamicState, ...recoveredAffect };
   const interactionCount = Math.max(0, relationship?.interactionCount || 0);
   const firstSeenAt = relationship?.firstSeenAt ? new Date(relationship.firstSeenAt).getTime() : Date.now();
   const relationshipAgeMinutes = Number.isFinite(firstSeenAt) ? Math.max(0, (Date.now() - firstSeenAt) / 60000) : 0;
@@ -163,11 +170,11 @@ function applyTemperamentBeforeKdm(
     noveltyLoad: appraisal.novelty.value,
     repetitionLoad: 1 - appraisal.novelty.value,
     relationshipSafety,
-    currentStress: Math.max(0, Math.min(1, dynamicState.stress / 100)),
+    currentStress: Math.max(0, Math.min(1, recoveredState.stress / 100)),
     minutesSinceEvent: 0,
   });
   const delta = temperamentResponse.stateDelta;
-  return { ...dynamicState, anger: clamp100(dynamicState.anger + delta.anger), stress: clamp100(dynamicState.stress + delta.stress), happiness: clamp100(dynamicState.happiness + delta.happiness), calmness: clamp100(dynamicState.calmness + delta.calmness), confidence: clamp100(dynamicState.confidence + delta.confidence), surprise: clamp100(dynamicState.surprise + delta.surprise) };
+  return { ...recoveredState, anger: clamp100(recoveredState.anger + delta.anger), stress: clamp100(recoveredState.stress + delta.stress), happiness: clamp100(recoveredState.happiness + delta.happiness), calmness: clamp100(recoveredState.calmness + delta.calmness), confidence: clamp100(recoveredState.confidence + delta.confidence), surprise: clamp100(recoveredState.surprise + delta.surprise) };
 }
 
 export const droitChatService = {
