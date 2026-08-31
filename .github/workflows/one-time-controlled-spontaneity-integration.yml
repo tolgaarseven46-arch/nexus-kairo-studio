@@ -1,4 +1,5 @@
 name: One-time controlled spontaneity integration
+# retry: robust literal prompt seam
 
 on:
   push:
