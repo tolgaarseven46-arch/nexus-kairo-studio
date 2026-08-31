@@ -60,6 +60,24 @@ describe("KDM post-generation enforcement", () => {
     expect(result.reply).not.toContain("?");
   });
 
+  it("deterministically trims replies to the final sentence budget", () => {
+    const result = enforceKairoResponse(
+      "birinci cümle. ikinci cümle. üçüncü cümle.",
+      trace(),
+      { maxSentences: 2 },
+    );
+    expect(result.reply).toBe("birinci cümle. ikinci cümle.");
+    expect(result.reasons).toContain("sentence_budget_enforced");
+  });
+
+  it("deterministically trims replies to the final word budget", () => {
+    const result = enforceKairoResponse("bir iki üç dört beş altı", trace(), {
+      maxWords: 4,
+    });
+    expect(result.reply).toBe("bir iki üç dört");
+    expect(result.reasons).toContain("word_budget_enforced");
+  });
+
   it("replaces playful chat reopening while disengaged", () => {
     const result = enforceKairoResponse("hahaha hadi konuşalım 😄", trace(), {
       continueConversation: false,
