@@ -929,6 +929,7 @@ app.post("/api/chat", async (req, res) => {
           reply = repairedReply;
           groundingIssues = repairedIssues;
           activeAiProviderUsed = repairedGeneration.providerUsed;
+          providerFailureFallbackUsed = false;
         }
       } catch {
         // İlk geçerli yanıtı koru; onarım çağrısının geçici model hatası sohbeti düşürmesin.
