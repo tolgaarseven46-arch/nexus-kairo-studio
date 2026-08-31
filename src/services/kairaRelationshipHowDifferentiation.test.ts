@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { computeKairoSpeechIdentity } from './kairoSpeechIdentity';
-import { getLanguageMemory } from './kairoLanguageMemory';
+import { getLanguageMemory, learnLanguageReply } from './kairoLanguageMemory';
 import { tryLocalKairoReply } from './kairoLocalLanguageEngine';
 import { interpretSemanticEvent } from './semanticEventEngine';
 
@@ -131,5 +131,37 @@ describe('relationship-level HOW differentiation', () => {
     expect(familiarReplies.some((reply) => /\bya\b/u.test(reply))).toBe(true);
     expect(familiarReplies.some((reply) => /\bkanka\b/u.test(reply))).toBe(false);
     expect(closeReplies.some((reply) => /\bkanka\b/u.test(reply))).toBe(true);
+  });
+
+  it('does not let stale close-style language memory reopen close wording after relationship context becomes new', () => {
+    vi.useFakeTimers();
+    const userId = 'relationship-how-stale-close-memory';
+    const memory = getLanguageMemory(userId);
+    memory.wordWeights = { kanka: 8, ya: 7, valla: 5, aynen: 5, he: 3, iyidir: 4, takılıyorum: 4, senden: 4 };
+    memory.phraseWeights = {};
+    memory.recentReplies = [];
+    memory.interactionCount = 0;
+
+    for (let i = 0; i < 12; i += 1) {
+      learnLanguageReply(userId, `iyidir kanka senden ${i}`);
+    }
+
+    const replies: string[] = [];
+    for (let i = 0; i < 12; i += 1) {
+      const result = tryLocalKairoReply(
+        'naber',
+        personality,
+        stateFor('new'),
+        trace,
+        userId,
+        'natural_reaction',
+        planFor('new'),
+        interpretSemanticEvent('naber'),
+      );
+      expect(result.handled).toBe(true);
+      replies.push(result.reply || '');
+    }
+
+    expect(replies.every((reply) => !/\bkanka\b/u.test(reply))).toBe(true);
   });
 });
