@@ -885,3 +885,28 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Verify KNT/debug observability and multi-turn persistence of reactionMode across follow-up neutral/social messages.
+
+
+## 84. Reaction-mode TestLab observability — 2026-08-31
+- TestLab now projects canonical reactionMode from backend dynamic state / reasoning trace into the diagnostic snapshot.
+- Current-state debug UI explicitly shows Tepki: <mode>.
+- TestLab uses canonical AffectiveReactionMode instead of a local string type.
+- Observability contracts lock persistence projection, UI visibility and canonical type usage.
+
+## 85. Multi-turn qualitative reaction continuity — 2026-08-31
+- hurt and irritated no longer disappear on the first unrelated neutral turn while measurable relationship injury remains.
+- Neutral turns gradually heal conflict and hurt, so low-level qualitative reactions eventually decay back to neutral instead of becoming permanent flags.
+- Characterization covers first-neutral-turn persistence and eventual decay.
+
+## 86. Integer-resolution healing correction — 2026-08-31
+- KDM state clamp rounds values to whole numbers. The first neutral healing formula could subtract less than one point and therefore fail to advance after rounding.
+- Neutral hurt healing now advances by at least one state point, keeping decay compatible with the canonical integer state resolution.
+
+## 87. Reaction/lifecycle hydration preservation — 2026-08-31
+- Dynamic-state normalization now preserves reactionMode across persistence and session restore.
+- Relationship lifecycle normalization also preserves conversationState, disengagedAt, disengageReason and repairAttempts so reload cannot silently weaken disengaged/repairing state.
+- Hydration regression locks all canonical reaction and relationship lifecycle fields.
+- Final combined CI #1102 passed architecture contracts, all tests, TypeScript and production build.
+
+### Next verified development question
+- Audit response-consistency enforcement for qualitative HOW: ensure generated replies cannot contradict hurt/irritated/withdrawn/repairing state even when permissions remain otherwise valid.
