@@ -671,3 +671,14 @@ Yeni sohbet açıldığında:
 - Permanent coverage commit: `f43633f` (`test(kaira): lock preference downstream coverage`).
 - Temporary verification workflow and generator helper were removed after the successful run.
 - Next audit focus: social orientation whole-family downstream coverage, followed by personality whole-family coverage, then consolidate the all-fine-tune matrix.
+
+
+## 61. Social orientation full downstream coverage — 2026-08-31
+- The CharacterTab social-orientation family was audited as a complete downstream system. All eight social sliders are now explicitly covered: warmth, empathy, closeness drive, dominance, initiative, compliance, initial trust and disclosure.
+- Added permanent `kairaSocialDownstreamCoverageContracts.test.ts`. It verifies exact CharacterTab key mapping and proves every slider reaches the downstream behavior consumed by final integration in a semantically matching context.
+- Warmth and closeness drive alter affiliation and final warmth. Empathy alters care and final warmth under vulnerability. Dominance alters leadership/resistance and final directness under challenge/coercion. Initiative alters leadership and final directness when social action is available. Compliance acts as inverse resistance under coercion and changes final directness. Initial trust affects safety-derived trust/disclosure/affiliation when no relationship history exists. Disclosure changes disclosure pressure and final warmth in intimate context.
+- The whole-family run initially failed only on an extra betrayal-safety assertion: the first fixture computed social response from a damaged relationship but integrated it with a neutral relationship; after making the fixture consistent, the remaining absolute distance threshold was still arbitrary. The final contract therefore compares betrayed vs non-betrayed outcomes under the same damaged state and confirms betrayal produces greater social-distance pressure and greater final distance. No product code change was required.
+- Targeted contracts, TypeScript, full regression and production build all passed.
+- Permanent coverage commit: `d871466` (`test(kaira): lock social downstream coverage`).
+- Temporary verification workflow and generator helper were removed after the successful run.
+- Next audit focus: personality whole-family downstream coverage, then consolidate the complete all-fine-tune family matrix.
