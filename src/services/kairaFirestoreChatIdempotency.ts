@@ -1,4 +1,4 @@
-import { deleteDoc, doc, getDoc, runTransaction, setDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type {
   DistributedChatIdempotencyBackend,
@@ -90,12 +90,14 @@ export const firestoreChatIdempotencyBackend: DistributedChatIdempotencyBackend<
 
   async fail({ key, ownerToken }) {
     const ref = refFor(key);
-    const snapshot = await getDoc(ref);
-    if (!snapshot.exists()) return;
-    const existing = snapshot.data() as Partial<DistributedChatRecord<any>>;
-    if (existing.ownerToken === ownerToken && existing.status === 'processing') {
-      await deleteDoc(ref);
-    }
+    await runTransaction(db, async (tx) => {
+      const snapshot = await tx.get(ref);
+      if (!snapshot.exists()) return;
+      const existing = snapshot.data() as Partial<DistributedChatRecord<any>>;
+      if (existing.ownerToken === ownerToken && existing.status === 'processing') {
+        tx.delete(ref);
+      }
+    });
   },
 };
 
