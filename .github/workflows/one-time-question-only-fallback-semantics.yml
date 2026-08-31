@@ -1,0 +1,54 @@
+name: One-time question-only fallback semantics
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Fix question-only fallback and verify final delivery
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/services/kairoResponseConsistency.ts')
+          s = p.read_text(encoding='utf-8')
+          old = '''  if (!askQuestion && text.includes('?')) {
+    const withoutQuestions = removeQuestionSentences(text);
+    text = withoutQuestions || fallbackForTrace(trace);
+    reasons.push('question_blocked');
+  }'''
+          new = '''  if (!askQuestion && text.includes('?')) {
+    const withoutQuestions = removeQuestionSentences(text);
+    text = withoutQuestions || (continueConversation ? 'tamam' : fallbackForTrace(trace));
+    reasons.push('question_blocked');
+  }'''
+          if old not in s:
+              raise SystemExit('question enforcement block not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          test = Path('src/services/kairaExplicitSemanticFinalDeliveryContracts.test.ts')
+          test.write_text('''import { describe, expect, it } from "vitest";\nimport { buildBehaviorContract } from "./behaviorContract";\nimport { buildKairaResponsePlan, findKairaResponsePlanIssues } from "./kairaResponsePlan";\nimport { enforceKairoResponse } from "./kairoResponseConsistency";\nimport { interpretSemanticEvent } from "./semanticEventEngine";\n\nconst state = { calmness:70, anger:10, stress:20, happiness:70, confidence:70, surprise:20, relationship:{ conversationState:"active", hurtScore:0, conflictScore:0, repairProgress:0, repairAttempts:0 } } as any;\nconst trace = { messageInterpretation:{ intent:"genel_sohbet", sentiment:"nötr" }, decision:{ chosenTone:"neutral" }, currentMood:{ moodText:"stabil" }, relationship:{ warmthScore:50, trustScore:50, hurtScore:0, conflictScore:0, repairProgress:0, interactionCount:3 } } as any;\nconst dialogue = { move:"natural_reaction", allowFollowUpQuestion:true, allowSpeculation:false, maxSentences:2, maxWords:20, hasSupportedTargetClaim:false, reason:"test" } as any;\nconst speech = { register:"casual", relationshipLevel:"familiar", emojiLevel:1 } as any;\n\nfunction rulesFor(message: string) {\n  const event = interpretSemanticEvent(message);\n  const contract = buildBehaviorContract(state, trace, event);\n  const plan = buildKairaResponsePlan(contract, dialogue, speech);\n  return { event, contract, plan, rules:{ continueConversation:plan.continueConversation, humorAllowed:plan.allowHumor, askQuestion:plan.allowQuestion, behaviorContract:contract, emojiBudget:plan.emojiBudget, conversationState:state.relationship.conversationState } };\n}\n\ndescribe("explicit semantic final-delivery contracts", () => {\n  it("question-only suppression does not become a false conversation shutdown", () => {\n    const { plan, rules } = rulesFor("soru sorma artık");\n    const result = enforceKairoResponse("neden böyle düşünüyorsun?", trace, rules);\n    expect(plan.continueConversation).toBe(true);\n    expect(plan.allowQuestion).toBe(false);\n    expect(result.reply).toBe("tamam");\n    expect(result.reply).not.toContain("devam etmeyeceğim");\n    expect(findKairaResponsePlanIssues(result.reply, plan)).toEqual([]);\n  });\n\n  it("stop-talking remains hard-closed through deterministic final delivery", () => {\n    const { plan, rules } = rulesFor("sus artık");\n    const result = enforceKairoResponse("hahaha hadi konuşalım mı 😂", trace, rules);\n    expect(plan.continueConversation).toBe(false);\n    expect(result.reply).toBe("bu şekilde devam etmeyeceğim");\n    expect(result.reply).not.toMatch(/[?😂🤣😏]/u);\n    expect(findKairaResponsePlanIssues(result.reply, plan)).toEqual([]);\n  });\n});\n''', encoding='utf-8')
+          PY
+          npm install
+          npx vitest run src/services/kairaExplicitSemanticFinalDeliveryContracts.test.ts src/services/kairaExplicitSemanticResponsePlanAuthorityContracts.test.ts src/services/kairaResponsePlan.test.ts
+          npx tsc --noEmit
+          npm test
+          npm run build
+          rm .github/workflows/one-time-question-only-fallback-semantics.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kairoResponseConsistency.ts src/services/kairaExplicitSemanticFinalDeliveryContracts.test.ts .github/workflows/one-time-question-only-fallback-semantics.yml
+          git commit -m "fix(kaira): keep question suppression conversation-open"
+          git push
