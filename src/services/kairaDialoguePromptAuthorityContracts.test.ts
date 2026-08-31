@@ -53,4 +53,12 @@ describe("dialogue prompt final ResponsePlan authority", () => {
       source.indexOf("dialogueDecisionInstruction = buildDialogueDecisionInstruction"),
     );
   });
+
+  it("server injects the canonical relationship instruction that carries affective reaction mode into the AI prompt", async () => {
+    const source = await readFile("server.ts", "utf8");
+
+    expect(source).toContain("const relationshipInstruction = behaviorProfile.relationshipInstruction");
+    expect(source).toContain("İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}");
+    expect(source).toContain("${relationshipInstruction}");
+  });
 });
