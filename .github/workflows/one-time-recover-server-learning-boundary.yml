@@ -15,8 +15,8 @@ jobs:
         with:
           fetch-depth: 0
       - name: Restore server from last intact commit and fix statement boundary
-        shell: python
         run: |
+          python - <<'PY'
           from pathlib import Path
           import subprocess
 
@@ -47,6 +47,7 @@ jobs:
               raise SystemExit('expected broken local learning block not found in intact source')
           restored = restored.replace(old, new, 1)
           Path('server.ts').write_text(restored)
+          PY
       - name: Commit recovery and self-clean
         run: |
           rm .github/workflows/one-time-recover-server-learning-boundary.yml
