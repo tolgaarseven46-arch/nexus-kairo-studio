@@ -57,11 +57,21 @@ describe("relationship-dependent qualitative reaction characterization", () => {
 
     const healthyHurtDelta = (healthy.nextDynamicState.relationship?.hurtScore ?? 0) - healthyEstablished.relationship.hurtScore;
     const damagedHurtDelta = (damaged.nextDynamicState.relationship?.hurtScore ?? 0) - alreadyDamaged.relationship.hurtScore;
+    const healthyConflictDelta = (healthy.nextDynamicState.relationship?.conflictScore ?? 0) - healthyEstablished.relationship.conflictScore;
+    const damagedConflictDelta = (damaged.nextDynamicState.relationship?.conflictScore ?? 0) - alreadyDamaged.relationship.conflictScore;
 
     expect(healthy.trace.relationship.toleranceMultiplier).toBeLessThan(damaged.trace.relationship.toleranceMultiplier);
     expect(healthyHurtDelta).toBeLessThan(damagedHurtDelta);
+    expect(healthyConflictDelta).toBeLessThan(damagedConflictDelta);
     expect(healthy.nextDynamicState.relationship?.conversationState).toBe("active");
     expect(damaged.nextDynamicState.relationship?.conversationState).toBe("distancing");
+  });
+
+  it("keeps red-line violations severe even in a healthy established relationship", () => {
+    const result = analyzeKdmInteraction("orospu", undefined, healthyEstablished);
+    expect(result.nextDynamicState.relationship?.conversationState).toBe("disengaged");
+    expect(result.nextDynamicState.relationship?.hurtScore ?? 0).toBeGreaterThanOrEqual(10);
+    expect(result.nextDynamicState.relationship?.conflictScore ?? 0).toBeGreaterThanOrEqual(7);
   });
 
   it("produces distinct relationship behavior instructions from the same insult", () => {
