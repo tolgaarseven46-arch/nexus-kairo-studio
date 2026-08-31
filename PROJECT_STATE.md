@@ -705,3 +705,15 @@ Yeni sohbet açıldığında:
 - Permanent matrix commit: `9a3456a` (`test(kaira): lock all fine-tune downstream matrix`).
 - Temporary matrix verification workflow and generator helper were removed after the successful run.
 - Next audit focus should move beyond single-slider no-op detection into cross-family interaction/conflict semantics: verify that higher-authority context and boundary signals correctly dominate or combine with personality, motivation, social and expression tendencies without accidental cancellation or leakage.
+
+
+## 64. Cross-family authority + relationship-priority leak fix — 2026-08-31
+- After locking the complete 64-slider matrix, audited cross-family precedence with conflicting lower-layer signals. Permanent `kairaCrossFamilyAuthorityContracts.test.ts` now locks the intended priority order `boundary > values > relationship > goal > preference > expression`.
+- Hard-stop boundary remains absolute even when social warmth, approach motivation, answer depth, humor and repair openness are maximized; apology/repair signals cannot reopen an absolute hard stop.
+- Value conflict outranks goal/preference/expression without incorrectly forcing disengagement. Goal, preference and expression fallback order is also explicitly covered.
+- The audit found a real relationship-authority leak: with severe hurt/conflict and social-distance pressure, integration correctly selected `relationship` priority and disabled humor, but high affiliation/care/approach plus repair openness could still collapse final distance to about `0.074`, effectively erasing the relationship damage in the final behavior.
+- Fixed `behaviorIntegrationEngine.ts`: while `relationship` is the active priority, relationship pressure now establishes a minimum distance floor and an additional warmth penalty. This fix is scoped to active relationship priority; hard-stop, repairing/disengaged and non-relationship priority paths remain unchanged.
+- Cross-family targeted contracts, the existing integration suite, the all-fine-tune matrix, TypeScript, full regression and production build all passed after the fix.
+- Permanent product + contract commit: `0792022` (`fix(kaira): enforce relationship authority`).
+- Temporary verification workflow and both helper scripts were removed after the successful run.
+- Next audit focus: explicit user semantic commands versus family tendencies, especially stop-talking/stop-questions, value-vs-boundary overlap, and repair reopening under competing warmth/goal/expression signals.
