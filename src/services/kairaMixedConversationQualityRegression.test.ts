@@ -59,8 +59,8 @@ function reportedMertPlan(): WorldEventObservation {
         targetKey: 'mert',
         contentKey: 'istifa',
       },
-      modality: { kind: 'planned', strength: 0.8 },
-      lifecycle: { kind: 'planned', strength: 0.8 },
+      modality: { kind: 'plan', strength: 0.8 },
+      lifecycle: { kind: 'unspecified', strength: 0 },
     },
   };
 }
