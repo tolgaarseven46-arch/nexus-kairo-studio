@@ -17,9 +17,13 @@ describe("Kaira response rhythm server integration", () => {
 
   it("checks repetition across draft, repair, fallback and guarded response seams", () => {
     expect(count(server, "findKairoResponseRhythmIssues(")).toBeGreaterThanOrEqual(5);
-    expect(server).toContain("findKairoResponseRhythmIssues(reply, cleanHistory)");
-    expect(server).toContain("findKairoResponseRhythmIssues(repairedReply, cleanHistory)");
-    expect(server).toContain("findKairoResponseRhythmIssues(fallback, cleanHistory)");
-    expect(server).toContain("findKairoResponseRhythmIssues(planSafeFallback, cleanHistory)");
+    expect(server).toContain("findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move)");
+    expect(server).toContain("findKairoResponseRhythmIssues(repairedReply, cleanHistory, dialogueDecision.move)");
+    expect(server).toContain("findKairoResponseRhythmIssues(fallback, cleanHistory, dialogueDecision.move)");
+    expect(server).toContain("findKairoResponseRhythmIssues(planSafeFallback, cleanHistory, dialogueDecision.move)");
+  });
+
+  it("passes the canonical dialogue move so factual and recall paths are not rhythm-policed", () => {
+    expect(count(server, "cleanHistory, dialogueDecision.move)")).toBeGreaterThanOrEqual(5);
   });
 });
