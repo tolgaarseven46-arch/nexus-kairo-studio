@@ -646,3 +646,15 @@ Yeni sohbet açıldığında:
 - Permanent coverage commit: `072ce7b` (`test(kaira): lock boundary downstream coverage`).
 - Temporary verification workflow and generator helper were removed after the successful run.
 - Next audit focus: motivation full downstream coverage, then preferences/social/personality whole-family matrices to complete the all-fine-tune coverage map.
+
+
+## 59. Motivation full downstream coverage — 2026-08-31
+- The CharacterTab motivation family was audited as a complete downstream system. All eight motivation sliders are now explicitly covered: connection, belonging, recognition, autonomy, achievement, impact, predictability and stability.
+- Added permanent `kairaMotivationDownstreamCoverageContracts.test.ts`. It verifies exact CharacterTab key mapping and proves every slider reaches the downstream motivation pressure consumed by final behavior in a semantically matching context.
+- Connection and belonging alter affiliation and social approach; connection also changes rejection withdrawal. Recognition changes approval and approach only when recognition opportunity exists, preserving context gating. Autonomy alters withdrawal under autonomy threat. Achievement and impact alter approach only when matching goal/influence opportunities exist. Predictability and stability alter security and withdrawal under uncertainty/instability.
+- High needs cannot manufacture approach or withdrawal when matching contextual opportunity/threat signals are absent.
+- No additional motivation no-op was found after the earlier recognition wiring fix, so no product behavior patch was required.
+- Targeted contracts, TypeScript, full regression and production build all passed.
+- Permanent coverage commit: `23bbad1` (`test(kaira): lock motivation downstream coverage`).
+- Temporary verification workflow and generator helper were removed after the successful run.
+- Next audit focus: preferences whole-family downstream coverage, followed by social orientation and personality whole-family matrices to complete the all-fine-tune coverage map.
