@@ -78,9 +78,9 @@ Mevcut özellikler:
 Doğrulanmış örnek:
 - `selam kaira` → yerel Dil Motoru tarafından işlendi; AI süresi 0 ms görüldü.
 
-Henüz tam doğrulanmamış:
-- Çok sayıda typo ve doğal sosyal medya yazımında yanlış pozitif/yanlış negatif oranı.
-- Aynı niyette cevap çeşitliliğinin doğallığı.
+Doğrulanmış local-language kalite davranışı:
+- Canonical typo/kısaltma fallback'i yalnız risksiz kısa sosyal rutinlerde local intent açar; advice/complaint/recall/stop/repair gibi zengin semantik mesajları yutmaz.
+- Aynı intent arka arkaya tekrarlandığında learned style affinity korunurken recency-weighted seçim baskısı immediate exact-repeat loop'u engeller.
 
 Doğrulanmış persistence davranışı:
 - Accepted AI/local cevap öğrenimi Firestore language-memory'ye yazılır.
@@ -1013,3 +1013,22 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Measure the local-language intent boundary on a larger typo/natural-social-message matrix: false positives, false negatives and near-neighbor intent collisions must be characterized before widening the local intent catalog.
+
+
+## 100. Local-language typo and near-neighbor intent boundary — 2026-08-31
+- The local engine now uses the existing canonical language normalizer as a guarded fallback when raw SemanticEvent does not already resolve a social routine.
+- Canonical fallback is allowed only for general/greeting, discourse-neutral, non-advice, non-insult, non-repair, non-stop, non-coercive and non-emotional raw events with sufficient normalization confidence.
+- Regression covers 17 positive colloquial/typo forms including slm/sa/mrb/nbr/napyon/sagol/tsk/gorusuruz/ii geceler and addressed variants.
+- A negative near-neighbor matrix proves richer advice, information, complaint, recall, stop-question, stop-talking and repair semantics remain on the AI path even when they contain a normalizable routine token.
+- CI #1153 passed architecture contracts, full tests, TypeScript and production build.
+
+## 101. Same-intent local reply diversity and recency separation — 2026-08-31
+- Language style affinity and repetition pressure are now separate concepts. languageAffinity measures learned style only; chooseLanguageReply applies recency-weighted repetition pressure at selection time.
+- Exact phrase contribution is bounded so repeatedly accepted wording can influence style without creating unlimited self-reinforcing exact-phrase dominance.
+- Recent reply pressure is strongest for the immediately previous canonical reply and decays across the bounded recent-reply window.
+- Learning contracts now verify style affinity growth, learned preference when recency pressure is absent, and immediate-repeat avoidance when it is present.
+- A 15-turn repeated-naber local regression requires at least four distinct replies and no consecutive exact duplicate.
+- CI #1156 passed architecture contracts, full tests, TypeScript and production build.
+
+### Next verified development question
+- Verify HOW differentiation across relationship levels: for the same safe social intent and same canonical WHAT, new/familiar/close users should produce observably distinct warmth/slang/directness surfaces without changing permissions or semantic intent.
