@@ -1,0 +1,45 @@
+name: One-time explicit stop intent-facet separation
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Separate transient stop facets from primary intent
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/services/semanticEventEngine.ts')
+          s = p.read_text(encoding='utf-8')
+          old = '''  else if (challenge || mockery || stopQuestions || stopTalking || confusion || frustration >= 0.7) intent = "complaint";
+  else if (directCommand || coercion > 0) intent = "command";'''
+          new = '''  else if (challenge || mockery || confusion || frustration >= 0.7) intent = "complaint";
+  else if (directCommand || coercion > 0) intent = "command";'''
+          if old not in s:
+              raise SystemExit('primary complaint marker missing')
+          s = s.replace(old, new, 1)
+          old2 = '''  else if (/^(selam|merhaba|hey|naber|nabr|nasılsın)(?:\\s|$)/u.test(text)) intent = "greeting";
+  else if (/(😂|🤣|😄|😅|:d|haha|hahah|taşak)/iu.test(text)) intent = "banter";'''
+          new2 = '''  else if (/^(selam|merhaba|hey|naber|nabr|nasılsın)(?:\\s|$)/u.test(text)) intent = "greeting";
+  else if (/(😂|🤣|😄|😅|:d|haha|hahah|taşak)/iu.test(text)) intent = "banter";
+  else if (stopQuestions || stopTalking) intent = "complaint";'''
+          if old2 not in s:
+              raise SystemExit('intent fallback marker missing')
+          p.write_text(s.replace(old2, new2, 1), encoding='utf-8')
+          PY
+          rm .github/workflows/one-time-explicit-stop-intent-facet.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/semanticEventEngine.ts .github/workflows/one-time-explicit-stop-intent-facet.yml
+          git commit -m "fix(kaira): keep explicit stops as semantic facets"
+          git push
