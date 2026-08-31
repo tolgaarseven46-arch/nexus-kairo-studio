@@ -553,3 +553,15 @@ Yeni sohbet açıldığında:
 - Integration commit: `27b0c72` (`fix(kaira): wire recognition motivation downstream`).
 - Temporary recognition migration workflow and helper script were removed after successful integration.
 - Next deep-audit focus: remaining motivation, preference and social outputs should be checked for the same pattern: key-level read is insufficient; each slider must produce a measurable downstream difference only in a context where its semantic meaning is relevant.
+
+
+## 51. Social compliance/disclosure downstream wiring — 2026-08-31
+- Deep social-orientation audit found two CharacterTab keys that were read correctly but lost before final behavior: `social.agency.compliance` and `social.trust.disclosure`.
+- Compliance changed `resistancePressure`, but behavior integration did not consume that signal; its legacy patience bridge was later overwritten by boundary processing. Disclosure changed `disclosurePressure`, but integration did not consume it; its legacy communication bridge was later overwritten by expression processing.
+- `behaviorIntegrationEngine` now uses social resistance only as a bounded directness contribution when the current semantic event actually contains coercion. Low compliance can therefore make Kaira more resistant/direct under coercion, while compliance does not create a general-purpose aggressive/direct style in neutral context.
+- `behaviorIntegrationEngine` now gives `disclosurePressure` a small contribution to normal warmth. Because disclosure pressure itself already requires disclosure willingness plus intimacy/safety context, this makes high disclosure measurably more open/warm only where semantically appropriate. Disengage and repairing branches remain authoritative and unchanged.
+- Added `kairaSocialComplianceDisclosureWiringContracts.test.ts` to verify both CharacterTab mappings, coercion-gated compliance/directness behavior, neutral-context non-effect for compliance, and safe-intimacy disclosure/warmth differentiation.
+- Targeted contracts, TypeScript, full regression and production build all passed.
+- Integration commit: `1ccc939` (`fix(kaira): wire social compliance and disclosure downstream`).
+- Temporary migration workflow and helper script were removed after integration.
+- Next deep-audit focus: preference signals and the remaining motivation/social dimensions should be tested at the final integrated behavior boundary rather than accepted merely because their engine-local outputs change.
