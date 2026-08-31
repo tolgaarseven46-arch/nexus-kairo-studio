@@ -717,3 +717,14 @@ Yeni sohbet açıldığında:
 - Permanent product + contract commit: `0792022` (`fix(kaira): enforce relationship authority`).
 - Temporary verification workflow and both helper scripts were removed after the successful run.
 - Next audit focus: explicit user semantic commands versus family tendencies, especially stop-talking/stop-questions, value-vs-boundary overlap, and repair reopening under competing warmth/goal/expression signals.
+
+
+## 65. Explicit semantic authority + stop-talking fix — 2026-08-31
+- Audited explicit user semantic commands against maximal personality, motivation, preference, social and expression pressure. Added permanent `kairaExplicitSemanticAuthorityContracts.test.ts`.
+- The semantic parser correctly distinguishes `stopQuestions` from `stopTalking`: a request such as `soru sorma artık` suppresses question generation while leaving the conversation open.
+- The audit found a real explicit-command leak for `stopTalking`: messages such as `sus artık` were recognized and already disabled humor/questions and shortened the response, but `continueConversation` could remain `true` under strong approach/engagement signals.
+- Fixed `behaviorIntegrationEngine.ts` narrowly: `continueConversation` is now false whenever `semanticEvent.stopTalking` is true. This does not force a persistent relationship disengage state; it only honors the explicit stop command at the integrated decision boundary.
+- Targeted semantic/integration/cross-family contracts, TypeScript, full regression and production build all passed after the fix.
+- Permanent product + contract commit: `38914b4` (`fix(kaira): honor explicit stop-talking command`).
+- Temporary verification workflow and helper scripts were removed after the successful run.
+- Next audit focus: value-vs-boundary overlap and repair reopening under competing warmth/goal/expression signals.
