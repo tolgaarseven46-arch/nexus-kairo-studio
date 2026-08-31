@@ -105,9 +105,18 @@ export const computePersonalityTendencyResponse = (
   const revisionReadiness = clamp01(
     n(cognitiveFlexibility) * 0.65 + correctionSignal * 0.35 - n(stubbornness) * 0.25,
   );
-  const assertivePressure = clamp01(n(confidence) * 0.45 + n(directness) * 0.4 + conflict * 0.15);
   const analysisPressure = clamp01(n(analysisDepth) * 0.7 + ambiguity * 0.2 + correctionSignal * 0.1);
   const decisionPressure = clamp01(n(decisiveness) * 0.7 + decisionDemand * 0.3);
+  const decisionContext = clamp01((decisionDemand - 0.2) / 0.65);
+  const correctionContext = clamp01((correctionSignal - 0.05) / 0.85);
+  const baseAssertivePressure = clamp01(
+    n(confidence) * 0.45 + n(directness) * 0.4 + conflict * 0.15,
+  );
+  const assertivePressure = clamp01(
+    baseAssertivePressure +
+      decisionPressure * decisionContext * 0.14 -
+      revisionReadiness * correctionContext * 0.18,
+  );
 
   return {
     effective: {
