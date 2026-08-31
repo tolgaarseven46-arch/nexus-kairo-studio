@@ -36,6 +36,9 @@ const MAX_PHRASE_WEIGHTS = 64;
 const MAX_LEARNED_WORD_DELTA = 2.1;
 const RECENCY_PENALTIES = [12, 8, 5, 3, 2, 1, 1, 1];
 const LEARNED_MARKER_DELTA = 0.69;
+const LEARNED_WORD_RETENTION = 0.9;
+const LEARNED_PHRASE_RETENTION = 0.9;
+const MIN_LEARNED_WEIGHT = 0.05;
 
 function createProfile(): LanguageMemoryProfile {
   return { wordWeights: { ...BASE_WORDS }, phraseWeights: {}, recentReplies: [], interactionCount: 0 };
@@ -83,6 +86,22 @@ function boundedLanguageWords(raw: unknown) {
   const result = boundedWeights(raw, MAX_WORD_WEIGHTS, 30, BASE_WORDS);
   for (const word of Object.keys(result)) result[word] = Math.min(result[word], learnedWordCap(word));
   return result;
+}
+
+function decayLearnedProfile(profile: LanguageMemoryProfile) {
+  for (const [word, current] of Object.entries(profile.wordWeights)) {
+    const base = BASE_WORDS[word] ?? 0;
+    const learnedDelta = Math.max(0, current - base);
+    if (learnedDelta <= 0) continue;
+    const nextDelta = learnedDelta * LEARNED_WORD_RETENTION;
+    if (base === 0 && nextDelta < MIN_LEARNED_WEIGHT) delete profile.wordWeights[word];
+    else profile.wordWeights[word] = base + nextDelta;
+  }
+  for (const [phrase, current] of Object.entries(profile.phraseWeights)) {
+    const next = current * LEARNED_PHRASE_RETENTION;
+    if (next < MIN_LEARNED_WEIGHT) delete profile.phraseWeights[phrase];
+    else profile.phraseWeights[phrase] = next;
+  }
 }
 
 function sanitize(raw: any): LanguageMemoryProfile {
@@ -160,6 +179,7 @@ function affinityForProfile(profile: LanguageMemoryProfile, reply: string) {
 export function learnLanguageReply(userId: string, reply: string) {
   const profile = getLanguageMemory(userId);
   profile.interactionCount += 1;
+  decayLearnedProfile(profile);
   const normalized = normalizeLanguageText(reply);
   const replyWords = [...new Set(normalized.split(' ').filter((word) => word.length >= 2))];
   for (const word of replyWords) {
