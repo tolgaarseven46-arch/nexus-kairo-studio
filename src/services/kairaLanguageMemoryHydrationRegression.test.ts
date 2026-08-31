@@ -114,4 +114,29 @@ describe('language-memory hydration regression', () => {
     expect(Object.values(profile.wordWeights).every(Number.isFinite)).toBe(true);
     expect(Object.values(profile.phraseWeights).every(Number.isFinite)).toBe(true);
   });
+
+  it('reconstructs the same stale-phrase selection freshness after a cold reload', async () => {
+    const first = await freshLanguageMemoryModule();
+    const userId = 'hydration-stale-phrase-user';
+    const stale = 'tamamdır harbi böyle';
+    const candidates = [stale, 'anladım peki', 'olur tamamdır'];
+
+    for (let i = 0; i < 12; i += 1) first.learnLanguageReply(userId, stale);
+    for (let i = 0; i < 32; i += 1) first.learnLanguageReply(userId, `başka biçim ${i}`);
+
+    const beforeReload = Array.from({ length: 50 }, (_, i) =>
+      first.chooseLanguageReply(userId, candidates, `reload-parity-${i}`),
+    );
+    expect(beforeReload.filter((reply) => reply === stale).length).toBeLessThanOrEqual(25);
+
+    await vi.advanceTimersByTimeAsync(600);
+
+    const reloaded = await freshLanguageMemoryModule();
+    await reloaded.hydrateLanguageMemory(userId);
+    const afterReload = Array.from({ length: 50 }, (_, i) =>
+      reloaded.chooseLanguageReply(userId, candidates, `reload-parity-${i}`),
+    );
+
+    expect(afterReload).toEqual(beforeReload);
+  });
 });
