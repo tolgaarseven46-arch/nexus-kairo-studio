@@ -1,0 +1,37 @@
+name: One-time project state social downstream coverage
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-social-downstream-coverage.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 61. Social orientation full downstream coverage — 2026-08-31\n- The CharacterTab social-orientation family was audited as a complete downstream system. All eight social sliders are now explicitly covered: warmth, empathy, closeness drive, dominance, initiative, compliance, initial trust and disclosure.\n- Added permanent `kairaSocialDownstreamCoverageContracts.test.ts`. It verifies exact CharacterTab key mapping and proves every slider reaches the downstream behavior consumed by final integration in a semantically matching context.\n- Warmth and closeness drive alter affiliation and final warmth. Empathy alters care and final warmth under vulnerability. Dominance alters leadership/resistance and final directness under challenge/coercion. Initiative alters leadership and final directness when social action is available. Compliance acts as inverse resistance under coercion and changes final directness. Initial trust affects safety-derived trust/disclosure/affiliation when no relationship history exists. Disclosure changes disclosure pressure and final warmth in intimate context.\n- The whole-family run initially failed only on an extra betrayal-safety assertion: the first fixture computed social response from a damaged relationship but integrated it with a neutral relationship; after making the fixture consistent, the remaining absolute distance threshold was still arbitrary. The final contract therefore compares betrayed vs non-betrayed outcomes under the same damaged state and confirms betrayal produces greater social-distance pressure and greater final distance. No product code change was required.\n- Targeted contracts, TypeScript, full regression and production build all passed.\n- Permanent coverage commit: `d871466` (`test(kaira): lock social downstream coverage`).\n- Temporary verification workflow and generator helper were removed after the successful run.\n- Next audit focus: personality whole-family downstream coverage, then consolidate the complete all-fine-tune family matrix.\n'''
+          if '## 61. Social orientation full downstream coverage — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record social downstream coverage"
+          git pull --rebase origin main
+          git push origin main
