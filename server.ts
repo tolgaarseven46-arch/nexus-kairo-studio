@@ -859,6 +859,7 @@ app.post("/api/chat", async (req, res) => {
           ),
           ...findKairoResponseRhythmIssues(repairedReply, cleanHistory, dialogueDecision.move),
           ...findKairaResponsePlanIssues(repairedReply, responsePlan),
+          ...findKairoAffectiveResponseIssues(repairedReply, kdm.trace),
           ...findWorldModelResponseIssues(repairedReply, retrievedWorldEvents).map((issue) => issue.message),
         ];
         if (repairedIssues.length < groundingIssues.length) {
@@ -895,6 +896,7 @@ app.post("/api/chat", async (req, res) => {
           ),
           ...findKairoResponseRhythmIssues(fallback, cleanHistory, dialogueDecision.move),
           ...findKairaResponsePlanIssues(fallback, responsePlan),
+          ...findKairoAffectiveResponseIssues(fallback, kdm.trace),
           ...findWorldModelResponseIssues(fallback, retrievedWorldEvents).map((issue) => issue.message),
         ];
         if (fallbackIssues.length < groundingIssues.length) {

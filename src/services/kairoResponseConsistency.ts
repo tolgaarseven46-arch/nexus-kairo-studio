@@ -49,6 +49,36 @@ const EMOJI_RE = /\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictograp
 const HUMOR_MARKER_RE = /(?:\b(?:haha+h*|hehe+h*|lol)\b|😂|🤣|😄|😅|🙃|😏)/giu;
 const AFFECTION_MARKER_RE = /(öp|öpüc|sarıl|kucağ|dudak|bebeğim|aşkım|tatlım|sevgilim)/iu;
 const REOPEN_MARKER_RE = /(hadi\s+(?:konuş|devam)|konuşalım|devam edelim|ne yapıyorsun|naber|anlat bakalım)/iu;
+const QUALITATIVE_FAMILIAR_MARKER_RE = /(\bkanka\b|canım|aşkım|bebeğim|tatlım|öpüc|sarıl|hahaha|😂|🤣|😏)/giu;
+const PREMATURE_REPAIR_CLOSURE_RE = /(sorun yok|geçti gitti|boşver geçti|affettim|eski gibi|hiçbir şey olmamış)/giu;
+const QUALITATIVE_REOPEN_MARKER_RE = /(hadi konuşalım|devam edelim|anlat bakalım|naber|ne yapıyorsun)/giu;
+
+function affectiveFallbackForTrace(trace: ReasoningTrace): string {
+  const mode = normalize(trace?.currentMood?.reactionMode);
+  if (mode === 'irritated') return 'hoş değil';
+  if (mode === 'hurt') return 'tamam, duydum';
+  if (mode === 'withdrawn') return 'şu an biraz mesafe istiyorum';
+  if (mode === 'repairing') return 'özrünü duydum';
+  return 'tamam';
+}
+
+function enforceQualitativeReactionHow(text: string, trace: ReasoningTrace): { reply: string; changed: boolean } {
+  const original = String(text || '').trim();
+  const mode = normalize(trace?.currentMood?.reactionMode);
+  if (!['irritated', 'hurt', 'withdrawn', 'repairing'].includes(mode)) return { reply: original, changed: false };
+  let next = original
+    .replace(QUALITATIVE_FAMILIAR_MARKER_RE, '')
+    .replace(PREMATURE_REPAIR_CLOSURE_RE, '');
+  QUALITATIVE_FAMILIAR_MARKER_RE.lastIndex = 0;
+  PREMATURE_REPAIR_CLOSURE_RE.lastIndex = 0;
+  if (mode === 'withdrawn') {
+    next = next.replace(QUALITATIVE_REOPEN_MARKER_RE, '');
+    QUALITATIVE_REOPEN_MARKER_RE.lastIndex = 0;
+  }
+  next = next.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
+  if (!next) next = affectiveFallbackForTrace(trace);
+  return { reply: next, changed: next !== original };
+}
 
 function fallbackForTrace(trace: ReasoningTrace): string {
   const intent = normalize(trace?.messageInterpretation?.intent);
@@ -107,6 +137,12 @@ export function enforceKairoResponse(
     const checked = enforceBehaviorContract(text, trace, contract);
     text = checked.reply;
     reasons.push(...checked.reasons);
+  }
+
+  const affectiveChecked = enforceQualitativeReactionHow(text, trace);
+  if (affectiveChecked.changed) {
+    text = affectiveChecked.reply;
+    reasons.push('qualitative_reaction_how_enforced');
   }
 
   const emojis = text.match(EMOJI_RE) || [];
