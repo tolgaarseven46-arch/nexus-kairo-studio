@@ -658,3 +658,16 @@ Yeni sohbet açıldığında:
 - Permanent coverage commit: `23bbad1` (`test(kaira): lock motivation downstream coverage`).
 - Temporary verification workflow and generator helper were removed after the successful run.
 - Next audit focus: preferences whole-family downstream coverage, followed by social orientation and personality whole-family matrices to complete the all-fine-tune coverage map.
+
+
+## 60. Preference full downstream coverage — 2026-08-31
+- The CharacterTab preference family was audited as a complete downstream system. All six preference sliders are now explicitly covered: novelty, complexity, intensity, depth, playfulness and competition.
+- Added permanent `kairaPreferenceDownstreamCoverageContracts.test.ts`. It verifies exact CharacterTab key mapping and proves each preference reaches downstream engagement, depth/response-length or overstimulation behavior in a semantically matching context.
+- Novelty changes exploration and final engagement. Complexity changes depth and can produce a long response when both complexity and depth opportunities are genuinely present. Depth independently changes depth drive and long-response behavior. Playfulness changes playful engagement but is suppressed in serious emotional context. Competition changes engagement only when a competition opportunity exists.
+- Intensity is covered in both directions after the earlier overstimulation wiring fix: high intensity preference increases engagement with high-tempo context, while low intensity preference under the same context raises overstimulation and produces a short response without manufacturing relationship distance or disengagement.
+- The first whole-family verification run failed only because the complexity test incorrectly required complexity alone to force a long response. The test context was corrected to include a real depth opportunity; no product code change was made for that failure. The corrected run passed.
+- High preferences cannot manufacture engagement or overstimulation when matching opportunities/intensity are absent.
+- Targeted contracts, TypeScript, full regression and production build all passed.
+- Permanent coverage commit: `f43633f` (`test(kaira): lock preference downstream coverage`).
+- Temporary verification workflow and generator helper were removed after the successful run.
+- Next audit focus: social orientation whole-family downstream coverage, followed by personality whole-family coverage, then consolidate the all-fine-tune matrix.
