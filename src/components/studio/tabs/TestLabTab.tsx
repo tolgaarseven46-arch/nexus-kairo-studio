@@ -27,6 +27,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import {
+  AffectiveReactionMode,
   DroitPersonalityTraits,
   DroitDynamicState,
   DroitExpressionMode,
@@ -55,7 +56,7 @@ export interface ReasoningTrace {
   currentMood: {
     moodText: string;
     reasonText: string;
-    reactionMode?: string;
+    reactionMode?: AffectiveReactionMode;
   };
   messageInterpretation: {
     intent: string;
@@ -372,7 +373,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
       sadness: number;
       statusText: string;
       reactionText: string;
-      reactionMode?: string;
+      reactionMode?: AffectiveReactionMode;
     };
     aiRequest: {
       model: string;
