@@ -37,6 +37,14 @@ const AFFECTION_RE = /(öp|öpüc|sarıl|kucağ|dudak|bebeğim|aşkım|tatlım|s
 const FORGIVENESS_RE = /(geçti gitti|sorun yok|affettim|tamamen geçti|kapandı gitti)/iu;
 const REOPEN_RE = /(hadi\s+(?:konuş|devam)|konuşalım|devam edelim|eski halimize|normale dön|barıştık|kaldığımız yerden)/iu;
 
+const DIALOGUE_HUMOR_BLOCKED_MOVES = new Set<DialogueDecisionPlan["move"]>([
+  "grounded_recall",
+  "invite_emotional_context",
+  "repair_or_rephrase",
+  "follow_previous_answer",
+  "acknowledge_correction",
+]);
+
 export function buildKairaResponsePlan(
   contract: BehaviorContract,
   dialogue: DialogueDecisionPlan,
@@ -48,10 +56,13 @@ export function buildKairaResponsePlan(
     contract.questions === "allowed" &&
     dialogue.allowFollowUpQuestion;
   // Speech identity is HOW-only: humorLevel shapes expression, but cannot grant
-  // or veto the underlying WHAT/WHETHER permission.
+  // or veto the underlying WHAT/WHETHER permission. Dialogue authority can still
+  // narrow humor when the selected discourse move explicitly requires a factual,
+  // minimal or repair-oriented response.
   const allowHumor =
     continueConversation &&
-    contract.playfulness === "allowed";
+    contract.playfulness === "allowed" &&
+    !DIALOGUE_HUMOR_BLOCKED_MOVES.has(dialogue.move);
   const allowAffection =
     continueConversation && contract.affection === "allowed";
   const allowForgiveness = contract.forgivenessGranted;
