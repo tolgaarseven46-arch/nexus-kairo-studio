@@ -20,7 +20,9 @@ jobs:
           node-version: 22
       - run: npm install
       - name: Apply expression policy hints fix
-        run: node scripts/applyExpressionPolicyHintsFix.mjs
+        run: |
+          node scripts/applyExpressionPolicyHintsFix.mjs
+          node scripts/fixExpressionPolicyHintsContractFixture.mjs
       - name: Targeted contracts
         run: npx vitest run src/services/kairaExpressionPolicyHintsContracts.test.ts src/services/expressionStyleEngine.test.ts src/services/behaviorIntegrationEngine.test.ts
       - name: TypeScript
