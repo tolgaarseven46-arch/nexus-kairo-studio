@@ -537,7 +537,7 @@ app.post("/api/chat", async (req, res) => {
       if (claim.kind === "replay") return res.json(claim.payload);
       if (claim.kind === "wait") {
         const outcome = await claim.outcome;
-        if (outcome.ok) return res.json(outcome.payload);
+        if (outcome.ok === true) return res.json(outcome.payload);
         throw new Error(outcome.errorMessage);
       }
       ownsIdempotencyClaim = true;
