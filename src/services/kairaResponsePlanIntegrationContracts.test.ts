@@ -27,7 +27,9 @@ describe("canonical KairaResponsePlan runtime integration", () => {
     expect(server).toContain("findKairaResponsePlanIssues(repairedReply, responsePlan)");
     expect(server).toContain("findKairaResponsePlanIssues(fallback, responsePlan)");
     expect(server).toContain("localPlanIssues = findKairaResponsePlanIssues(reply, responsePlan)");
-    expect(server).toContain("finalPlanIssues = findKairaResponsePlanIssues(reply, responsePlan)");
+    expect(server).toContain("postEnforcementPlanIssues = findKairaResponsePlanIssues(reply, responsePlan)");
+    expect(server).toContain("findKairaResponsePlanIssues(planSafeFallback, responsePlan)");
+    expect(server).toContain("response_plan_delivery_fallback");
     expect(server).toContain("finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues])]");
   });
 

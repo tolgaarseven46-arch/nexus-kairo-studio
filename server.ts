@@ -920,9 +920,30 @@ app.post("/api/chat", async (req, res) => {
       ],
     };
     reply = enforced.reply;
+    let postEnforcementPlanIssues = findKairaResponsePlanIssues(reply, responsePlan);
+    if (postEnforcementPlanIssues.length) {
+      const planSafeFallback = buildGroundedDialogueFallback(
+        dialogueDecision, cleanHistory, userMessage, userName, dialogueAnalysis, responsePlan.allowQuestion,
+      );
+      if (planSafeFallback) {
+        const planSafeIssues = [
+          ...findKairoGroundingIssues(planSafeFallback, cleanHistory, userMessage),
+          ...findDialogueAttributionIssues(planSafeFallback, cleanHistory, userMessage, userName, dialogueAnalysis),
+          ...findDialogueDecisionIssues(planSafeFallback, dialogueDecision, dialogueOutputStyle),
+          ...findKairaResponsePlanIssues(planSafeFallback, responsePlan),
+          ...findWorldModelResponseIssues(planSafeFallback, retrievedWorldEvents).map((issue) => issue.message),
+        ];
+        if (planSafeIssues.length === 0) {
+          reply = planSafeFallback;
+          postEnforcementPlanIssues = [];
+          enforced.changed = true;
+          enforced.reasons.push("response_plan_delivery_fallback");
+        }
+      }
+    }
     const aiMs = Math.round(now() - aiStart);
     const baseConsistency = validateKairoResponse(reply, kdm.trace);
-    const finalPlanIssues = findKairaResponsePlanIssues(reply, responsePlan);
+    const finalPlanIssues = postEnforcementPlanIssues;
     const finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues])];
     const consistency = {
       ...baseConsistency,

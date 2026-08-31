@@ -365,6 +365,7 @@ export function buildGroundedDialogueFallback(
   }
   if (plan.move === "repair_or_rephrase") return "biraz saçmaladım galiba";
   if (plan.move === "follow_previous_answer") return "he tamam o zaman";
+  if (plan.move === "acknowledge_correction") return "he doğru";
   if (plan.move === "join_banter") {
     return PROCRASTINATION_BANTER_RE.test(userMessage)
       ? "yine şaşırtmadın hahah"
