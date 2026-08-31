@@ -32,6 +32,7 @@ export interface DialogueDecisionPlan {
 export interface DialogueOutputStyle {
   emojiLevel?: number;
   userMessage?: string;
+  allowQuestion?: boolean;
 }
 
 const SPECULATION_RE =
@@ -42,6 +43,7 @@ const UNSOLICITED_ADVICE_RE =
   /\b(bence|yapmalısın|denemelisin|iyi gelir|hakkın var)\b/i;
 const MINIMAL_EMOTIONAL_CURIOSITY_RE =
   /^(?:(?:hmm|off)\s+)?(?:niye|neden|ne oldu|noldu|hayırdır)(?:\s+ya)?[?…]*$/i;
+const MINIMAL_EMOTIONAL_ACK_RE = /^(?:hmm|anladım|hee)[.!…]*$/i;
 const CANNED_BANTER_RE =
   /\b(speedrun|full kaos|plot twist|achievement|level atla\w*|npc|boss fight|main character|challenge accepted)\b/i;
 const PROCRASTINATION_BANTER_RE =
@@ -267,6 +269,7 @@ export function findDialogueDecisionIssues(
   const issues: string[] = [];
   const wordCount = (reply.match(/[\p{L}\p{N}]+/gu) || []).length;
   const emojiCount = (reply.match(/\p{Extended_Pictographic}/gu) || []).length;
+  const effectiveAllowQuestion = style?.allowQuestion ?? plan.allowFollowUpQuestion;
   const emojiBudget =
     plan.move === "join_banter"
       ? 0
@@ -296,7 +299,7 @@ export function findDialogueDecisionIssues(
   if (plan.maxWords && wordCount > plan.maxWords) {
     issues.push(`Diyalog kararı ${plan.maxWords} kelime sınırını aştı`);
   }
-  if (!plan.allowFollowUpQuestion && /[?？]/.test(reply)) {
+  if (!effectiveAllowQuestion && /[?？]/.test(reply)) {
     issues.push("Diyalog kararı takip sorusunu yasakladığı halde soru eklendi");
   }
   if (!plan.allowSpeculation && SPECULATION_RE.test(reply)) {
@@ -305,9 +308,14 @@ export function findDialogueDecisionIssues(
     );
   }
   if (plan.move === "invite_emotional_context") {
-    if (!MINIMAL_EMOTIONAL_CURIOSITY_RE.test(reply.trim())) {
+    const matchesExpectedOpening = effectiveAllowQuestion
+      ? MINIMAL_EMOTIONAL_CURIOSITY_RE.test(reply.trim())
+      : MINIMAL_EMOTIONAL_ACK_RE.test(reply.trim());
+    if (!matchesExpectedOpening) {
       issues.push(
-        "İlk duygusal açılış tek kısa merak tepkisinin dışına çıktı",
+        effectiveAllowQuestion
+          ? "İlk duygusal açılış tek kısa merak tepkisinin dışına çıktı"
+          : "İlk duygusal açılış soru kapalıyken tek kısa kabul tepkisinin dışına çıktı",
       );
     }
     if (EMOTIONAL_OVERCARE_RE.test(reply)) {
@@ -337,8 +345,11 @@ export function buildGroundedDialogueFallback(
   userMessage: string,
   userName: string,
   currentAnalysis?: DialogueTurnAnalysis,
+  effectiveAllowQuestion = plan.allowFollowUpQuestion,
 ): string | null {
-  if (plan.move === "invite_emotional_context") return "hmm niye";
+  if (plan.move === "invite_emotional_context") {
+    return effectiveAllowQuestion ? "hmm niye" : "hmm";
+  }
   if (plan.move === "repair_or_rephrase") return "biraz saçmaladım galiba";
   if (plan.move === "follow_previous_answer") return "he tamam o zaman";
   if (plan.move === "join_banter") {
