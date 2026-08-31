@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AffectiveReactionMode, ReasoningTrace } from "../types/nexus";
-import { validateKairoResponse } from "./kairoResponseConsistency";
+import { enforceKairoResponse, validateKairoResponse } from "./kairoResponseConsistency";
 
 const traceFor = (reactionMode: AffectiveReactionMode): ReasoningTrace => ({
   whoSent: {
@@ -81,5 +81,27 @@ describe("affective reaction response consistency", () => {
     const result = validateKairoResponse("aynen kanka hahaha", traceFor("neutral"));
     expect(result.issues).not.toContain(issue);
     expect(result.checks.qualitativeReactionTone).toBe(true);
+  });
+
+  it("removes only contradictory HOW markers while preserving factual content at final delivery", () => {
+    const enforced = enforceKairoResponse("Maç 20.00'de kanka hahaha", traceFor("hurt"));
+    expect(enforced.reply).toContain("Maç 20.00'de");
+    expect(enforced.reply).not.toMatch(/kanka|hahaha/i);
+    expect(enforced.reasons).toContain("qualitative_reaction_how_enforced");
+  });
+
+  it("uses a narrow mode fallback when contradictory repairing language is all that remains", () => {
+    const enforced = enforceKairoResponse("sorun yok geçti gitti", traceFor("repairing"));
+    expect(enforced.reply).toBe("özrünü duydum");
+    expect(enforced.reasons).toContain("qualitative_reaction_how_enforced");
+  });
+
+  it("removes social reopening language while withdrawn without changing neutral mode output", () => {
+    const withdrawn = enforceKairoResponse("hadi konuşalım, dosya burada", traceFor("withdrawn"));
+    const neutral = enforceKairoResponse("aynen kanka hahaha", traceFor("neutral"));
+
+    expect(withdrawn.reply).not.toContain("hadi konuşalım");
+    expect(withdrawn.reply).toContain("dosya burada");
+    expect(neutral.reply).toBe("aynen kanka hahaha");
   });
 });
