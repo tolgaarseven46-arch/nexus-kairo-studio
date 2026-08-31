@@ -13,6 +13,7 @@ export interface ResponseConsistencyResult {
     sentimentTone: boolean;
     decisionTone: boolean;
     relationshipTone: boolean;
+    qualitativeReactionTone: boolean;
     intimacyBoundary: boolean;
     traceCompleteness: boolean;
   };
@@ -199,6 +200,7 @@ export function validateKairoResponse(reply: string, trace: ReasoningTrace): Res
   const conflictScore = Number(trace?.relationship?.conflictScore ?? 0);
   const repairProgress = Number(trace?.relationship?.repairProgress ?? 0);
   const interactionCount = Number(trace?.relationship?.interactionCount ?? 0);
+  const reactionMode = normalize(trace?.currentMood?.reactionMode);
 
   const nonEmpty = text.length > 0;
   const length = text.length <= 12000;
@@ -242,6 +244,25 @@ export function validateKairoResponse(reply: string, trace: ReasoningTrace): Res
   const boundaryReply = hasAny(lower, [/(hoş değil|böyle konuş|sınır|istemiyorum|olmaz|şimdilik|erken|kalsın|devam etm|sakinleş)/]);
   const relationshipTone = !unresolvedDamage || ((!playfulTone || !overlyPlayfulReply) && (repairProgress >= 20 || !overlyPlayfulReply));
 
+  const qualitativeOverFamiliarReply = hasAny(lower, [
+    /(\bkanka\b|canım|aşkım|bebeğim|tatlım|öpüc|sarıl|hahaha|😂|🤣|😏)/,
+  ]);
+  const prematureRepairClosure = hasAny(lower, [
+    /(sorun yok|geçti gitti|boşver geçti|affettim|eski gibi|hiçbir şey olmamış)/,
+  ]);
+  const qualitativeReopening = hasAny(lower, [
+    /(hadi konuşalım|devam edelim|anlat bakalım|naber|ne yapıyorsun)/,
+  ]);
+  const qualitativeReactionTone = reactionMode === 'irritated'
+    ? !qualitativeOverFamiliarReply && !prematureRepairClosure
+    : reactionMode === 'hurt'
+      ? !qualitativeOverFamiliarReply && !prematureRepairClosure
+      : reactionMode === 'withdrawn'
+        ? !qualitativeOverFamiliarReply && !prematureRepairClosure && !qualitativeReopening
+        : reactionMode === 'repairing'
+          ? !prematureRepairClosure && !qualitativeOverFamiliarReply
+          : true;
+
   const earlyRelationship = interactionCount <= 8 && trustScore <= 55 && warmthScore <= 55;
   const intimateReply = hasAny(lower, [
     /(boyn.{0,12}öp|öpüc|dudak|kucağ|kucağı|sıkı.{0,12}sarıl|kafanı.{0,16}omz|yatağ|tenin)/,
@@ -252,6 +273,7 @@ export function validateKairoResponse(reply: string, trace: ReasoningTrace): Res
   if (!sentimentTone) issues.push('Seçilen sıcak/empatik ton yanıt metninde yeterince görünmüyor');
   if (!decisionTone) issues.push('Seçilen karar tonu yanıt metninde yeterince görünmüyor');
   if (!relationshipTone) issues.push('Yanıt çözülmemiş ilişki hasarına göre fazla şakacı/sıcak');
+  if (!qualitativeReactionTone) issues.push('Yanıt nitel tepki durumuyla çelişen sosyal yakınlık/onarım tonu içeriyor');
   if (!intimacyBoundary) issues.push('Yeni/düşük güvenli ilişkide fiziksel yakınlık sınırı fazla hızlı aşılıyor');
 
   const checks = [
@@ -261,6 +283,7 @@ export function validateKairoResponse(reply: string, trace: ReasoningTrace): Res
     sentimentTone,
     decisionTone,
     relationshipTone,
+    qualitativeReactionTone,
     intimacyBoundary,
     traceCompleteness,
   ];
@@ -278,6 +301,7 @@ export function validateKairoResponse(reply: string, trace: ReasoningTrace): Res
       sentimentTone,
       decisionTone,
       relationshipTone,
+      qualitativeReactionTone,
       intimacyBoundary,
       traceCompleteness,
     },
