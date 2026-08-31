@@ -1,0 +1,40 @@
+name: One-time social downstream coverage
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-social-downstream-coverage.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Add social downstream coverage contracts
+        run: node scripts/addSocialDownstreamCoverageContracts.mjs
+      - name: Targeted contracts
+        run: npx vitest run src/services/kairaSocialDownstreamCoverageContracts.test.ts src/services/socialOrientationEngine.test.ts src/services/kairaSocialComplianceDisclosureWiringContracts.test.ts
+      - name: TypeScript
+        run: npm run lint
+      - name: Full regression
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Commit contracts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kairaSocialDownstreamCoverageContracts.test.ts
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "test(kaira): lock social downstream coverage"
+          git pull --rebase origin main
+          git push origin main
