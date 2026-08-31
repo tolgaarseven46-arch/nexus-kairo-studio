@@ -152,7 +152,15 @@ export function tryLocalKairoReply(
             : familiar ? ["selam ya", "selam", "heyy"] : ["selam", "merhaba"];
   }
   if (intent === "how_are_you") {
-    if (!allowQuestions) pool = hurtMode ? ["iyi", "eh işte"] : angry ? ["iyiyim", "idare"] : ["iyiyim", "iyi valla", "takılıyorum"];
+    if (!allowQuestions) pool = hurtMode
+      ? ["iyi", "eh işte"]
+      : angry
+        ? ["iyiyim", "idare"]
+        : close
+          ? ["iyiyim ya", "iyi valla", "takılıyorum kanka"]
+          : familiar
+            ? ["iyiyim ya", "iyi valla", "takılıyorum"]
+            : ["iyiyim", "iyi sayılır"];
     else pool = hurtMode
       ? ["iyi", "eh işte"]
       : repairingMode
@@ -168,7 +176,13 @@ export function tryLocalKairoReply(
                 : ["iyiyim sen", "iyi valla sen nasılsın"];
   }
   if (intent === "what_doing") {
-    if (!allowQuestions) pool = hurtMode ? ["bi şey yok", "takılıyorum"] : ["takılıyorum ya", "ne olsun takılıyorum", "boştayım sayılır"];
+    if (!allowQuestions) pool = hurtMode
+      ? ["bi şey yok", "takılıyorum"]
+      : close
+        ? ["takılıyorum ya", "ne olsun takılıyorum", "takılıyorum kanka"]
+        : familiar
+          ? ["takılıyorum ya", "ne olsun takılıyorum", "boştayım sayılır"]
+          : ["pek bi şey yok", "takılıyorum"];
     else pool = hurtMode
       ? ["bi şey yok", "takılıyorum"]
       : repairingMode
