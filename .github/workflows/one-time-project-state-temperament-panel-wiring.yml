@@ -1,0 +1,37 @@
+name: One-time project state temperament panel wiring
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-temperament-panel-wiring.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 47. Temperament panel runtime wiring and threshold semantics — 2026-08-31\n- CharacterTab temperament registry auditinde `temperament.exploration.uncertaintyTolerance` ve `temperament.exploration.approachDrive` sliderlarının runtime `temperamentEngine` tarafından tüketilmediği doğrulandı; iki slider sessiz no-op idi.\n- `TemperamentProfile` artık `uncertaintyTolerance` ve `approachDriveBias` alanlarını taşır. `temperamentFromFineTune(...)` paneldeki iki persisted key'i doğrudan runtime profile'a bağlar. Yüksek uncertainty tolerance tehdit/kaçınma baskısını azaltır; yüksek approach drive bias yenilik bağlamındaki yaklaşma davranışını artırır.\n- `temperament.reactivity.threshold` daha önce `threatSensitivity` fallback'ı olarak okunuyordu. Bu bağlantı panel semantiğini tersine çevirebiliyordu: yüksek “Tepki eşiği” tehdit aktivasyonunu artırabiliyordu. Eşik artık ayrı `reactivityThreshold` alanıdır ve 50 backward-compatible nötr noktadır; eşik yükseldikçe negative/frustration/threat aktivasyonu azalır, düştükçe daha kolay tepki oluşur.\n- `kairaTemperamentPanelWiringContracts.test.ts` panel key mapping, reaction-threshold yönü, uncertainty tolerance ve approach-drive davranış etkisini regression contract olarak doğrular. Mevcut `temperamentEngine.test.ts` ve `kairaTemperamentBeforeKdmContracts.test.ts` ile birlikte targeted suite geçti.\n- Entegrasyon commit'i: `e109723` (`fix(kaira): wire temperament panel controls`). Targeted contractlar, TypeScript, full regression ve production build başarıyla geçti.\n- İlk workflow denemesi yalnız CI altyapısında lockfile/cache varsayımı nedeniyle `actions/setup-node` aşamasında durdu; ürün migration'ı uygulanmadı. Repo'da lockfile bulunmadığı doğrulanınca one-time workflow `npm install` ile düzeltildi ve ikinci run tamamen yeşil geçti.\n- Geçici temperament migration workflow/script kaldırıldı.\n- Registry auditinde motivation, values, preferences ve social bloklarının UI key'leri runtime reader'larla birebir eşleşti; bu bloklarda no-op bulunmadı. `personality.cognition.deciveness` legacy typo'su UI/engine/persisted contract boyunca aynı kullanıldığı için compatibility migration olmadan rename edilmedi.\n- Sonraki audit adayı: CharacterTab `boundaries` ve kalan personality/expression parametrelerinin tamamını runtime tüketicilerle birebir karşılaştırmak; yalnız gerçek no-op veya ters semantik bulunan noktaları minimum patch ile kapatmak.\n'''
+          if '## 47. Temperament panel runtime wiring and threshold semantics — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record temperament panel wiring"
+          git pull --rebase origin main
+          git push origin main
