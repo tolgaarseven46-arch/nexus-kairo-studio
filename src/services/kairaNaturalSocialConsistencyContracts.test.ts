@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findDialogueDecisionIssues, type DialogueDecisionPlan } from "./kairoDialogueDecisionEngine";
+import { buildGroundedDialogueFallback, findDialogueDecisionIssues, type DialogueDecisionPlan } from "./kairoDialogueDecisionEngine";
 
 const socialPlan: DialogueDecisionPlan = {
   move: "natural_reaction",
@@ -15,6 +15,11 @@ const questionPlan: DialogueDecisionPlan = {
   ...socialPlan,
   move: "answer_or_clarify",
   allowFollowUpQuestion: true,
+};
+
+const topicShiftPlan: DialogueDecisionPlan = {
+  ...socialPlan,
+  move: "follow_topic_shift",
 };
 
 describe("natural social response consistency", () => {
@@ -45,5 +50,17 @@ describe("natural social response consistency", () => {
   it("allows infrastructure/persona vocabulary when the user explicitly opened that topic", () => {
     const issues = findDialogueDecisionIssues("CPU tarafı normal şu an", socialPlan, { userMessage: "CPU'n nasıl çalışıyor?" });
     expect(issues).not.toContain("Kullanıcının açmadığı yapay persona/altyapı gösterisi eklendi");
+  });
+
+  it("treats a topic shift as a social move for assistant-menu/persona checks", () => {
+    expect(
+      findDialogueDecisionIssues("İstersen yardımcı olabilirim.", topicShiftPlan, { userMessage: "neyse yarın maça gidiyorum" }),
+    ).toContain("Sosyal sohbet hamlesi robotik yardımcı/menü kalıbına döndü");
+  });
+
+  it("provides a narrow topic-shift fallback when repair cannot produce a valid social reply", () => {
+    expect(
+      buildGroundedDialogueFallback(topicShiftPlan, [], "neyse yarın maça gidiyorum", "Ali"),
+    ).toBe("he tamam");
   });
 });
