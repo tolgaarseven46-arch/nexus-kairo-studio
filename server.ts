@@ -10,6 +10,10 @@ import { buildBehaviorContract, behaviorContractInstruction } from "./src/servic
 import { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";
 import { buildKairaResponsePlan, findKairaResponsePlanIssues, kairaResponsePlanInstruction } from "./src/services/kairaResponsePlan";
 import {
+  decideKairaControlledSpontaneity,
+  kairaControlledSpontaneityInstruction,
+} from "./src/services/kairaControlledSpontaneity";
+import {
   loadKdmState,
   loadRecentKdmMemory,
   saveKdmInteraction,
@@ -585,7 +589,15 @@ app.post("/api/chat", async (req, res) => {
         behaviorPolicy?.expressionStyle,
       ),
       responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech),
-      responsePlanInstruction = kairaResponsePlanInstruction(responsePlan),
+      spontaneityDecision = decideKairaControlledSpontaneity({
+        responsePlan,
+        dynamicState: kdm.nextDynamicState,
+        history: cleanHistory,
+      }),
+      responsePlanInstruction = [
+        kairaResponsePlanInstruction(responsePlan),
+        kairaControlledSpontaneityInstruction(spontaneityDecision, responsePlan),
+      ].join("\n"),
       dialogueDecisionInstruction = buildDialogueDecisionInstruction(
         dialogueDecision,
         responsePlan.allowQuestion,
@@ -739,6 +751,7 @@ app.post("/api/chat", async (req, res) => {
           },
           metadata: {
             providerUsed: "local_language",
+            controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" },
             speechIdentity: speech,
             entityResolution: languageUnderstanding.entityResolution,
             worldEvent: languageUnderstanding.worldEvent,
@@ -1047,6 +1060,7 @@ app.post("/api/chat", async (req, res) => {
         },
         metadata: {
           providerUsed: activeAiProviderUsed,
+          controlledSpontaneity: spontaneityDecision,
           speechIdentity: speech,
           entityResolution: languageUnderstanding.entityResolution,
           worldEvent: languageUnderstanding.worldEvent,
