@@ -92,6 +92,35 @@ describe("KairaResponsePlan", () => {
     expect(plan.allowHumor).toBe(true);
   });
 
+  it("lets dialogue authority narrow humor for first emotional opening", () => {
+    const contract = buildBehaviorContract(state("active"));
+    const plan = buildKairaResponsePlan(
+      contract,
+      dialogue({ move: "invite_emotional_context", allowFollowUpQuestion: true, maxSentences: 1, maxWords: 4 }),
+      speech({ humorLevel: 100 }),
+    );
+
+    expect(contract.playfulness).toBe("allowed");
+    expect(plan.allowQuestion).toBe(true);
+    expect(plan.allowHumor).toBe(false);
+    expect(findKairaResponsePlanIssues("şaka yapıyorum hehe", plan)).toContain(
+      "response_plan_humor_blocked",
+    );
+  });
+
+  it("lets dialogue authority narrow humor for repair and grounded recall moves", () => {
+    const contract = buildBehaviorContract(state("active"));
+
+    for (const move of ["repair_or_rephrase", "grounded_recall", "follow_previous_answer", "acknowledge_correction"] as const) {
+      const plan = buildKairaResponsePlan(
+        contract,
+        dialogue({ move }),
+        speech({ humorLevel: 100 }),
+      );
+      expect(plan.allowHumor, move).toBe(false);
+    }
+  });
+
   it("hard-closes disengaged state regardless of speech warmth", () => {
     const contract = buildBehaviorContract(state("disengaged", { hurtScore: 80 }));
     const plan = buildKairaResponsePlan(
