@@ -1,4 +1,5 @@
 name: One-time cross-family authority
+# rerun-with-relationship-authority-fix
 
 on:
   push:
@@ -21,6 +22,41 @@ jobs:
       - run: npm install
       - name: Add cross-family authority contracts
         run: node scripts/addCrossFamilyAuthorityContracts.mjs
+      - name: Fix relationship authority leakage
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/services/behaviorIntegrationEngine.ts')
+          text = p.read_text()
+          old = '''  const distance = disengage
+    ? 1
+    : repairingHold
+      ? Math.max(0.68, clamp01(relationshipPressure * 0.55 + withdrawalPressure * 0.25 - b.repairOpenness * 0.1))
+      : clamp01(boundaryPressure * 0.5 + relationshipPressure * 0.3 + withdrawalPressure * 0.2 - b.repairOpenness * 0.2);
+  const warmth = disengage
+    ? 0
+    : repairingHold
+      ? Math.min(0.24, clamp01(s.affiliationPressure * 0.18 + b.repairOpenness * 0.12))
+      : clamp01(s.affiliationPressure * 0.32 + s.carePressure * 0.27 + approachPressure * 0.18 + s.disclosurePressure * 0.08 + b.repairOpenness * 0.15 - distance * 0.55);'''
+          new = '''  const relationshipDistanceFloor = priority === "relationship" ? clamp01(relationshipPressure * 0.48) : 0;
+  const relationshipWarmthPenalty = priority === "relationship" ? relationshipPressure * 0.25 : 0;
+  const distance = disengage
+    ? 1
+    : repairingHold
+      ? Math.max(0.68, clamp01(relationshipPressure * 0.55 + withdrawalPressure * 0.25 - b.repairOpenness * 0.1))
+      : Math.max(
+          relationshipDistanceFloor,
+          clamp01(boundaryPressure * 0.5 + relationshipPressure * 0.3 + withdrawalPressure * 0.2 - b.repairOpenness * 0.2),
+        );
+  const warmth = disengage
+    ? 0
+    : repairingHold
+      ? Math.min(0.24, clamp01(s.affiliationPressure * 0.18 + b.repairOpenness * 0.12))
+      : clamp01(s.affiliationPressure * 0.32 + s.carePressure * 0.27 + approachPressure * 0.18 + s.disclosurePressure * 0.08 + b.repairOpenness * 0.15 - distance * 0.55 - relationshipWarmthPenalty);'''
+          if old not in text:
+              raise SystemExit('relationship integration marker missing')
+          p.write_text(text.replace(old, new))
+          PY
       - name: Targeted contracts
         run: npx vitest run src/services/kairaCrossFamilyAuthorityContracts.test.ts src/services/behaviorIntegrationEngine.test.ts src/services/kairaAllFineTuneDownstreamMatrixContracts.test.ts
       - name: TypeScript
@@ -29,12 +65,12 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
-      - name: Commit contracts
+      - name: Commit product and contracts
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/services/kairaCrossFamilyAuthorityContracts.test.ts
+          git add src/services/behaviorIntegrationEngine.ts src/services/kairaCrossFamilyAuthorityContracts.test.ts
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "test(kaira): lock cross-family authority"
+          git commit -m "fix(kaira): enforce relationship authority"
           git pull --rebase origin main
           git push origin main
