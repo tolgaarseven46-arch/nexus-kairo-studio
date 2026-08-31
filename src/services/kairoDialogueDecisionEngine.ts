@@ -49,6 +49,18 @@ const MINIMAL_EMOTIONAL_CURIOSITY_RE =
 const MINIMAL_EMOTIONAL_ACK_RE = /^(?:hmm|anladım|hee)[.!…]*$/i;
 const CANNED_BANTER_RE =
   /\b(speedrun|full kaos|plot twist|achievement|level atla\w*|npc|boss fight|main character|challenge accepted)\b/i;
+const ASSISTANT_MENU_RE =
+  /\b(istersen (?:yardımcı olabilirim|birlikte|şöyle yapabiliriz)|yardımcı olabilirim|başka bir konuda yardımcı|nasıl yardımcı olabilirim|şöyle yapalım|istersen anlat)\b/i;
+const ARTIFICIAL_PERSONA_RE =
+  /\b(cpu|işlemci|log(?:lar|larım)?|veri merkezi|sunucu(?:lar|larım)?|algoritma(?:m)?|kod(?:lar|larım)?|ram)\b/i;
+const SOCIAL_ONLY_MOVES = new Set<DialogueDecisionPlan["move"]>([
+  "natural_reaction",
+  "join_banter",
+  "follow_previous_answer",
+  "invite_emotional_context",
+  "acknowledge_correction",
+  "repair_or_rephrase",
+]);
 const PROCRASTINATION_BANTER_RE =
   /\b(son dakikaya bırak\w*|ertele\w*|geciktir\w*|üşen\w*|yapmayıp bekle\w*)\b/i;
 const SHORT_CONTEXTUAL_ANSWER_RE =
@@ -303,6 +315,16 @@ export function findDialogueDecisionIssues(
     issues.push(
       "Kullanıcının başlatmadığı hazır internet esprisi veya oyun metaforu eklendi",
     );
+  }
+  if (SOCIAL_ONLY_MOVES.has(plan.move) && ASSISTANT_MENU_RE.test(reply)) {
+    issues.push("Sosyal sohbet hamlesi robotik yardımcı/menü kalıbına döndü");
+  }
+  if (
+    SOCIAL_ONLY_MOVES.has(plan.move) &&
+    ARTIFICIAL_PERSONA_RE.test(reply) &&
+    !ARTIFICIAL_PERSONA_RE.test(style?.userMessage || "")
+  ) {
+    issues.push("Kullanıcının açmadığı yapay persona/altyapı gösterisi eklendi");
   }
   if (responseUnitCount(reply) > effectiveMaxSentences) {
     issues.push(
