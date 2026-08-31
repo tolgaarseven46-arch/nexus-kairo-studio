@@ -51,8 +51,8 @@ const messages = [
 
 describe('twenty-turn persistence roundtrip regression', () => {
   it('keeps every turn bound to its own after-state across save and hydration', async () => {
-    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-08-31T18:00:00.000Z').getTime());
-    vi.spyOn(Math, 'random').mockReturnValue(0.123456789);
+    let nowTick = new Date('2026-08-31T18:00:00.000Z').getTime();
+    vi.spyOn(Date, 'now').mockImplementation(() => nowTick++);
 
     let state: DroitDynamicState | undefined;
     const expectedStates: DroitDynamicState[] = [];
@@ -102,6 +102,7 @@ describe('twenty-turn persistence roundtrip regression', () => {
     }
 
     expect(savedTurns).toHaveLength(20);
+    expect(new Set(savedTurns.map((turn) => turn.id)).size).toBe(20);
     expect(expectedStates).toHaveLength(20);
 
     firestore.getDoc.mockReset();
