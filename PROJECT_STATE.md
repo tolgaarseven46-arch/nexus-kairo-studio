@@ -612,3 +612,14 @@ Yeni sohbet açıldığında:
 - Integration commit: `1ea37af` (`fix(kaira): wire temperament recovery and persistence`).
 - Temporary migration workflow and helper script were removed after integration.
 - Next audit focus: lock all remaining temperament dimensions with a final live-state/stateDelta coverage matrix so every slider is proven behaviorally live, then move toward a comprehensive all-fine-tune end-to-end coverage matrix.
+
+
+## 56. Temperament full live-state coverage — 2026-08-31
+- After wiring recovery speed and attention persistence in section 55, the remaining eleven immediate-response temperament dimensions were audited at the live `stateDelta` boundary instead of being accepted from engine-local intermediate values.
+- Added permanent `kairaTemperamentLiveCoverageContracts.test.ts` covering negative sensitivity, frustration sensitivity, threat sensitivity, reactivity threshold, reward sensitivity, impulse strength, inhibitory control, arousal baseline, novelty seeking, uncertainty tolerance and approach-drive bias.
+- Each slider was tested in a semantically matching event context and shown to produce a measurable downstream difference in immediate activation and/or the final state delta consumed by the live chat path. No additional temperament no-op was found, so no further product behavior patch was needed.
+- Together with `kairaTemperamentRecoveryPersistenceWiringContracts.test.ts`, all thirteen stable temperament dimensions now have explicit downstream behavioral coverage: eleven immediate-response dimensions plus recovery speed and attention persistence across turns.
+- Targeted contracts, TypeScript, full regression and production build all passed.
+- Permanent coverage commit: `18985a1` (`test(kaira): lock temperament live coverage`).
+- Temporary verification workflow and generator helper were removed after the successful run.
+- Next audit focus: build an all-fine-tune coverage matrix across personality, temperament, motivations, values, preferences, social orientation, boundaries and expression. The matrix should distinguish key mapping, engine-local effect, final integrated effect and context gating so future sliders cannot regress into silent no-ops.
