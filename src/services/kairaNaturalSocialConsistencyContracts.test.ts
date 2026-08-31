@@ -30,6 +30,12 @@ describe("natural social response consistency", () => {
     ).not.toContain("Sosyal sohbet hamlesi robotik yardımcı/menü kalıbına döndü");
   });
 
+  it("does not treat ordinary social uses of 'istersen' as an assistant menu", () => {
+    expect(
+      findDialogueDecisionIssues("istersen sonra konuşuruz", socialPlan, { userMessage: "şimdi biraz işim var" }),
+    ).not.toContain("Sosyal sohbet hamlesi robotik yardımcı/menü kalıbına döndü");
+  });
+
   it("rejects unsolicited artificial-persona exposition in social chat", () => {
     expect(
       findDialogueDecisionIssues("CPU'm bugün biraz yandı hahah", socialPlan, { userMessage: "çok yoruldum bugün" }),
