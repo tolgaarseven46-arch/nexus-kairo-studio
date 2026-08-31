@@ -86,12 +86,15 @@ export function tryLocalKairoReply(
   const hurt = rel?.hurtScore ?? 0;
   const conflict = rel?.conflictScore ?? 0;
   const warmth = rel?.warmth ?? 50;
-  const angry = state.anger >= 55 || conflict >= 45;
-  const hurtMode = hurt >= 35;
+  const reactionMode = state.reactionMode ?? "neutral";
+  const angry = reactionMode === "irritated" || state.anger >= 55 || conflict >= 45;
+  const hurtMode = reactionMode === "hurt" || reactionMode === "withdrawn" || hurt >= 35;
+  const repairingMode = reactionMode === "repairing";
+  const cautiousMode = hurtMode || repairingMode;
   const relationshipLevel = responsePlan?.relationshipLevel ?? resolveKairoRelationshipLevel(state);
   const familiar = relationshipLevel !== "new";
   const close = relationshipLevel === "close";
-  const funny = allowHumor && personality.humor >= 65 && !angry && !hurtMode;
+  const funny = allowHumor && personality.humor >= 65 && !angry && !cautiousMode;
   let pool: string[] = [];
 
   if (intent === "emotional_opening") {
@@ -102,43 +105,53 @@ export function tryLocalKairoReply(
   if (intent === "greeting") {
     pool = hurtMode
       ? ["selam", "hee selam"]
-      : angry
-        ? ["selam.", "evet selam"]
-        : close
-          ? ["selam kanka", "selam ya", "heyy", "selammm"]
-          : familiar ? ["selam ya", "selam", "heyy"] : ["selam", "merhaba"];
+      : repairingMode
+        ? ["selam", "selam ya"]
+        : angry
+          ? ["selam.", "evet selam"]
+          : close
+            ? ["selam kanka", "selam ya", "heyy", "selammm"]
+            : familiar ? ["selam ya", "selam", "heyy"] : ["selam", "merhaba"];
   }
   if (intent === "how_are_you") {
     if (!allowQuestions) pool = hurtMode ? ["iyi", "eh işte"] : angry ? ["iyiyim", "idare"] : ["iyiyim", "iyi valla", "takılıyorum"];
     else pool = hurtMode
       ? ["iyi", "eh işte"]
-      : angry
-        ? ["iyiyim", "idare"]
-        : funny && close
-          ? ["iyiyim ya sen naber", "iyi valla sen", "iyidir kanka senden", "takılıyorum ya sen naber", "iyi be senden naber"]
-          : funny
-            ? ["iyiyim ya sen naber", "iyi valla sen", "takılıyorum ya sen naber", "iyi be senden naber"]
-            : ["iyiyim sen", "iyi valla sen nasılsın"];
+      : repairingMode
+        ? ["iyiyim", "iyi sayılır sen"]
+        : angry
+          ? ["iyiyim", "idare"]
+          : funny && close
+            ? ["iyiyim ya sen naber", "iyi valla sen", "iyidir kanka senden", "takılıyorum ya sen naber", "iyi be senden naber"]
+            : funny
+              ? ["iyiyim ya sen naber", "iyi valla sen", "takılıyorum ya sen naber", "iyi be senden naber"]
+              : ["iyiyim sen", "iyi valla sen nasılsın"];
   }
   if (intent === "what_doing") {
     if (!allowQuestions) pool = hurtMode ? ["bi şey yok", "takılıyorum"] : ["takılıyorum ya", "ne olsun takılıyorum", "boştayım sayılır"];
     else pool = hurtMode
       ? ["bi şey yok", "takılıyorum"]
-      : funny && close
-        ? ["takılıyorum ya", "ne olsun takılıyorum", "boştayım sayılır sen napiyon", "takılıyorum kanka sen"]
-        : funny ? ["takılıyorum ya", "ne olsun takılıyorum", "boştayım sayılır sen napiyon"] : ["takılıyorum sen", "pek bi şey yok"];
+      : repairingMode
+        ? ["takılıyorum ya", "pek bi şey yok sen"]
+        : funny && close
+          ? ["takılıyorum ya", "ne olsun takılıyorum", "boştayım sayılır sen napiyon", "takılıyorum kanka sen"]
+          : funny ? ["takılıyorum ya", "ne olsun takılıyorum", "boştayım sayılır sen napiyon"] : ["takılıyorum sen", "pek bi şey yok"];
   }
   if (intent === "thanks") {
-    pool = close ? ["eyvallah", "ne demek kanka", "rica ederim ya", "lafı mı olur"] : familiar ? ["eyvallah", "rica ederim ya", "lafı mı olur"] : ["rica ederim", "ne demek"];
+    pool = hurtMode
+      ? ["rica ederim", "tamam"]
+      : repairingMode
+        ? ["rica ederim", "ne demek"]
+        : close ? ["eyvallah", "ne demek kanka", "rica ederim ya", "lafı mı olur"] : familiar ? ["eyvallah", "rica ederim ya", "lafı mı olur"] : ["rica ederim", "ne demek"];
   }
-  if (intent === "agreement") pool = hurtMode ? ["he", "tamam"] : familiar ? ["aynen", "heh aynen", "tamamdır", "aynen öyle"] : ["tamam", "evet"];
-  if (intent === "goodbye") pool = close ? ["görüşürüz kanka", "hadi görüşürüz", "kendine iyi bak", "hadi kaçarım ben"] : familiar ? ["hadi görüşürüz", "kendine iyi bak", "görüşürüz"] : ["görüşürüz", "hoşça kal"];
-  if (intent === "good_night") pool = close ? ["iyi geceler kanka", "geceler", "iyi uyu", "hadi iyi geceler"] : familiar ? ["geceler", "iyi uyu", "hadi iyi geceler"] : ["iyi geceler", "iyi uykular"];
+  if (intent === "agreement") pool = hurtMode ? ["he", "tamam"] : repairingMode ? ["tamam", "aynen"] : familiar ? ["aynen", "heh aynen", "tamamdır", "aynen öyle"] : ["tamam", "evet"];
+  if (intent === "goodbye") pool = hurtMode ? ["görüşürüz", "tamam görüşürüz"] : repairingMode ? ["görüşürüz", "kendine iyi bak"] : close ? ["görüşürüz kanka", "hadi görüşürüz", "kendine iyi bak", "hadi kaçarım ben"] : familiar ? ["hadi görüşürüz", "kendine iyi bak", "görüşürüz"] : ["görüşürüz", "hoşça kal"];
+  if (intent === "good_night") pool = hurtMode ? ["iyi geceler", "geceler"] : repairingMode ? ["iyi geceler", "iyi uyu"] : close ? ["iyi geceler kanka", "geceler", "iyi uyu", "hadi iyi geceler"] : familiar ? ["geceler", "iyi uyu", "hadi iyi geceler"] : ["iyi geceler", "iyi uykular"];
 
   const reply = chooseLanguageReply(
     userId,
     pool,
-    `${intent}|${normalization.canonical}|${state.anger}|${warmth}|${hurt}|${trace.decision.chosenTone}|q${allowQuestions ? 1 : 0}|h${allowHumor ? 1 : 0}`,
+    `${intent}|${normalization.canonical}|${state.anger}|${warmth}|${hurt}|${reactionMode}|${trace.decision.chosenTone}|q${allowQuestions ? 1 : 0}|h${allowHumor ? 1 : 0}`,
   );
   learnLanguageReply(userId, reply);
   return { handled: true, intent, reply, confidence: intent === "emotional_opening" ? 0.96 : 0.97, source: "local_language", normalization };
