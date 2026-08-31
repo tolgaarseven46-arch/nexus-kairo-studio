@@ -55,6 +55,7 @@ export interface ReasoningTrace {
   currentMood: {
     moodText: string;
     reasonText: string;
+    reactionMode?: string;
   };
   messageInterpretation: {
     intent: string;
@@ -371,6 +372,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
       sadness: number;
       statusText: string;
       reactionText: string;
+      reactionMode?: string;
     };
     aiRequest: {
       model: string;
@@ -442,6 +444,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
         sadness: 8,
         statusText: 'Sıcak ve destekleyici',
         reactionText: 'Kullanıcının duygusal durumuna odaklanıldı.',
+        reactionMode: 'neutral',
       },
       aiRequest: {
         model: 'gemini-3.7-flash',
@@ -783,6 +786,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
           (canonicalEvent
             ? `Semantic: ${canonicalEvent.intent}, hedef=${canonicalEvent.target}`
             : 'KDM yanıtı uygulandı.'),
+        reactionMode: serverState.reactionMode || serverTrace?.currentMood?.reactionMode || 'neutral',
       };
 
       onDynamicStateChange?.(serverState);
@@ -1520,6 +1524,11 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                       {lastAnalysis.emotionAfter.statusText}
                     </span>
+                    {lastAnalysis.emotionAfter.reactionMode && (
+                      <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                        Tepki: {lastAnalysis.emotionAfter.reactionMode}
+                      </span>
+                    )}
                   </div>
                   <div className="text-[8.5px] font-mono">
                     <span className="text-sky-400 font-semibold">Sakinlik %{lastAnalysis.emotionAfter.calmness}</span>

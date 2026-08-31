@@ -429,6 +429,7 @@ export function analyzeKdmInteraction(
     if (priorConversationState === "active") repairAfter = clamp(repairAfter + 3 * forgivenessFactor);
   } else {
     conflictAfter = clamp(conflictAfter - healingRate);
+    hurtAfter = clamp(hurtAfter - healingRate * 0.5);
     repairAfter = baseRepair;
   }
 
@@ -489,9 +490,13 @@ export function analyzeKdmInteraction(
           : closeness >= 60 && (familiarityDays >= 14 || interactionCount >= 20)
             ? "hurt"
             : "irritated"
-        : unresolvedHurt
-          ? "hurt"
-          : "neutral";
+        : kind === "neutral" && !repairSignal &&
+          (state.reactionMode === "hurt" || state.reactionMode === "irritated") &&
+          (hurtAfter >= 2 || conflictAfter >= 2)
+          ? state.reactionMode
+          : unresolvedHurt
+            ? "hurt"
+            : "neutral";
 
   const neutralStress = approachBaseline(state.stress ?? 20, DEFAULT_DYNAMIC_STATE.stress, 1);
   const neutralHappiness = approachBaseline(state.happiness ?? 70, DEFAULT_DYNAMIC_STATE.happiness, 1);
