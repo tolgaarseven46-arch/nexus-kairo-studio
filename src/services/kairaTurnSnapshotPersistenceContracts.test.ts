@@ -10,10 +10,10 @@ const persistence = fs.readFileSync(
 
 describe("KAIRA per-turn persistence/hydration contracts", () => {
   it("persists the actual before/after state for each runtime turn", () => {
-    const beforeMatches = server.match(/dynamicStateBefore:\s*requestState/g) ?? [];
+    const beforeMatches = server.match(/dynamicStateBefore:\s*effective/g) ?? [];
     const afterMatches = server.match(/dynamicStateAfter:\s*kdm\.nextDynamicState/g) ?? [];
 
-    // Both local-language and AI paths must persist the same turn-local state boundary.
+    // Both local-language and AI paths must persist the same canonical turn-local state boundary.
     expect(beforeMatches.length).toBeGreaterThanOrEqual(2);
     expect(afterMatches.length).toBeGreaterThanOrEqual(2);
   });
