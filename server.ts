@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
 import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
+import { claimKairaChatRequest, completeKairaChatRequest, failKairaChatRequest } from "./src/services/kairaChatIdempotency";
 import { normalizeDroitPersonality } from "./src/services/droitPersonalityNormalizer";
 import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
@@ -498,6 +499,8 @@ function buildWorldEventInstruction(worldEvent: any) {
 }
 app.post("/api/chat", async (req, res) => {
   const serverStart = now();
+  let idempotencyKey = "";
+  let ownsIdempotencyClaim = false;
   try {
     const {
       userId = "anonymous",
@@ -515,6 +518,7 @@ app.post("/api/chat", async (req, res) => {
       sessionId: incomingSessionId,
       kairaInstanceId: incomingKairaInstanceId,
       kairaInstanceType: incomingKairaInstanceType,
+      requestId: incomingRequestId,
     } = req.body;
     if (!userMessage)
       return res.status(400).json({ error: "userMessage is required" });
@@ -526,6 +530,25 @@ app.post("/api/chat", async (req, res) => {
     const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, "_");
     const stateUserId = stateOwnerScope(userId, kairaInstance.instanceId);
     const sessionId = incomingSessionId?.trim() || `session_${stateUserId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+    const requestId = typeof incomingRequestId === "string" ? incomingRequestId.trim().slice(0, 160) : "";
+    idempotencyKey = requestId ? `${stateUserId}::${kairaInstance.instanceId}::${requestId}` : "";
+    if (idempotencyKey) {
+      const claim = claimKairaChatRequest<any>(idempotencyKey);
+      if (claim.kind === "replay") return res.json(claim.payload);
+      if (claim.kind === "wait") {
+        const outcome = await claim.outcome;
+        if (outcome.ok) return res.json(outcome.payload);
+        throw new Error(outcome.errorMessage);
+      }
+      ownsIdempotencyClaim = true;
+    }
+    const sendChatPayload = (payload: any) => {
+      if (idempotencyKey && ownsIdempotencyClaim) {
+        completeKairaChatRequest(idempotencyKey, payload);
+        ownsIdempotencyClaim = false;
+      }
+      return res.json(payload);
+    };
     const cleanHistory = sanitizeKairoChatHistory(history);
     const retrievedWorldEvents = kairaPolicy.persistentWorldModel && shouldRetrieveWorldEvents(userMessage)
       ? rankWorldEventObservations(
@@ -807,9 +830,10 @@ app.post("/api/chat", async (req, res) => {
           postProcessMs,
           serverTotalMs: Math.round(now() - serverStart),
         };
-      res.json({
+      sendChatPayload({
         sessionId,
         turnId: savedTurnId,
+        requestId: requestId || undefined,
         kairaInstanceId: kairaInstance.instanceId,
         kairaInstanceType: kairaInstance.instanceType,
         reply,
@@ -1138,9 +1162,10 @@ app.post("/api/chat", async (req, res) => {
         postProcessMs,
         serverTotalMs: Math.round(now() - serverStart),
       };
-    res.json({
+    sendChatPayload({
       sessionId,
       turnId: savedTurnId,
+      requestId: requestId || undefined,
       kairaInstanceId: kairaInstance.instanceId,
       kairaInstanceType: kairaInstance.instanceType,
       reply,
@@ -1155,6 +1180,10 @@ app.post("/api/chat", async (req, res) => {
     });
   } catch (e: any) {
     console.error(e);
+    if (idempotencyKey && ownsIdempotencyClaim) {
+      failKairaChatRequest(idempotencyKey, e);
+      ownsIdempotencyClaim = false;
+    }
     if (!res.headersSent)
       res.status(500).json({ error: e?.message || "Chat service failed" });
   }
