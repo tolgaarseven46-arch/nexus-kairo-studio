@@ -1,0 +1,37 @@
+name: One-time wire relationship rhythm guard
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Wire relationship level into all rhythm checks
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          path = Path('server.ts')
+          text = path.read_text()
+          pattern = r'findKairoResponseRhythmIssues\(([^,\n]+), cleanHistory, dialogueDecision\.move\)'
+          updated, count = re.subn(pattern, r'findKairoResponseRhythmIssues(\1, cleanHistory, dialogueDecision.move, speech.relationshipLevel)', text)
+          if count != 5:
+              raise SystemExit(f'expected 5 rhythm call sites, changed {count}')
+          path.write_text(updated)
+      - name: Commit wiring and self-clean
+        shell: bash
+        run: |
+          rm .github/workflows/one-time-wire-rhythm-relationship.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts .github/workflows/one-time-wire-rhythm-relationship.yml
+          git commit -m "fix(kaira): enforce relationship slang across AI repair chain"
+          git push
