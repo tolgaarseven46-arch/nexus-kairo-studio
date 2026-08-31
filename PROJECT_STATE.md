@@ -682,3 +682,14 @@ Yeni sohbet açıldığında:
 - Permanent coverage commit: `d871466` (`test(kaira): lock social downstream coverage`).
 - Temporary verification workflow and generator helper were removed after the successful run.
 - Next audit focus: personality whole-family downstream coverage, then consolidate the complete all-fine-tune family matrix.
+
+
+## 62. Personality full downstream coverage — 2026-08-31
+- The CharacterTab personality family was audited as a complete downstream system. All six sliders are explicitly covered: confidence, directness, stubbornness, analysis depth, cognitive flexibility and decisiveness.
+- Added permanent `kairaPersonalityDownstreamCoverageContracts.test.ts`. It verifies exact CharacterTab key mapping and proves every slider reaches downstream behavior consumed by final integration in a semantically matching context.
+- Confidence/directness alter assertive pressure and final directness; stubbornness and cognitive flexibility affect revision readiness and correction-context directness; analysis depth alters analysis pressure and final answer length; decisiveness alters decision pressure and final directness only when a decision is actually demanded.
+- Added context-gate protection proving decisiveness does not harden neutral conversation and cognitive flexibility does not generically soften behavior without a correction signal.
+- Targeted contracts, TypeScript, full regression and production build all passed. No product code change was required.
+- Permanent coverage commit: `3a2171c` (`test(kaira): lock personality downstream coverage`).
+- Temporary verification workflow and generator helper were removed after the successful run.
+- Next audit focus: consolidate the complete eight-family fine-tune downstream matrix into one meta contract.
