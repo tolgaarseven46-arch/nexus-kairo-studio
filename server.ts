@@ -551,8 +551,6 @@ app.post("/api/chat", async (req, res) => {
       languageUnderstanding.event,
       dialogueAnalysis,
     );
-    const dialogueDecisionInstruction =
-      buildDialogueDecisionInstruction(dialogueDecision);
     const memoryStart = now();
     const [persistedState, persistentMemory] = await Promise.all([
       kairaPolicy.persistentRelationship ? loadKdmState(stateUserId).catch(() => null) : Promise.resolve(null),
@@ -585,6 +583,10 @@ app.post("/api/chat", async (req, res) => {
       ),
       responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech),
       responsePlanInstruction = kairaResponsePlanInstruction(responsePlan),
+      dialogueDecisionInstruction = buildDialogueDecisionInstruction(
+        dialogueDecision,
+        responsePlan.allowQuestion,
+      ),
       enforcementRules = {
         continueConversation: responsePlan.continueConversation,
         humorAllowed: responsePlan.allowHumor,
