@@ -1,0 +1,55 @@
+name: One-time final response plan delivery guard
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Enforce final ResponsePlan before delivery
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          dialogue = Path('src/services/kairoDialogueDecisionEngine.ts')
+          ds = dialogue.read_text()
+          old = '''  if (plan.move === "follow_previous_answer") return "he tamam o zaman";\n  if (plan.move === "join_banter") {'''
+          new = '''  if (plan.move === "follow_previous_answer") return "he tamam o zaman";\n  if (plan.move === "acknowledge_correction") return "he doğru";\n  if (plan.move === "join_banter") {'''
+          if old not in ds:
+              raise SystemExit('acknowledge correction fallback marker not found')
+          dialogue.write_text(ds.replace(old, new, 1))
+
+          server = Path('server.ts')
+          s = server.read_text()
+          old_block = '''    reply = enforced.reply;\n    const aiMs = Math.round(now() - aiStart);\n    const baseConsistency = validateKairoResponse(reply, kdm.trace);\n    const finalPlanIssues = findKairaResponsePlanIssues(reply, responsePlan);\n    const finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues])];'''
+          new_block = '''    reply = enforced.reply;\n    let postEnforcementPlanIssues = findKairaResponsePlanIssues(reply, responsePlan);\n    if (postEnforcementPlanIssues.length) {\n      const planSafeFallback = buildGroundedDialogueFallback(\n        dialogueDecision,\n        cleanHistory,\n        userMessage,\n        userName,\n        dialogueAnalysis,\n        responsePlan.allowQuestion,\n      );\n      if (planSafeFallback) {\n        const planSafeIssues = [\n          ...findKairoGroundingIssues(planSafeFallback, cleanHistory, userMessage),\n          ...findDialogueAttributionIssues(\n            planSafeFallback,\n            cleanHistory,\n            userMessage,\n            userName,\n            dialogueAnalysis,\n          ),\n          ...findDialogueDecisionIssues(\n            planSafeFallback,\n            dialogueDecision,\n            dialogueOutputStyle,\n          ),\n          ...findKairaResponsePlanIssues(planSafeFallback, responsePlan),\n          ...findWorldModelResponseIssues(planSafeFallback, retrievedWorldEvents).map((issue) => issue.message),\n        ];\n        if (planSafeIssues.length === 0) {\n          reply = planSafeFallback;\n          postEnforcementPlanIssues = [];\n          enforced.changed = true;\n          enforced.reasons.push('response_plan_delivery_fallback');\n        }\n      }\n    }\n    const aiMs = Math.round(now() - aiStart);\n    const baseConsistency = validateKairoResponse(reply, kdm.trace);\n    const finalPlanIssues = postEnforcementPlanIssues;\n    const finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues])];'''
+          if old_block not in s:
+              raise SystemExit('final delivery seam marker not found')
+          server.write_text(s.replace(old_block, new_block, 1))
+
+          test = Path('src/services/kairaPostEnforcementResponsePlanContracts.test.ts')
+          test.write_text('''import { describe, expect, it } from "vitest";\nimport { buildBehaviorContract } from "./behaviorContract";\nimport { enforceBehaviorContract } from "./behaviorContractEnforcer";\nimport { buildGroundedDialogueFallback, findDialogueDecisionIssues, type DialogueDecisionPlan } from "./kairoDialogueDecisionEngine";\nimport { buildKairaResponsePlan, findKairaResponsePlanIssues } from "./kairaResponsePlan";\n\nconst trace = {\n  messageInterpretation: { intent: "duygusal_paylasim" },\n} as any;\n\nconst speech = {\n  register: "balanced", relationshipLevel: "new", sentenceLength: "short",\n  slangLevel: 0, humorLevel: 0, emojiLevel: 0, warmthLevel: 20, directness: 50,\n  rhythm: { messageLength: "short_first", bubbleFlow: "split_when_natural", punctuation: "sparse_in_casual_chat", colloquialSpelling: "light", topicTransitions: "direct" },\n  instructions: [],\n} as any;\n\nconst emotionalDialogue: DialogueDecisionPlan = {\n  move: "invite_emotional_context", allowFollowUpQuestion: true, allowSpeculation: false,\n  maxSentences: 1, maxWords: 4, hasSupportedTargetClaim: false, reason: "test",\n};\n\ndescribe("post-enforcement final ResponsePlan delivery", () => {\n  it("detects when a behavior-contract fallback violates a narrower focused response plan", () => {\n    const state = {\n      calmness: 50, anger: 20, stress: 20, happiness: 40, confidence: 50, surprise: 0,\n      relationship: { conversationState: "distancing", hurtScore: 35, conflictScore: 15, repairProgress: 0, repairAttempts: 0 },\n    } as any;\n    const contract = buildBehaviorContract(state);\n    const plan = buildKairaResponsePlan(contract, emotionalDialogue, speech);\n    const contractResult = enforceBehaviorContract("hahaha gel sarılayım", trace, contract);\n\n    expect(contractResult.changed).toBe(true);\n    expect(findKairaResponsePlanIssues(contractResult.reply, plan)).toContain("response_plan_word_budget_exceeded");\n\n    const fallback = buildGroundedDialogueFallback(emotionalDialogue, [], "moralim bozuk", "Ali", undefined, plan.allowQuestion);\n    expect(fallback).toBe("hmm");\n    expect(findDialogueDecisionIssues(fallback!, emotionalDialogue, {\n      allowQuestion: plan.allowQuestion, emojiBudget: plan.emojiBudget, maxSentences: plan.maxSentences, maxWords: plan.maxWords,\n    })).toEqual([]);\n    expect(findKairaResponsePlanIssues(fallback!, plan)).toEqual([]);\n  });\n\n  it("provides a minimal correction fallback that remains plan-safe", () => {\n    const dialogue: DialogueDecisionPlan = {\n      move: "acknowledge_correction", allowFollowUpQuestion: false, allowSpeculation: false,\n      maxSentences: 2, maxWords: 8, hasSupportedTargetClaim: false, reason: "test",\n    };\n    const fallback = buildGroundedDialogueFallback(dialogue, [], "hayır öyle değildi", "Ali");\n    expect(fallback).toBe("he doğru");\n  });\n});\n''')
+          PY
+          npm install
+          npx vitest run src/services/kairaPostEnforcementResponsePlanContracts.test.ts src/services/kairaResponsePlan.test.ts src/services/kairoResponseConsistency.enforcement.test.ts
+          npx tsc --noEmit
+          npm test
+          npm run build
+          rm .github/workflows/one-time-final-response-plan-delivery.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts src/services/kairoDialogueDecisionEngine.ts src/services/kairaPostEnforcementResponsePlanContracts.test.ts .github/workflows/one-time-final-response-plan-delivery.yml
+          git commit -m "fix(kaira): enforce response plan before final delivery"
+          git push
