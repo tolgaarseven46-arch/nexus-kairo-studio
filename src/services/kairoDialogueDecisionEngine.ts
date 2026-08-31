@@ -249,16 +249,17 @@ export function planDialogueResponse(
 
 export function buildDialogueDecisionInstruction(
   plan: DialogueDecisionPlan,
+  effectiveAllowQuestion = plan.allowFollowUpQuestion,
 ): string {
   return `DİYALOG KARARI:
 - Bu turdaki tek ana hareket: ${plan.move}
 - Hedef kişi: ${plan.target || "aktif konuşan/genel sohbet"}
-- Takip sorusu: ${plan.allowFollowUpQuestion ? "gerekiyorsa en fazla bir tane" : "yasak"}
+- Takip sorusu: ${effectiveAllowQuestion ? "gerekiyorsa en fazla bir tane" : "yasak"}
 - Desteksiz tahmin: ${plan.allowSpeculation ? "yalnızca açık şaka bağlamında" : "yasak"}
 - Uzunluk bütçesi: en fazla ${plan.maxSentences} kısa cümle
 - Kelime bütçesi: ${plan.maxWords ? `en fazla ${plan.maxWords} kelime` : "özel sınır yok"}
 - Gerekçe: ${plan.reason}
-Doğru cevabı verdikten sonra ikinci bir tahmin, seçenek listesi, yeni şaka veya otomatik soru ekleyerek cevabın mantığını BOZMA.`;
+${plan.move === "invite_emotional_context" && !effectiveAllowQuestion ? "- Üst davranış otoritesi soru iznini kapattı: merak sorusu yerine yalnız kısa kabul tepkisi kullan (hmm/anladım/hee).\n" : ""}Doğru cevabı verdikten sonra ikinci bir tahmin, seçenek listesi, yeni şaka veya otomatik soru ekleyerek cevabın mantığını BOZMA.`;
 }
 
 export function findDialogueDecisionIssues(
