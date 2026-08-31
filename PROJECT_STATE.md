@@ -577,3 +577,15 @@ Yeni sohbet açıldığında:
 - Integration commit: `dd265e3` (`fix(kaira): wire preference overstimulation downstream`).
 - Temporary migration workflow and helper script were removed after integration.
 - Motivation and social follow-up audit found no additional obvious dropped final signals after recognition, compliance and disclosure wiring. Next audit focus should move to the next CharacterTab fine-tune family and continue using final integrated behavior as the acceptance boundary.
+
+
+## 53. Personality decision/revision downstream wiring — 2026-08-31
+- Deep personality-tendency audit confirmed CharacterTab key mapping was already correct, but two semantic runtime signals did not survive to final integrated behavior: `decisionPressure` and `revisionReadiness`.
+- Decisiveness now contributes a small bounded increase to `assertivePressure` only when the current turn actually contains a decision demand. The default neutral decision-demand baseline is normalized out, so high decisiveness does not become general-purpose directness in ordinary chat.
+- Revision readiness now reduces `assertivePressure` only in an actual correction context. High cognitive flexibility plus low stubbornness can therefore make Kaira measurably less forceful when the user corrects her, while no correction signal means no generic softening.
+- The integration path remains unchanged: `behaviorIntegrationEngine` still consumes `assertivePressure`; the personality engine now ensures decision/revision semantics are contextually folded into that established signal rather than adding another competing behavior authority.
+- Added `kairaPersonalityDecisionRevisionWiringContracts.test.ts` to verify persisted key mapping, decision-context final directness differentiation, neutral-context non-effect for decisiveness, and correction-context directness softening for high revision readiness.
+- Targeted contracts, TypeScript, full regression and production build all passed.
+- Integration commit: `8337707` (`fix(kaira): wire personality decision and revision downstream`).
+- Temporary migration workflow and helper script were removed after integration.
+- Next deep-audit candidate: values `protectivePressure` is calculated but not directly consumed by behavior integration. Because compassion still affects `moralObjection`, this is not automatically a slider no-op; the next step is to test whether the intended protective/care semantic is measurably lost at the final behavior boundary before changing code.
