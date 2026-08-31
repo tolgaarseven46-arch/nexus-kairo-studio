@@ -90,7 +90,8 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
   const relationshipPressure = clamp01(s.socialDistancePressure * 0.5 + hurt * 0.3 + conflict * 0.2 + (priorDisengaged ? 0.55 : priorRepairing ? 0.28 : 0));
   const approachPressure = clamp01(m.approachPressure);
   const withdrawalPressure = clamp01(Math.max(m.withdrawalPressure, b.distancePressure, priorDisengaged ? 1 : priorRepairing ? 0.6 : 0));
-  const engagementPressure = clamp01(p.engagementDrive);
+  const overstimulationPressure = clamp01(p.overstimulationPressure);
+  const engagementPressure = clamp01(p.engagementDrive * (1 - overstimulationPressure * 0.75));
   const humorPressure = clamp01(e.humor.strength * (1 - e.inhibition));
 
   let priority: IntegratedBehaviorDecision["priority"] = "expression";
@@ -135,7 +136,7 @@ export const integrateBehaviorLayers = (input: BehaviorIntegrationInput): Behavi
   const repairAllowed = repairSignal && !input.boundaries.hardStop && (priorDisengaged || priorRepairing || b.repairOpenness >= 0.2);
   const socialResistanceDirectness = clamp01(s.resistancePressure * clamp01(semanticEvent.coercion));
   const directness = clamp01(pt.assertivePressure * 0.32 + s.leadershipPressure * 0.18 + socialResistanceDirectness * 0.15 + b.boundaryAssertion * 0.25 + valuePressure * 0.1 + (priorDisengaged ? 0.25 : priorRepairing ? 0.12 : 0));
-  const responseLength: IntegratedBehaviorDecision["responseLength"] = disengage || repairingHold || semanticEvent.stopTalking || distance >= 0.6 || e.speech.brevity >= 0.65 ? "short" : pt.analysisPressure >= 0.62 || p.depthDrive >= 0.58 ? "long" : "medium";
+  const responseLength: IntegratedBehaviorDecision["responseLength"] = disengage || repairingHold || semanticEvent.stopTalking || distance >= 0.6 || e.speech.brevity >= 0.65 || overstimulationPressure >= 0.45 ? "short" : pt.analysisPressure >= 0.62 || p.depthDrive >= 0.58 ? "long" : "medium";
 
   const explanation: string[] = [];
   if (input.boundaries.hardStop) explanation.push("Mutlak kırmızı çizgi tetiklendi; konuşma kesildi.");
