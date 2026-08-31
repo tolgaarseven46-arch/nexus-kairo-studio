@@ -10,6 +10,26 @@ const baseState = {
   surprise: 10,
 };
 
+const newRelationship = {
+  ...baseState,
+  relationship: {
+    firstSeenAt: new Date().toISOString(),
+    lastInteractionAt: new Date().toISOString(),
+    familiarityDays: 0,
+    interactionCount: 0,
+    warmth: 50,
+    trust: 50,
+    positiveEvents: 0,
+    negativeEvents: 0,
+    conflictScore: 0,
+    hurtScore: 0,
+    repairProgress: 0,
+    repeatedNegativeCount: 0,
+    conversationState: "active",
+    repairAttempts: 0,
+  },
+} as any;
+
 const healthyEstablished = {
   ...baseState,
   relationship: {
@@ -67,25 +87,50 @@ describe("relationship-dependent qualitative reaction characterization", () => {
     expect(damaged.nextDynamicState.relationship?.conversationState).toBe("distancing");
   });
 
-  it("keeps red-line violations severe even in a healthy established relationship", () => {
+  it("selects irritated, hurt and withdrawn for the same insult from relationship context", () => {
+    const fresh = analyzeKdmInteraction("salak", undefined, newRelationship);
+    const close = analyzeKdmInteraction("salak", undefined, healthyEstablished);
+    const damaged = analyzeKdmInteraction("salak", undefined, alreadyDamaged);
+
+    expect(fresh.nextDynamicState.reactionMode).toBe("irritated");
+    expect(close.nextDynamicState.reactionMode).toBe("hurt");
+    expect(damaged.nextDynamicState.reactionMode).toBe("withdrawn");
+    expect(fresh.trace.currentMood.reactionMode).toBe("irritated");
+    expect(close.trace.currentMood.reactionMode).toBe("hurt");
+    expect(damaged.trace.currentMood.reactionMode).toBe("withdrawn");
+  });
+
+  it("feeds the qualitative mode into HOW-only relationship behavior directives", () => {
+    const fresh = analyzeKdmInteraction("salak", undefined, newRelationship);
+    const close = analyzeKdmInteraction("salak", undefined, healthyEstablished);
+    const damaged = analyzeKdmInteraction("salak", undefined, alreadyDamaged);
+
+    expect(fresh.behaviorProfile.behaviorDirectives.some((item) => item.includes("Nitel tepki irritated"))).toBe(true);
+    expect(close.behaviorProfile.behaviorDirectives.some((item) => item.includes("Nitel tepki hurt"))).toBe(true);
+    expect(damaged.behaviorProfile.behaviorDirectives.some((item) => item.includes("Nitel tepki withdrawn"))).toBe(true);
+  });
+
+  it("keeps red-line violations severe and withdrawn even in a healthy established relationship", () => {
     const result = analyzeKdmInteraction("orospu", undefined, healthyEstablished);
     expect(result.nextDynamicState.relationship?.conversationState).toBe("disengaged");
+    expect(result.nextDynamicState.reactionMode).toBe("withdrawn");
     expect(result.nextDynamicState.relationship?.hurtScore ?? 0).toBeGreaterThanOrEqual(10);
     expect(result.nextDynamicState.relationship?.conflictScore ?? 0).toBeGreaterThanOrEqual(7);
   });
 
-  it("produces distinct relationship behavior instructions from the same insult", () => {
+  it("uses repairing while unresolved hurt is being actively repaired", () => {
+    const result = analyzeKdmInteraction("özür dilerim", undefined, alreadyDamaged);
+    expect(result.nextDynamicState.reactionMode).toBe("repairing");
+    expect(result.trace.currentMood.reactionMode).toBe("repairing");
+    expect(result.behaviorProfile.behaviorDirectives.some((item) => item.includes("Nitel tepki repairing"))).toBe(true);
+  });
+
+  it("still produces distinct relationship behavior instructions from the same insult", () => {
     const healthy = analyzeKdmInteraction("salak", undefined, healthyEstablished);
     const damaged = analyzeKdmInteraction("salak", undefined, alreadyDamaged);
 
     expect(healthy.behaviorProfile.relationshipInstruction).not.toBe(damaged.behaviorProfile.relationshipInstruction);
     expect(healthy.behaviorProfile.relationshipInstruction).toContain("sıcak ve güvenli");
     expect(damaged.behaviorProfile.relationshipInstruction).toMatch(/gerilimli|hasarlı/i);
-  });
-
-  it("does not claim an explicit anger-vs-withdrawal reaction-mode selector that the engine does not yet expose", () => {
-    const result = analyzeKdmInteraction("salak", undefined, healthyEstablished) as any;
-    expect(result.nextDynamicState.reactionMode).toBeUndefined();
-    expect(result.trace.decision.reactionMode).toBeUndefined();
   });
 });
