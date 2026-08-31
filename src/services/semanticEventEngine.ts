@@ -187,7 +187,7 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   if (apology) intent = "apology";
   else if (repairAttempt) intent = "repair";
   else if (insult) intent = "insult";
-  else if (challenge || mockery || stopQuestions || stopTalking || confusion || frustration >= 0.7) intent = "complaint";
+  else if (challenge || mockery || confusion || frustration >= 0.7) intent = "complaint";
   else if (directCommand || coercion > 0) intent = "command";
   else if (rejection) intent = "rejection";
   else if (support > 0) intent = "support";
@@ -199,6 +199,7 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   else if (/[?]/u.test(message) || INFORMATION_REQUEST_RE.test(text)) intent = "information_request";
   else if (/^(selam|merhaba|hey|naber|nabr|nasılsın)(?:\s|$)/u.test(text)) intent = "greeting";
   else if (/(😂|🤣|😄|😅|:d|haha|hahah|taşak)/iu.test(text)) intent = "banter";
+  else if (stopQuestions || stopTalking) intent = "complaint";
 
   const socialRoutine = inferSocialRoutine(text, intent);
 
