@@ -752,7 +752,7 @@ app.post("/api/chat", async (req, res) => {
             surprise: kdm.nextDynamicState.surprise,
             deltas: kdm.nextDynamicState.lastEvent?.deltas || [],
           },
-          dynamicStateBefore: requestState,
+          dynamicStateBefore: effective,
           dynamicStateAfter: kdm.nextDynamicState,
           relationshipState:
             kdm.nextDynamicState.relationship || kdm.trace.relationship,
@@ -1064,7 +1064,7 @@ app.post("/api/chat", async (req, res) => {
           surprise: kdm.nextDynamicState.surprise,
           deltas: kdm.nextDynamicState.lastEvent?.deltas || [],
         },
-        dynamicStateBefore: requestState,
+        dynamicStateBefore: effective,
         dynamicStateAfter: kdm.nextDynamicState,
         relationshipState:
           kdm.nextDynamicState.relationship || kdm.trace.relationship,
