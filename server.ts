@@ -705,6 +705,14 @@ app.post("/api/chat", async (req, res) => {
           memoryScope: kairaPolicy.persistentUserMemory ? dialogueAnalysis.memoryScope : "session",
           dialogueAnalysis,
         }) : Promise.resolve(),
+        recordKdmMetric({
+          userId: stateUserId,
+          score: consistency.score,
+          accepted: consistency.accepted,
+          repaired: false,
+          repairAttempts: 0,
+          issues: consistency.issues,
+        }),
         saveKntTrace({
           userId: stateUserId,
           userMessage,
