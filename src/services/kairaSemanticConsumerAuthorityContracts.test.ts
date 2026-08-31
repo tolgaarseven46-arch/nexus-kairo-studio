@@ -30,7 +30,7 @@ describe("canonical SemanticEvent consumer authority", () => {
   });
 
   it("feeds the same canonical event to the local verbalizer", () => {
-    expect(server).toMatch(/dialogueDecision\.move,\s*responsePlan,\s*languageUnderstanding\.event,\s*\)/u);
+    expect(server).toMatch(/dialogueDecision\.move,\s*responsePlan,\s*languageUnderstanding\.event,\s*kairaPolicy\.persistentUserMemory,\s*\)/u);
     expect(local).toContain("semanticEvent?: SemanticEvent");
     expect(local).toContain("localIntentFromSemanticEvent");
     expect(local).not.toContain("function detectIntent(text:");
