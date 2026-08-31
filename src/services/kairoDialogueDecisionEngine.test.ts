@@ -183,6 +183,16 @@ describe("Kaira dialogue decision engine", () => {
     expect(instruction).toContain("hmm, anladım veya hee");
   });
 
+  it("renders final ResponsePlan sentence and word budgets instead of wider dialogue budgets", () => {
+    const plan = planDialogueResponse([], "bu konuda detaylı ne düşünüyorsun?", "Ali");
+    expect(plan.maxSentences).toBe(3);
+    const instruction = buildDialogueDecisionInstruction(plan, true, 1, 6);
+
+    expect(instruction).toContain("Uzunluk bütçesi: en fazla 1 kısa cümle");
+    expect(instruction).toContain("Kelime bütçesi: en fazla 6 kelime");
+    expect(instruction).not.toContain("Uzunluk bütçesi: en fazla 3 kısa cümle");
+  });
+
   it("rejects all three failed real emotional-opening replies", () => {
     const plan = planDialogueResponse(
       [],

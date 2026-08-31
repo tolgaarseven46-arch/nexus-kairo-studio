@@ -586,6 +586,8 @@ app.post("/api/chat", async (req, res) => {
       dialogueDecisionInstruction = buildDialogueDecisionInstruction(
         dialogueDecision,
         responsePlan.allowQuestion,
+        responsePlan.maxSentences,
+        responsePlan.maxWords,
       ),
       enforcementRules = {
         continueConversation: responsePlan.continueConversation,

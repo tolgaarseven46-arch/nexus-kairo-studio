@@ -250,6 +250,8 @@ export function planDialogueResponse(
 export function buildDialogueDecisionInstruction(
   plan: DialogueDecisionPlan,
   effectiveAllowQuestion = plan.allowFollowUpQuestion,
+  effectiveMaxSentences = plan.maxSentences,
+  effectiveMaxWords = plan.maxWords,
 ): string {
   const effectiveReason =
     plan.move === "invite_emotional_context" && !effectiveAllowQuestion
@@ -260,8 +262,8 @@ export function buildDialogueDecisionInstruction(
 - Hedef kişi: ${plan.target || "aktif konuşan/genel sohbet"}
 - Takip sorusu: ${effectiveAllowQuestion ? "gerekiyorsa en fazla bir tane" : "yasak"}
 - Desteksiz tahmin: ${plan.allowSpeculation ? "yalnızca açık şaka bağlamında" : "yasak"}
-- Uzunluk bütçesi: en fazla ${plan.maxSentences} kısa cümle
-- Kelime bütçesi: ${plan.maxWords ? `en fazla ${plan.maxWords} kelime` : "özel sınır yok"}
+- Uzunluk bütçesi: en fazla ${effectiveMaxSentences} kısa cümle
+- Kelime bütçesi: ${effectiveMaxWords ? `en fazla ${effectiveMaxWords} kelime` : "özel sınır yok"}
 - Gerekçe: ${effectiveReason}
 Doğru cevabı verdikten sonra ikinci bir tahmin, seçenek listesi, yeni şaka veya otomatik soru ekleyerek cevabın mantığını BOZMA.`;
 }
