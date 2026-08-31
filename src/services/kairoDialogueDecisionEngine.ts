@@ -60,6 +60,7 @@ const SOCIAL_ONLY_MOVES = new Set<DialogueDecisionPlan["move"]>([
   "invite_emotional_context",
   "acknowledge_correction",
   "repair_or_rephrase",
+  "follow_topic_shift",
 ]);
 const PROCRASTINATION_BANTER_RE =
   /\b(son dakikaya bırak\w*|ertele\w*|geciktir\w*|üşen\w*|yapmayıp bekle\w*)\b/i;
@@ -389,6 +390,7 @@ export function buildGroundedDialogueFallback(
   if (plan.move === "follow_previous_answer") return "he tamam o zaman";
   if (plan.move === "acknowledge_correction") return "he doğru";
   if (plan.move === "natural_reaction") return "he anladım";
+  if (plan.move === "follow_topic_shift") return "he tamam";
   if (plan.move === "join_banter") {
     return PROCRASTINATION_BANTER_RE.test(userMessage)
       ? "yine şaşırtmadın hahah"
