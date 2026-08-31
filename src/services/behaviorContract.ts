@@ -1,4 +1,5 @@
 import type { DroitDynamicState, ReasoningTrace } from "../types/nexus";
+import type { SemanticEvent } from "./semanticEventEngine";
 
 export type BehaviorPermission = "allowed" | "forbidden";
 export type RepairStatus = "none" | "incomplete" | "repairing" | "repaired";
@@ -20,6 +21,7 @@ export interface BehaviorContract {
 export function buildBehaviorContract(
   dynamicState: DroitDynamicState,
   trace?: ReasoningTrace | null,
+  semanticEvent?: Pick<SemanticEvent, "stopTalking" | "stopQuestions"> | null,
 ): BehaviorContract {
   const relationship = dynamicState.relationship;
   const state = (relationship?.conversationState ?? "active") as BehaviorContract["conversationState"];
@@ -28,6 +30,8 @@ export function buildBehaviorContract(
   const repairProgress = Number(relationship?.repairProgress ?? trace?.relationship?.repairProgress ?? 0);
   const repairAttempts = Number(relationship?.repairAttempts ?? trace?.relationship?.repairAttempts ?? 0);
   const unresolvedDamage = hurt >= 20 || conflict >= 20 || repairProgress > 0 || state !== "active";
+  const stopTalking = semanticEvent?.stopTalking === true;
+  const stopQuestions = semanticEvent?.stopQuestions === true;
   const reasons: string[] = [];
 
   if (state === "disengaged") {
@@ -81,18 +85,38 @@ export function buildBehaviorContract(
     };
   }
 
+  if (stopTalking) {
+    reasons.push("Kullanıcı bu tur konuşmanın durmasını açıkça istedi; transient komut kalıcı ilişki disengage üretmeden cevabı kapattı.");
+    return {
+      conversationState: "active",
+      continueConversation: false,
+      playfulness: "forbidden",
+      affection: "forbidden",
+      questions: "forbidden",
+      forgivenessGranted: false,
+      repairStatus: "repaired",
+      reopeningCloseness: "forbidden",
+      stance: "closed",
+      maxResponseLength: "short",
+      reasons,
+    };
+  }
+
   return {
     conversationState: "active",
     continueConversation: true,
     playfulness: "allowed",
     affection: "allowed",
-    questions: "allowed",
+    questions: stopQuestions ? "forbidden" : "allowed",
     forgivenessGranted: true,
     repairStatus: "repaired",
     reopeningCloseness: "allowed",
     stance: "open",
     maxResponseLength: "medium",
-    reasons: ["İlişki aktif ve çözülmemiş hasar eşiği yok."],
+    reasons: [
+      "İlişki aktif ve çözülmemiş hasar eşiği yok.",
+      ...(stopQuestions ? ["Kullanıcı bu tur yeni soru sorulmamasını açıkça istedi."] : []),
+    ],
   };
 }
 
