@@ -858,3 +858,30 @@ Yeni sohbet açıldığında:
 - Ürün entegrasyon commit'i `54154ba`; kalıcı regression `kairaNaturalSocialConsistencyContracts.test.ts`, commit `9fe841c`.
 - CI #1072 architecture contracts, full tests, TypeScript ve production build adımlarının tamamında başarıyla geçti.
 - Sonraki gelişim sorusu koddan yeniden doğrulandı: mevcut ilişki motoru aynı olumsuz olayı farklı ilişki geçmişlerinde tolerans, hasar şiddeti, conversationState ve ton açısından farklılaştırıyor; ancak kişi/ilişki bağlamından açık bir nitel reaction mode (ör. öfkelenme vs küsme/withdrawal) seçen ayrı canonical kavram henüz yok. Bu hedef ayrı characterization + design adımı olarak ele alınmalı.
+
+
+## 80. Relationship injury tolerance completed — 2026-08-31
+- Healthy established relationships now reduce ordinary relationship injury as well as warmth/trust impact.
+- Severe boundary events retain a hard injury floor and disengagement behavior.
+- CI #1078 passed all validation stages.
+
+## 81. Canonical affective reaction mode — 2026-08-31
+- Added canonical modes: neutral, irritated, hurt, withdrawn, repairing.
+- KDM owns the appraisal and stores it in dynamic state and reasoning trace.
+- Relationship context can now change the qualitative HOW state for the same negative event.
+- BehaviorContract remains the only authorization/permission authority.
+- CI #1083 passed all validation stages.
+
+## 82. Reaction-mode AI prompt seam — 2026-08-31
+- The canonical reaction directive is now included in relationshipInstruction, which is already injected by server.ts into the AI system prompt.
+- This exposes qualitative HOW to AI without creating a second prompt authority.
+- CI #1086 passed all validation stages.
+
+## 83. Reaction-mode local-language parity — 2026-08-31
+- Local language now consumes canonical reactionMode instead of relying only on numeric hurt/anger thresholds.
+- hurt/withdrawn remain reserved; repairing stays cautious; irritated contributes to firm local HOW.
+- Language-memory choice context now includes reactionMode.
+- CI #1088 passed all validation stages.
+
+### Next verified development question
+- Verify KNT/debug observability and multi-turn persistence of reactionMode across follow-up neutral/social messages.
