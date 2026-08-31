@@ -7,7 +7,8 @@ const persistence = fs.readFileSync(path.resolve(process.cwd(), "src/services/kd
 
 describe("KAIRA per-turn observability completeness contracts", () => {
   it("persists before/after state and reasoning per turn instead of reconstructing from final session state", () => {
-    expect(server).toContain("dynamicStateBefore: requestState");
+    expect(server).toContain("dynamicStateBefore: effective");
+    expect(server).not.toContain("dynamicStateBefore: requestState");
     expect(server).toContain("dynamicStateAfter: kdm.nextDynamicState");
     expect(server).toContain("reasoningTrace: kdm.trace");
 
