@@ -61,4 +61,16 @@ describe('learned language HOW signal', () => {
 
     expect(languageStyleMemorySignal(userId).preferredMarkers).not.toContain('cidden');
   });
+
+  it('counts repeated marker tokens in one reply as one evidence observation', () => {
+    learnLanguageReply(userId, 'cidden cidden proje uzadı');
+    learnLanguageReply(userId, 'başka bir cevap');
+    learnLanguageReply(userId, 'bir cevap daha');
+
+    expect(languageStyleMemorySignal(userId).maturity).toBe('emerging');
+    expect(languageStyleMemorySignal(userId).preferredMarkers).not.toContain('cidden');
+
+    learnLanguageReply(userId, 'cidden bu da uzadı');
+    expect(languageStyleMemorySignal(userId).preferredMarkers).toContain('cidden');
+  });
 });
