@@ -1,4 +1,5 @@
 import {
+  AffectiveReactionMode,
   DroitDynamicState,
   DroitPersonalityTraits,
   ReasoningTrace,
@@ -477,6 +478,20 @@ export function analyzeKdmInteraction(
   const negativeEventsAfter = negativeEvents + (kind === "negative" ? 1 : 0);
   const unresolvedHurt = hurtAfter >= 20 || conflictAfter >= 20;
   const repeatedProblem = samePattern && repeatCount >= 2;
+  const priorRelationshipDamaged = priorConversationState !== "active" || passivelyHealedHurt >= 20 || passivelyHealedConflict >= 20;
+  const reactionMode: AffectiveReactionMode = conversationState === "disengaged"
+    ? "withdrawn"
+    : conversationState === "repairing" || (repairSignal && unresolvedHurt)
+      ? "repairing"
+      : kind === "negative" && targetsKaira
+        ? priorRelationshipDamaged
+          ? "withdrawn"
+          : closeness >= 60 && (familiarityDays >= 14 || interactionCount >= 20)
+            ? "hurt"
+            : "irritated"
+        : unresolvedHurt
+          ? "hurt"
+          : "neutral";
 
   const neutralStress = approachBaseline(state.stress ?? 20, DEFAULT_DYNAMIC_STATE.stress, 1);
   const neutralHappiness = approachBaseline(state.happiness ?? 70, DEFAULT_DYNAMIC_STATE.happiness, 1);
@@ -554,6 +569,7 @@ export function analyzeKdmInteraction(
     confidence: clamp((state.confidence ?? 70) + confidenceDelta),
     calmness: clamp((state.calmness ?? 70) + calmnessDelta),
     anger: clamp((state.anger ?? 10) + angerDelta),
+    reactionMode,
     relationship: {
       ...relationship,
       lastInteractionAt: interactionAt,
@@ -582,7 +598,7 @@ export function analyzeKdmInteraction(
         : apology
           ? "KDM: özür/telafi"
           : `KDM: ${intent}`,
-      reactionText: `Kişilik etkisi x${personalityImpact.toFixed(2)}; affetme x${forgivenessFactor.toFixed(2)}; güven %${trustAfter}; çatışma %${conflictAfter}; kırgınlık %${hurtAfter}; ilişki=${conversationState}.`,
+      reactionText: `Kişilik etkisi x${personalityImpact.toFixed(2)}; affetme x${forgivenessFactor.toFixed(2)}; güven %${trustAfter}; çatışma %${conflictAfter}; kırgınlık %${hurtAfter}; ilişki=${conversationState}; reaction=${reactionMode}.`,
       deltas: [
         { label: "Stres", key: "stress", value: stressDelta },
         { label: "Mutluluk", key: "happiness", value: happinessDelta },
@@ -618,6 +634,7 @@ export function analyzeKdmInteraction(
     },
     currentMood: {
       moodText: lastStatus,
+      reactionMode,
       reasonText: conversationState === "disengaged"
         ? "İlişki hard-stop sonrasında disengaged durumda; nötr mesaj veya yakınlaşma bu durumu tek turda silemez."
         : conversationState === "repairing"

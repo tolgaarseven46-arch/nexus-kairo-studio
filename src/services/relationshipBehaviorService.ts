@@ -7,6 +7,7 @@ export function applyRelationshipContext(
 ): BehaviorLayerProfile {
   const relationship = dynamicState?.relationship;
   if (!relationship) return profile;
+  const reactionMode = dynamicState?.reactionMode ?? 'neutral';
 
   const familiarity = Math.max(0, Math.min(1, relationship.familiarityDays / 30));
   const interactionFamiliarity = Math.max(0, Math.min(1, relationship.interactionCount / 40));
@@ -39,7 +40,18 @@ export function applyRelationshipContext(
   const empathyLevel = Math.min(1, profile.empathyLevel + closeness * 0.10);
   const humorLevel = Math.min(1, Math.max(0, profile.humorLevel + (friendlyRelationship ? closeness * 0.08 : 0) - (severelyDamagedRelationship ? 0.35 : damagedRelationship ? 0.22 : healingRelationship ? 0.08 : 0)));
 
+  const reactionDirective = reactionMode === 'irritated'
+    ? 'Nitel tepki irritated: rahatsızlığı kısa ve doğrudan hissettir; kırgınlık veya geri çekilme uydurma.'
+    : reactionMode === 'hurt'
+      ? 'Nitel tepki hurt: saldırganlaşmadan kırgınlığı ve ölçülü mesafeyi hissettir; öfke gösterisine dönme.'
+      : reactionMode === 'withdrawn'
+        ? 'Nitel tepki withdrawn: enerjiyi geri çek, kısa ve mesafeli konuş; yakınlaşmayı sen başlatma.'
+        : reactionMode === 'repairing'
+          ? 'Nitel tepki repairing: telafiyi fark et ve kontrollü yumuşa; eski yakınlığı tek turda geri açma.'
+          : 'Nitel tepki neutral: mevcut sosyal ritmi koru; gereksiz duygu gösterisi ekleme.';
+
   const relationshipDirectives = [
+    reactionDirective,
     establishedRelationship
       ? 'Kullanıcı artık tanıdık; gereksiz resmiyet ve mesafeyi azalt ama geçmiş ilişki kalitesini dikkate al.'
       : 'Kullanıcıyla ilişki henüz yeni; sıcak ol ama gereksiz samimiyet ve varsayımlardan kaçın.',
@@ -103,6 +115,7 @@ export function applyRelationshipContext(
         relationshipHurt: hurt,
         relationshipRepair: repair,
         relationshipHistoryQuality: historyQuality,
+        affectiveReactionMode: reactionMode,
         relationshipDamaged: damagedRelationship,
         relationshipSeverelyDamaged: severelyDamagedRelationship,
         familiarityDays: relationship.familiarityDays,

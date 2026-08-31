@@ -1,6 +1,7 @@
 export type NexusTab = 'KARAKTER' | 'TEST' | 'IC_SISTEMLER' | 'AYARLAR';
 
 export type ConversationRelationshipState = 'active' | 'distancing' | 'disengaged' | 'repairing';
+export type AffectiveReactionMode = 'neutral' | 'irritated' | 'hurt' | 'withdrawn' | 'repairing';
 
 export interface RelationshipState {
   firstSeenAt?: string;
@@ -32,7 +33,7 @@ export interface RelationshipState {
 export interface ReasoningTrace {
   whoSent: { userName: string; isNewUser: boolean; recognitionText: string; };
   relationship: { warmthScore: number; warmthLabel: string; note: string; familiarityDays?: number; interactionCount?: number; toleranceMultiplier?: number; trustScore?: number; conflictScore?: number; hurtScore?: number; repairProgress?: number; repeatedNegativeCount?: number; conversationState?: ConversationRelationshipState; repairAttempts?: number; };
-  currentMood: { moodText: string; reasonText: string; };
+  currentMood: { moodText: string; reasonText: string; reactionMode?: AffectiveReactionMode; };
   messageInterpretation: { intent: string; sentiment: string; explanation: string; };
   decision: { chosenTone: string; explanation: string; };
   memoryUpdate: { warmthBefore: number; warmthAfter: number; warmthDelta: number; moodChange: string; reason: string; };
@@ -50,7 +51,7 @@ export interface StructuredDroitPersonality { emotional: { anger: number; patien
 export interface DroitPersonalityTraits { anger: number; patience: number; empathy: number; emotionalSensitivity: number; socialIntelligence: number; selfConfidence: number; humor: number; communication: number; charisma: number; curiosity: number; analyticalThinking: number; creativity: number; decisionMaking: number; attention: number; authority: number; courage: number; seriousness: number; loyalty: number; initiative: number; trust?: number; analytical?: number; [key: string]: number | undefined; }
 export interface DynamicStateDelta { anger?: number; stress?: number; calmness?: number; confidence?: number; happiness?: number; surprise?: number; }
 export interface LastEventReaction { eventTitle: string; reactionText: string; deltas: { label: string; key: string; value: number; }[]; }
-export interface DroitDynamicState { calmness: number; anger: number; stress: number; happiness: number; confidence: number; surprise: number; lastStatus: string; lastEvent?: LastEventReaction; relationship?: RelationshipState; }
+export interface DroitDynamicState { calmness: number; anger: number; stress: number; happiness: number; confidence: number; surprise: number; lastStatus: string; reactionMode?: AffectiveReactionMode; lastEvent?: LastEventReaction; relationship?: RelationshipState; }
 export type DroitExpressionMode = 'NEUTRAL' | 'FOCUSED' | 'ALERT' | 'CALM' | 'ANALYTICAL' | 'FRIENDLY' | 'CONFIDENT';
 export interface TestMessage { id: string; sender: 'user' | 'droit'; text: string; timestamp: string; moodEffect?: string; participantId?: string; participantName?: string; replyToParticipantId?: string; replyToParticipantName?: string; }
 export interface DroitStudioData { id: string; codeName: string; name: string; title: string; personality: DroitPersonalityTraits; dynamicState: DroitDynamicState; expression: DroitExpressionMode; }
