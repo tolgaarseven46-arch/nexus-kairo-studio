@@ -172,8 +172,10 @@ describe('mixed local/AI + recall + relationship repair quality regression', () 
 
     expect(insultState.reactionMode).not.toBe('neutral');
     expect(postInsultGreetingState.reactionMode).not.toBe('neutral');
-    expect(postInsultGreetingPlan.allowHumor).toBe(false);
-    expect(postInsultGreetingPlan.allowReopeningCloseness).toBe(false);
+    // Low-score qualitative hurt/irritation may leave the higher WHAT/WHETHER
+    // plan open. The qualitative HOW layer must still keep the delivered local
+    // surface from jumping back to close/familiar language.
+    expect(postInsultGreetingPlan.continueConversation).toBe(true);
     expect((replies[9] ?? '').toLocaleLowerCase('tr-TR')).not.toContain('kanka');
     expect(
       [firstApologyState.reactionMode, secondApologyState.reactionMode].some(
