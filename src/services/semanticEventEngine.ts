@@ -107,21 +107,21 @@ const AFFECTION_RE = word("bebeğim|bebegim|aşkım|askım|tatlım|sevgilim");
 const FRUSTRATION_RE = /(yeter|bıktım|sinir|aynı şeyi|kaç kere|neden anlamıyorsun|niye anlamıyorsun|saçmalıyorsun|saçmalıyor)/u;
 const CONFUSION_RE = /(ne diyon|ne diyorsun|ne anlatıyosun|ne anlatıyorsun|ne alaka|nasıl yani|bi şey anlamadım|bir şey anlamadım)/u;
 const VENTING_PROFANITY_RE = word("amk|aq|mk");
-const EMOTIONAL_SHARE_RE = /(moralim.{0,30}bozuk|üzgünüm|çok mutluyum|mutluyum|bunaldım|canım (?:çok )?sıkkın|kendimi (?:çok )?kötü hissediyorum|kendimi (?:çok )?iyi hissediyorum|kaygılıyım|endişeliyim|yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|moodum düşük|keyfim yerinde değil|içim sıkılıyor)/u;
-const LOW_MOOD_RE = /(moralim.{0,30}bozuk|üzgün|kötü hissed|bunaldım|canım (?:çok )?sıkkın|kaygı|endişe|stres|yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|moodum düşük|keyfim yerinde değil|içim sıkılıyor)/u;
+const EMOTIONAL_SHARE_RE = /(moralim.{0,30}bozuk|moral yok|üzgünüm|çok mutluyum|mutluyum|bunaldım|çok bunaldım|canım (?:çok )?sıkkın|kendimi (?:çok )?kötü hissediyorum|kendimi (?:çok )?iyi hissediyorum|kaygılıyım|endişeliyim|yoruldum|çok yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|mod düşük|moodum düşük|enerjim yok|keyfim yerinde değil|içim sıkılıyor|içim daraldı)/u;
+const LOW_MOOD_RE = /(moralim.{0,30}bozuk|moral yok|üzgün|kötü hissed|bunaldım|canım (?:çok )?sıkkın|kaygı|endişe|stres|yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|mod düşük|moodum düşük|enerjim yok|keyfim yerinde değil|içim sıkılıyor|içim daraldı)/u;
 const INFORMATION_REQUEST_RE = /(?:^|\s)(neden|niye|nasıl|nedir|ne demek|kim|kime|kimi|hangi|hangisi|nerede|neresi)(?:\s|$|[?.!,])/u;
 const RECALL_QUESTION_RE = /(?:^|\s)(?:neydi|ne yapacaktı)(?:\s|$|[?.!,])|ne\s+yapmayı\s+düşünüyordu|hatırlıyor\s+musun|hatırladın\s+mı|az önce ne dedi|ne demişti|ne söylemişti|kim söylemişti/u;
 const CORRECTION_RE = /(?:^|\s)(?:yok|hayır|yanlış|değil|değildi|ben değildim|o ben değildim|onu demedim|öyle demedim|demek istemedim|düzelteyim|düzeltiyorum)(?:\s|$|[?.!,])/u;
 const TOPIC_SHIFT_RE = /(?:^|\s)(?:bu arada|neyse|konu dışı|şey diyeceğim|şey dicem|onu boşver|geç onu)(?:\s|$|[?.!,])/u;
 
 function inferSocialRoutine(text: string, intent: SemanticIntent): SemanticSocialRoutine {
-  if (/^(?:selam|merhaba|hey|heyy)(?:\s+(?:kaira|kairo|kanka|aga|lan))?[.!?…]*$/u.test(text)) return "greeting";
-  if (/^(?:naber|nabr|nber|nasılsın)(?:\s+(?:kaira|kairo|kanka|aga|lan))?[.!?…]*$/u.test(text)) return "how_are_you";
-  if (/^(?:ne yapıyorsun|napıyorsun|napıyon|napion|napiyon)(?:\s+(?:kaira|kairo|kanka|aga|lan))?[.!?…]*$/u.test(text)) return "what_doing";
-  if (/^(?:sağol|sağ ol|teşekkürler|teşekkür ederim|eyvallah|thx)[.!?…]*$/u.test(text)) return "thanks";
-  if (/^(?:aynen|evet|he|hıhı|tamam|ok|okey)[.!?…]*$/u.test(text)) return "agreement";
-  if (/^(?:görüşürüz|bb|bay bay|hoşça kal)[.!?…]*$/u.test(text)) return "goodbye";
-  if (/^(?:iyi geceler|ig)[.!?…]*$/u.test(text)) return "good_night";
+  if (/^(?:selam|selamlar|merhaba|hey|heyy|günaydın|gunaydin)(?:\s+(?:kaira|kairo|kanka|aga|lan))?[.!?…]*$/u.test(text)) return "greeting";
+  if (/^(?:naber|nabr|nber|nasılsın|nasıl gidiyor|nasil gidiyor|ne var ne yok|keyifler nasıl|keyifler nasil)(?:\s+(?:kaira|kairo|kanka|aga|lan))?[.!?…]*$/u.test(text)) return "how_are_you";
+  if (/^(?:ne yapıyorsun|ne yapiyorsun|napıyorsun|napıyosun|napiyorsun|napiyosun|napıyon|napion|napiyon)(?:\s+(?:kaira|kairo|kanka|aga|lan))?[.!?…]*$/u.test(text)) return "what_doing";
+  if (/^(?:sağol|sağ ol|saol|saolasın|sağolasın|teşekkür|teşekkürler|teşekkür ederim|eyvallah|eyw|thx)[.!?…]*$/u.test(text)) return "thanks";
+  if (/^(?:aynen|aynen öyle|evet|he|hıhı|tamam|tamamdır|olur|oldu|ok|okey)[.!?…]*$/u.test(text)) return "agreement";
+  if (/^(?:görüşürüz|görüşmek üzere|hadi görüşürüz|bb|bay bay|hoşça kal|kaçtım ben|kaçarım)[.!?…]*$/u.test(text)) return "goodbye";
+  if (/^(?:iyi geceler|iyi uykular|geceler|ig)[.!?…]*$/u.test(text)) return "good_night";
   if (intent === "emotional_share") return "emotional_opening";
   return "none";
 }
