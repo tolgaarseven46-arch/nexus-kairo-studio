@@ -11,6 +11,9 @@ const RHYTHM_SENSITIVE_MOVES = new Set<DialogueMove>([
   "follow_topic_shift",
 ]);
 
+const GENERIC_ASSISTANT_DRIFT_RE = /\b(?:elbette|memnuniyetle|size yardımcı|yardımcı olmaktan memnun|nasıl yardımcı olabilirim|başka bir konuda yardımcı|bu konuda size|dilerseniz|arzu ederseniz|özetlemek gerekirse|sonuç olarak|bu bağlamda)\b/iu;
+const SOCIAL_LIST_DRIFT_RE = /(?:^|\n)\s*(?:[-*•]|\d+[.)])\s+/u;
+
 function normalizeReply(text: string): string {
   return String(text || "")
     .toLocaleLowerCase("tr-TR")
@@ -30,8 +33,21 @@ export function findKairoResponseRhythmIssues(
 ): string[] {
   if (move && !RHYTHM_SENSITIVE_MOVES.has(move)) return [];
 
-  const normalized = normalizeReply(reply);
-  if (!normalized || normalized.length < 18 || wordCount(normalized) < 4) return [];
+  const issues: string[] = [];
+  const raw = String(reply || "").trim();
+  const normalized = normalizeReply(raw);
+
+  if (GENERIC_ASSISTANT_DRIFT_RE.test(raw)) {
+    issues.push("Kaira sosyal cevapta generic/formal asistan diline kaydı");
+  }
+  GENERIC_ASSISTANT_DRIFT_RE.lastIndex = 0;
+
+  if (SOCIAL_LIST_DRIFT_RE.test(raw)) {
+    issues.push("Kaira doğal sosyal tepkiyi liste/rapor formatına çevirdi");
+  }
+  SOCIAL_LIST_DRIFT_RE.lastIndex = 0;
+
+  if (!normalized || normalized.length < 18 || wordCount(normalized) < 4) return issues;
 
   const recentKairaReplies = (Array.isArray(history) ? history : [])
     .filter((turn) => turn?.sender === "droit")
@@ -39,7 +55,9 @@ export function findKairoResponseRhythmIssues(
     .map((turn) => normalizeReply(String(turn.text || "")))
     .filter(Boolean);
 
-  return recentKairaReplies.includes(normalized)
-    ? ["Kaira son mesajlarından birini anlamlı uzunlukta aynen tekrar etti"]
-    : [];
+  if (recentKairaReplies.includes(normalized)) {
+    issues.push("Kaira son mesajlarından birini anlamlı uzunlukta aynen tekrar etti");
+  }
+
+  return issues;
 }
