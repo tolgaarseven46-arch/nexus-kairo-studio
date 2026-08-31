@@ -1,0 +1,38 @@
+name: One-time authority audit state record
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Record completed authority audit
+        shell: bash
+        run: |
+          cat >> PROJECT_STATE.md <<'EOF'
+
+
+## 66. Value/boundary overlap + repair reopening authority — 2026-08-31
+- Section 65'in açık kalan iki cross-family authority adayı birlikte kapatıldı: value-vs-boundary overlap ve repair reopening altında warmth/goal/preference/expression baskısı.
+- Kalıcı `kairaValueBoundaryRepairAuthorityContracts.test.ts` eklendi.
+- Aynı olay hem güçlü boundary hem güçlü value pressure ürettiğinde canonical öncelik sırası korunur: boundary gate aşılmışsa `boundary`, boundary gate aşılmamış fakat value gate aşılmışsa `values` seçilir. Value çatışması güçlü bir boundary kararını geri açamaz; boundary oluşmadığında ise değer katmanı bağımsız firm davranış otoritesi olarak kalır.
+- `repairing` ilişki durumu altında maksimum affiliation/care/approach/engagement/humor ve tam repair openness verilse bile normal yakınlık anında geri açılmaz: humor ve soru kapalı, yanıt kısa, stance distant, distance en az 0.68 ve warmth en fazla 0.24 kalır.
+- `disengaged` durumdan uygun apology/repair sinyaliyle geçiş yalnız repairing hold'a açılır; doğrudan normal warm ilişkiye sıçrama yoktur. Hard-stop boundary ise repair sinyalini ve alt katman sıcaklığını tamamen bloke eder.
+- Bu auditte ürün kodu değişikliği gerekmedi; mevcut `behaviorIntegrationEngine` otorite semantiği beklenen contractları zaten sağlıyordu.
+- Entegrasyon commit'i: `e156c47` (`test(kaira): lock value boundary repair authority`). Normal CI architecture contracts, full tests, TypeScript ve production build ile tamamen yeşil geçti.
+- Repo açık issue taşımıyor ve TODO code search'te açık kayıt bulunmadı. Section 65'te kayıtlı mevcut cross-family authority audit dalının bilinen açık işleri bu bölümle tamamlandı.
+EOF
+          rm .github/workflows/one-time-record-value-boundary-repair.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md .github/workflows/one-time-record-value-boundary-repair.yml
+          git commit -m "docs(kaira): record completed authority audit"
+          git push
