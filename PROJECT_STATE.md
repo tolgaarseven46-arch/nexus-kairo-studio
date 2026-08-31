@@ -751,3 +751,15 @@ Yeni sohbet açıldığında:
 - İlgili commitler: `eddec110` (focused social permission narrowing), `728e346` (focused permission tests), `a8d1ed85` (effective emotional question permission), `14ba9827` (parity contract), final server entegrasyonu `780f997` (`fix(kaira): align emotional question permission seam`).
 - One-time entegrasyon run'ında targeted 10/10 test, full regression 657/657 test, TypeScript ve production build başarıyla geçti. Geçici workflow entegrasyon commit'inde silindi.
 - Sonraki baseline audit adayı: `buildDialogueDecisionInstruction(...)` final ResponsePlan oluşmadan hazırlanıyor. Dialogue plan soru iznine izin verirken final ResponsePlan bunu kapatırsa model prompt'una çelişkili takip-sorusu talimatı yazılıp yazılmadığı koddan doğrulanacak; validator düzeldi diye prompt contradiction varsayılmayacak.
+
+
+## 68. Explicit semantic stop → final ResponsePlan authority — 2026-08-31
+- Baseline audit, section 65'teki `stopTalking` fix'inin final server WHAT/WHETHER sınırına kadar taşınmadığını ortaya çıkardı. Client `behaviorIntegrationEngine` `sus artık` için `continueConversation=false` üretiyordu; ancak bu komut bilinçli olarak persistent relationship `disengaged` state'ine yazılmadığı için server `BehaviorContract` yalnız dynamic state'ten yeniden `continueConversation=true` üretebiliyordu.
+- Fix canonical server semantiğinde yapıldı: `buildBehaviorContract(...)` artık optional canonical `SemanticEvent` stop facet'lerini (`stopTalking`, `stopQuestions`) transient daraltıcı girdi olarak alır. Client behavior-policy bu final izin için güven kaynağı yapılmadı.
+- `stopTalking=true` aktif ilişkiyi persistent disengaged yapmaz; contract `conversationState=active` kalırken yalnız mevcut tur için `continueConversation=false`, questions/playfulness/affection/reopening forbidden, forgiveness false, stance closed ve short response üretir. Böylece sonraki tur ilişki state'i gereksiz kalıcı kapanmaya uğramaz.
+- `stopQuestions=true` ise aktif konuşmayı açık bırakır ve yalnız questions iznini forbidden yapar.
+- `server.ts` canonical `canonicalSemantic.event` nesnesini BehaviorContract'a taşır; `KairaResponsePlan` final tek WHAT/WHETHER otoritesi olarak aynı contract'tan türemeye devam eder.
+- Kalıcı regression contract: `kairaExplicitSemanticResponsePlanAuthorityContracts.test.ts`. `sus artık` ve `soru sorma artık` için contract→plan semantiğini ve server canonical seam'ini kilitler.
+- İlgili commitler: `35d92a4` (canonical semantic event server seam), `e007578` (BehaviorContract transient stop semantics), `5fc0a1d` (permanent regression contract).
+- CI #1028 architecture contracts, full tests, TypeScript ve production build adımlarının tamamında başarıyla geçti.
+- Sonraki audit odağı: explicit semantic command'ların final delivery fallback/enforcer zincirinde de aynı transient contract'ı koruduğunu gerçek cevap örnekleriyle doğrulamak; özellikle `stopTalking` için fallback'in yeni soru, mizah veya yeniden yakınlaşma üretmediğini kilitlemek.
