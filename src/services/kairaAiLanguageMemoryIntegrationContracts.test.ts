@@ -17,13 +17,14 @@ describe('final accepted language-memory integration', () => {
     const server = await readFile('server.ts', 'utf8');
     const localConsistencyIndex = server.indexOf('localBaseConsistency = validateKairoResponse');
     const localLearningIndex = server.indexOf('learnLanguageReply(stateUserId, reply)', localConsistencyIndex);
-    const localPersistenceIndex = server.indexOf('postStart = now()', localConsistencyIndex);
+    const localPersistenceIndex = server.indexOf('const postStart = now()', localConsistencyIndex);
 
     expect(localConsistencyIndex).toBeGreaterThanOrEqual(0);
     expect(localLearningIndex).toBeGreaterThan(localConsistencyIndex);
     expect(localPersistenceIndex).toBeGreaterThan(localLearningIndex);
     expect(server.slice(localConsistencyIndex, localLearningIndex)).toContain('consistency = {');
     expect(server.slice(localLearningIndex - 120, localLearningIndex)).toContain('kairaPolicy.persistentUserMemory && consistency.accepted');
+    expect(server.slice(localLearningIndex, localPersistenceIndex + 24)).toContain('const postStart = now();');
   });
 
   it('keeps the local verbalizer free of pre-delivery learning side effects', async () => {
