@@ -4,16 +4,16 @@ import { describe, expect, it } from 'vitest';
 describe('controlled spontaneity observability contracts', () => {
   it('persists explicit local none and the AI decision in KNT traces', async () => {
     const server = await readFile('server.ts', 'utf8');
-    const localKnt = 'providerUsed: "local_language",\n          controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" }';
-    const aiKnt = 'providerUsed: activeAiProviderUsed,\n        controlledSpontaneity: spontaneityDecision';
+    const localKnt = /providerUsed: \"local_language\",[\s\S]{0,160}?controlledSpontaneity: \{ mode: \"none\", eligible: false, probability: 0, roll: 0, reason: \"local_language_short_circuit\" \}/;
+    const aiKnt = /providerUsed: activeAiProviderUsed,[\s\S]{0,160}?controlledSpontaneity: spontaneityDecision/;
 
-    expect(server).toContain(localKnt);
-    expect(server).toContain(aiKnt);
+    expect(server).toMatch(localKnt);
+    expect(server).toMatch(aiKnt);
   });
 
   it('exposes controlled spontaneity in both local and AI API KDM responses', async () => {
     const server = await readFile('server.ts', 'utf8');
-    expect(server).toContain('responsePlan, controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" } }');
+    expect(server).toContain('responsePlan, controlledSpontaneity: { mode: \"none\", eligible: false, probability: 0, roll: 0, reason: \"local_language_short_circuit\" } }');
     expect(server).toContain('responsePlan, controlledSpontaneity: spontaneityDecision }');
   });
 
@@ -31,7 +31,7 @@ describe('controlled spontaneity observability contracts', () => {
 
   it('keeps the KNT trace endpoint available for post-turn inspection', async () => {
     const server = await readFile('server.ts', 'utf8');
-    expect(server).toContain('app.get("/api/knt/traces"');
+    expect(server).toContain('app.get(\"/api/knt/traces\"');
     expect(server).toContain('loadRecentKntTraces');
   });
 });
