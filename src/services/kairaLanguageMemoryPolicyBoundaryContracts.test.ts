@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   chooseLanguageReply,
   getLanguageMemory,
+  languageMemorySummary,
   languageStyleMemoryInstruction,
   languageStyleMemorySignal,
   learnLanguageReply,
@@ -43,6 +44,17 @@ describe('language-memory policy read boundary', () => {
     expect(gated).toBe(cold);
   });
 
+  it('hides stale learned state from summaries when learned-memory reads are disabled', () => {
+    const userId = 'memory-read-policy-summary-trained';
+    for (let i = 0; i < 8; i += 1) learnLanguageReply(userId, `iyidir kanka senden ${i}`);
+
+    expect(languageMemorySummary(userId, true).interactionCount).toBeGreaterThan(0);
+    const gated = languageMemorySummary(userId, false);
+    expect(gated.interactionCount).toBe(0);
+    expect(gated.persistent).toBe(false);
+    expect(gated.recentReplies).toEqual([]);
+  });
+
   it('wires persistentUserMemory into every learned language read on the server path', async () => {
     const server = await readFile('server.ts', 'utf8');
     expect(server).toContain('languageStyleMemorySignal(stateUserId, kairaPolicy.persistentUserMemory)');
@@ -54,5 +66,17 @@ describe('language-memory policy read boundary', () => {
     const local = await readFile('src/services/kairoLocalLanguageEngine.ts', 'utf8');
     expect(local).toContain('useLearnedMemory = true');
     expect(local).toContain('useLearnedMemory,\n  );');
+  });
+
+  it('gates language-memory debug hydration and summary reads by the resolved instance policy', async () => {
+    const server = await readFile('server.ts', 'utf8');
+    const routeStart = server.indexOf('app.get("/api/kaira/language-memory"');
+    const routeEnd = server.indexOf('app.get("/api/test-sessions/active"', routeStart);
+    const route = server.slice(routeStart, routeEnd);
+
+    expect(routeStart).toBeGreaterThanOrEqual(0);
+    expect(route).toContain('const policy = instancePolicy(instance.instanceType)');
+    expect(route).toContain('if (policy.persistentUserMemory) await hydrateLanguageMemory(scopedUserId)');
+    expect(route).toContain('languageMemorySummary(scopedUserId, policy.persistentUserMemory)');
   });
 });
