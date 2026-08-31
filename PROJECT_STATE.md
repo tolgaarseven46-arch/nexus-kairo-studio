@@ -541,3 +541,15 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `41661f9` (`fix(kaira): carry expression style into speech identity`).
 - Geçici one-time workflow ve üç migration/test helper script kaldırıldı.
 - Sonraki audit odağı: key-level wiring'i geçmiş diğer fine-tune katmanlarında da semantik sinyalin end-to-end hayatta kalıp kalmadığını ölçmek. Özellikle motivation/preferences/social çıktılarında tek tek slider etkilerinin aggregate pressure veya responsePersonality içinde gerçekten ölçülebilir downstream fark üretip üretmediği kontrol edilmeli; raw alanın doğrudan taşınmaması tek başına bug sayılmamalı.
+
+
+## 50. Recognition motivation downstream wiring — 2026-08-31
+- Deep fine-tune audit found `motivation.social.recognition` was key-level wired but behaviorally dead: it changed `approvalDrive`, while `approvalDrive` was not consumed by behavior integration, legacy personality, or server prompt/policy.
+- Recognition need now contributes a bounded contextual bias to `approachPressure` only when a recognition opportunity is present. The bias is centered on the neutral 50 value, so default/backward-compatible behavior remains unchanged at 50.
+- High recognition need can therefore make Kaira slightly more approach-oriented in an actual praise/takdir context; low recognition need can slightly reduce that approach tendency. Recognition alone cannot create approach pressure when no recognition opportunity exists.
+- This preserves the architecture rule that stable motivation values are needs/priorities, not direct behavior commands. They still require a matching situation before affecting integrated behavior.
+- Added `kairaRecognitionMotivationWiringContracts.test.ts` to verify CharacterTab key mapping, downstream approach differentiation under recognition opportunity, and no meaningful effect without recognition opportunity.
+- Targeted contracts, TypeScript, full regression, production build and integration commit all passed in the one-time migration workflow.
+- Integration commit: `27b0c72` (`fix(kaira): wire recognition motivation downstream`).
+- Temporary recognition migration workflow and helper script were removed after successful integration.
+- Next deep-audit focus: remaining motivation, preference and social outputs should be checked for the same pattern: key-level read is insufficient; each slider must produce a measurable downstream difference only in a context where its semantic meaning is relevant.
