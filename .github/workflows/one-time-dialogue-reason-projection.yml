@@ -1,0 +1,57 @@
+name: One-time effective dialogue reason projection
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Remove contradictory emotional prompt reason
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/services/kairoDialogueDecisionEngine.ts')
+          s = p.read_text()
+          old = '''export function buildDialogueDecisionInstruction(\n  plan: DialogueDecisionPlan,\n  effectiveAllowQuestion = plan.allowFollowUpQuestion,\n): string {\n  return `DİYALOG KARARI:\n'''
+          new = '''export function buildDialogueDecisionInstruction(\n  plan: DialogueDecisionPlan,\n  effectiveAllowQuestion = plan.allowFollowUpQuestion,\n): string {\n  const effectiveReason =\n    plan.move === "invite_emotional_context" && !effectiveAllowQuestion\n      ? "İlk duygusal açılışta soru sorma; yalnızca tek kısa kabul tepkisi üret: hmm, anladım veya hee. Teselli, tavsiye, lakap, espri, fiziksel yakınlık veya yeni sosyal anlam ekleme."\n      : plan.reason;\n  return `DİYALOG KARARI:\n'''
+          if old not in s:
+              raise SystemExit('instruction function marker not found')
+          s = s.replace(old, new, 1)
+          s = s.replace('- Gerekçe: ${plan.reason}', '- Gerekçe: ${effectiveReason}', 1)
+          old_extra = '${plan.move === "invite_emotional_context" && !effectiveAllowQuestion ? "- Üst davranış otoritesi soru iznini kapattı: merak sorusu yerine yalnız kısa kabul tepkisi kullan (hmm/anladım/hee).\\n" : ""}'
+          if old_extra not in s:
+              raise SystemExit('extra effective-question marker not found')
+          s = s.replace(old_extra, '', 1)
+          p.write_text(s)
+
+          t = Path('src/services/kairoDialogueDecisionEngine.test.ts')
+          ts = t.read_text()
+          marker = '''    expect(instruction).not.toContain("Takip sorusu: gerekiyorsa en fazla bir tane");\n'''
+          replacement = marker + '''    expect(instruction).not.toContain("hmm niye");\n    expect(instruction).not.toContain("ne oldu");\n    expect(instruction).toContain("hmm, anladım veya hee");\n'''
+          if marker not in ts:
+              raise SystemExit('test marker not found')
+          t.write_text(ts.replace(marker, replacement, 1))
+          PY
+          npm install
+          npx vitest run src/services/kairoDialogueDecisionEngine.test.ts src/services/kairaEmotionalQuestionPermissionContracts.test.ts src/services/kairaResponsePlan.test.ts
+          npx tsc --noEmit
+          npm test
+          npm run build
+          rm .github/workflows/one-time-dialogue-reason-projection.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kairoDialogueDecisionEngine.ts src/services/kairoDialogueDecisionEngine.test.ts .github/workflows/one-time-dialogue-reason-projection.yml
+          git commit -m "fix(kaira): project dialogue reason from final question authority"
+          git push
