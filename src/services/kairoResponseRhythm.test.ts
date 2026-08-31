@@ -12,6 +12,7 @@ describe("Kaira response rhythm", () => {
       findKairoResponseRhythmIssues(
         "valla bugün biraz yoruldum ben de",
         history("Valla bugün biraz yoruldum ben de."),
+        "natural_reaction",
       ),
     ).toContain("Kaira son mesajlarından birini anlamlı uzunlukta aynen tekrar etti");
   });
@@ -21,13 +22,14 @@ describe("Kaira response rhythm", () => {
       findKairoResponseRhythmIssues(
         "bugün   baya yoğun geçti ya",
         history("Bugün baya yoğun geçti ya..."),
+        "natural_reaction",
       ),
     ).toHaveLength(1);
   });
 
   it("allows short conversational acknowledgements to repeat naturally", () => {
-    expect(findKairoResponseRhythmIssues("tamam", history("tamam"))).toEqual([]);
-    expect(findKairoResponseRhythmIssues("aynen ya", history("aynen ya"))).toEqual([]);
+    expect(findKairoResponseRhythmIssues("tamam", history("tamam"), "natural_reaction")).toEqual([]);
+    expect(findKairoResponseRhythmIssues("aynen ya", history("aynen ya"), "natural_reaction")).toEqual([]);
   });
 
   it("does not flag a different substantial reply", () => {
@@ -35,6 +37,27 @@ describe("Kaira response rhythm", () => {
       findKairoResponseRhythmIssues(
         "bugün biraz daha sakin geçti bence",
         history("valla bugün biraz yoruldum ben de"),
+        "natural_reaction",
+      ),
+    ).toEqual([]);
+  });
+
+  it("allows a repeated factual answer outside rhythm-sensitive social moves", () => {
+    expect(
+      findKairoResponseRhythmIssues(
+        "cevap yine aynı çünkü gerçek değişmedi",
+        history("cevap yine aynı çünkü gerçek değişmedi"),
+        "answer_or_clarify",
+      ),
+    ).toEqual([]);
+  });
+
+  it("allows repeated grounded recall when the supported memory is unchanged", () => {
+    expect(
+      findKairoResponseRhythmIssues(
+        "Mert yarın istifa etmeyi düşündüğünü söyledi",
+        history("Mert yarın istifa etmeyi düşündüğünü söyledi"),
+        "grounded_recall",
       ),
     ).toEqual([]);
   });
