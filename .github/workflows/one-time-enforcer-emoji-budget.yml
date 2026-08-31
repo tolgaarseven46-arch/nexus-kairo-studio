@@ -1,0 +1,71 @@
+name: One-time canonical enforcer emoji budget
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Align deterministic enforcer with ResponsePlan emoji budget
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/services/kairoResponseConsistency.ts')
+          s = p.read_text()
+          old_iface = '''  askQuestion?: boolean;\n  emojiLevel?: number;\n  conversationState?: string;'''
+          new_iface = '''  askQuestion?: boolean;\n  emojiLevel?: number;\n  emojiBudget?: number;\n  conversationState?: string;'''
+          if old_iface not in s:
+              raise SystemExit('enforcement interface marker not found')
+          s = s.replace(old_iface, new_iface, 1)
+          old_vars = '''  const askQuestion = rules.askQuestion !== false;\n  const emojiLevel = Number.isFinite(rules.emojiLevel) ? Number(rules.emojiLevel) : 100;'''
+          new_vars = '''  const askQuestion = rules.askQuestion !== false;\n  const emojiLevel = Number.isFinite(rules.emojiLevel) ? Number(rules.emojiLevel) : 100;\n  const emojiBudget = Number.isFinite(rules.emojiBudget)\n    ? Math.max(0, Math.floor(Number(rules.emojiBudget)))\n    : emojiLevel <= 0\n      ? 0\n      : Number.POSITIVE_INFINITY;'''
+          if old_vars not in s:
+              raise SystemExit('enforcement emoji vars marker not found')
+          s = s.replace(old_vars, new_vars, 1)
+          old_gate = '''  if (emojiLevel <= 0 && EMOJI_RE.test(text)) {\n    EMOJI_RE.lastIndex = 0;\n    text = text.replace(EMOJI_RE, '').replace(/\\s{2,}/g, ' ').trim();\n    reasons.push('emoji_blocked');\n  }\n  EMOJI_RE.lastIndex = 0;'''
+          new_gate = '''  const emojis = text.match(EMOJI_RE) || [];\n  EMOJI_RE.lastIndex = 0;\n  if (emojis.length > emojiBudget) {\n    let kept = 0;\n    text = text\n      .replace(EMOJI_RE, (emoji) => {\n        if (kept < emojiBudget) {\n          kept += 1;\n          return emoji;\n        }\n        return '';\n      })\n      .replace(/\\s{2,}/g, ' ')\n      .trim();\n    reasons.push('emoji_budget_enforced');\n  }\n  EMOJI_RE.lastIndex = 0;'''
+          if old_gate not in s:
+              raise SystemExit('enforcement emoji gate marker not found')
+          p.write_text(s.replace(old_gate, new_gate, 1))
+
+          server = Path('server.ts')
+          ss = server.read_text()
+          old_rules = '''        behaviorContract,\n        emojiLevel: speech.emojiLevel,\n        conversationState: kdm.nextDynamicState.relationship?.conversationState,'''
+          new_rules = '''        behaviorContract,\n        emojiLevel: speech.emojiLevel,\n        emojiBudget: responsePlan.emojiBudget,\n        conversationState: kdm.nextDynamicState.relationship?.conversationState,'''
+          if old_rules not in ss:
+              raise SystemExit('server enforcement rules marker not found')
+          server.write_text(ss.replace(old_rules, new_rules, 1))
+
+          t = Path('src/services/kairoResponseConsistency.enforcement.test.ts')
+          ts = t.read_text()
+          ts = ts.replace('expect(result.reasons).toContain("emoji_blocked");', 'expect(result.reasons).toContain("emoji_budget_enforced");', 1)
+          marker = '''  it("blocks questions when KDM askQuestion is false", () => {\n'''
+          addition = '''  it("enforces final ResponsePlan emoji budget even when speech emoji level is positive", () => {\n    const result = enforceKairoResponse("tamam 😄 🤝", trace(), {\n      emojiLevel: 50,\n      emojiBudget: 0,\n    });\n    expect(result.reply).toBe("tamam");\n    expect(result.reasons).toContain("emoji_budget_enforced");\n  });\n\n  it("keeps only the allowed number of emoji when the final budget is positive", () => {\n    const result = enforceKairoResponse("tamam 😄 🤝", trace(), {\n      emojiLevel: 50,\n      emojiBudget: 1,\n    });\n    expect((result.reply.match(/\\p{Extended_Pictographic}/gu) || []).length).toBe(1);\n    expect(result.reasons).toContain("emoji_budget_enforced");\n  });\n\n'''
+          if marker not in ts:
+              raise SystemExit('enforcement test marker not found')
+          t.write_text(ts.replace(marker, addition + marker, 1))
+          PY
+          npm install
+          npx vitest run src/services/kairoResponseConsistency.enforcement.test.ts src/services/kairaResponsePlan.test.ts src/services/kairoDialogueDecisionEngine.test.ts
+          npx tsc --noEmit
+          npm test
+          npm run build
+          rm .github/workflows/one-time-enforcer-emoji-budget.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kairoResponseConsistency.ts src/services/kairoResponseConsistency.enforcement.test.ts server.ts .github/workflows/one-time-enforcer-emoji-budget.yml
+          git commit -m "fix(kaira): enforce final response emoji budget early"
+          git push
