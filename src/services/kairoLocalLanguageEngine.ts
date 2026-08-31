@@ -29,12 +29,7 @@ export interface LocalLanguageResult {
   normalization?: ReturnType<typeof normalizeKairoLanguageInput>;
 }
 
-function localIntentFromSemanticEvent(
-  message: string,
-  semanticEvent?: SemanticEvent,
-): LocalIntent | null {
-  const event = semanticEvent ?? interpretSemanticEvent(message);
-  if (event.adviceRequested) return null;
+function localIntentFromEvent(event: SemanticEvent): LocalIntent | null {
   switch (event.socialRoutine) {
     case "greeting": return "greeting";
     case "how_are_you": return "how_are_you";
@@ -53,6 +48,49 @@ function localIntentFromSemanticEvent(
   }
 }
 
+function canUseCanonicalRoutineFallback(event: SemanticEvent): boolean {
+  const discourseAct = event.discourseAct ?? "none";
+  return (
+    (event.intent === "general_chat" || event.intent === "greeting") &&
+    (event.socialRoutine ?? "none") === "none" &&
+    discourseAct === "none" &&
+    !event.adviceRequested &&
+    !event.insult &&
+    !event.redLine &&
+    !event.apology &&
+    !event.repairAttempt &&
+    !event.stopQuestions &&
+    !event.stopTalking &&
+    event.coercion <= 0 &&
+    event.manipulation <= 0 &&
+    event.privacyViolation <= 0 &&
+    event.emotionalLoad <= 0
+  );
+}
+
+function localIntentFromSemanticEvent(
+  message: string,
+  semanticEvent: SemanticEvent | undefined,
+  normalization: ReturnType<typeof normalizeKairoLanguageInput>,
+): LocalIntent | null {
+  const event = semanticEvent ?? interpretSemanticEvent(message);
+  if (event.adviceRequested) return null;
+
+  const directIntent = localIntentFromEvent(event);
+  if (directIntent) return directIntent;
+
+  const canonical = normalization.canonical.trim();
+  if (
+    canonical === normalization.normalized ||
+    normalization.confidence < 0.85 ||
+    !canUseCanonicalRoutineFallback(event)
+  ) return null;
+
+  const canonicalEvent = interpretSemanticEvent(canonical);
+  if (canonicalEvent.adviceRequested) return null;
+  return localIntentFromEvent(canonicalEvent);
+}
+
 const runtimeFlag = (personality: DroitPersonalityTraits, key: string, fallback: boolean) => {
   const value = personality[key];
   return typeof value === "number" ? value >= 50 : fallback;
@@ -69,7 +107,7 @@ export function tryLocalKairoReply(
   semanticEvent?: SemanticEvent,
 ): LocalLanguageResult {
   const normalization = normalizeKairoLanguageInput(message);
-  const intent = localIntentFromSemanticEvent(message, semanticEvent);
+  const intent = localIntentFromSemanticEvent(message, semanticEvent, normalization);
   if (!intent) return { handled: false, confidence: 0, source: "ai", normalization };
 
   const continueConversation = responsePlan?.continueConversation
