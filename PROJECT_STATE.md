@@ -600,3 +600,15 @@ Yeni sohbet açıldığında:
 - Permanent coverage contract commit: `25f2fc4` (`test(kaira): lock value downstream coverage`).
 - Temporary verification workflow and generator helper were removed after the successful run.
 - Next deep-audit candidate: temperament runtime semantics. `attentionPersistence` produces an intermediate `persistence` output that may not feed live chat state, and `recoverySpeed` may be ineffective because the current live-turn call supplies `minutesSinceEvent: 0`. These must be verified at the actual `droitChatService` consumption boundary before any patch.
+
+
+## 55. Temperament recovery/persistence live-state wiring — 2026-08-31
+- Deep live-consumption audit found two temperament semantics that were engine-local but behaviorally dead in the real chat path. `recoverySpeed` could not affect live state because the current-event call always used `minutesSinceEvent: 0`; `attentionPersistence` only changed the intermediate `persistence` output, which `droitChatService` did not consume.
+- `RelationshipState.lastInteractionAt` is now used as the real between-turn time source. Before the new event reaction is applied, existing anger/stress are decayed according to elapsed time. `recoverySpeed` increases the decay rate while `attentionPersistence` resists that decay and retains more prior activation.
+- Immediate-event semantics remain unchanged: when no time has elapsed, recovery/persistence do not modify the current state, and the new event is still evaluated with `minutesSinceEvent: 0`. Thus recovery speed is not misused as an instant emotional dampener and persistence is not misused as extra reactivity.
+- Recovery operates only on already-existing anger/stress and cannot create negative activation from a zero state. After between-turn recovery, the ordinary temperament event `stateDelta` is applied on top of the recovered state.
+- Added `kairaTemperamentRecoveryPersistenceWiringContracts.test.ts` to verify CharacterTab key mapping, zero-time non-effect, faster recovery with high recovery speed, greater retention with high attention persistence, and zero-state safety.
+- Targeted contracts, TypeScript, full regression and production build all passed.
+- Integration commit: `1ea37af` (`fix(kaira): wire temperament recovery and persistence`).
+- Temporary migration workflow and helper script were removed after integration.
+- Next audit focus: lock all remaining temperament dimensions with a final live-state/stateDelta coverage matrix so every slider is proven behaviorally live, then move toward a comprehensive all-fine-tune end-to-end coverage matrix.
