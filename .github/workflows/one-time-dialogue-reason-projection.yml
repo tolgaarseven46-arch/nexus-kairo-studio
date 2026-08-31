@@ -38,6 +38,10 @@ jobs:
 
           t = Path('src/services/kairoDialogueDecisionEngine.test.ts')
           ts = t.read_text()
+          stale = '''    expect(instruction).toContain("merak sorusu yerine yalnız kısa kabul tepkisi");\n'''
+          if stale not in ts:
+              raise SystemExit('stale prompt assertion not found')
+          ts = ts.replace(stale, '', 1)
           marker = '''    expect(instruction).not.toContain("Takip sorusu: gerekiyorsa en fazla bir tane");\n'''
           replacement = marker + '''    expect(instruction).not.toContain("hmm niye");\n    expect(instruction).not.toContain("ne oldu");\n    expect(instruction).toContain("hmm, anladım veya hee");\n'''
           if marker not in ts:
