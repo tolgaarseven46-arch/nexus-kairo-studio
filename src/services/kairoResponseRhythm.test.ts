@@ -61,4 +61,25 @@ describe("Kaira response rhythm", () => {
       ),
     ).toEqual([]);
   });
+
+  it("keeps close-only kanka address out of new and familiar social replies", () => {
+    expect(
+      findKairoResponseRhythmIssues("iyiyim kanka", [], "natural_reaction", "new"),
+    ).toContain("Kaira ilişki seviyesi close olmadan aşırı samimi hitap kullandı");
+    expect(
+      findKairoResponseRhythmIssues("iyiyim kanka", [], "natural_reaction", "familiar"),
+    ).toContain("Kaira ilişki seviyesi close olmadan aşırı samimi hitap kullandı");
+  });
+
+  it("allows kanka address for close social replies", () => {
+    expect(
+      findKairoResponseRhythmIssues("iyiyim kanka", [], "natural_reaction", "close"),
+    ).toEqual([]);
+  });
+
+  it("does not apply relationship slang checks to factual answer moves", () => {
+    expect(
+      findKairoResponseRhythmIssues("kanka kelimesi burada alıntı konusu", [], "answer_or_clarify", "new"),
+    ).toEqual([]);
+  });
 });
