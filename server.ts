@@ -168,13 +168,17 @@ async function callOpenRouter(messages: any[], temperature: number) {
   if (!text) throw new Error("OpenRouter boş yanıt döndürdü.");
   return text;
 }
-let activeAiProviderUsed = "gemini";
-async function generateText(
+type AiProviderUsed = "gemini" | "openrouter" | "deterministic_fallback";
+type GeneratedTextResult = {
+  text: string;
+  providerUsed: Exclude<AiProviderUsed, "deterministic_fallback">;
+};
+async function generateTextResult(
   system: string,
   messages: any[],
   temperature: number,
   preferredProvider: string,
-): Promise<string> {
+): Promise<GeneratedTextResult> {
   const hasOpenRouter = Boolean(process.env.OPENROUTER_API_KEY?.trim());
   const hasGemini = Boolean(process.env.GEMINI_API_KEY?.trim());
 
@@ -184,8 +188,7 @@ async function generateText(
         [{ role: "system", content: system }, ...messages],
         temperature,
       );
-      activeAiProviderUsed = "openrouter";
-      return text;
+      return { text, providerUsed: "openrouter" };
     } catch (openRouterErr) {
       console.warn("[Provider] OpenRouter failed, falling back to Gemini:", openRouterErr);
       if (hasGemini) {
@@ -197,8 +200,7 @@ async function generateText(
           })),
           config: { systemInstruction: system },
         });
-        activeAiProviderUsed = "gemini";
-        return (response?.text || "").trim();
+        return { text: (response?.text || "").trim(), providerUsed: "gemini" };
       }
       throw openRouterErr;
     }
@@ -213,8 +215,7 @@ async function generateText(
       })),
       config: { systemInstruction: system },
     });
-    activeAiProviderUsed = "gemini";
-    return (response?.text || "").trim();
+    return { text: (response?.text || "").trim(), providerUsed: "gemini" };
   }
 
   if (hasOpenRouter) {
@@ -222,11 +223,18 @@ async function generateText(
       [{ role: "system", content: system }, ...messages],
       temperature,
     );
-    activeAiProviderUsed = "openrouter";
-    return text;
+    return { text, providerUsed: "openrouter" };
   }
 
   throw new Error("Yapay zeka anahtarı (GEMINI_API_KEY veya OPENROUTER_API_KEY) bulunamadı.");
+}
+async function generateText(
+  system: string,
+  messages: any[],
+  temperature: number,
+  preferredProvider: string,
+): Promise<string> {
+  return (await generateTextResult(system, messages, temperature, preferredProvider)).text;
 }
 async function getFastRecentMemory(userId: string, kairaInstanceId: string) {
   const cacheKey = memoryCacheKey(userId, kairaInstanceId);
@@ -845,10 +853,11 @@ app.post("/api/chat", async (req, res) => {
     const aiStart = now();
     let reply = "";
     let providerFailureFallbackUsed = false;
+    let activeAiProviderUsed: AiProviderUsed = provider === "gemini" ? "gemini" : "openrouter";
     try {
-      reply = sanitizeKairoReplyText(
-        await generateText(system, msgs, 0.78, provider),
-      );
+      const generated = await generateTextResult(system, msgs, 0.78, provider);
+      reply = sanitizeKairoReplyText(generated.text);
+      activeAiProviderUsed = generated.providerUsed;
     } catch (generationError) {
       const providerFallback = buildGroundedDialogueFallback(
         dialogueDecision,
@@ -886,18 +895,17 @@ app.post("/api/chat", async (req, res) => {
     if (groundingIssues.length && now() - aiStart < 24000) {
       try {
         repairAttempts = 1;
-        const repairedReply = sanitizeKairoReplyText(
-          await Promise.race([
-            generateText(
-              `${system}\nDÜZELTME KAPISI: Önceki taslak şu nedenle reddedildi: ${groundingIssues.join("; ")}. Aynı doğal konuşma tonunu koruyarak yalnızca bu hataları düzelt.`,
-              msgs,
-              0.35,
-              provider,
-            ),
-            sleep(8000, ""),
-          ]),
-        );
-        if (!repairedReply.trim()) throw new Error("KDM onarım zaman aşımı");
+        const repairedGeneration = await Promise.race([
+          generateTextResult(
+            `${system}\nDÜZELTME KAPISI: Önceki taslak şu nedenle reddedildi: ${groundingIssues.join("; ")}. Aynı doğal konuşma tonunu koruyarak yalnızca bu hataları düzelt.`,
+            msgs,
+            0.35,
+            provider,
+          ),
+          sleep<GeneratedTextResult | null>(8000, null),
+        ]);
+        if (!repairedGeneration?.text.trim()) throw new Error("KDM onarım zaman aşımı");
+        const repairedReply = sanitizeKairoReplyText(repairedGeneration.text);
         const repairedIssues = [
           ...findKairoGroundingIssues(repairedReply, cleanHistory, userMessage),
           ...findDialogueAttributionIssues(
@@ -920,6 +928,7 @@ app.post("/api/chat", async (req, res) => {
         if (repairedIssues.length < groundingIssues.length) {
           reply = repairedReply;
           groundingIssues = repairedIssues;
+          activeAiProviderUsed = repairedGeneration.providerUsed;
         }
       } catch {
         // İlk geçerli yanıtı koru; onarım çağrısının geçici model hatası sohbeti düşürmesin.

@@ -25,7 +25,7 @@ import { resolveKairaInstanceContext, type KairaInstanceType } from "./kairaInst
 import { normalizeFineTuneProfile } from "./fineTuneProfileNormalizer";
 
 export type KairoProvider = "gemini" | "openrouter";
-export type KairoProviderUsed = KairoProvider | "local_language";
+export type KairoProviderUsed = KairoProvider | "local_language" | "deterministic_fallback";
 
 export interface KairoTimingMetrics {
   clientPrepMs: number;
