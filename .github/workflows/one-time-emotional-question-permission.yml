@@ -1,0 +1,49 @@
+name: One-time emotional question permission patch
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Patch server effective permission seam
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('server.ts')
+          s = p.read_text()
+          old_style = '''      dialogueOutputStyle = {\n        emojiLevel: speech.emojiLevel,\n        userMessage,\n      },'''
+          new_style = '''      dialogueOutputStyle = {\n        emojiLevel: speech.emojiLevel,\n        userMessage,\n        allowQuestion: responsePlan.allowQuestion,\n      },'''
+          if old_style not in s:
+              raise SystemExit('dialogueOutputStyle marker not found')
+          s = s.replace(old_style, new_style, 1)
+          old_fallback = '''      const fallback = buildGroundedDialogueFallback(\n        dialogueDecision,\n        cleanHistory,\n        userMessage,\n        userName,\n        dialogueAnalysis,\n      );'''
+          new_fallback = '''      const fallback = buildGroundedDialogueFallback(\n        dialogueDecision,\n        cleanHistory,\n        userMessage,\n        userName,\n        dialogueAnalysis,\n        responsePlan.allowQuestion,\n      );'''
+          if old_fallback not in s:
+              raise SystemExit('fallback marker not found')
+          s = s.replace(old_fallback, new_fallback, 1)
+          p.write_text(s)
+          PY
+          npm install
+          npx vitest run src/services/kairaResponsePlan.test.ts src/services/kairaEmotionalQuestionPermissionContracts.test.ts
+          npx tsc --noEmit
+          npm test
+          npm run build
+          rm .github/workflows/one-time-emotional-question-permission.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts .github/workflows/one-time-emotional-question-permission.yml
+          git commit -m "fix(kaira): align emotional question permission seam"
+          git push
