@@ -21,8 +21,16 @@ describe("post-enforcement final ResponsePlan delivery", () => {
     expect(findDialogueDecisionIssues(fallback!, emotionalDialogue, { allowQuestion:plan.allowQuestion, emojiBudget:plan.emojiBudget, maxSentences:plan.maxSentences, maxWords:plan.maxWords })).toEqual([]);
     expect(findKairaResponsePlanIssues(fallback!, plan)).toEqual([]);
   });
+
   it("provides a minimal correction fallback", () => {
     const dialogue: DialogueDecisionPlan = { move:"acknowledge_correction", allowFollowUpQuestion:false, allowSpeculation:false, maxSentences:2, maxWords:8, hasSupportedTargetClaim:false, reason:"test" };
     expect(buildGroundedDialogueFallback(dialogue, [], "hayır öyle değildi", "Ali")).toBe("he doğru");
+  });
+
+  it("provides a semantically narrow fallback for rejected natural social drafts", () => {
+    const dialogue: DialogueDecisionPlan = { move:"natural_reaction", allowFollowUpQuestion:false, allowSpeculation:false, maxSentences:2, maxWords:32, hasSupportedTargetClaim:false, reason:"test" };
+    const fallback = buildGroundedDialogueFallback(dialogue, [], "bugün iş çok yoğundu", "Ali");
+    expect(fallback).toBe("he anladım");
+    expect(findDialogueDecisionIssues(fallback!, dialogue, { userMessage:"bugün iş çok yoğundu", allowQuestion:false, maxSentences:2, maxWords:32, emojiBudget:0 })).toEqual([]);
   });
 });
