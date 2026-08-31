@@ -79,9 +79,13 @@ Doğrulanmış örnek:
 - `selam kaira` → yerel Dil Motoru tarafından işlendi; AI süresi 0 ms görüldü.
 
 Henüz tam doğrulanmamış:
-- Kalıcı dil hafızasının uzun süre sonra davranışı gerçekten değiştirmesi.
 - Çok sayıda typo ve doğal sosyal medya yazımında yanlış pozitif/yanlış negatif oranı.
 - Aynı niyette cevap çeşitliliğinin doğallığı.
+
+Doğrulanmış persistence davranışı:
+- Accepted AI/local cevap öğrenimi Firestore language-memory'ye yazılır.
+- Phrase/repetition anahtarları canonical normalizasyon kullanır; noktalama varyantı öğrenimi veya tekrar cezasını by-pass etmez.
+- Module/process reload simülasyonunda Firestore hydration interactionCount ve öğrenilmiş affinity'yi geri yükler.
 
 ## 8. Konuşma kimliği
 - `kairoSpeechIdentity.ts` register, cümle uzunluğu, argo, mizah, emoji, sıcaklık ve doğrudanlık üretir.
@@ -988,3 +992,24 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Measure controlled spontaneity in multi-turn simulations for frequency, duplicate-topic pressure and permission-boundary preservation before adding any new spontaneity mode.
+
+
+## 97. Controlled spontaneity frequency and topic-pressure quality — 2026-08-31
+- Deterministic 100-roll quality regression locks configured selection rates exactly at close 12/100, familiar 7/100 and new 3/100.
+- Permission boundaries remain absolute across stress rolls: closed conversation and active irritated/hurt/withdrawn/repairing reaction states never select spontaneity.
+- A safe prior topic already echoed in recent Kaira replies is excluded from immediate reuse; selection falls back to another safe prior user topic when available.
+- CI #1147 passed architecture contracts, full tests, TypeScript and production build.
+
+## 98. Language-memory canonical phrase and repetition normalization — 2026-08-31
+- Learned phrase keys and affinity/repetition lookup now share one canonical reply normalizer.
+- Punctuation variants such as `he tamam kanka!` and `he tamam kanka` no longer split phrase learning or bypass recent-reply repetition pressure.
+- CI #1148 passed architecture contracts, full tests, TypeScript and production build.
+
+## 99. Language-memory reload/hydration preservation — 2026-08-31
+- Added a regression that learns replies, flushes the persistence timer, resets the imported module to simulate a cold process/module reload, then hydrates from mocked Firestore.
+- Before hydration the fresh runtime has neutral in-memory state; after hydration the persisted interactionCount and learned phrase affinity are restored.
+- The hydration regression also proves canonical punctuation variants retain the same learned affinity after reload.
+- CI #1149 passed architecture contracts, full tests, TypeScript and production build.
+
+### Next verified development question
+- Measure the local-language intent boundary on a larger typo/natural-social-message matrix: false positives, false negatives and near-neighbor intent collisions must be characterized before widening the local intent catalog.
