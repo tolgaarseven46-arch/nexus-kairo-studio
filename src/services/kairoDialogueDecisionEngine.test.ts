@@ -171,6 +171,16 @@ describe("Kaira dialogue decision engine", () => {
     );
   });
 
+  it("renders the dialogue prompt from the effective final question permission", () => {
+    const plan = planDialogueResponse([], "moralim bozuk", "Ali");
+    const instruction = buildDialogueDecisionInstruction(plan, false);
+
+    expect(plan.allowFollowUpQuestion).toBe(true);
+    expect(instruction).toContain("Takip sorusu: yasak");
+    expect(instruction).toContain("merak sorusu yerine yalnız kısa kabul tepkisi");
+    expect(instruction).not.toContain("Takip sorusu: gerekiyorsa en fazla bir tane");
+  });
+
   it("rejects all three failed real emotional-opening replies", () => {
     const plan = planDialogueResponse(
       [],
