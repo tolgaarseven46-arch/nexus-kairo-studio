@@ -599,8 +599,11 @@ app.post("/api/chat", async (req, res) => {
       },
       dialogueOutputStyle = {
         emojiLevel: speech.emojiLevel,
+        emojiBudget: responsePlan.emojiBudget,
         userMessage,
         allowQuestion: responsePlan.allowQuestion,
+        maxSentences: responsePlan.maxSentences,
+        maxWords: responsePlan.maxWords,
       },
       local = tryLocalKairoReply(
         userMessage,

@@ -139,6 +139,28 @@ describe("KairaResponsePlan", () => {
     }
   });
 
+  it("makes focused dialogue and banter emoji-free even when speech style prefers emoji", () => {
+    const contract = buildBehaviorContract(state("active"));
+    for (const move of ["invite_emotional_context", "grounded_recall", "repair_or_rephrase", "follow_previous_answer", "acknowledge_correction", "join_banter"] as const) {
+      const plan = buildKairaResponsePlan(
+        contract,
+        dialogue({ move }),
+        speech({ emojiLevel: 100 }),
+      );
+      expect(plan.emojiBudget, move).toBe(0);
+    }
+  });
+
+  it("keeps emoji as HOW quantity when an unrestricted move and open contract allow it", () => {
+    const contract = buildBehaviorContract(state("active"));
+    const plan = buildKairaResponsePlan(
+      contract,
+      dialogue({ move: "natural_reaction" }),
+      speech({ emojiLevel: 10 }),
+    );
+    expect(plan.emojiBudget).toBe(1);
+  });
+
   it("hard-closes disengaged state regardless of speech warmth", () => {
     const contract = buildBehaviorContract(state("disengaged", { hurtScore: 80 }));
     const plan = buildKairaResponsePlan(

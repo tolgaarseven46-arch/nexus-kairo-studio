@@ -31,8 +31,11 @@ export interface DialogueDecisionPlan {
 
 export interface DialogueOutputStyle {
   emojiLevel?: number;
+  emojiBudget?: number;
   userMessage?: string;
   allowQuestion?: boolean;
+  maxSentences?: number;
+  maxWords?: number;
 }
 
 const SPECULATION_RE =
@@ -277,14 +280,17 @@ export function findDialogueDecisionIssues(
   const wordCount = (reply.match(/[\p{L}\p{N}]+/gu) || []).length;
   const emojiCount = (reply.match(/\p{Extended_Pictographic}/gu) || []).length;
   const effectiveAllowQuestion = style?.allowQuestion ?? plan.allowFollowUpQuestion;
-  const emojiBudget =
+  const emojiBudget = style?.emojiBudget ?? (
     plan.move === "join_banter"
       ? 0
       : style?.emojiLevel === undefined
         ? 1
         : style.emojiLevel >= 15
           ? 1
-          : 0;
+          : 0
+  );
+  const effectiveMaxSentences = style?.maxSentences ?? plan.maxSentences;
+  const effectiveMaxWords = style?.maxWords ?? plan.maxWords;
   if (emojiCount > emojiBudget) {
     issues.push(
       `Konuşma kimliği bu turda en fazla ${emojiBudget} emojiye izin veriyor`,
@@ -298,13 +304,13 @@ export function findDialogueDecisionIssues(
       "Kullanıcının başlatmadığı hazır internet esprisi veya oyun metaforu eklendi",
     );
   }
-  if (responseUnitCount(reply) > plan.maxSentences) {
+  if (responseUnitCount(reply) > effectiveMaxSentences) {
     issues.push(
-      `Diyalog kararı ${plan.maxSentences} kısa cümle sınırını aştı`,
+      `Diyalog kararı ${effectiveMaxSentences} kısa cümle sınırını aştı`,
     );
   }
-  if (plan.maxWords && wordCount > plan.maxWords) {
-    issues.push(`Diyalog kararı ${plan.maxWords} kelime sınırını aştı`);
+  if (effectiveMaxWords && wordCount > effectiveMaxWords) {
+    issues.push(`Diyalog kararı ${effectiveMaxWords} kelime sınırını aştı`);
   }
   if (!effectiveAllowQuestion && /[?？]/.test(reply)) {
     issues.push("Diyalog kararı takip sorusunu yasakladığı halde soru eklendi");

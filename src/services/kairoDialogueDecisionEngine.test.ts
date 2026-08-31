@@ -129,6 +129,22 @@ describe("Kaira dialogue decision engine", () => {
     );
   });
 
+  it("uses final ResponsePlan output budgets in dialogue validation", () => {
+    const plan = planDialogueResponse([], "bu konuda detaylı anlatır mısın?", "Mert");
+    const issues = findDialogueDecisionIssues(
+      "bir iki üç dört beş altı yedi 😄",
+      plan,
+      {
+        emojiLevel: 100,
+        emojiBudget: 0,
+        maxSentences: 1,
+        maxWords: 6,
+      },
+    );
+    expect(issues).toContain("Konuşma kimliği bu turda en fazla 0 emojiye izin veriyor");
+    expect(issues).toContain("Diyalog kararı 6 kelime sınırını aştı");
+  });
+
   it("bounds self-deprecating banter to one short everyday reaction", () => {
     const message = "yine bütün işi son dakikaya bıraktım hahah";
     const plan = planDialogueResponse([], message, "Mert");

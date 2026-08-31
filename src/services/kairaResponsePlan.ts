@@ -85,8 +85,14 @@ export function buildKairaResponsePlan(
       contract.maxResponseLength === "short" ? 14 : 32,
     ),
   );
+  const dialogueEmojiBlocked = dialogueFocused || dialogue.move === "join_banter";
   const emojiBudget =
-    continueConversation && speech.emojiLevel > 0 && contract.stance === "open" ? 1 : 0;
+    continueConversation &&
+    !dialogueEmojiBlocked &&
+    speech.emojiLevel > 0 &&
+    contract.stance === "open"
+      ? 1
+      : 0;
 
   return {
     move: dialogue.move,
