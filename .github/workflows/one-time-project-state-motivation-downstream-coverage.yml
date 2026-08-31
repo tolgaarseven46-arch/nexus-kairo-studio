@@ -1,0 +1,37 @@
+name: One-time project state motivation downstream coverage
+
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-project-state-motivation-downstream-coverage.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update project state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text()
+          section = '''\n\n## 59. Motivation full downstream coverage — 2026-08-31\n- The CharacterTab motivation family was audited as a complete downstream system. All eight motivation sliders are now explicitly covered: connection, belonging, recognition, autonomy, achievement, impact, predictability and stability.\n- Added permanent `kairaMotivationDownstreamCoverageContracts.test.ts`. It verifies exact CharacterTab key mapping and proves every slider reaches the downstream motivation pressure consumed by final behavior in a semantically matching context.\n- Connection and belonging alter affiliation and social approach; connection also changes rejection withdrawal. Recognition changes approval and approach only when recognition opportunity exists, preserving context gating. Autonomy alters withdrawal under autonomy threat. Achievement and impact alter approach only when matching goal/influence opportunities exist. Predictability and stability alter security and withdrawal under uncertainty/instability.\n- High needs cannot manufacture approach or withdrawal when matching contextual opportunity/threat signals are absent.\n- No additional motivation no-op was found after the earlier recognition wiring fix, so no product behavior patch was required.\n- Targeted contracts, TypeScript, full regression and production build all passed.\n- Permanent coverage commit: `23bbad1` (`test(kaira): lock motivation downstream coverage`).\n- Temporary verification workflow and generator helper were removed after the successful run.\n- Next audit focus: preferences whole-family downstream coverage, followed by social orientation and personality whole-family matrices to complete the all-fine-tune coverage map.\n'''
+          if '## 59. Motivation full downstream coverage — 2026-08-31' not in text:
+              text += section
+          p.write_text(text)
+          PY
+      - name: Commit project state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(kaira): record motivation downstream coverage"
+          git pull --rebase origin main
+          git push origin main
