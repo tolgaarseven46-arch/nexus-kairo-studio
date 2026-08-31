@@ -1044,3 +1044,15 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Bound persistent language-memory growth: recentReplies is bounded but wordWeights and phraseWeights currently accumulate keys indefinitely, so long-lived accepted AI/local learning may eventually bloat the Firestore document.
+
+
+## 103. Bounded persistent language-memory storage — 2026-08-31
+- Persistent language-memory growth is now structurally bounded: wordWeights <= 128 keys, phraseWeights <= 64 keys and recentReplies remains <= 8.
+- Base Kaira style words are pinned; higher-weight learned entries survive churn while one-off low-weight content is naturally displaced.
+- Hydration sanitizes oversized/legacy maps, removes non-finite and negative weights, clamps weight ranges and restores bounded canonical state.
+- Persistence uses document replacement rather than merge semantics so pruned nested map keys are physically removed from Firestore instead of lingering indefinitely.
+- Stress regressions cover 300 unique learned replies, retention of a repeatedly learned phrase through churn, oversized legacy hydration, invalid values and replacement-write call shape.
+- Product commits: f465024 and 47dea58; final regression commit 51081be. CI #1169 passed architecture contracts, full tests, TypeScript and production build.
+
+### Next verified development question
+- Close the learned-language HOW loop for AI responses: accepted AI/local replies currently train the bounded language-memory used by local selection, but the AI system prompt does not consume a safe derived language-style memory signal.
