@@ -26,6 +26,7 @@ async function freshLanguageMemoryModule() {
 describe('language-memory hydration regression', () => {
   beforeEach(() => {
     firestoreStore.clear();
+    vi.clearAllMocks();
     vi.useFakeTimers();
   });
 
@@ -36,6 +37,7 @@ describe('language-memory hydration regression', () => {
 
   it('restores learned phrase affinity after a module reload', async () => {
     const first = await freshLanguageMemoryModule();
+    const firestore = await import('firebase/firestore');
     const userId = 'hydration-regression-user';
     const learnedReply = 'he tamam kanka!';
     const neutralReply = 'anladım tamam';
@@ -49,6 +51,7 @@ describe('language-memory hydration regression', () => {
 
     await vi.advanceTimersByTimeAsync(600);
     expect(firestoreStore.size).toBe(1);
+    expect(vi.mocked(firestore.setDoc).mock.calls.at(-1)).toHaveLength(2);
 
     const reloaded = await freshLanguageMemoryModule();
     const coldSummary = reloaded.languageMemorySummary(userId);
