@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe('language-memory learning contracts', () => {
-  it('raises affinity for a repeatedly accepted writing pattern', () => {
+  it('raises style affinity for a repeatedly accepted writing pattern', () => {
     const reply = 'he tamamdır kanka';
     const before = languageAffinity(userId, reply);
 
@@ -35,13 +35,23 @@ describe('language-memory learning contracts', () => {
     expect(getLanguageMemory(userId).phraseWeights[reply]).toBe(8);
   });
 
-  it('can change candidate preference after repeated learning', () => {
+  it('can change candidate preference after learning when recency pressure is absent', () => {
     const learned = 'he tamamdır kanka';
     const alternative = 'peki teşekkür ederim';
 
     for (let i = 0; i < 10; i += 1) learnLanguageReply(userId, learned);
+    getLanguageMemory(userId).recentReplies = [];
 
     expect(chooseLanguageReply(userId, [alternative, learned], 'stable-seed')).toBe(learned);
+  });
+
+  it('does not let learned affinity force an immediate exact-repeat loop', () => {
+    const learned = 'he tamamdır kanka';
+    const alternative = 'tamam ya';
+
+    for (let i = 0; i < 10; i += 1) learnLanguageReply(userId, learned);
+
+    expect(chooseLanguageReply(userId, [alternative, learned], 'stable-seed')).toBe(alternative);
   });
 
   it('keeps recent-reply memory bounded while learning', () => {
