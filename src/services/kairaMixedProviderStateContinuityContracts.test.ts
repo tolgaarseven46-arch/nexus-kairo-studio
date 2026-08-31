@@ -33,6 +33,22 @@ describe('mixed local / AI provider state continuity contracts', () => {
     expect(localBranch).toBeGreaterThan(persistedFallback);
   });
 
+  it('records KDM quality metrics on both local and AI response paths', () => {
+    expect(count('recordKdmMetric({')).toBe(2);
+
+    const localBranch = server.indexOf('if (local.handled && local.reply)');
+    const aiBranch = server.indexOf('const relationship = kdm.trace.relationship;', localBranch);
+    const localWindow = server.slice(localBranch, aiBranch);
+    const aiWindow = server.slice(aiBranch);
+
+    expect(localWindow).toContain('recordKdmMetric({');
+    expect(localWindow).toContain('score: consistency.score');
+    expect(localWindow).toContain('accepted: consistency.accepted');
+    expect(localWindow).toContain('repaired: false');
+    expect(localWindow).toContain('repairAttempts: 0');
+    expect(aiWindow).toContain('recordKdmMetric({');
+  });
+
   it('returns the same canonical state envelope to clients regardless of provider path', () => {
     const localBranch = server.indexOf('if (local.handled && local.reply)');
     const aiBranch = server.indexOf('const relationship = kdm.trace.relationship;', localBranch);
