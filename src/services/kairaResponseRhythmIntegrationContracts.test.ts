@@ -15,15 +15,15 @@ describe("Kaira response rhythm server integration", () => {
     );
   });
 
-  it("checks repetition across draft, repair, fallback and guarded response seams", () => {
+  it("checks repetition and relationship HOW across draft, repair, fallback and guarded response seams", () => {
     expect(count(server, "findKairoResponseRhythmIssues(")).toBeGreaterThanOrEqual(5);
-    expect(server).toContain("findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move)");
-    expect(server).toContain("findKairoResponseRhythmIssues(repairedReply, cleanHistory, dialogueDecision.move)");
-    expect(server).toContain("findKairoResponseRhythmIssues(fallback, cleanHistory, dialogueDecision.move)");
-    expect(server).toContain("findKairoResponseRhythmIssues(planSafeFallback, cleanHistory, dialogueDecision.move)");
+    expect(server).toContain("findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move, speech.relationshipLevel)");
+    expect(server).toContain("findKairoResponseRhythmIssues(repairedReply, cleanHistory, dialogueDecision.move, speech.relationshipLevel)");
+    expect(server).toContain("findKairoResponseRhythmIssues(fallback, cleanHistory, dialogueDecision.move, speech.relationshipLevel)");
+    expect(server).toContain("findKairoResponseRhythmIssues(planSafeFallback, cleanHistory, dialogueDecision.move, speech.relationshipLevel)");
   });
 
-  it("passes the canonical dialogue move so factual and recall paths are not rhythm-policed", () => {
-    expect(count(server, "cleanHistory, dialogueDecision.move)")).toBeGreaterThanOrEqual(5);
+  it("passes canonical dialogue move and relationship level through every AI rhythm seam", () => {
+    expect(count(server, "cleanHistory, dialogueDecision.move, speech.relationshipLevel)")).toBeGreaterThanOrEqual(5);
   });
 });
