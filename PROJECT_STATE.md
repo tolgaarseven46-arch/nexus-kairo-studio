@@ -928,3 +928,22 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Verify repair-failure final delivery: if the model still violates qualitative reaction HOW after repair attempts, ensure the invalid draft cannot be delivered unchanged.
+
+
+## 90. Qualitative reaction final delivery enforcement — 2026-08-31
+- Qualitative reaction HOW is now enforced at final delivery after BehaviorContract enforcement.
+- If model repair still leaves over-familiar humor, premature repair closure or withdrawn-state reopening language, deterministic delivery removes only the conflicting HOW surface while preserving factual content.
+- If removing the conflicting surface empties the reply, a narrow reaction-specific fallback is used.
+- Repaired AI candidates and grounded fallback candidates are revalidated with the same qualitative reaction check before replacement decisions.
+- CI #1116 passed architecture contracts, full tests, TypeScript and production build.
+
+## 91. Stateful 20-turn conversation regression and cleanup — 2026-08-31
+- Added a real 20-turn regression that feeds every turn from the prior turn's nextDynamicState rather than reconstructing or repeating the final state.
+- The regression locks historical snapshot immutability, per-turn relationship-state variation, monotonic interaction history, insult-to-neutral qualitative reaction continuity and later repair movement.
+- CI #1117 passed architecture contracts, full tests, TypeScript and production build.
+- Final workflow audit found only the permanent ci.yml workflow; no one-time workflow remains.
+- TODO code search and open issue audit returned no active entries.
+- The current architecture/audit + world reasoning + qualitative reaction + response-consistency hardening package is complete.
+
+### Next development phase
+- Move from baseline hardening to higher-level product behavior validation: long-session natural-language quality, speech-identity fingerprint quality, persistent language-memory learning and eventually controlled spontaneity.
