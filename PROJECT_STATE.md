@@ -504,3 +504,15 @@ Yeni sohbet açıldığında:
 - Entegrasyon commit'i: `8a2a1ef` (`fix(kaira): wire wordplay fine-tune into expression runtime`). Targeted wordplay/behavior integration contractları, TypeScript, full regression ve production build başarıyla geçti.
 - Geçici wordplay migration workflow/script kaldırıldı.
 - Sonraki audit: CharacterTab LAYERS registry'nin kalan personality/temperament/motivation/values/preferences/social/boundaries/expression key'leri runtime reader'larla karşılaştırılacak; UI'da olup tüketilmeyen parametreler sessiz no-op olarak kapatılacak.
+
+
+## 47. Temperament panel runtime wiring and threshold semantics — 2026-08-31
+- CharacterTab temperament registry auditinde `temperament.exploration.uncertaintyTolerance` ve `temperament.exploration.approachDrive` sliderlarının runtime `temperamentEngine` tarafından tüketilmediği doğrulandı; iki slider sessiz no-op idi.
+- `TemperamentProfile` artık `uncertaintyTolerance` ve `approachDriveBias` alanlarını taşır. `temperamentFromFineTune(...)` paneldeki iki persisted key'i doğrudan runtime profile'a bağlar. Yüksek uncertainty tolerance tehdit/kaçınma baskısını azaltır; yüksek approach drive bias yenilik bağlamındaki yaklaşma davranışını artırır.
+- `temperament.reactivity.threshold` daha önce `threatSensitivity` fallback'ı olarak okunuyordu. Bu bağlantı panel semantiğini tersine çevirebiliyordu: yüksek “Tepki eşiği” tehdit aktivasyonunu artırabiliyordu. Eşik artık ayrı `reactivityThreshold` alanıdır ve 50 backward-compatible nötr noktadır; eşik yükseldikçe negative/frustration/threat aktivasyonu azalır, düştükçe daha kolay tepki oluşur.
+- `kairaTemperamentPanelWiringContracts.test.ts` panel key mapping, reaction-threshold yönü, uncertainty tolerance ve approach-drive davranış etkisini regression contract olarak doğrular. Mevcut `temperamentEngine.test.ts` ve `kairaTemperamentBeforeKdmContracts.test.ts` ile birlikte targeted suite geçti.
+- Entegrasyon commit'i: `e109723` (`fix(kaira): wire temperament panel controls`). Targeted contractlar, TypeScript, full regression ve production build başarıyla geçti.
+- İlk workflow denemesi yalnız CI altyapısında lockfile/cache varsayımı nedeniyle `actions/setup-node` aşamasında durdu; ürün migration'ı uygulanmadı. Repo'da lockfile bulunmadığı doğrulanınca one-time workflow `npm install` ile düzeltildi ve ikinci run tamamen yeşil geçti.
+- Geçici temperament migration workflow/script kaldırıldı.
+- Registry auditinde motivation, values, preferences ve social bloklarının UI key'leri runtime reader'larla birebir eşleşti; bu bloklarda no-op bulunmadı. `personality.cognition.deciveness` legacy typo'su UI/engine/persisted contract boyunca aynı kullanıldığı için compatibility migration olmadan rename edilmedi.
+- Sonraki audit adayı: CharacterTab `boundaries` ve kalan personality/expression parametrelerinin tamamını runtime tüketicilerle birebir karşılaştırmak; yalnız gerçek no-op veya ters semantik bulunan noktaları minimum patch ile kapatmak.
