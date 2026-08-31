@@ -1,0 +1,30 @@
+name: One-time provider failure fallback
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Apply provider fallback patch
+        run: python scripts/one-time-provider-failure-fallback.py
+      - name: Commit patch and cleanup
+        run: |
+          rm scripts/one-time-provider-failure-fallback.py
+          rm .github/workflows/one-time-provider-failure-fallback.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts scripts/one-time-provider-failure-fallback.py .github/workflows/one-time-provider-failure-fallback.yml
+          git commit -m "fix(kaira): add deterministic provider failure fallback"
+          git push
