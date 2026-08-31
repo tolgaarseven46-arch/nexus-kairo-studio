@@ -64,6 +64,8 @@ import { tryLocalKairoReply } from "./src/services/kairoLocalLanguageEngine";
 import {
   hydrateLanguageMemory,
   languageMemorySummary,
+  languageStyleMemoryInstruction,
+  languageStyleMemorySignal,
   learnLanguageReply,
 } from "./src/services/kairoLanguageMemory";
 import {
@@ -565,6 +567,7 @@ app.post("/api/chat", async (req, res) => {
       kairaPolicy.persistentUserMemory ? hydrateLanguageMemory(stateUserId) : Promise.resolve(),
     ]);
     const memoryMs = Math.round(now() - memoryStart),
+      languageStyleMemory = languageStyleMemorySignal(stateUserId),
       requestState = normalizeDynamicState(dynamicState),
       effective = dynamicState?.relationship
         ? requestState
@@ -706,6 +709,7 @@ app.post("/api/chat", async (req, res) => {
             serverTotalMs: 0,
           },
           providerUsed: "local_language",
+          languageStyleMemory,
           controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" },
           speechIdentity: speech,
           worldStateAppraisal,
@@ -752,6 +756,7 @@ app.post("/api/chat", async (req, res) => {
           },
           metadata: {
             providerUsed: "local_language",
+            languageStyleMemory,
             controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" },
             speechIdentity: speech,
             entityResolution: languageUnderstanding.entityResolution,
@@ -816,7 +821,7 @@ app.post("/api/chat", async (req, res) => {
     const relationshipInstruction = behaviorProfile.relationshipInstruction
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
-    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const system = `Sen ${character.name || "KAIRO"} adlı Droit'sun. ${speechIdentityPrompt(speech)}\n${languageStyleMemoryInstruction(stateUserId)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
@@ -1016,6 +1021,7 @@ app.post("/api/chat", async (req, res) => {
         dynamicState: kdm.nextDynamicState,
         timings: { memoryMs, kdmMs, aiMs, postProcessMs: 0, serverTotalMs: 0 },
         providerUsed: activeAiProviderUsed,
+        languageStyleMemory,
         controlledSpontaneity: spontaneityDecision,
         speechIdentity: speech,
         worldStateAppraisal,
@@ -1062,6 +1068,7 @@ app.post("/api/chat", async (req, res) => {
         },
         metadata: {
           providerUsed: activeAiProviderUsed,
+          languageStyleMemory,
           controlledSpontaneity: spontaneityDecision,
           speechIdentity: speech,
           entityResolution: languageUnderstanding.entityResolution,
