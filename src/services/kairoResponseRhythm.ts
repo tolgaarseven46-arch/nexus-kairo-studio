@@ -1,4 +1,15 @@
 import type { ConversationTurn } from "./kairoConversationGrounding";
+import type { DialogueMove } from "./kairoDialogueDecisionEngine";
+
+const RHYTHM_SENSITIVE_MOVES = new Set<DialogueMove>([
+  "natural_reaction",
+  "join_banter",
+  "follow_previous_answer",
+  "invite_emotional_context",
+  "acknowledge_correction",
+  "repair_or_rephrase",
+  "follow_topic_shift",
+]);
 
 function normalizeReply(text: string): string {
   return String(text || "")
@@ -15,7 +26,10 @@ function wordCount(text: string): number {
 export function findKairoResponseRhythmIssues(
   reply: string,
   history: ConversationTurn[],
+  move?: DialogueMove,
 ): string[] {
+  if (move && !RHYTHM_SENSITIVE_MOVES.has(move)) return [];
+
   const normalized = normalizeReply(reply);
   if (!normalized || normalized.length < 18 || wordCount(normalized) < 4) return [];
 
