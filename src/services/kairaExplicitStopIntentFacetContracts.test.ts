@@ -1,26 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { interpretSemanticEvent } from "./semanticEventEngine";
-import { chooseKairoDialoguePlan } from "./kairoDialogueDecisionEngine";
-
-const context = {
-  personality: { humor: 50, empathy: 50, communication: 50 } as any,
-  dynamicState: {
-    calmness: 70,
-    anger: 10,
-    stress: 20,
-    happiness: 60,
-    confidence: 60,
-    surprise: 20,
-    relationship: {
-      conversationState: "active",
-      hurtScore: 0,
-      conflictScore: 0,
-      repairProgress: 0,
-      repairAttempts: 0,
-    },
-  } as any,
-  history: [] as any[],
-};
+import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
 
 describe("explicit stop intent-facet contracts", () => {
   it("standalone stop commands remain complaints while carrying explicit facets", () => {
@@ -37,11 +17,7 @@ describe("explicit stop intent-facet contracts", () => {
 
   it("question suppression does not erase an emotional-share primary intent", () => {
     const event = interpretSemanticEvent("moralim bozuk, soru sorma artık");
-    const plan = chooseKairoDialoguePlan({
-      ...context,
-      userMessage: event.raw,
-      semanticEvent: event,
-    } as any);
+    const plan = planDialogueResponse([], event.raw, "Ali", event);
 
     expect(event.intent).toBe("emotional_share");
     expect(event.socialRoutine).toBe("emotional_opening");
@@ -62,5 +38,6 @@ describe("explicit stop intent-facet contracts", () => {
 
     expect(event.intent).toBe("greeting");
     expect(event.stopQuestions).toBe(true);
+    expect(event.frustration).toBe(0);
   });
 });
