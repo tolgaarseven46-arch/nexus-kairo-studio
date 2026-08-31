@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLanguageMemory } from './kairoLanguageMemory';
+import { getLanguageMemory, learnLanguageReply } from './kairoLanguageMemory';
 import { tryLocalKairoReply } from './kairoLocalLanguageEngine';
 import { interpretSemanticEvent } from './semanticEventEngine';
 
@@ -56,7 +56,7 @@ afterEach(() => {
 });
 
 describe('same-intent local reply diversity', () => {
-  it('keeps repeated how-are-you turns varied without immediate exact-repeat loops', () => {
+  it('keeps repeated how-are-you turns varied when final accepted local replies are learned', () => {
     const replies: string[] = [];
 
     for (let i = 0; i < 15; i += 1) {
@@ -72,7 +72,10 @@ describe('same-intent local reply diversity', () => {
       );
       expect(result.handled).toBe(true);
       expect(result.intent).toBe('how_are_you');
-      replies.push(result.reply || '');
+      const reply = result.reply || '';
+      replies.push(reply);
+      // Mirrors the server's final accepted-delivery learning seam.
+      learnLanguageReply(userId, reply);
     }
 
     expect(new Set(replies).size).toBeGreaterThanOrEqual(4);
