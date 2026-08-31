@@ -38,6 +38,7 @@ const RECENCY_PENALTIES = [12, 8, 5, 3, 2, 1, 1, 1];
 const LEARNED_MARKER_DELTA = 0.69;
 const LEARNED_WORD_RETENTION = 0.9;
 const MIN_LEARNED_WEIGHT = 0.05;
+const STYLE_DECAY_GRACE_REPLIES = 3;
 
 function createProfile(): LanguageMemoryProfile {
   return { wordWeights: { ...BASE_WORDS }, phraseWeights: {}, recentReplies: [], interactionCount: 0 };
@@ -87,9 +88,15 @@ function boundedLanguageWords(raw: unknown) {
   return result;
 }
 
+function recentReplyContainsWord(profile: LanguageMemoryProfile, word: string) {
+  return profile.recentReplies
+    .slice(0, STYLE_DECAY_GRACE_REPLIES)
+    .some((reply) => new Set(normalizeLanguageText(reply).split(/\s+/).filter(Boolean)).has(word));
+}
+
 function decayAbsentLearnedWords(profile: LanguageMemoryProfile, observedWords: Set<string>) {
   for (const [word, current] of Object.entries(profile.wordWeights)) {
-    if (observedWords.has(word)) continue;
+    if (observedWords.has(word) || recentReplyContainsWord(profile, word)) continue;
     const base = BASE_WORDS[word] ?? 0;
     const learnedDelta = Math.max(0, current - base);
     if (learnedDelta <= 0) continue;
