@@ -115,10 +115,12 @@ export const computeMotivationResponse = (
   const influenceDrive = clamp01(n(impact) * 0.7 + influenceOpportunity * 0.3);
   const securityDrive = clamp01(n(predictability) * 0.45 + n(stability) * 0.4 + uncertainty * 0.15);
 
+  const recognitionBias = (n(profile.recognition) - 0.5) * recognitionOpportunity;
   const approachPressure = clamp01(
     affiliationDrive * socialOpportunity * 0.34 +
       achievementDrive * achievementOpportunity * 0.33 +
-      influenceDrive * influenceOpportunity * 0.33,
+      influenceDrive * influenceOpportunity * 0.33 +
+      recognitionBias * 0.18,
   );
 
   const withdrawalPressure = clamp01(
