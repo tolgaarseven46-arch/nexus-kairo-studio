@@ -60,6 +60,7 @@ import { tryLocalKairoReply } from "./src/services/kairoLocalLanguageEngine";
 import {
   hydrateLanguageMemory,
   languageMemorySummary,
+  learnLanguageReply,
 } from "./src/services/kairoLanguageMemory";
 import {
   instancePolicy,
@@ -963,6 +964,9 @@ app.post("/api/chat", async (req, res) => {
       issues: [...baseConsistency.issues, ...finalIssues],
       warnings: enforced.reasons,
     };
+    if (kairaPolicy.persistentUserMemory && consistency.accepted) {
+      learnLanguageReply(stateUserId, reply);
+    }
     const postStart = now();
     let savedTurnId = "";
     await Promise.allSettled([
