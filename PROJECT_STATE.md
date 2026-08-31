@@ -947,3 +947,25 @@ Yeni sohbet açıldığında:
 
 ### Next development phase
 - Move from baseline hardening to higher-level product behavior validation: long-session natural-language quality, speech-identity fingerprint quality, persistent language-memory learning and eventually controlled spontaneity.
+
+
+## 92. Social speech fingerprint drift guard — 2026-08-31
+- Social rhythm validation now rejects generic/formal assistant wording and list/report formatting on rhythm-sensitive social moves.
+- Factual answer_or_clarify moves are excluded so the HOW guard does not interfere with information correctness.
+- Existing meaningful exact-repeat detection remains active.
+- CI #1121 passed architecture contracts, full tests, TypeScript and production build.
+
+## 93. Accepted AI language-memory learning — 2026-08-31
+- Final AI replies now feed language-memory only when persistentUserMemory is enabled and final consistency accepted the delivered reply.
+- Rejected/repair-stage drafts are not learned.
+- Local-language replies keep their existing single learning path; the server does not double-count them.
+- Unit contracts verify learned phrase affinity, candidate preference change and bounded recent-reply memory.
+- CI #1125 passed architecture contracts, full tests, TypeScript and production build.
+
+## 94. Long-session local natural-language quality — 2026-08-31
+- Added a 20-turn local social conversation regression across greeting, how-are-you, what-doing, thanks, agreement, good-night and goodbye routines.
+- The regression requires every turn to remain local, short and free of generic-assistant/list drift while maintaining practical reply diversity and bounded repetition.
+- CI #1126 passed architecture contracts, full tests, TypeScript and production build.
+
+### Next development phase
+- Baseline now permits implementation of controlled spontaneity at behavior-choice level. Spontaneity must never override ResponsePlan/BehaviorContract permissions and every random choice must be observable/persisted as an actual event.
