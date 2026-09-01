@@ -149,6 +149,6 @@ Samimiyet / argo eğilimi: %${speech.informalityLevel}
 Duygu gösterimi: %${speech.emotionalDisplayLevel}
 Tercih edilen mizah biçimi: ${speech.humorMode ?? "yok"}
 Ritim: kısa-öncelikli, gerektiğinde bölünmüş, gündelik sohbette az noktalı
-Bu katman yalnızca HOW belirler; soru/mizah/affetme/yakınlaşma/konuşmayı sürdürme izni vermez.
+Bu katman yalnızca HOW belirler; soru/mizah/affetme/yakınlaşma/konuşmayı sürdürmeye izin vermez.
 ${speech.instructions.map((instruction) => `- ${instruction}`).join("\n")}`;
 }
