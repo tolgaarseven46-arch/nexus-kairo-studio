@@ -12,6 +12,17 @@ function replaceOnce(label, before, after) {
   source = source.slice(0, first) + after + source.slice(first + before.length);
 }
 
+function replaceNth(label, before, after, occurrence) {
+  let from = 0;
+  let index = -1;
+  for (let i = 0; i < occurrence; i += 1) {
+    index = source.indexOf(before, from);
+    if (index < 0) throw new Error(`Patch anchor missing: ${label} occurrence=${occurrence}`);
+    from = index + before.length;
+  }
+  source = source.slice(0, index) + after + source.slice(index + before.length);
+}
+
 replaceOnce(
   "self-memory imports",
   'import { buildKairaRuntimeIdentityInstruction } from "./src/services/kairaRuntimeIdentity";\n',
@@ -42,16 +53,18 @@ replaceOnce(
   '    const selfMemoryGuard = enforceKairaAutobiographicalResponse(reply, selfMemoryRuntime);\n    reply = selfMemoryGuard.reply;\n    const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess);\n    reply = epistemicGuard.reply;\n    const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules);',
 );
 
-replaceOnce(
-  "primary guard changed aggregation",
+replaceNth(
+  "AI guard changed aggregation",
   '      changed: worldMemoryGuard.changed || epistemicGuard.changed || baseEnforced.changed || contractEnforced.changed,',
   '      changed: worldMemoryGuard.changed || selfMemoryGuard.changed || epistemicGuard.changed || baseEnforced.changed || contractEnforced.changed,',
+  2,
 );
 
-replaceOnce(
-  "primary guard reason aggregation",
+replaceNth(
+  "AI guard reason aggregation",
   '        ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),\n        ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),',
   '        ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),\n        ...(selfMemoryGuard.reason ? [selfMemoryGuard.reason] : []),\n        ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),',
+  2,
 );
 
 replaceOnce(
@@ -66,9 +79,6 @@ replaceOnce(
   '            ...(candidateWorldGuard.reason ? [candidateWorldGuard.reason] : []),\n            ...(candidateSelfMemoryGuard.reason ? [candidateSelfMemoryGuard.reason] : []),\n            ...(candidateEpistemicGuard.reason ? [candidateEpistemicGuard.reason] : []),',
 );
 
-// Observability: add the typed runtime decision beside epistemic access in both
-// local and AI trace/session payloads. Global replacement is deliberate and
-// asserted to affect at least two payload seams.
 const observabilityAnchor = '          epistemicAccess,\n          responsePlan,';
 const observabilityCount = source.split(observabilityAnchor).length - 1;
 if (observabilityCount < 2) throw new Error(`Expected >=2 observability seams, got ${observabilityCount}`);
