@@ -22,6 +22,7 @@ const semanticSchemaExample = {
   intent: "general_chat",
   socialRoutine: "none",
   discourseAct: "none",
+  repairSignal: "none",
   adviceRequested: false,
   valence: "neutral",
   target: "unknown",
@@ -67,6 +68,7 @@ ENUM DEĞERLERİ:
 intent = greeting | question | information_request | emotional_share | affection | banter | insult | rejection | apology | repair | complaint | command | support | compliment | general_chat
 socialRoutine = none | greeting | how_are_you | what_doing | thanks | agreement | goodbye | good_night | emotional_opening
 discourseAct = none | correction | topic_shift | recall_request | confusion_or_challenge
+repairSignal = none | clarification_request | relevance_challenge; yalnız discourse repair'in alt türünü belirtir, cevap davranışına karar vermez
 adviceRequested = boolean; kullanıcı açıkça ne yapması gerektiğini/tavsiye/öneri soruyorsa true
 valence = positive | negative | neutral
 target = kaira | third_party | event | unknown

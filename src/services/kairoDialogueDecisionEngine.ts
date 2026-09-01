@@ -6,6 +6,7 @@ import {
 import {
   interpretSemanticEvent,
   type SemanticEvent,
+  type SemanticRepairSignal,
   type SemanticSocialRoutine,
 } from "./semanticEventEngine";
 import { projectSemanticEventToDialogueAnalysis } from "./kairaDialogueTurnProjection";
@@ -27,6 +28,7 @@ export interface DialogueDecisionPlan {
   move: DialogueMove;
   target?: string;
   socialRoutine?: SemanticSocialRoutine;
+  repairSignal?: SemanticRepairSignal;
   allowFollowUpQuestion: boolean;
   allowSpeculation: boolean;
   maxSentences: number;
@@ -188,15 +190,22 @@ export function planDialogueResponse(
   const supportedClaims = supportedClaimsFor(claims, target);
 
   if (event.discourseAct === "confusion_or_challenge" && hasImmediateKairaTurn(history)) {
+    const repairSignal = event.repairSignal ?? "none";
+    const reason =
+      repairSignal === "clarification_request"
+        ? "Kullanıcı Kaira'nın hemen önceki mesajını anlamadı. Aynı fikri daha açık, kısa ve doğal biçimde yeniden söyle; yeni iddia, yeni konu veya soru ekleme."
+        : repairSignal === "relevance_challenge"
+          ? "Kullanıcı Kaira'nın hemen önceki mesajının alakasına veya doğrultusuna itiraz etti. Gereksiz bağlantıyı geri çek veya yalnızca ilgili kısmı düzelt; kendini savunma, yeni konu açma ve soru sorma."
+          : "Kullanıcı Kaira'nın hemen önceki mesajı için onarım başlattı. Önceki fikri kısa ve doğal biçimde düzelt veya yeniden söyle; kendini savunma, yeni konu açma ve soru sorma.";
     return {
       move: "repair_or_rephrase",
+      repairSignal,
       allowFollowUpQuestion: false,
       allowSpeculation: false,
       maxSentences: 1,
       maxWords: 8,
       hasSupportedTargetClaim: false,
-      reason:
-        "Kullanıcı Kaira'nın önceki mesajını anlamadı veya ona itiraz etti. Önceki fikri kısa ve daha doğal biçimde yeniden söyle ya da gereksiz kısmı geri çek; kendini savunma, yeni konu açma ve soru sorma.",
+      reason,
     };
   }
   if (isShortAnswerToPreviousKairaTurn(history, userMessage)) {
@@ -449,7 +458,11 @@ export function buildGroundedDialogueFallback(
   if (plan.move === "invite_emotional_context") {
     return effectiveAllowQuestion ? "hmm niye" : "hmm";
   }
-  if (plan.move === "repair_or_rephrase") return "biraz saçmaladım galiba";
+  if (plan.move === "repair_or_rephrase") {
+    if (plan.repairSignal === "clarification_request") return "biraz karışık anlattım";
+    if (plan.repairSignal === "relevance_challenge") return "he alakasız oldu";
+    return "biraz saçmaladım galiba";
+  }
   if (plan.move === "complete_social_routine") {
     if (plan.socialRoutine === "greeting") return "selam";
     if (plan.socialRoutine === "thanks") return "rica ederim";

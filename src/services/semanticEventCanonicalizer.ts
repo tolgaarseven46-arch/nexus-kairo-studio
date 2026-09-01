@@ -29,6 +29,7 @@ export function canonicalizeSemanticEvent(
     normalized: event.normalized || fallback.normalized,
     socialRoutine,
     discourseAct: event.discourseAct ?? fallback.discourseAct ?? "none",
+    repairSignal: event.repairSignal ?? fallback.repairSignal ?? "none",
     adviceRequested: event.adviceRequested ?? fallback.adviceRequested ?? false,
   };
 }

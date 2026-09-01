@@ -16,6 +16,10 @@ export type SemanticDiscourseAct =
   | "topic_shift"
   | "recall_request"
   | "confusion_or_challenge";
+export type SemanticRepairSignal =
+  | "none"
+  | "clarification_request"
+  | "relevance_challenge";
 export type SemanticIntent =
   | "greeting"
   | "question"
@@ -47,6 +51,7 @@ export interface SemanticEvent {
   intent: SemanticIntent;
   socialRoutine?: SemanticSocialRoutine;
   discourseAct?: SemanticDiscourseAct;
+  repairSignal?: SemanticRepairSignal;
   adviceRequested?: boolean;
   valence: SemanticValence;
   target: SemanticTarget;
@@ -105,7 +110,8 @@ const SUPPORT_RE = /(yanındayım|haklısın|seni anlıyorum|destekliyorum|merak
 const COMPLIMENT_RE = /(harika|süper|mükemmel|çok iyisin|seviyorum|teşekkür|sağ ol|iyi ki varsın)/u;
 const AFFECTION_RE = word("bebeğim|bebegim|aşkım|askım|tatlım|sevgilim");
 const FRUSTRATION_RE = /(yeter|bıktım|sinir|aynı şeyi|kaç kere|neden anlamıyorsun|niye anlamıyorsun|saçmalıyorsun|saçmalıyor)/u;
-const CONFUSION_RE = /(ne diyon|ne diyorsun|ne anlatıyosun|ne anlatıyorsun|ne alaka|nasıl yani|bi şey anlamadım|bir şey anlamadım)/u;
+const CLARIFICATION_REQUEST_RE = /(nasıl yani|bi şey anlamadım|bir şey anlamadım)/u;
+const RELEVANCE_CHALLENGE_RE = /(ne diyon|ne diyorsun|ne anlatıyosun|ne anlatıyorsun|ne alaka)/u;
 const VENTING_PROFANITY_RE = word("amk|aq|mk");
 const EMOTIONAL_SHARE_RE = /(moralim.{0,30}bozuk|moral yok|üzgünüm|çok mutluyum|mutluyum|bunaldım|çok bunaldım|canım (?:çok )?sıkkın|kendimi (?:çok )?kötü hissediyorum|kendimi (?:çok )?iyi hissediyorum|kaygılıyım|endişeliyim|yoruldum|çok yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|mod düşük|moodum düşük|enerjim yok|keyfim yerinde değil|içim sıkılıyor|içim daraldı)/u;
 const LOW_MOOD_RE = /(moralim.{0,30}bozuk|moral yok|üzgün|kötü hissed|bunaldım|canım (?:çok )?sıkkın|kaygı|endişe|stres|yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|mod düşük|moodum düşük|enerjim yok|keyfim yerinde değil|içim sıkılıyor|içim daraldı)/u;
@@ -166,7 +172,14 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   const support = SUPPORT_RE.test(text) ? 0.8 : 0;
   const compliment = COMPLIMENT_RE.test(text) ? 0.8 : 0;
   const affection = AFFECTION_RE.test(text) ? 0.7 : closenessBid ? 0.45 : 0;
-  const confusion = CONFUSION_RE.test(text);
+  const clarificationRequest = CLARIFICATION_REQUEST_RE.test(text);
+  const relevanceChallenge = RELEVANCE_CHALLENGE_RE.test(text) || challenge;
+  const confusion = clarificationRequest || relevanceChallenge;
+  const repairSignal: SemanticRepairSignal = clarificationRequest
+    ? "clarification_request"
+    : relevanceChallenge
+      ? "relevance_challenge"
+      : "none";
   const frustration = FRUSTRATION_RE.test(text) ? 0.75 : challenge ? 0.6 : VENTING_PROFANITY_RE.test(text) ? 0.35 : 0;
   const emotionalShare = EMOTIONAL_SHARE_RE.test(text);
   const adviceRequested = /(?:ne\s+yapmalıyım|ne\s+yapayım|sence\s+ne\s+yap|tavsiye|öner(?:in|i|ir)?|yardım\s+et|akıl\s+ver)/u.test(text);
@@ -214,7 +227,7 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   const severity = redLine ? 1 : clamp01(Math.max(disrespect, coercion * 0.85, manipulation * 0.8, privacyViolation * 0.8, rejection ? 0.65 : 0, frustration * 0.55));
 
   return {
-    raw: message, normalized: text, intent, socialRoutine, discourseAct, adviceRequested, valence, target, relationalAct, relationalIntensity, severity,
+    raw: message, normalized: text, intent, socialRoutine, discourseAct, repairSignal, adviceRequested, valence, target, relationalAct, relationalIntensity, severity,
     insult, redLine, disrespect, coercion, manipulation, privacyViolation, apology, repairAttempt,
     stopQuestions, stopTalking, frustration, emotionalLoad, affection, support, compliment,
   };
