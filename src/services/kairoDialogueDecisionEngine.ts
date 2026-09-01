@@ -146,6 +146,10 @@ function isReciprocalSocialRoutine(event: SemanticEvent): boolean {
   );
 }
 
+function hasImmediateKairaTurn(history: ConversationTurn[]): boolean {
+  return history.at(-1)?.sender === "droit";
+}
+
 function isShortAnswerToPreviousKairaTurn(
   history: ConversationTurn[],
   userMessage: string,
@@ -183,7 +187,7 @@ export function planDialogueResponse(
   const claims = buildDialogueClaimLedger(history, userMessage, userName, dialogueAnalysis);
   const supportedClaims = supportedClaimsFor(claims, target);
 
-  if (event.discourseAct === "confusion_or_challenge") {
+  if (event.discourseAct === "confusion_or_challenge" && hasImmediateKairaTurn(history)) {
     return {
       move: "repair_or_rephrase",
       allowFollowUpQuestion: false,

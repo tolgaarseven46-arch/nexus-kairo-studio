@@ -90,6 +90,18 @@ describe("Kaira dialogue decision engine", () => {
     );
   });
 
+  it("does not invent an other-repair sequence when there is no immediately prior Kaira turn", () => {
+    const withoutPriorKaira = planDialogueResponse([], "ne alaka", "Mert");
+    const afterUserTurn = planDialogueResponse(
+      [{ sender: "user", text: "Mert böyle dedi", participantName: "Ali" }],
+      "ne alaka",
+      "Mert",
+    );
+
+    expect(withoutPriorKaira.move).not.toBe("repair_or_rephrase");
+    expect(afterUserTurn.move).not.toBe("repair_or_rephrase");
+  });
+
   it.each(["hiç biri", "hiçbiri", "yok", "ikisi de", "olmadı"])(
     "binds a short answer to Kaira's previous prompt: %s",
     (message) => {
