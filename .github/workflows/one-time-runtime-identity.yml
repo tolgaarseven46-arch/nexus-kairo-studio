@@ -1,0 +1,36 @@
+name: one-time-runtime-identity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-runtime-identity.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - name: Apply runtime identity migration
+        run: python .github/scripts/one-time-runtime-identity.py
+      - name: Focused regressions
+        run: npx vitest run src/services/kairaRuntimeIdentityContracts.test.ts src/services/kairaInstanceFoundationContracts.test.ts src/services/kairaSpeechIdentityAuthorityContracts.test.ts src/services/kairaLocalAiParityContracts.test.ts
+      - name: TypeScript
+        run: npm run lint
+      - name: Commit product and clean helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts src/services/kairaRuntimeIdentity.ts src/services/kairaRuntimeIdentityContracts.test.ts
+          git rm .github/workflows/one-time-runtime-identity.yml .github/scripts/one-time-runtime-identity.py
+          git commit -m "feat(kaira): wire runtime identity projection"
+          git push origin main
