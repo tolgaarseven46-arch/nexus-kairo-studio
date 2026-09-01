@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const world = vi.hoisted(() => ({ save: vi.fn() }));
-const identity = vi.hoisted(() => ({ append: vi.fn() }));
+const identity = vi.hoisted(() => ({ append: vi.fn(), revise: vi.fn() }));
+const consolidation = vi.hoisted(() => ({ appraise: vi.fn() }));
 
 vi.mock("./worldModelEventStore", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./worldModelEventStore")>();
@@ -9,7 +10,12 @@ vi.mock("./worldModelEventStore", async (importOriginal) => {
 });
 vi.mock("./kairaCanonicalIdentityStore", () => ({
   appendKairaAutobiographicalMemoryAtomic: identity.append,
+  applyKairaSelfFactRevisionAtomic: identity.revise,
 }));
+vi.mock("./kairaLivedMemoryConsolidation", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./kairaLivedMemoryConsolidation")>();
+  return { ...actual, appraiseLivedMemoryCandidate: consolidation.appraise };
+});
 
 import { persistWorldEventAndMaybeConsolidateLivedMemory } from "./kairaLivedMemoryRuntime";
 
@@ -48,8 +54,30 @@ const persistedObservation = {
   event,
   createdAt: "2026-09-01T10:00:00.000Z",
 };
+const baseMemory = {
+  id: "lived_obs_1",
+  origin: "lived" as const,
+  occurredAt: "2026-09-01T10:00:00.000Z",
+  participantIds: ["user_1"],
+  eventType: "insult",
+  facts: ["salak"],
+  emotions: [{ label: "kırgınlık", intensity: 0.7 }],
+  salience: 0.8,
+  sensitivity: "ordinary" as const,
+  canonical: true as const,
+  sourceWorldObservationIds: ["obs_1"],
+  consolidationKey: "world:obs_1",
+};
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  consolidation.appraise.mockReturnValue({
+    status: "consolidate",
+    score: 0.8,
+    reasons: ["test"],
+    memory: baseMemory,
+  });
+});
 
 describe("lived autobiographical runtime coordinator", () => {
   it("persists world truth before appending the lived projection", async () => {
@@ -63,6 +91,49 @@ describe("lived autobiographical runtime coordinator", () => {
       dynamicStateAfter,
     })).resolves.toMatchObject({ status: "consolidated", observationId: "obs_1", memoryId: "lived_obs_1" });
     expect(world.save.mock.invocationCallOrder[0]).toBeLessThan(identity.append.mock.invocationCallOrder[0]);
+    expect(identity.revise).not.toHaveBeenCalled();
+  });
+
+  it("applies self revision only after a canonical lived memory carrying typed evidence", async () => {
+    world.save.mockResolvedValue(persistedObservation);
+    consolidation.appraise.mockReturnValue({
+      status: "consolidate",
+      score: 0.9,
+      reasons: ["typed_self_evidence"],
+      memory: {
+        ...baseMemory,
+        selfRevisionEvidence: {
+          factKey: "preferred_music",
+          domain: "preference",
+          value: "ambient",
+          confidence: 0.9,
+        },
+      },
+    });
+    identity.append.mockResolvedValue({ status: "appended", memoryId: "lived_obs_1" });
+    identity.revise.mockResolvedValue({
+      status: "unchanged",
+      decision: { status: "insufficient_evidence" },
+    });
+
+    const result = await persistWorldEventAndMaybeConsolidateLivedMemory({
+      instance: { instanceId: "kaira_1", instanceType: "individual" },
+      sessionId: "s1",
+      event,
+      dynamicStateAfter,
+    });
+
+    expect(identity.append.mock.invocationCallOrder[0]).toBeLessThan(identity.revise.mock.invocationCallOrder[0]);
+    expect(identity.revise).toHaveBeenCalledWith(
+      expect.objectContaining({ instanceId: "kaira_1" }),
+      "preferred_music",
+    );
+    expect(result).toMatchObject({
+      status: "consolidated",
+      selfRevisionFactKey: "preferred_music",
+      selfRevisionStatus: "unchanged",
+      selfRevisionDecision: "insufficient_evidence",
+    });
   });
 
   it("does not touch autobiography when the world event is not persisted", async () => {
@@ -71,6 +142,7 @@ describe("lived autobiographical runtime coordinator", () => {
       instance: { instanceId: "kaira_1", instanceType: "individual" }, sessionId: "s1", event, dynamicStateAfter,
     })).resolves.toEqual({ status: "world_event_skipped" });
     expect(identity.append).not.toHaveBeenCalled();
+    expect(identity.revise).not.toHaveBeenCalled();
   });
 
   it("keeps world persistence even when canonical identity is unavailable", async () => {
@@ -95,5 +167,6 @@ describe("lived autobiographical runtime coordinator", () => {
     })).resolves.toEqual({ status: "not_applicable" });
     expect(world.save).not.toHaveBeenCalled();
     expect(identity.append).not.toHaveBeenCalled();
+    expect(identity.revise).not.toHaveBeenCalled();
   });
 });
