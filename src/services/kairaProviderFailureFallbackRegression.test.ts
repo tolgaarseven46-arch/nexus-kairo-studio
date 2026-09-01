@@ -19,7 +19,7 @@ describe('provider failure fallback regression', () => {
     expect(server).toContain('consistency.accepted && !providerFailureFallbackUsed');
   });
 
-  it('uses a plan-safe deterministic social fallback when the provider is unavailable', () => {
+  it('uses a plan-safe deterministic canonical greeting fallback when the provider is unavailable', () => {
     const message = 'selam kaira';
     const event = interpretSemanticEvent(message);
     const kdm = analyzeKdmInteraction(message, NEUTRAL_DROIT_PERSONALITY, undefined, event);
@@ -29,8 +29,14 @@ describe('provider failure fallback regression', () => {
     const plan = buildKairaResponsePlan(contract, dialogue, speech);
     const fallback = buildGroundedDialogueFallback(dialogue, [], message, 'Ali', undefined, plan.allowQuestion);
 
-    expect(dialogue.move).toBe('natural_reaction');
-    expect(fallback).toBe('he anladım');
+    expect(event.socialRoutine).toBe('greeting');
+    expect(dialogue).toMatchObject({
+      move: 'complete_social_routine',
+      socialRoutine: 'greeting',
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+    });
+    expect(fallback).toBe('selam');
     expect(findKairaResponsePlanIssues(fallback!, plan)).toEqual([]);
   });
 
