@@ -80,6 +80,30 @@ describe("KairaResponsePlan", () => {
     expect(plan.allowQuestion).toBe(true);
   });
 
+  it("keeps active positive repair progress open instead of inventing relationship damage", () => {
+    const contract = buildBehaviorContract(
+      state("active", { hurtScore: 0, conflictScore: 0, repairProgress: 12 }),
+    );
+    const plan = buildKairaResponsePlan(
+      contract,
+      dialogue({
+        move: "invite_emotional_context",
+        allowFollowUpQuestion: true,
+        maxSentences: 1,
+        maxWords: 4,
+      }),
+      speech(),
+    );
+
+    expect(contract.stance).toBe("open");
+    expect(contract.questions).toBe("allowed");
+    expect(contract.reasons).not.toContain(
+      "Çözülmemiş ilişki hasarı var; sıcak/oyuncu yeniden yakınlaşma ve kesin affetme engellendi.",
+    );
+    expect(plan.allowQuestion).toBe(true);
+    expect(plan.maxWords).toBe(4);
+  });
+
   it("does not let HOW-only humor style veto an allowed behavior permission", () => {
     const contract = buildBehaviorContract(state("active"));
     const plan = buildKairaResponsePlan(
