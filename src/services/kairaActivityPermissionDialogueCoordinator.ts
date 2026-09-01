@@ -14,6 +14,20 @@ import {
   settleKairaActivityPermissionRequestAtomic,
   type KairaActivityPermissionRequestCreateResult,
 } from "./kairaActivityPermissionDialogueStore";
+import {
+  clearKairaActivityPermissionSessionPointerAtomic,
+  createKairaActivityPermissionSessionPointerAtomic,
+  loadActiveKairaActivityPermissionSessionPointer,
+} from "./kairaActivityPermissionSessionPointerStore";
+import type { KairaActivityPermissionSessionPointer } from "./kairaActivityPermissionSessionPointer";
+
+export interface KairaActivityPermissionDialogueOpenResult {
+  request: KairaActivityPermissionRequestCreateResult;
+  pointer: {
+    status: "created" | "existing";
+    pointer: KairaActivityPermissionSessionPointer;
+  };
+}
 
 export async function openKairaActivityPermissionDialogue(input: {
   execution: KairaActivityExecutionRecord;
@@ -21,9 +35,11 @@ export async function openKairaActivityPermissionDialogue(input: {
   promptTurnId: string;
   now: string;
   expiresAt?: string;
-}): Promise<KairaActivityPermissionRequestCreateResult> {
+}): Promise<KairaActivityPermissionDialogueOpenResult> {
   const request = createKairaActivityPermissionDialogueRequest(input);
-  return createKairaActivityPermissionRequestAtomic(request);
+  const requestResult = await createKairaActivityPermissionRequestAtomic(request);
+  const pointer = await createKairaActivityPermissionSessionPointerAtomic(requestResult.request);
+  return { request: requestResult, pointer };
 }
 
 export type KairaActivityPermissionDialogueApplyResult =
@@ -46,8 +62,9 @@ export type KairaActivityPermissionDialogueApplyResult =
 /**
  * Dialogue is only a correlation authority. It never edits execution state itself.
  * The canonical activity executor applies grant/deny first; only then is the
- * dialogue request settled. If request persistence fails after execution applied,
- * an exact retry replays the execution command and can safely finish settlement.
+ * dialogue request settled. If request/pointer persistence fails after execution
+ * applied, an exact retry replays the executor command and safely finishes the
+ * remaining projections.
  */
 export async function applyKairaActivityPermissionDialogueReply(input: {
   request: KairaActivityPermissionDialogueRequest;
@@ -76,5 +93,13 @@ export async function applyKairaActivityPermissionDialogueReply(input: {
     intent: decision.intent,
     now: input.now,
   });
+  const pointer = await loadActiveKairaActivityPermissionSessionPointer({
+    ownerUserId: decision.request.ownerUserId,
+    kairaInstanceId: decision.request.kairaInstanceId,
+    sessionId: decision.request.sessionId,
+  });
+  if (pointer && pointer.request.requestId === decision.request.requestId) {
+    await clearKairaActivityPermissionSessionPointerAtomic({ pointer, now: input.now });
+  }
   return { status: "applied", decision, execution, request };
 }
