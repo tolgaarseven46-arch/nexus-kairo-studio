@@ -65,4 +65,13 @@ describe('beta conversation continuity regressions', () => {
     });
     expect(plan.reason).toContain('beğeni');
   });
+
+  it('does not bind a standalone evet when there is no recent prompt or offer', () => {
+    const plan = planDialogueResponse(
+      [{ sender: 'droit', text: 'bugün hava baya sıcak' } as any],
+      'evet',
+      'Mert',
+    );
+    expect(plan.move).toBe('natural_reaction');
+  });
 });
