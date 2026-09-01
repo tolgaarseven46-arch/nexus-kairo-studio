@@ -18,6 +18,18 @@ jobs:
       - run: npm install --ignore-scripts
       - name: Apply fail-closed epistemic migration
         run: node scripts/one-time-epistemic-profile-fail-closed.cjs
+      - name: Align final issue authority contract
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'src/services/kairaResponsePlanIntegrationContracts.test.ts';
+          let source = fs.readFileSync(path, 'utf8');
+          source = source.replace(
+            'expect(server).toContain("finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues])]");',
+            'expect(server).toContain("finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues])]");',
+          );
+          fs.writeFileSync(path, source);
+          NODE
       - name: Focused epistemic regressions
         run: npx vitest run src/services/kairaKnowledgeProfileStore.test.ts src/services/kairaEpistemicGateContracts.test.ts src/services/kairaEpistemicResponsePolicy.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts
       - name: Architecture contracts
@@ -36,4 +48,4 @@ jobs:
           git add server.ts src/services/kairaEpistemicGate.ts src/services/kairaKnowledgeProfileStore.ts src/services/kairaKnowledgeProfileStore.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts src/services/kairaBehaviorProfileAuthorityContracts.test.ts src/services/kairaResponsePlanIntegrationContracts.test.ts src/services/kairaWorldStateAppraisalIntegrationContracts.test.ts
           git commit -m "fix(kaira): fail closed on epistemic profile outage"
           git push
-# retry: 3
+# retry: 4
