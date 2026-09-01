@@ -1,0 +1,36 @@
+name: one-time-dyadic-user-style
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-dyadic-user-style.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - name: Apply migration
+        run: python .github/scripts/one-time-dyadic-user-style.py
+      - name: Focused regressions
+        run: npx vitest run src/services/kairaDyadicUserStyleContracts.test.ts src/services/kairaLanguageMemoryLearningContracts.test.ts src/services/kairaLanguageMemoryPolicyBoundaryContracts.test.ts src/services/kairaLanguageMemoryInstanceIsolation.test.ts src/services/kairaLanguageMemoryStyleAdaptationRegression.test.ts src/services/kairaLanguageStyleMemoryIntegrationContracts.test.ts src/services/kairoLocalLanguageEngine.test.ts
+      - name: TypeScript
+        run: npm run lint
+      - name: Commit and clean helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts src/services/kairoLanguageMemory.ts src/services/kairoLocalLanguageEngine.ts src/services/kairaLanguageMemoryPolicyBoundaryContracts.test.ts src/services/kairaDyadicUserStyleContracts.test.ts
+          git rm .github/workflows/one-time-dyadic-user-style.yml .github/scripts/one-time-dyadic-user-style.py
+          git commit -m "feat(kaira): add dyadic user style alignment"
+          git push origin main
