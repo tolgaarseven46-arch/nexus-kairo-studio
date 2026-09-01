@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { canonicalIdentityFromSeed } from "./kairaCanonicalIdentity";
+import {
+  canonicalIdentityFromSeed,
+  validateKairaCanonicalIdentity,
+} from "./kairaCanonicalIdentity";
 import { buildKairaIdentityTestFixture, type KairaAutobiographicalMemory } from "./kairaIdentityContracts";
 import { evaluateKairaSelfFactRevision } from "./kairaSelfFactRevision";
 
@@ -137,5 +140,35 @@ describe("Kaira self-fact revision contracts", () => {
       eventType: "music_experience",
     });
     expect(evaluateKairaSelfFactRevision(state, "preferred_music").status).toBe("no_evidence");
+  });
+
+  it("rejects duplicate canonical self-fact keys", () => {
+    const state = canonicalIdentityFromSeed(buildKairaIdentityTestFixture("kaira_a"));
+    state.selfFacts.push({
+      id: "sf_duplicate_flower",
+      domain: "preference",
+      key: "FAVORITE_FLOWER",
+      value: "lale",
+      canonical: true,
+      confidence: 0.9,
+      source: "lived_revision",
+    });
+    expect(validateKairaCanonicalIdentity(state).map((issue) => issue.invariant))
+      .toContain("canonical_identity.self_fact_key_unique");
+  });
+
+  it("keeps lived_revision out of trait and biography ownership", () => {
+    const state = canonicalIdentityFromSeed(buildKairaIdentityTestFixture("kaira_a"));
+    state.selfFacts.push({
+      id: "sf_illegal_trait_revision",
+      domain: "trait",
+      key: "core_patience",
+      value: 80,
+      canonical: true,
+      confidence: 0.9,
+      source: "lived_revision",
+    });
+    expect(validateKairaCanonicalIdentity(state).map((issue) => issue.invariant))
+      .toContain("canonical_identity.lived_revision_domain");
   });
 });
