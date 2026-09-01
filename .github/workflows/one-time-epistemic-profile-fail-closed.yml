@@ -33,7 +33,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/one-time-epistemic-profile-fail-closed.yml scripts/one-time-epistemic-profile-fail-closed.cjs
-          git add server.ts src/services/kairaEpistemicGate.ts src/services/kairaKnowledgeProfileStore.ts src/services/kairaKnowledgeProfileStore.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts
+          git add server.ts src/services/kairaEpistemicGate.ts src/services/kairaKnowledgeProfileStore.ts src/services/kairaKnowledgeProfileStore.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts src/services/kairaBehaviorProfileAuthorityContracts.test.ts src/services/kairaResponsePlanIntegrationContracts.test.ts src/services/kairaWorldStateAppraisalIntegrationContracts.test.ts
           git commit -m "fix(kaira): fail closed on epistemic profile outage"
           git push
-# retry: 2
+# retry: 3
