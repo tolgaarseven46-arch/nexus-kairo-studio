@@ -7,19 +7,34 @@ import {
 } from "./kairaAutobiographicalRecall";
 
 describe("Kaira selective autobiographical recall contracts", () => {
-  it("retrieves a matching self-fact without importing knowledge concepts", () => {
+  it("retrieves a matching self-fact by canonical key without importing knowledge concepts", () => {
     const state = canonicalIdentityFromSeed(buildKairaIdentityTestFixture("kaira_01"));
     const recall = selectKairaAutobiographicalRecall(
       {
         surface: "senin en sevdiğin çiçek neydi",
         scope: "self_fact",
+        factKey: "favorite_flower",
         confidence: 0.95,
       },
       state,
     );
     expect(recall.selfFacts[0]?.fact.key).toBe("favorite_flower");
+    expect(recall.selfFacts).toHaveLength(1);
     expect(recall.memories).toHaveLength(0);
     expect(JSON.stringify(recall)).not.toContain("concept_krizantem");
+  });
+
+  it("fails closed instead of guessing between unrelated self-facts", () => {
+    const state = canonicalIdentityFromSeed(buildKairaIdentityTestFixture("kaira_01"));
+    const recall = selectKairaAutobiographicalRecall(
+      {
+        surface: "senin en sevdiğin şey ne",
+        scope: "self_fact",
+        confidence: 0.9,
+      },
+      state,
+    );
+    expect(recall.selfFacts).toHaveLength(0);
   });
 
   it("retrieves only relevant ordinary autobiography", () => {
@@ -52,9 +67,15 @@ describe("Kaira selective autobiographical recall contracts", () => {
   it("does not spill autobiography into a self-fact-only query", () => {
     const state = canonicalIdentityFromSeed(buildKairaIdentityTestFixture("kaira_01"));
     const recall = selectKairaAutobiographicalRecall(
-      { surface: "senin favori rengin ne", scope: "self_fact", confidence: 0.9 },
+      {
+        surface: "senin favori rengin ne",
+        scope: "self_fact",
+        factKey: "preferred_clothing_color",
+        confidence: 0.9,
+      },
       state,
     );
+    expect(recall.selfFacts[0]?.fact.key).toBe("preferred_clothing_color");
     expect(recall.memories).toHaveLength(0);
   });
 
