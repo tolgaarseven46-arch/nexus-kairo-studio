@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, limit, orderBy, query, runTransaction } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import {
   DEFAULT_KAIRA_INSTANCE_ID,
@@ -68,6 +68,47 @@ const validActivityValue = (value: unknown): value is string | number | boolean 
   (typeof value === "string" && Boolean(value.trim())) ||
   (typeof value === "number" && Number.isFinite(value)) ||
   typeof value === "boolean";
+
+const activityValueKey = (value: string | number | boolean) =>
+  `${typeof value}:${typeof value === "string" ? value.trim() : String(value)}`;
+
+export function kairaActivityObservationDocumentId(
+  activityId: string,
+  status: KairaActivityWorldStatus,
+): string {
+  const canonicalId = canonicalActivityKey(activityId);
+  if (!canonicalId) throw new Error("Invalid Kaira activity id");
+  return `kaira_activity__${canonicalId}__${status}`;
+}
+
+function sameActivityExperienceSubject(
+  left?: KairaActivityExperienceSubject,
+  right?: KairaActivityExperienceSubject,
+): boolean {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  return (
+    left.preferenceKey === right.preferenceKey &&
+    activityValueKey(left.experiencedValue) === activityValueKey(right.experiencedValue)
+  );
+}
+
+function sameCanonicalActivityObservation(
+  existing: WorldEventObservation,
+  intended: Omit<WorldEventObservation, "id">,
+): boolean {
+  return Boolean(
+    existing.kind === "kaira_activity" &&
+    existing.status === "grounded" &&
+    existing.userId === intended.userId &&
+    observationKairaInstanceId(existing) === observationKairaInstanceId(intended as WorldEventObservation) &&
+    existing.sessionId === intended.sessionId &&
+    existing.activity?.activityId === intended.activity?.activityId &&
+    existing.activity?.activityType === intended.activity?.activityType &&
+    existing.activity?.status === intended.activity?.status &&
+    sameActivityExperienceSubject(existing.activity?.experienceSubject, intended.activity?.experienceSubject)
+  );
+}
 
 export function observationKairaInstanceId(observation: WorldEventObservation): string {
   return resolveKairaInstanceContext({ instanceId: observation.kairaInstanceId }).instanceId;
@@ -199,8 +240,9 @@ export async function saveWorldEventObservation(input: {
 
 /**
  * Persists trusted Kaira-owned activity lifecycle truth without routing it
- * through user-message classification. The generic event is only a compatibility
- * projection for existing world-model readers; `kind + activity` is authority.
+ * through user-message classification. Activity lifecycle rows use deterministic
+ * document ids, so executor retries resolve to the original canonical observation
+ * instead of manufacturing a second independent lived episode.
  */
 export async function saveKairaActivityWorldObservation(input: {
   userId?: string;
@@ -269,8 +311,26 @@ export async function saveKairaActivityWorldObservation(input: {
     activity,
     createdAt,
   };
-  const ref = await addDoc(collection(parent, EVENT_COLLECTION), persisted);
-  return { id: ref.id, ...persisted };
+
+  const observationRef = doc(
+    collection(parent, EVENT_COLLECTION),
+    kairaActivityObservationDocumentId(activityId, activity.status),
+  );
+  return runTransaction(db, async (transaction) => {
+    const existingSnapshot = await transaction.get(observationRef);
+    if (existingSnapshot.exists()) {
+      const existing: WorldEventObservation = {
+        id: existingSnapshot.id,
+        ...(existingSnapshot.data() as Omit<WorldEventObservation, "id">),
+      };
+      if (!sameCanonicalActivityObservation(existing, persisted)) {
+        throw new Error("Kaira activity idempotency conflict");
+      }
+      return existing;
+    }
+    transaction.set(observationRef, persisted);
+    return { id: observationRef.id, ...persisted };
+  });
 }
 
 export async function loadRecentWorldEventObservations(
