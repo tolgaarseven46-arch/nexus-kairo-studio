@@ -60,23 +60,10 @@ replaceNth(
   2,
 );
 
-replaceNth(
-  "AI guard reason aggregation",
-  '        ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),\n        ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),',
-  '        ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),\n        ...(selfMemoryGuard.reason ? [selfMemoryGuard.reason] : []),\n        ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),',
-  2,
-);
-
 replaceOnce(
   "post-enforcement candidate self-memory guard",
   '        const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents, worldReasoningContext);\n        const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateWorldGuard.reply, epistemicAccess);\n        const candidateBaseEnforced = enforceKairoResponse(candidateEpistemicGuard.reply, kdm.trace, enforcementRules);',
   '        const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents, worldReasoningContext);\n        const candidateSelfMemoryGuard = enforceKairaAutobiographicalResponse(candidateWorldGuard.reply, selfMemoryRuntime);\n        const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateSelfMemoryGuard.reply, epistemicAccess);\n        const candidateBaseEnforced = enforceKairoResponse(candidateEpistemicGuard.reply, kdm.trace, enforcementRules);',
-);
-
-replaceOnce(
-  "candidate self-memory reason aggregation",
-  '            ...(candidateWorldGuard.reason ? [candidateWorldGuard.reason] : []),\n            ...(candidateEpistemicGuard.reason ? [candidateEpistemicGuard.reason] : []),',
-  '            ...(candidateWorldGuard.reason ? [candidateWorldGuard.reason] : []),\n            ...(candidateSelfMemoryGuard.reason ? [candidateSelfMemoryGuard.reason] : []),\n            ...(candidateEpistemicGuard.reason ? [candidateEpistemicGuard.reason] : []),',
 );
 
 const observabilityAnchor = '          epistemicAccess,\n          responsePlan,';
@@ -98,5 +85,6 @@ source = source.replaceAll(
 if (!source.includes("resolveKairaAutobiographicalRecallRuntime")) throw new Error("Recall runtime import missing after patch");
 if (!source.includes("enforceKairaAutobiographicalResponse")) throw new Error("Response guard import missing after patch");
 if (!source.includes("${selfMemoryInstruction}")) throw new Error("System prompt self-memory instruction missing after patch");
+if (!source.includes("candidateSelfMemoryGuard")) throw new Error("Post-enforcement self-memory guard missing after patch");
 
 writeFileSync(path, source);
