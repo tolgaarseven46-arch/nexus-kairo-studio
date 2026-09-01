@@ -55,12 +55,67 @@ describe("Kaira selective autobiographical recall contracts", () => {
       {
         surface: "senin yağmura yakalandığın anıyı hatırlıyor musun",
         scope: "autobiographical_memory",
+        retrievalMode: "targeted",
         confidence: 0.96,
       },
       state,
     );
     expect(recall.memories.map((item) => item.memory.id)).toContain("mem_fixture_storm");
     expect(recall.memories.map((item) => item.memory.id)).not.toContain("mem_private");
+    expect(recall.withheldSensitiveCount).toBe(1);
+  });
+
+  it("returns high-salience ordinary memories for broad autobiography", () => {
+    const state = canonicalIdentityFromSeed(buildKairaIdentityTestFixture("kaira_01"));
+    state.autobiographicalMemories.push(
+      {
+        id: "mem_high",
+        origin: "lived",
+        participantIds: ["ali"],
+        eventType: "support",
+        facts: ["zor bir anda destek gördü"],
+        emotions: [{ label: "rahatlama", intensity: 0.8 }],
+        salience: 0.96,
+        sensitivity: "ordinary",
+        canonical: true,
+      },
+      {
+        id: "mem_low",
+        origin: "lived",
+        participantIds: ["mert"],
+        eventType: "general",
+        facts: ["sıradan bir konuşma oldu"],
+        emotions: [],
+        salience: 0.3,
+        sensitivity: "ordinary",
+        canonical: true,
+      },
+      {
+        id: "mem_sensitive_high",
+        origin: "lived",
+        participantIds: [],
+        eventType: "private_event",
+        facts: ["özel olay"],
+        emotions: [{ label: "kaygı", intensity: 1 }],
+        salience: 1,
+        sensitivity: "sensitive",
+        canonical: true,
+      },
+    );
+
+    const recall = selectKairaAutobiographicalRecall(
+      {
+        surface: "senin geçmişinde neler yaşadın",
+        scope: "autobiographical_memory",
+        retrievalMode: "broad",
+        confidence: 0.95,
+      },
+      state,
+      2,
+    );
+
+    expect(recall.memories[0]?.memory.id).toBe("mem_high");
+    expect(recall.memories.map((item) => item.memory.id)).not.toContain("mem_sensitive_high");
     expect(recall.withheldSensitiveCount).toBe(1);
   });
 
@@ -85,6 +140,7 @@ describe("Kaira selective autobiographical recall contracts", () => {
       {
         surface: "senin geçmişindeki yağmur anısı",
         scope: "autobiographical_memory",
+        retrievalMode: "targeted",
         confidence: 0.9,
       },
       state,
@@ -96,12 +152,13 @@ describe("Kaira selective autobiographical recall contracts", () => {
     expect(instruction).toContain("private/sensitive");
   });
 
-  it("returns an explicit no-match grounding instead of model-prior autobiography", () => {
+  it("returns an explicit no-match grounding for a targeted miss", () => {
     const state = canonicalIdentityFromSeed(buildKairaIdentityTestFixture("kaira_01"));
     const recall = selectKairaAutobiographicalRecall(
       {
         surface: "senin mars kolonisi anın",
         scope: "autobiographical_memory",
+        retrievalMode: "targeted",
         confidence: 0.9,
       },
       state,
