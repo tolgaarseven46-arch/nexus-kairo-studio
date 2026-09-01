@@ -30,6 +30,9 @@ export interface KairaAutobiographicalRecallRuntimeDependencies {
   ) => Promise<KairaCanonicalIdentityLoadResult>;
 }
 
+const ephemeralInstruction =
+  "KAIRA SELECTIVE SELF-MEMORY RECALL:\nSTORE_STATUS=ephemeral\nRULE: Bu Kaira instance'ı kalıcı benlik/otobiyografi taşımaz. Model prior'ından tercih, biyografi veya geçmiş olay UYDURMA; soruya doğal biçimde kalıcı bir anı kaydın olmadığını belirterek cevap ver.";
+
 export async function resolveKairaAutobiographicalRecallRuntime(
   input: {
     instance: KairaInstanceContext;
@@ -50,13 +53,13 @@ export async function resolveKairaAutobiographicalRecallRuntime(
 
   const policy = instancePolicy(input.instance.instanceType);
   if (!policy.persistentIdentity || !policy.persistentAutobiography) {
-    return { status: "ephemeral", recall: null, instruction: "" };
+    return { status: "ephemeral", recall: null, instruction: ephemeralInstruction };
   }
 
   const loadIdentity = dependencies.loadIdentity ?? loadKairaCanonicalIdentityResult;
   const loaded = await loadIdentity(input.instance);
   if (loaded.status === "ephemeral") {
-    return { status: "ephemeral", recall: null, instruction: "" };
+    return { status: "ephemeral", recall: null, instruction: ephemeralInstruction };
   }
   if (loaded.status === "missing") {
     const recall: KairaAutobiographicalRecall = {
