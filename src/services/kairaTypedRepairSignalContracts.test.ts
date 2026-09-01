@@ -6,6 +6,7 @@ import {
   planDialogueResponse,
 } from "./kairoDialogueDecisionEngine";
 
+// Repair subtype ownership stays at the canonical semantic boundary; dialogue only consumes it.
 describe("typed conversational repair signal contracts", () => {
   it.each([
     ["nasıl yani", "clarification_request"],
