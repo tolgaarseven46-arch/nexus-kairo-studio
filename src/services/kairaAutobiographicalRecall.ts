@@ -110,9 +110,13 @@ function rankMemory(
     score += participantOverlap * 0.08;
     reasons.push("participant_overlap");
   }
-  if (/anı|hatırla|geçmiş|başına gel|yaşadığın|yaşamış/u.test(normalize(query.surface))) {
-    score += 0.12;
-    reasons.push("autobiography_intent_match");
+  const hasEvidence = score > 0;
+  if (
+    hasEvidence &&
+    /anı|hatırla|geçmiş|başına gel|yaşadığın|yaşamış/u.test(normalize(query.surface))
+  ) {
+    score += 0.06;
+    reasons.push("autobiography_intent_tiebreak");
   }
   score += Math.min(0.08, memory.salience * 0.08);
   return { memory, score: Math.min(1, score), reasons };
