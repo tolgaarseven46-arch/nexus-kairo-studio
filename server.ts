@@ -52,7 +52,8 @@ import {
   planDialogueResponse,
 } from "./src/services/kairoDialogueDecisionEngine";
 import { recordKdmMetric } from "./src/services/kdmMetricsService";
-import { saveWorldEventObservation, loadRecentWorldEventObservations } from "./src/services/worldModelEventStore";
+import { loadRecentWorldEventObservations } from "./src/services/worldModelEventStore";
+import { persistWorldEventAndMaybeConsolidateLivedMemory } from "./src/services/kairaLivedMemoryRuntime";
 import { buildWorldEventMemoryInstruction, rankWorldEventObservations, shouldRetrieveWorldEvents } from "./src/services/worldEventRetrieval";
 import { enforceWorldModelRecallResponse, findWorldModelResponseIssues } from "./src/services/worldModelResponseGuard";
 import { appraiseRetrievedWorldState, buildWorldStateAppraisalInstruction } from "./src/services/worldStateAppraisal";
@@ -771,15 +772,16 @@ app.post("/api/chat", async (req, res) => {
         learnLanguageReply(stateUserId, reply);
       }
       const postStart = now();
+      const livedMemoryRuntime = await persistWorldEventAndMaybeConsolidateLivedMemory({
+        userId,
+        instance: kairaInstance,
+        sessionId,
+        speakerName: userName,
+        event: languageUnderstanding.worldEvent,
+        dynamicStateAfter: kdm.nextDynamicState,
+      });
       let savedTurnId = "";
       await Promise.allSettled([
-        kairaPolicy.persistentWorldModel ? saveWorldEventObservation({
-          userId,
-          kairaInstanceId: kairaInstance.instanceId,
-          sessionId,
-          speakerName: userName,
-          event: languageUnderstanding.worldEvent,
-        }) : Promise.resolve(),
         kairaPolicy.persistentRelationship ? saveKdmInteraction({
           userId: stateUserId,
           dynamicState: kdm.nextDynamicState,
@@ -819,6 +821,7 @@ app.post("/api/chat", async (req, res) => {
           worldMemoryGuard,
           epistemicAccess,
           selfMemoryRuntime,
+          livedMemoryRuntime,
           responsePlan,
         }),
         saveTestSessionTurn({
@@ -870,6 +873,8 @@ app.post("/api/chat", async (req, res) => {
             worldReasoningPolicy,
             worldMemoryGuard,
             epistemicAccess,
+            selfMemoryRuntime,
+            livedMemoryRuntime,
             responsePlan,
             timings: { memoryMs, kdmMs, aiMs: 0 },
           },
@@ -901,7 +906,7 @@ app.post("/api/chat", async (req, res) => {
         },
         enforcement: enforced,
         speechIdentity: speech,
-        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, epistemicAccess, selfMemoryRuntime, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" } },
+        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, epistemicAccess, selfMemoryRuntime, livedMemoryRuntime, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" } },
         consistency,
         dialogue: dialogueAnalysis,
         timings,
@@ -1133,15 +1138,16 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
       learnLanguageReply(stateUserId, reply);
     }
     const postStart = now();
+    const livedMemoryRuntime = await persistWorldEventAndMaybeConsolidateLivedMemory({
+      userId,
+      instance: kairaInstance,
+      sessionId,
+      speakerName: userName,
+      event: languageUnderstanding.worldEvent,
+      dynamicStateAfter: kdm.nextDynamicState,
+    });
     let savedTurnId = "";
     await Promise.allSettled([
-      kairaPolicy.persistentWorldModel ? saveWorldEventObservation({
-        userId,
-        kairaInstanceId: kairaInstance.instanceId,
-        sessionId,
-        speakerName: userName,
-        event: languageUnderstanding.worldEvent,
-      }) : Promise.resolve(),
       kairaPolicy.persistentRelationship ? saveKdmInteraction({
         userId: stateUserId,
         dynamicState: kdm.nextDynamicState,
@@ -1174,6 +1180,8 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         worldReasoningPolicy,
         worldMemoryGuard,
         epistemicAccess,
+        selfMemoryRuntime,
+        livedMemoryRuntime,
         responsePlan,
       }),
       saveTestSessionTurn({
@@ -1226,6 +1234,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           worldMemoryGuard,
           epistemicAccess,
           selfMemoryRuntime,
+          livedMemoryRuntime,
           responsePlan,
           timings: { memoryMs, kdmMs, aiMs },
         },
@@ -1252,7 +1261,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, epistemicAccess, selfMemoryRuntime, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: spontaneityDecision },
+      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, epistemicAccess, selfMemoryRuntime, livedMemoryRuntime, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: spontaneityDecision },
       consistency,
       dialogue: dialogueAnalysis,
       dialogueDecision,
