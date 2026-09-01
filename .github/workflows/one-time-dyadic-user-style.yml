@@ -35,6 +35,18 @@ jobs:
           PY
       - name: Apply migration
         run: python .github/scripts/one-time-dyadic-user-style.py
+      - name: Tighten generated marker assertion
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          p = Path('src/services/kairaDyadicUserStyleContracts.test.ts')
+          s = p.read_text()
+          old = "    expect(dyadicLanguageAlignmentInstruction(userId, 'familiar')).not.toContain('lan');"
+          new = "    expect(dyadicLanguageAlignmentInstruction(userId, 'familiar')).toContain('markerlar=kanka');\n    expect(dyadicLanguageAlignmentInstruction(userId, 'familiar')).not.toContain('markerlar=lan');"
+          if old not in s:
+              raise SystemExit('dyadic familiar assertion target missing')
+          p.write_text(s.replace(old, new, 1))
+          PY
       - name: Focused regressions
         run: npx vitest run src/services/kairaDyadicUserStyleContracts.test.ts src/services/kairaLanguageMemoryLearningContracts.test.ts src/services/kairaLanguageMemoryPolicyBoundaryContracts.test.ts src/services/kairaLanguageMemoryInstanceIsolation.test.ts src/services/kairaLanguageMemoryStyleAdaptationRegression.test.ts src/services/kairaLanguageStyleMemoryIntegrationContracts.test.ts src/services/kairoLocalLanguageEngine.test.ts
       - name: TypeScript
