@@ -36,3 +36,4 @@ jobs:
           git add server.ts
           git commit -m "feat(kaira): wire lived autobiographical memory runtime"
           git push
+# retry: 2
