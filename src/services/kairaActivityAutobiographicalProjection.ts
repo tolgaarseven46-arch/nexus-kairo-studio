@@ -56,10 +56,21 @@ function exactExperienceSubjectMatch(
   );
 }
 
+function validBoundedOutcome(receipt: KairaActivityExecutionReceipt): boolean {
+  const outcome = receipt.outcome;
+  return Boolean(
+    outcome &&
+    Number.isFinite(outcome.outcomeValence) && outcome.outcomeValence >= -1 && outcome.outcomeValence <= 1 &&
+    Number.isFinite(outcome.appraisalConfidence) && outcome.appraisalConfidence >= 0 && outcome.appraisalConfidence <= 1 &&
+    Number.isFinite(outcome.attributionConfidence) && outcome.attributionConfidence >= 0 && outcome.attributionConfidence <= 1
+  );
+}
+
 /**
  * Activity autobiography has its own salience authority. It does not reuse the
- * social-interaction relationship score. A completed trusted activity can be a
- * salient lived episode from either positive or negative outcome magnitude.
+ * social-interaction relationship score. A trusted completed activity may be
+ * remembered without changing any preference. Preference evidence is an
+ * additional projection only when canonical experience subject + probe exist.
  */
 export function projectKairaActivityObservationToAutobiography(input: {
   instance: Pick<KairaInstanceContext, "instanceId" | "instanceType">;
@@ -95,8 +106,12 @@ export function projectKairaActivityObservationToAutobiography(input: {
   if (!input.receipt) {
     return { status: "skip_missing_receipt", score: 0, reasons: ["trusted_outcome_receipt_required"], memory: null };
   }
+
   const receipt = input.receipt;
+  const receiptInstanceId = resolveKairaInstanceContext({ instanceId: receipt.kairaInstanceId }).instanceId;
   if (
+    receipt.authority !== "kaira_activity_executor" ||
+    receiptInstanceId !== instance.instanceId ||
     receipt.sourceWorldObservationId !== observation.id ||
     canonicalKey(receipt.activityId) !== activity.activityId ||
     receipt.status !== activity.status ||
@@ -104,30 +119,38 @@ export function projectKairaActivityObservationToAutobiography(input: {
   ) {
     return { status: "skip_receipt_mismatch", score: 0, reasons: ["receipt_must_match_canonical_activity"], memory: null };
   }
-
-  const appraisalDecision = experiencePreferenceAppraisalFromActivityReceipt(instance, receipt);
-  if (appraisalDecision.status !== "appraisal") {
-    return { status: "skip_invalid_outcome", score: 0, reasons: [appraisalDecision.reason], memory: null };
-  }
-  const appraisal = appraisalDecision.appraisal;
-  if (
-    !Number.isFinite(appraisal.outcomeValence) || appraisal.outcomeValence < -1 || appraisal.outcomeValence > 1 ||
-    !Number.isFinite(appraisal.appraisalConfidence) || appraisal.appraisalConfidence < 0 || appraisal.appraisalConfidence > 1 ||
-    !Number.isFinite(appraisal.attributionConfidence) || appraisal.attributionConfidence < 0 || appraisal.attributionConfidence > 1
-  ) {
+  if (!validBoundedOutcome(receipt)) {
     return { status: "skip_invalid_outcome", score: 0, reasons: ["bounded_outcome_required"], memory: null };
   }
 
+  const outcome = receipt.outcome!;
   const score = clamp01(
-    Math.abs(appraisal.outcomeValence) * 0.55 +
-    appraisal.appraisalConfidence * 0.25 +
-    appraisal.attributionConfidence * 0.20,
+    Math.abs(outcome.outcomeValence) * 0.55 +
+    outcome.appraisalConfidence * 0.25 +
+    outcome.attributionConfidence * 0.20,
   );
   if (score < 0.58) {
     return { status: "skip_low_salience", score, reasons: [`activity_salience:${score.toFixed(2)}`], memory: null };
   }
 
-  const preferenceDecision = preferenceEvidenceFromExperienceAppraisal(appraisal);
+  let preferenceEvidenceStatus: "evidence" | "rejected" | undefined;
+  let preferenceEvidenceReason: string | undefined;
+  let selfRevisionEvidence: KairaAutobiographicalMemory["selfRevisionEvidence"];
+  if (activity.experienceSubject && receipt.preferenceProbe) {
+    const appraisalDecision = experiencePreferenceAppraisalFromActivityReceipt(instance, receipt);
+    if (appraisalDecision.status === "appraisal") {
+      const preferenceDecision = preferenceEvidenceFromExperienceAppraisal(appraisalDecision.appraisal);
+      preferenceEvidenceStatus = preferenceDecision.status;
+      preferenceEvidenceReason = preferenceDecision.reason;
+      if (preferenceDecision.status === "evidence") {
+        selfRevisionEvidence = { ...preferenceDecision.evidence };
+      }
+    } else {
+      preferenceEvidenceStatus = "rejected";
+      preferenceEvidenceReason = appraisalDecision.reason;
+    }
+  }
+
   const facts = [
     `activity:${activity.activityId}`,
     `activity_type:${activity.activityType}`,
@@ -137,7 +160,7 @@ export function projectKairaActivityObservationToAutobiography(input: {
     facts.push(`experience_key:${activity.experienceSubject.preferenceKey}`);
     facts.push(`experience_value:${String(activity.experienceSubject.experiencedValue)}`);
   }
-  const intensity = clamp01(Math.abs(appraisal.outcomeValence));
+  const intensity = clamp01(Math.abs(outcome.outcomeValence));
   const memory: KairaAutobiographicalMemory = {
     id: `lived_${observation.id}`,
     origin: "lived",
@@ -146,16 +169,14 @@ export function projectKairaActivityObservationToAutobiography(input: {
     eventType: `activity:${activity.activityType}`,
     facts,
     emotions: intensity > 0
-      ? [{ label: appraisal.outcomeValence >= 0 ? "olumlu_deneyim" : "olumsuz_deneyim", intensity }]
+      ? [{ label: outcome.outcomeValence >= 0 ? "olumlu_deneyim" : "olumsuz_deneyim", intensity }]
       : [],
     salience: score,
     sensitivity: "ordinary",
     canonical: true,
     sourceWorldObservationIds: [observation.id],
     consolidationKey: `world:${observation.id}`,
-    ...(preferenceDecision.status === "evidence"
-      ? { selfRevisionEvidence: { ...preferenceDecision.evidence } }
-      : {}),
+    ...(selfRevisionEvidence ? { selfRevisionEvidence } : {}),
   };
 
   return {
@@ -163,7 +184,7 @@ export function projectKairaActivityObservationToAutobiography(input: {
     score,
     reasons: [`activity_salience:${score.toFixed(2)}`],
     memory,
-    preferenceEvidenceStatus: preferenceDecision.status,
-    preferenceEvidenceReason: preferenceDecision.reason,
+    ...(preferenceEvidenceStatus ? { preferenceEvidenceStatus } : {}),
+    ...(preferenceEvidenceReason ? { preferenceEvidenceReason } : {}),
   };
 }
