@@ -6,6 +6,7 @@ import {
   projectKairaRuntimeIdentity,
 } from "./kairaRuntimeIdentity";
 
+// Runtime identity is a self-anchor only; canonical autobiographical ownership stays separate.
 describe("runtime identity projection contracts", () => {
   it("anchors persistent individual identity without inventing autobiography", () => {
     const instance = resolveKairaInstanceContext({ instanceId: "kaira_ali_01", instanceType: "individual" });
