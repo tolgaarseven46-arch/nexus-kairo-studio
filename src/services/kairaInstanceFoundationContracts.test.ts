@@ -60,7 +60,7 @@ describe("Kaira multi-instance foundation contracts", () => {
     }
   });
 
-  it("keeps Welcome Kaira intentionally lightweight and non-biographical", () => {
+  it("keeps Welcome Kaira intentionally lightweight, non-biographical and non-autonomous", () => {
     expect(instancePolicy("welcome")).toEqual({
       persistentIdentity: false,
       persistentAutobiography: false,
@@ -68,11 +68,12 @@ describe("Kaira multi-instance foundation contracts", () => {
       persistentRelationship: false,
       persistentUserMemory: false,
       canConsolidateCoreMemories: false,
+      autonomousActivityPlanning: false,
       purpose: "onboarding",
     });
   });
 
-  it("allows Individual Kaira to own a durable life", () => {
+  it("allows Individual Kaira to own a durable autonomous life", () => {
     const policy = instancePolicy("individual");
     expect(policy.persistentIdentity).toBe(true);
     expect(policy.persistentAutobiography).toBe(true);
@@ -80,6 +81,7 @@ describe("Kaira multi-instance foundation contracts", () => {
     expect(policy.persistentRelationship).toBe(true);
     expect(policy.persistentUserMemory).toBe(true);
     expect(policy.canConsolidateCoreMemories).toBe(true);
+    expect(policy.autonomousActivityPlanning).toBe(true);
   });
 
   it("treats legacy observations without instance id as reference Kaira only", () => {
