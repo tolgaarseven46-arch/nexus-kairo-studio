@@ -1,3 +1,4 @@
+import type { KairaAutobiographicalMemory } from "./kairaIdentityContracts";
 import type { KairaSelfRevisionEvidence } from "./kairaSelfRevisionEvidence";
 
 export type KairaExperienceCompletion = "completed" | "interrupted" | "ongoing";
@@ -37,6 +38,16 @@ export type KairaExperiencePreferenceEvidenceDecision =
         | "weak_or_negative_outcome"
         | "low_appraisal_confidence"
         | "low_attribution_confidence";
+    };
+
+export type KairaExperiencePreferenceProjectionDecision =
+  | { status: "projected"; memory: KairaAutobiographicalMemory }
+  | {
+      status: "rejected";
+      memory: KairaAutobiographicalMemory;
+      reason: KairaExperiencePreferenceEvidenceDecision extends infer _T
+        ? "not_lived_memory" | "provenance_mismatch" | Exclude<KairaExperiencePreferenceEvidenceDecision extends { reason: infer R } ? R : never, "direct_completed_positive_outcome">
+        : never;
     };
 
 const finiteInRange = (value: number, min: number, max: number) =>
@@ -110,5 +121,39 @@ export function preferenceEvidenceFromExperienceAppraisal(
       confidence,
     },
     reason: "direct_completed_positive_outcome",
+  };
+}
+
+/**
+ * Binds evidence to the exact lived-memory/world-observation provenance that
+ * produced the appraisal. A valid appraisal cannot be attached to another
+ * episode and thereby manufacture an independent revision vote.
+ */
+export function projectExperiencePreferenceEvidenceToLivedMemory(
+  memory: KairaAutobiographicalMemory,
+  appraisal: KairaExperiencePreferenceAppraisal,
+): KairaExperiencePreferenceProjectionDecision {
+  if (memory.origin !== "lived") {
+    return { status: "rejected", memory, reason: "not_lived_memory" };
+  }
+  if (!memory.sourceWorldObservationIds?.includes(appraisal.sourceWorldObservationId.trim())) {
+    return { status: "rejected", memory, reason: "provenance_mismatch" };
+  }
+
+  const decision = preferenceEvidenceFromExperienceAppraisal(appraisal);
+  if (decision.status !== "evidence") {
+    return { status: "rejected", memory, reason: decision.reason };
+  }
+
+  return {
+    status: "projected",
+    memory: {
+      ...memory,
+      participantIds: [...memory.participantIds],
+      facts: [...memory.facts],
+      emotions: memory.emotions.map((emotion) => ({ ...emotion })),
+      sourceWorldObservationIds: [...(memory.sourceWorldObservationIds || [])],
+      selfRevisionEvidence: { ...decision.evidence },
+    },
   };
 }
