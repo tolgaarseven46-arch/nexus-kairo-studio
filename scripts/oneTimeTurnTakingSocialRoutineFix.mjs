@@ -99,4 +99,12 @@ describe("canonical turn-taking social routines", () => {
 });
 `);
 
+const betaPath = 'src/services/kairaBetaConversationContinuityRegression.test.ts';
+let beta = fs.readFileSync(betaPath, 'utf8');
+const oldStandalone = "    expect(plan.move).toBe('natural_reaction');\n  });\n\n  it.each(['naber', 'nasılsın kank', 'ne yapıyorsun'])";
+const newStandalone = "    expect(plan).toMatchObject({\n      move: 'complete_social_routine',\n      socialRoutine: 'agreement',\n      allowFollowUpQuestion: false,\n      allowSpeculation: false,\n    });\n    expect(plan.move).not.toBe('follow_previous_answer');\n  });\n\n  it.each(['naber', 'nasılsın kank', 'ne yapıyorsun'])";
+if (!beta.includes(oldStandalone)) throw new Error('missing standalone agreement regression anchor');
+beta = beta.replace(oldStandalone, newStandalone);
+fs.writeFileSync(betaPath, beta);
+
 console.log('turn-taking social routine patch applied');
