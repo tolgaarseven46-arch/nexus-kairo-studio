@@ -1,0 +1,38 @@
+name: one-time-lived-memory-runtime-wiring
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-lived-memory-runtime-wiring.yml'
+permissions:
+  contents: write
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - name: Apply runtime wiring
+        run: node scripts/one-time-lived-memory-runtime-wiring.cjs
+      - name: Focused lived-memory tests
+        run: npx vitest run src/services/kairaLivedMemoryConsolidationContracts.test.ts src/services/kairaLivedMemoryRuntime.test.ts src/services/kairaCanonicalIdentityStore.test.ts src/services/kairaAutobiographicalRecallContracts.test.ts
+      - name: Architecture contracts
+        run: npm run test:contracts
+      - name: Full tests
+        run: npm test
+      - name: TypeScript
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Commit product and clean helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f .github/workflows/one-time-lived-memory-runtime-wiring.yml scripts/one-time-lived-memory-runtime-wiring.cjs
+          git add server.ts
+          git commit -m "feat(kaira): wire lived autobiographical memory runtime"
+          git push
