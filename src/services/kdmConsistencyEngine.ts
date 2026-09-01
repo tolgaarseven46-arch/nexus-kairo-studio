@@ -474,56 +474,23 @@ export function analyzeKdmInteraction(
       calmness: state.calmness ?? 70,
       priorReactionMode: state.reactionMode,
     },
+    modulation: {
+      repeatEscalation,
+      personalityImpact,
+      negativeSensitivity,
+      angerTrait,
+      toleranceMultiplier,
+      forgivenessFactor,
+    },
   });
   const reactionMode: AffectiveReactionMode = relationshipAppraisal.reactionTendency;
 
-  const neutralStress = approachBaseline(state.stress ?? 20, DEFAULT_DYNAMIC_STATE.stress, 1);
-  const neutralHappiness = approachBaseline(state.happiness ?? 70, DEFAULT_DYNAMIC_STATE.happiness, 1);
-  const neutralCalmness = approachBaseline(state.calmness ?? 70, DEFAULT_DYNAMIC_STATE.calmness, 1);
-  const neutralAnger = approachBaseline(state.anger ?? 10, DEFAULT_DYNAMIC_STATE.anger, 1);
-
-  let stressDelta = 0;
-  let happinessDelta = 0;
-  let calmnessDelta = 0;
-  let angerDelta = 0;
-
-  if (kind === "negative" && targetsKaira) {
-    stressDelta = Math.max(2, Math.round(4 * repeatEscalation * personalityImpact * toleranceMultiplier));
-    happinessDelta = Math.min(-2, Math.round(-3 * repeatEscalation * personalityImpact * toleranceMultiplier));
-    calmnessDelta = Math.min(-2, Math.round(-3 * repeatEscalation * personalityImpact * toleranceMultiplier));
-    angerDelta = Math.max(2, Math.round((2 + angerTrait / 50) * repeatEscalation * negativeSensitivity));
-  } else if (sentiment === "negatif") {
-    stressDelta = 2;
-    happinessDelta = -1;
-    calmnessDelta = -1;
-    angerDelta = 1;
-  } else if (sentiment === "duygusal_yük") {
-    stressDelta = 1;
-    happinessDelta = unresolvedHurt ? -1 : 0;
-    calmnessDelta = 0;
-    angerDelta = neutralAnger;
-  } else if (apology) {
-    stressDelta = unresolvedHurt ? -1 : neutralStress;
-    happinessDelta = unresolvedHurt ? 0 : 1;
-    calmnessDelta = 1;
-    angerDelta = -Math.min(2, Math.max(0, (state.anger ?? 10) - DEFAULT_DYNAMIC_STATE.anger));
-  } else if (kind === "positive") {
-    stressDelta = -1;
-    happinessDelta = 2;
-    calmnessDelta = 1;
-    angerDelta = neutralAnger;
-  } else {
-    stressDelta = neutralStress;
-    happinessDelta = neutralHappiness;
-    calmnessDelta = neutralCalmness;
-    angerDelta = neutralAnger;
-  }
-
-  if (unresolvedHurt && kind === "neutral" && !apology) {
-    happinessDelta = Math.min(happinessDelta, 0);
-    calmnessDelta = Math.min(calmnessDelta, 0);
-    stressDelta = Math.max(stressDelta, 0);
-  }
+  const {
+    stress: stressDelta,
+    happiness: happinessDelta,
+    calmness: calmnessDelta,
+    anger: angerDelta,
+  } = relationshipAppraisal.emotionDelta;
 
   const confidenceDelta = intent === "eylem_talebi" ? Math.max(1, Math.round(toleranceMultiplier)) : 0;
   const lastStatus = conversationState === "disengaged"
