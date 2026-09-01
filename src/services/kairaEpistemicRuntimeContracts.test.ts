@@ -26,21 +26,25 @@ describe("Kaira epistemic runtime contracts", () => {
     expect(server).toContain('evaluateKairaKnowledge(');
     expect(server).toContain('buildKairaEpistemicInstruction(epistemicAccess)');
     expect(server).toContain('enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess)');
+    expect(server.indexOf('const selfMemoryGuard = enforceKairaAutobiographicalResponse(reply, selfMemoryRuntime)')).toBeLessThan(server.indexOf('const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess)'));
     expect(server.indexOf('const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess)')).toBeLessThan(server.indexOf('const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules)'));
-    expect(server).toContain('epistemicAccess, behaviorContract');
-    expect(server).toContain('const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateWorldGuard.reply, epistemicAccess)');
+    expect(server).toContain('epistemicAccess, selfMemoryRuntime, behaviorContract');
+    expect(server).toContain('const candidateSelfMemoryGuard = enforceKairaAutobiographicalResponse(candidateWorldGuard.reply, selfMemoryRuntime)');
+    expect(server).toContain('const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateSelfMemoryGuard.reply, epistemicAccess)');
     expect(server).toContain('const finalEpistemicIssues = findKairaEpistemicResponseIssues(reply, epistemicAccess)');
   });
 
-  it("keeps every post-plan fallback behind world, epistemic and social final authority", () => {
+  it("keeps every post-plan fallback behind world, autobiographical, epistemic and social final authority", () => {
     const server = readFileSync("server.ts", "utf8");
     const candidateWorld = server.indexOf("const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents, worldReasoningContext)");
-    const candidateEpistemic = server.indexOf("const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateWorldGuard.reply, epistemicAccess)");
+    const candidateSelfMemory = server.indexOf("const candidateSelfMemoryGuard = enforceKairaAutobiographicalResponse(candidateWorldGuard.reply, selfMemoryRuntime)");
+    const candidateEpistemic = server.indexOf("const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateSelfMemoryGuard.reply, epistemicAccess)");
     const candidateSocial = server.indexOf("const candidateBaseEnforced = enforceKairoResponse(candidateEpistemicGuard.reply, kdm.trace, enforcementRules)");
     const candidateContract = server.indexOf("const candidateContractEnforced = enforceBehaviorContract(candidateBaseEnforced.reply, kdm.trace, behaviorContract)");
     const finalEpistemic = server.indexOf("const finalEpistemicIssues = findKairaEpistemicResponseIssues(reply, epistemicAccess)");
     expect(candidateWorld).toBeGreaterThan(-1);
-    expect(candidateWorld).toBeLessThan(candidateEpistemic);
+    expect(candidateWorld).toBeLessThan(candidateSelfMemory);
+    expect(candidateSelfMemory).toBeLessThan(candidateEpistemic);
     expect(candidateEpistemic).toBeLessThan(candidateSocial);
     expect(candidateSocial).toBeLessThan(candidateContract);
     expect(candidateContract).toBeLessThan(finalEpistemic);

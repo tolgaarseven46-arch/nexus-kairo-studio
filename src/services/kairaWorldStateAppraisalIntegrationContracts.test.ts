@@ -9,7 +9,7 @@ describe("world-state appraisal runtime integration contract", () => {
     expect(server).toContain('from "./src/services/worldStateAppraisal"');
     expect(server).toContain("appraiseRetrievedWorldState(retrievedWorldEvents)");
     expect(server).toContain("buildWorldStateAppraisalInstruction(worldStateAppraisal)");
-    expect(server).toContain("${worldEventMemoryInstruction}\\n${worldStateAppraisalInstruction}\\n${worldReasoningPolicyInstruction}\\n${epistemicInstruction}\\n${dialogueInstruction}");
+    expect(server).toContain("${worldEventMemoryInstruction}\\n${worldStateAppraisalInstruction}\\n${worldReasoningPolicyInstruction}\\n${epistemicInstruction}\\n${selfMemoryInstruction}\\n${dialogueInstruction}");
 
     const appraisalIndex = server.indexOf("${worldStateAppraisalInstruction}");
     const policyIndex = server.indexOf("${worldReasoningPolicyInstruction}");

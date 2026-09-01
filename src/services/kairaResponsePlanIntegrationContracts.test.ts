@@ -34,8 +34,8 @@ describe("canonical KairaResponsePlan runtime integration", () => {
   });
 
   it("persists response-plan observability in both local and AI paths", () => {
-    const kntPlanWrites = server.match(/worldMemoryGuard,\s*epistemicAccess,\s*responsePlan,\s*\}\),/gu)?.length ?? 0;
-    const turnMetadataPlanWrites = server.match(/worldMemoryGuard,\s*epistemicAccess,\s*responsePlan,\s*timings:/gu)?.length ?? 0;
+    const kntPlanWrites = server.match(/worldMemoryGuard,\s*epistemicAccess,\s*(?:selfMemoryRuntime,\s*)?responsePlan,\s*\}\),/gu)?.length ?? 0;
+    const turnMetadataPlanWrites = server.match(/worldMemoryGuard,\s*epistemicAccess,\s*selfMemoryRuntime,\s*responsePlan,\s*timings:/gu)?.length ?? 0;
 
     expect(kntPlanWrites).toBeGreaterThanOrEqual(2);
     expect(turnMetadataPlanWrites).toBeGreaterThanOrEqual(2);
