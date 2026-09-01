@@ -15,6 +15,7 @@ export interface KairaInstancePolicy {
   persistentRelationship: boolean;
   persistentUserMemory: boolean;
   canConsolidateCoreMemories: boolean;
+  autonomousActivityPlanning: boolean;
   purpose: "reference-development" | "onboarding" | "individual-life";
 }
 
@@ -44,6 +45,7 @@ export function instancePolicy(type: KairaInstanceType): KairaInstancePolicy {
       persistentRelationship: false,
       persistentUserMemory: false,
       canConsolidateCoreMemories: false,
+      autonomousActivityPlanning: false,
       purpose: "onboarding",
     };
   }
@@ -55,6 +57,7 @@ export function instancePolicy(type: KairaInstanceType): KairaInstancePolicy {
       persistentRelationship: true,
       persistentUserMemory: true,
       canConsolidateCoreMemories: true,
+      autonomousActivityPlanning: true,
       purpose: "individual-life",
     };
   }
@@ -65,6 +68,7 @@ export function instancePolicy(type: KairaInstanceType): KairaInstancePolicy {
     persistentRelationship: true,
     persistentUserMemory: true,
     canConsolidateCoreMemories: true,
+    autonomousActivityPlanning: true,
     purpose: "reference-development",
   };
 }
