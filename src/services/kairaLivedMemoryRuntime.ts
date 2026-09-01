@@ -1,5 +1,6 @@
 import type { DroitDynamicState } from "../types/nexus";
 import type { CanonicalWorldEvent } from "./worldEventEngine";
+import type { KairaAutobiographicalMemory } from "./kairaIdentityContracts";
 import {
   instancePolicy,
   resolveKairaInstanceContext,
@@ -11,6 +12,11 @@ import {
   appendKairaAutobiographicalMemoryAtomic,
   applyKairaSelfFactRevisionAtomic,
 } from "./kairaCanonicalIdentityStore";
+import {
+  experiencePreferenceAppraisalFromActivityReceipt,
+  type KairaActivityExecutionReceipt,
+} from "./kairaActivityExperienceReceipt";
+import { projectExperiencePreferenceEvidenceToLivedMemory } from "./kairaExperiencePreferenceAppraisal";
 
 export type KairaLivedMemoryRuntimeStatus =
   | "not_applicable"
@@ -29,6 +35,8 @@ export interface KairaLivedMemoryRuntimeResult {
   consolidationDecision?: string;
   score?: number;
   reasons?: string[];
+  experiencePreferenceStatus?: "projected" | "rejected";
+  experiencePreferenceReason?: string;
   selfRevisionFactKey?: string;
   selfRevisionStatus?: "applied" | "unchanged" | "missing_identity" | "ephemeral" | "unavailable";
   selfRevisionDecision?: string;
@@ -47,18 +55,56 @@ async function maybeApplySelfRevision(
       ...(result.decision ? { selfRevisionDecision: result.decision.status } : {}),
     };
   } catch {
+    return { selfRevisionFactKey: factKey, selfRevisionStatus: "unavailable" };
+  }
+}
+
+function maybeProjectActivityExperience(input: {
+  instance: KairaInstanceContext;
+  memory: KairaAutobiographicalMemory;
+  receipt?: KairaActivityExecutionReceipt;
+}): {
+  memory: KairaAutobiographicalMemory;
+  observability: Pick<KairaLivedMemoryRuntimeResult, "experiencePreferenceStatus" | "experiencePreferenceReason">;
+} {
+  if (!input.receipt) return { memory: input.memory, observability: {} };
+
+  const appraisal = experiencePreferenceAppraisalFromActivityReceipt(input.instance, input.receipt);
+  if (appraisal.status !== "appraisal") {
     return {
-      selfRevisionFactKey: factKey,
-      selfRevisionStatus: "unavailable",
+      memory: input.memory,
+      observability: {
+        experiencePreferenceStatus: "rejected",
+        experiencePreferenceReason: appraisal.reason,
+      },
     };
   }
+
+  const projection = projectExperiencePreferenceEvidenceToLivedMemory(input.memory, appraisal.appraisal);
+  if (projection.status !== "projected") {
+    return {
+      memory: input.memory,
+      observability: {
+        experiencePreferenceStatus: "rejected",
+        experiencePreferenceReason: projection.reason,
+      },
+    };
+  }
+  return {
+    memory: projection.memory,
+    observability: {
+      experiencePreferenceStatus: "projected",
+      experiencePreferenceReason: "direct_completed_positive_outcome",
+    },
+  };
 }
 
 /**
  * Canonical mutation coordinator:
  * world-model persistence happens first, then that exact persisted observation
- * may be projected into Kaira-owned autobiography. Typed self-revision evidence,
- * when present, is evaluated only after the lived memory itself is canonical.
+ * may be projected into Kaira-owned autobiography. A trusted Kaira activity
+ * receipt may add preference evidence only when it points to that same world
+ * observation. Self-revision runs only after autobiography is canonical.
  */
 export async function persistWorldEventAndMaybeConsolidateLivedMemory(input: {
   userId?: string;
@@ -67,6 +113,7 @@ export async function persistWorldEventAndMaybeConsolidateLivedMemory(input: {
   speakerName?: string;
   event: CanonicalWorldEvent;
   dynamicStateAfter: DroitDynamicState;
+  activityExperienceReceipt?: KairaActivityExecutionReceipt;
 }): Promise<KairaLivedMemoryRuntimeResult> {
   const instance = resolveKairaInstanceContext(input.instance);
   const policy = instancePolicy(instance.instanceType);
@@ -101,13 +148,17 @@ export async function persistWorldEventAndMaybeConsolidateLivedMemory(input: {
     };
   }
 
+  const activityProjection = maybeProjectActivityExperience({
+    instance,
+    memory: decision.memory,
+    receipt: input.activityExperienceReceipt,
+  });
+  const memory = activityProjection.memory;
+
   try {
-    const append = await appendKairaAutobiographicalMemoryAtomic(instance, decision.memory);
+    const append = await appendKairaAutobiographicalMemoryAtomic(instance, memory);
     if (append.status === "appended" || append.status === "duplicate") {
-      const selfRevision = await maybeApplySelfRevision(
-        instance,
-        decision.memory.selfRevisionEvidence?.factKey,
-      );
+      const selfRevision = await maybeApplySelfRevision(instance, memory.selfRevisionEvidence?.factKey);
       return {
         status: append.status === "appended" ? "consolidated" : "duplicate",
         observationId: observation.id,
@@ -115,6 +166,7 @@ export async function persistWorldEventAndMaybeConsolidateLivedMemory(input: {
         consolidationDecision: decision.status,
         score: decision.score,
         reasons: decision.reasons,
+        ...activityProjection.observability,
         ...selfRevision,
       };
     }
@@ -125,9 +177,10 @@ export async function persistWorldEventAndMaybeConsolidateLivedMemory(input: {
         consolidationDecision: decision.status,
         score: decision.score,
         reasons: decision.reasons,
+        ...activityProjection.observability,
       };
     }
-    return { status: "not_applicable", observationId: observation.id };
+    return { status: "not_applicable", observationId: observation.id, ...activityProjection.observability };
   } catch {
     return {
       status: "identity_unavailable",
@@ -135,6 +188,7 @@ export async function persistWorldEventAndMaybeConsolidateLivedMemory(input: {
       consolidationDecision: decision.status,
       score: decision.score,
       reasons: decision.reasons,
+      ...activityProjection.observability,
     };
   }
 }
