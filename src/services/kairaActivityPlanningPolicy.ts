@@ -178,7 +178,7 @@ export function planKairaActivityProposal(input: {
     instanceType: input.instanceType,
   });
   const instanceRules = instancePolicy(instance.instanceType);
-  if (!instanceRules.persistentIdentity || !instanceRules.persistentWorldModel) {
+  if (!instanceRules.autonomousActivityPlanning) {
     return { status: "none", reason: "all_blocked", ranked: [] };
   }
   if (!input.candidates.length) return { status: "none", reason: "no_candidates", ranked: [] };
@@ -188,8 +188,9 @@ export function planKairaActivityProposal(input: {
 
   const policy = input.policy || DEFAULT_KAIRA_ACTIVITY_PLANNING_POLICY;
   const ranked = available
-    .map((candidate) => scoreKairaActivityProposal(candidate, policy))
-    .sort((left, right) => right.score - left.score || left.proposalId.localeCompare(right.proposalId));
+    .map((candidate, inputOrder) => ({ inputOrder, scored: scoreKairaActivityProposal(candidate, policy) }))
+    .sort((left, right) => right.scored.score - left.scored.score || left.inputOrder - right.inputOrder)
+    .map(({ scored }) => scored);
   const selected = ranked[0];
   if (!selected || selected.score < policy.minimumScore) {
     return { status: "none", reason: "below_threshold", ranked };
