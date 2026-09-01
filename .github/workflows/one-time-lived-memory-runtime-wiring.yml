@@ -20,24 +20,8 @@ jobs:
         run: node scripts/one-time-lived-memory-runtime-wiring.cjs
       - name: Focused lived-memory tests
         run: npx vitest run src/services/kairaLivedMemoryConsolidationContracts.test.ts src/services/kairaLivedMemoryRuntime.test.ts src/services/kairaCanonicalIdentityStore.test.ts src/services/kairaAutobiographicalRecallContracts.test.ts
-      - name: Capture architecture diagnostics
-        id: contracts
-        shell: bash
-        run: |
-          set +e
-          npm run test:contracts > contracts.log 2>&1
-          code=$?
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          cat contracts.log
-          exit 0
-      - name: Upload architecture diagnostics
-        uses: actions/upload-artifact@v4
-        with:
-          name: lived-memory-contract-diagnostics
-          path: contracts.log
-      - name: Fail if architecture contracts failed
-        if: steps.contracts.outputs.exit_code != '0'
-        run: exit 1
+      - name: Architecture contracts
+        run: npm run test:contracts
       - name: Full tests
         run: npm test
       - name: TypeScript
@@ -52,4 +36,4 @@ jobs:
           git add server.ts src/services/kdmPersistenceService.ts src/types/nexus.ts
           git commit -m "feat(kaira): wire lived autobiographical memory runtime"
           git push
-# retry: diagnostic-5
+# retry: final-6
