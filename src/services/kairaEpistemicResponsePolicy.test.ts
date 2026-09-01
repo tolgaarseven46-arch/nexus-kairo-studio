@@ -39,10 +39,15 @@ describe("Kaira epistemic response policy", () => {
     });
   });
 
-  it("requires uncertainty for partial knowledge without converting it to unknown", () => {
+  it("enforces uncertainty for partial knowledge without converting it to unknown", () => {
     expect(findKairaEpistemicResponseIssues("kesin böyle", partial)).toContain(
       "epistemic.partial_requires_uncertainty",
     );
+    expect(enforceKairaEpistemicResponse("kesin böyle", partial)).toEqual({
+      reply: "emin değilim ama kesin böyle",
+      changed: true,
+      reason: "epistemic.partial_guard",
+    });
     expect(findKairaEpistemicResponseIssues("emin değilim ama sanırım öyle", partial)).toEqual([]);
     expect(enforceKairaEpistemicResponse("emin değilim ama sanırım öyle", partial).changed).toBe(false);
   });
