@@ -39,8 +39,11 @@ jobs:
           if [ "$code" -ne 0 ]; then
             node <<'NODE'
           const fs = require('fs');
-          const log = fs.readFileSync('/tmp/vitest.log', 'utf8');
-          const lines = log.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-12);
+          const raw = fs.readFileSync('/tmp/vitest.log', 'utf8');
+          const clean = raw.replace(/\u001b\[[0-9;]*m/g, '');
+          const all = clean.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+          const interesting = all.filter((line) => /FAIL|AssertionError|expected|received|Error:|❯|×|toBe|toEqual|toContain|toMatch/i.test(line));
+          const lines = interesting.slice(-24);
           const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
           const headers = {
             Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
@@ -56,7 +59,7 @@ jobs:
                 headers,
                 body: JSON.stringify({
                   state: 'error',
-                  context: `ci-diagnostic/${String(index + 1).padStart(2, '0')}`,
+                  context: `ci-detail/${String(index + 1).padStart(2, '0')}`,
                   description,
                 }),
               });
