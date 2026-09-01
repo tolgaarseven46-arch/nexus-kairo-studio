@@ -1,0 +1,38 @@
+name: one-time-world-reasoning-authority
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-world-reasoning-authority.yml'
+permissions:
+  contents: write
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - name: Apply canonical world reasoning authority migration
+        run: node scripts/one-time-world-reasoning-authority.cjs
+      - name: Focused world reasoning regressions
+        run: npx vitest run src/services/kairaWorldModelResponseGuardContracts.test.ts src/services/kairaWorldModelResponseGuardIntegrationContracts.test.ts src/services/kairaWorldStateAppraisalContracts.test.ts src/services/kairaWorldReasoningPolicyContracts.test.ts src/services/kairaWorldReasoningPolicyIntegrationContracts.test.ts src/services/kairaProjectionAwareRetrievalContracts.test.ts src/services/kairaContradictionResponseSeamContracts.test.ts
+      - name: Architecture contracts
+        run: npm run test:contracts
+      - name: Full tests
+        run: npm test
+      - name: TypeScript
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Commit product and clean helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-time-world-reasoning-authority.yml scripts/one-time-world-reasoning-authority.cjs
+          git add server.ts src/services/worldModelResponseGuard.ts src/services/kairaWorldModelResponseGuardContracts.test.ts src/services/kairaWorldModelResponseGuardIntegrationContracts.test.ts src/services/kairaWorldReasoningPolicyIntegrationContracts.test.ts
+          git commit -m "refactor(kaira): unify world reasoning authority"
+          git push
