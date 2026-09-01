@@ -45,6 +45,17 @@ describe("Kaira experience preference appraisal contracts", () => {
     expect(decision.evidence.confidence).toBeGreaterThan(0.78);
   });
 
+  it("emits the same canonical evidence shape consumed by canonical identity", () => {
+    const decision = preferenceEvidenceFromExperienceAppraisal(appraisal({
+      preferenceKey: " Preferred Music ",
+      experiencedValue: "  ambient  ",
+    }));
+    expect(decision.status).toBe("evidence");
+    if (decision.status !== "evidence") throw new Error("expected evidence");
+    expect(decision.evidence.factKey).toBe("preferred_music");
+    expect(decision.evidence.value).toBe("ambient");
+  });
+
   it.each([
     ["reported", { ownership: "reported" as const }, "not_direct"],
     ["inferred", { ownership: "inferred" as const }, "not_direct"],
