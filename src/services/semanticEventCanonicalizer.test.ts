@@ -1,3 +1,4 @@
+// Coarse provider labels are refined only at the canonical language boundary; downstream dialogue consumers must never reparse raw text to recover social routines.
 import { describe, expect, it } from "vitest";
 import { canonicalizeSemanticEvent } from "./semanticEventCanonicalizer";
 import { interpretSemanticEvent } from "./semanticEventEngine";
@@ -20,7 +21,6 @@ describe("semantic event canonicalizer", () => {
     expect(result.discourseAct).toBe("none");
     expect(result.adviceRequested).toBe(false);
   });
-
 
   it.each([
     ["naber", "how_are_you"],
