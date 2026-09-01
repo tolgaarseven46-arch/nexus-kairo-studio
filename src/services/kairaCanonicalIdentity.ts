@@ -3,7 +3,7 @@ import type {
   KairaIdentitySeed,
   KairaSelfFact,
 } from "./kairaIdentityContracts";
-import { normalizeKairaSelfRevisionEvidence } from "./kairaSelfRevisionEvidence";
+import { isCanonicalKairaSelfRevisionEvidence } from "./kairaSelfRevisionEvidence";
 
 export interface KairaCanonicalIdentityState {
   kairaInstanceId: string;
@@ -114,14 +114,13 @@ export function validateKairaCanonicalIdentity(
       });
     }
     if (memory.selfRevisionEvidence) {
-      const normalizedEvidence = normalizeKairaSelfRevisionEvidence(memory.selfRevisionEvidence);
       if (memory.origin !== "lived") {
         issues.push({
           invariant: "canonical_identity.revision_evidence_lived_only",
           message: `${memory.id} self-revision evidence yalnız lived memory üzerinde taşınabilir.`,
         });
       }
-      if (!normalizedEvidence || JSON.stringify(normalizedEvidence) !== JSON.stringify(memory.selfRevisionEvidence)) {
+      if (!isCanonicalKairaSelfRevisionEvidence(memory.selfRevisionEvidence)) {
         issues.push({
           invariant: "canonical_identity.revision_evidence_normalized",
           message: `${memory.id} self-revision evidence canonical formatta olmalı.`,
