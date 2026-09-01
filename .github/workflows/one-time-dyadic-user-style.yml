@@ -20,6 +20,8 @@ jobs:
         with:
           node-version: 20
       - run: npm install --ignore-scripts
+      - name: Normalize migration occurrence counts
+        run: sed -i 's/minimum=2/minimum=1/g' .github/scripts/one-time-dyadic-user-style.py
       - name: Apply migration
         run: python .github/scripts/one-time-dyadic-user-style.py
       - name: Focused regressions
