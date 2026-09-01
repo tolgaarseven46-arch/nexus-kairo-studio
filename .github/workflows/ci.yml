@@ -24,6 +24,9 @@ jobs:
       - name: Architecture contracts
         run: npm run test:contracts
 
+      - name: Beta runtime regression gate
+        run: npm run test:beta
+
       - name: Tests
         run: npm test -- --run
 
