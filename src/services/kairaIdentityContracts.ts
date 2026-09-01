@@ -1,3 +1,5 @@
+import type { KairaSelfRevisionEvidence } from "./kairaSelfRevisionEvidence";
+
 export type KairaKnowledgeProvenance = "species_canon" | "inherited" | "learned";
 export type KairaSelfFactDomain = "preference" | "belief" | "trait" | "biography";
 export type KairaMemorySensitivity = "ordinary" | "private" | "sensitive";
@@ -43,6 +45,12 @@ export interface KairaAutobiographicalMemory {
   sourceWorldObservationIds?: string[];
   /** Stable idempotency key for consolidation of one lived episode. */
   consolidationKey?: string;
+  /**
+   * Optional typed evidence that a higher-level appraisal explicitly derived
+   * from this lived episode. Memory eventType/facts are never re-parsed here to
+   * invent self-model changes.
+   */
+  selfRevisionEvidence?: KairaSelfRevisionEvidence;
   /** Canonical memory stores facts, never a finished prose story. */
   narrationText?: never;
 }
@@ -90,6 +98,7 @@ export function validateKairaIdentitySeed(seed: KairaIdentitySeed): KairaIdentit
     if (memory.origin !== "inherited") issues.push({ invariant: "identity.seed_memory_inherited", message: `${memory.id} seed içinde inherited olmalı.` });
     if (!in01(memory.salience)) issues.push({ invariant: "identity.salience_bounded", message: `${memory.id} salience 0..1 olmalı.` });
     if ("narrationText" in memory) issues.push({ invariant: "identity.memory_truth_not_prose", message: `${memory.id} canonical anı bitmiş anlatım metni taşıyamaz.` });
+    if (memory.selfRevisionEvidence) issues.push({ invariant: "identity.seed_memory_no_lived_revision_evidence", message: `${memory.id} inherited seed memory lived revision evidence taşıyamaz.` });
   }
   return issues;
 }
