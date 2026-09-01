@@ -129,6 +129,7 @@ export async function evaluateAndCommitKairaActivityPlanningTrigger(
       instanceType: input.instanceType,
       trigger: input.trigger,
       now: input.now,
+      outcome: { kind: "none" },
     });
     return { status: "completed_none", claim, triggerReceipt, evaluation };
   }
@@ -166,6 +167,7 @@ export async function evaluateAndCommitKairaActivityPlanningTrigger(
     instanceType: input.instanceType,
     trigger: input.trigger,
     now: input.now,
+    outcome: { kind: "selected", proposalId: episodeId },
   });
   return { status: "completed_selected", claim, triggerReceipt, evaluation, proposal };
 }
