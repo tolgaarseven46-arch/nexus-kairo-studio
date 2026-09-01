@@ -10,15 +10,12 @@ import {
   type WorldEventObservation,
 } from "./worldModelEventStore";
 import { appraiseLivedMemoryCandidate } from "./kairaLivedMemoryConsolidation";
+import { projectKairaActivityObservationToAutobiography } from "./kairaActivityAutobiographicalProjection";
 import {
   appendKairaAutobiographicalMemoryAtomic,
   applyKairaSelfFactRevisionAtomic,
 } from "./kairaCanonicalIdentityStore";
-import {
-  experiencePreferenceAppraisalFromActivityReceipt,
-  type KairaActivityExecutionReceipt,
-} from "./kairaActivityExperienceReceipt";
-import { projectExperiencePreferenceEvidenceToLivedMemory } from "./kairaExperiencePreferenceAppraisal";
+import type { KairaActivityExecutionReceipt } from "./kairaActivityExperienceReceipt";
 
 export type KairaPersistedObservationConsolidationStatus =
   | "not_applicable"
@@ -61,41 +58,68 @@ async function maybeApplySelfRevision(
   }
 }
 
-function projectActivityExperience(input: {
+function selectAutobiographicalCandidate(input: {
   instance: KairaInstanceContext;
-  memory: KairaAutobiographicalMemory;
-  receipt?: KairaActivityExecutionReceipt;
+  observation: WorldEventObservation;
+  dynamicStateAfter: DroitDynamicState;
+  activityExperienceReceipt?: KairaActivityExecutionReceipt;
 }): {
-  memory: KairaAutobiographicalMemory;
+  status: string;
+  score: number;
+  reasons: string[];
+  memory: KairaAutobiographicalMemory | null;
   observability: Pick<KairaPersistedObservationConsolidationResult, "experiencePreferenceStatus" | "experiencePreferenceReason">;
 } {
-  if (!input.receipt) return { memory: input.memory, observability: {} };
-  const appraisal = experiencePreferenceAppraisalFromActivityReceipt(input.instance, input.receipt);
-  if (appraisal.status !== "appraisal") {
+  if (input.observation.kind === "kaira_activity") {
+    const activityDecision = projectKairaActivityObservationToAutobiography({
+      instance: input.instance,
+      observation: input.observation,
+      receipt: input.activityExperienceReceipt,
+    });
     return {
-      memory: input.memory,
-      observability: { experiencePreferenceStatus: "rejected", experiencePreferenceReason: appraisal.reason },
+      status: activityDecision.status,
+      score: activityDecision.score,
+      reasons: activityDecision.reasons,
+      memory: activityDecision.memory,
+      observability:
+        activityDecision.preferenceEvidenceStatus === "evidence"
+          ? {
+              experiencePreferenceStatus: "projected",
+              experiencePreferenceReason: activityDecision.preferenceEvidenceReason,
+            }
+          : activityDecision.preferenceEvidenceStatus === "rejected"
+            ? {
+                experiencePreferenceStatus: "rejected",
+                experiencePreferenceReason: activityDecision.preferenceEvidenceReason,
+              }
+            : {},
     };
   }
-  const projection = projectExperiencePreferenceEvidenceToLivedMemory(input.memory, appraisal.appraisal);
-  if (projection.status !== "projected") {
-    return {
-      memory: input.memory,
-      observability: { experiencePreferenceStatus: "rejected", experiencePreferenceReason: projection.reason },
-    };
-  }
+
+  const socialDecision = appraiseLivedMemoryCandidate({
+    instance: input.instance,
+    observation: input.observation,
+    dynamicStateAfter: input.dynamicStateAfter,
+  });
   return {
-    memory: projection.memory,
-    observability: {
-      experiencePreferenceStatus: "projected",
-      experiencePreferenceReason: "direct_completed_positive_outcome",
-    },
+    status: socialDecision.status,
+    score: socialDecision.score,
+    reasons: socialDecision.reasons,
+    memory: socialDecision.memory,
+    observability: input.activityExperienceReceipt
+      ? {
+          experiencePreferenceStatus: "rejected",
+          experiencePreferenceReason: "activity_receipt_requires_kaira_activity",
+        }
+      : {},
   };
 }
 
 /**
  * Single authority for turning an already-persisted canonical world observation
  * into Kaira-owned autobiography. It never writes world truth itself.
+ * Social interaction and Kaira-owned activity observations intentionally use
+ * different autobiographical appraisal authorities.
  */
 export async function consolidatePersistedWorldObservation(input: {
   instance: Pick<KairaInstanceContext, "instanceId" | "instanceType">;
@@ -114,28 +138,24 @@ export async function consolidatePersistedWorldObservation(input: {
     return { status: "observation_owner_mismatch", observationId };
   }
 
-  const decision = appraiseLivedMemoryCandidate({
+  const decision = selectAutobiographicalCandidate({
     instance,
     observation: input.observation,
     dynamicStateAfter: input.dynamicStateAfter,
+    activityExperienceReceipt: input.activityExperienceReceipt,
   });
-  if (decision.status !== "consolidate" || !decision.memory) {
+  if (!decision.memory) {
     return {
       status: "candidate_rejected",
       observationId,
       consolidationDecision: decision.status,
       score: decision.score,
       reasons: decision.reasons,
+      ...decision.observability,
     };
   }
 
-  const activityProjection = projectActivityExperience({
-    instance,
-    memory: decision.memory,
-    receipt: input.activityExperienceReceipt,
-  });
-  const memory = activityProjection.memory;
-
+  const memory = decision.memory;
   try {
     const append = await appendKairaAutobiographicalMemoryAtomic(instance, memory);
     if (append.status === "appended" || append.status === "duplicate") {
@@ -147,7 +167,7 @@ export async function consolidatePersistedWorldObservation(input: {
         consolidationDecision: decision.status,
         score: decision.score,
         reasons: decision.reasons,
-        ...activityProjection.observability,
+        ...decision.observability,
         ...selfRevision,
       };
     }
@@ -158,10 +178,10 @@ export async function consolidatePersistedWorldObservation(input: {
         consolidationDecision: decision.status,
         score: decision.score,
         reasons: decision.reasons,
-        ...activityProjection.observability,
+        ...decision.observability,
       };
     }
-    return { status: "not_applicable", observationId, ...activityProjection.observability };
+    return { status: "not_applicable", observationId, ...decision.observability };
   } catch {
     return {
       status: "identity_unavailable",
@@ -169,7 +189,7 @@ export async function consolidatePersistedWorldObservation(input: {
       consolidationDecision: decision.status,
       score: decision.score,
       reasons: decision.reasons,
-      ...activityProjection.observability,
+      ...decision.observability,
     };
   }
 }
