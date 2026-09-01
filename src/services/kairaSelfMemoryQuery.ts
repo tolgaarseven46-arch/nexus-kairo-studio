@@ -4,11 +4,13 @@ export type SemanticSelfMemoryScope =
   | "self_fact"
   | "autobiographical_memory"
   | "any";
+export type SemanticSelfMemoryRetrievalMode = "targeted" | "broad";
 
 export interface SemanticSelfMemoryQuery {
   surface: string;
   scope: SemanticSelfMemoryScope;
   factKey?: string;
+  retrievalMode?: SemanticSelfMemoryRetrievalMode;
   confidence: number;
 }
 
@@ -43,10 +45,13 @@ export function normalizeSemanticSelfMemoryQuery(
       ? query.scope
       : "any";
   const factKey = normalizeFactKey(query.factKey);
+  const retrievalMode: SemanticSelfMemoryRetrievalMode =
+    query.retrievalMode === "broad" ? "broad" : "targeted";
   return {
     surface,
     scope,
     ...(factKey && scope !== "autobiographical_memory" ? { factKey } : {}),
+    ...(scope !== "self_fact" ? { retrievalMode } : {}),
     confidence: Math.max(0, Math.min(1, Number(query.confidence) || 0)),
   };
 }
@@ -61,7 +66,8 @@ export function inferFallbackSelfMemoryQuery(
   message: string,
   event: Pick<SemanticEvent, "discourseAct" | "intent">,
 ): SemanticSelfMemoryQuery | null {
-  const text = normalizeSurface(message).toLocaleLowerCase("tr-TR");
+  const surface = normalizeSurface(message);
+  const text = surface.toLocaleLowerCase("tr-TR");
   if (!text) return null;
 
   const userSelf = /\b(ben|benim|bana|beni)\b/u.test(text);
@@ -69,20 +75,22 @@ export function inferFallbackSelfMemoryQuery(
   if (userSelf && !/\bsenin\b/u.test(text)) return null;
 
   const recallCue = /hatırlıyor musun|hatırladın mı|hatırlıyor muydun|anı(?:n|ların|larını)?|geçmiş(?:in|inde)?|başına gel|yaşadığın|yaşamış mıydın|olmuş muydu/u.test(text);
+  const broadRecallCue = /(?:geçmişinde|hayatında) (?:neler|ne) (?:yaşadın|oldu)|(?:en önemli|unutamadığın) anı(?:n)?|başına (?:neler|ne) geldi|anıların neler/u.test(text);
   const factCue = /en sevdiğin|sevdiğin|tercih ettiğin|favori(?:n)?|hangi .* seversin|ne seversin|neyi seversin|neye inanırsın|nasıl birisin/u.test(text);
 
   if (explicitKairaSelf && factCue) {
-    return { surface: normalizeSurface(message), scope: "self_fact", confidence: 0.88 };
+    return { surface, scope: "self_fact", confidence: 0.88 };
   }
   if (explicitKairaSelf && recallCue) {
     return {
-      surface: normalizeSurface(message),
+      surface,
       scope: "autobiographical_memory",
+      retrievalMode: broadRecallCue ? "broad" : "targeted",
       confidence: 0.9,
     };
   }
   if (explicitKairaSelf && event.discourseAct === "recall_request") {
-    return { surface: normalizeSurface(message), scope: "any", confidence: 0.8 };
+    return { surface, scope: "any", retrievalMode: "targeted", confidence: 0.8 };
   }
   return null;
 }
