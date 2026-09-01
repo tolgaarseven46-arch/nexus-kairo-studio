@@ -28,7 +28,7 @@ describe("Kaira epistemic runtime contracts", () => {
     expect(server).toContain('enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess)');
     expect(server.indexOf('const selfMemoryGuard = enforceKairaAutobiographicalResponse(reply, selfMemoryRuntime)')).toBeLessThan(server.indexOf('const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess)'));
     expect(server.indexOf('const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess)')).toBeLessThan(server.indexOf('const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules)'));
-    expect(server).toContain('epistemicAccess, selfMemoryRuntime, behaviorContract');
+    expect(server).toMatch(/epistemicAccess\s*,\s*selfMemoryRuntime\s*,\s*(?:livedMemoryRuntime\s*,\s*)?behaviorContract/);
     expect(server).toContain('const candidateSelfMemoryGuard = enforceKairaAutobiographicalResponse(candidateWorldGuard.reply, selfMemoryRuntime)');
     expect(server).toContain('const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateSelfMemoryGuard.reply, epistemicAccess)');
     expect(server).toContain('const finalEpistemicIssues = findKairaEpistemicResponseIssues(reply, epistemicAccess)');
