@@ -20,8 +20,22 @@ const WORLD_MODEL_COLLECTION = "worldModel";
 const EVENT_COLLECTION = "events";
 const QUESTION_LIKE_RE = /[?？]\s*$|\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor musun|hatırladın mı|hakkında ne biliyorsun)\b|\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
 
-export type WorldEventObservationKind = "direct_interaction" | "reported_claim";
+export type WorldEventObservationKind = "direct_interaction" | "reported_claim" | "kaira_activity";
 export type WorldEventObservationStatus = "grounded" | "ambiguous";
+export type KairaActivityWorldStatus = "planned" | "active" | "completed" | "cancelled" | "failed";
+
+export interface KairaActivityExperienceSubject {
+  preferenceKey: string;
+  experiencedValue: string | number | boolean;
+}
+
+/** Canonical world truth for one Kaira-owned activity lifecycle observation. */
+export interface KairaActivityWorldObservation {
+  activityId: string;
+  activityType: string;
+  status: KairaActivityWorldStatus;
+  experienceSubject?: KairaActivityExperienceSubject;
+}
 
 export interface WorldEventObservation {
   id?: string;
@@ -33,6 +47,8 @@ export interface WorldEventObservation {
   kind: WorldEventObservationKind;
   status: WorldEventObservationStatus;
   event: LifecycleCanonicalWorldEvent;
+  /** Present only for first-class Kaira activity observations. */
+  activity?: KairaActivityWorldObservation;
   createdAt: string;
   temporalReferenceObservationId?: string;
 }
@@ -40,14 +56,27 @@ export interface WorldEventObservation {
 const scope = (value?: string) =>
   (value || "anonymous").replace(/[^a-zA-Z0-9_-]/g, "_");
 
+const canonicalActivityKey = (value: string) =>
+  String(value || "")
+    .trim()
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9_:-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 96);
+
+const validActivityValue = (value: unknown): value is string | number | boolean =>
+  (typeof value === "string" && Boolean(value.trim())) ||
+  (typeof value === "number" && Number.isFinite(value)) ||
+  typeof value === "boolean";
+
 export function observationKairaInstanceId(observation: WorldEventObservation): string {
   return resolveKairaInstanceContext({ instanceId: observation.kairaInstanceId }).instanceId;
 }
 
 export function classifyWorldEventObservation(
   event: CanonicalWorldEvent,
-): { persist: boolean; kind: WorldEventObservationKind; status: WorldEventObservationStatus } {
-  const kind: WorldEventObservationKind = event.reportedSpeech
+): { persist: boolean; kind: Exclude<WorldEventObservationKind, "kaira_activity">; status: WorldEventObservationStatus } {
+  const kind: Exclude<WorldEventObservationKind, "kaira_activity"> = event.reportedSpeech
     ? "reported_claim"
     : "direct_interaction";
 
@@ -165,6 +194,82 @@ export async function saveWorldEventObservation(input: {
     ...persisted,
     speakerName: input.speakerName || null,
   });
+  return { id: ref.id, ...persisted };
+}
+
+/**
+ * Persists trusted Kaira-owned activity lifecycle truth without routing it
+ * through user-message classification. The generic event is only a compatibility
+ * projection for existing world-model readers; `kind + activity` is authority.
+ */
+export async function saveKairaActivityWorldObservation(input: {
+  userId?: string;
+  kairaInstanceId: string;
+  sessionId: string;
+  activity: KairaActivityWorldObservation;
+}): Promise<WorldEventObservation> {
+  const instance = resolveKairaInstanceContext({ instanceId: input.kairaInstanceId });
+  const activityId = canonicalActivityKey(input.activity.activityId);
+  const activityType = canonicalActivityKey(input.activity.activityType);
+  if (!activityId || !activityType) throw new Error("Invalid Kaira activity world observation");
+
+  let experienceSubject: KairaActivityExperienceSubject | undefined;
+  if (input.activity.experienceSubject) {
+    const preferenceKey = canonicalActivityKey(input.activity.experienceSubject.preferenceKey);
+    const experiencedValue = input.activity.experienceSubject.experiencedValue;
+    if (!preferenceKey || !validActivityValue(experiencedValue)) {
+      throw new Error("Invalid Kaira activity experience subject");
+    }
+    experienceSubject = {
+      preferenceKey,
+      experiencedValue: typeof experiencedValue === "string" ? experiencedValue.trim().slice(0, 160) : experiencedValue,
+    };
+  }
+
+  const createdAt = new Date().toISOString();
+  const userId = scope(input.userId);
+  const parent = doc(
+    db,
+    WORLD_MODEL_COLLECTION,
+    worldModelOwnerScope(userId, instance.instanceId),
+  );
+  const activity: KairaActivityWorldObservation = {
+    activityId,
+    activityType,
+    status: input.activity.status,
+    ...(experienceSubject ? { experienceSubject } : {}),
+  };
+  const canonicalEvent: CanonicalWorldEvent = {
+    raw: `kaira_activity:${activityType}:${activity.status}`,
+    eventType: "general",
+    actor: { id: instance.instanceId, source: "first_person", confidence: 1 },
+    target: { id: `activity:${activityId}`, source: "semantic_target", confidence: 1 },
+    reportedSpeech: false,
+    certainty: 1,
+    ambiguities: [],
+    evidence: ["authority:kaira_activity_executor", `activity:${activityId}`, `status:${activity.status}`],
+    proposition: {
+      key: `${instance.instanceId}|activity|${activityId}|${activity.status}`,
+      predicate: "general",
+      actorKey: instance.instanceId,
+      targetKey: `activity:${activityId}`,
+      contentKey: activityType,
+    },
+    polarity: "positive",
+    temporal: { relation: "present", asksLatest: false },
+  };
+  const event = enrichWorldEventLifecycle(enrichWorldEventModality(canonicalEvent));
+  const persisted: Omit<WorldEventObservation, "id"> = {
+    userId,
+    kairaInstanceId: instance.instanceId,
+    sessionId: input.sessionId,
+    kind: "kaira_activity",
+    status: "grounded",
+    event,
+    activity,
+    createdAt,
+  };
+  const ref = await addDoc(collection(parent, EVENT_COLLECTION), persisted);
   return { id: ref.id, ...persisted };
 }
 
