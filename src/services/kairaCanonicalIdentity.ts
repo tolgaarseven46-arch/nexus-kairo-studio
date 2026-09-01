@@ -3,6 +3,7 @@ import type {
   KairaIdentitySeed,
   KairaSelfFact,
 } from "./kairaIdentityContracts";
+import { normalizeKairaSelfRevisionEvidence } from "./kairaSelfRevisionEvidence";
 
 export interface KairaCanonicalIdentityState {
   kairaInstanceId: string;
@@ -32,6 +33,9 @@ export function canonicalIdentityFromSeed(
       emotions: memory.emotions.map((emotion) => ({ ...emotion })),
       ...(memory.sourceWorldObservationIds
         ? { sourceWorldObservationIds: [...memory.sourceWorldObservationIds] }
+        : {}),
+      ...(memory.selfRevisionEvidence
+        ? { selfRevisionEvidence: { ...memory.selfRevisionEvidence } }
         : {}),
     })),
   };
@@ -108,6 +112,21 @@ export function validateKairaCanonicalIdentity(
         invariant: "canonical_identity.memory_truth_not_prose",
         message: `${memory.id} canonical anı bitmiş anlatım metni taşıyamaz.`,
       });
+    }
+    if (memory.selfRevisionEvidence) {
+      const normalizedEvidence = normalizeKairaSelfRevisionEvidence(memory.selfRevisionEvidence);
+      if (memory.origin !== "lived") {
+        issues.push({
+          invariant: "canonical_identity.revision_evidence_lived_only",
+          message: `${memory.id} self-revision evidence yalnız lived memory üzerinde taşınabilir.`,
+        });
+      }
+      if (!normalizedEvidence || JSON.stringify(normalizedEvidence) !== JSON.stringify(memory.selfRevisionEvidence)) {
+        issues.push({
+          invariant: "canonical_identity.revision_evidence_normalized",
+          message: `${memory.id} self-revision evidence canonical formatta olmalı.`,
+        });
+      }
     }
     if (memory.origin === "lived") {
       const sources = (memory.sourceWorldObservationIds || []).map((id) => id.trim()).filter(Boolean);
