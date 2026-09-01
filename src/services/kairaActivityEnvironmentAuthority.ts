@@ -42,6 +42,46 @@ function normalizedCapabilities(input: Record<string, boolean> | undefined) {
   return result;
 }
 
+/** Canonical structural validation used by both persistence and projection. */
+export function normalizeKairaActivityEnvironmentSnapshot(
+  snapshot: KairaActivityEnvironmentSnapshot,
+): KairaActivityEnvironmentSnapshot {
+  if (snapshot.schemaVersion !== 1) {
+    throw new Error("Unsupported Kaira activity environment schema");
+  }
+  const instance = resolveKairaInstanceContext({ instanceId: snapshot.kairaInstanceId });
+  const observedAtMs = Date.parse(snapshot.observedAt);
+  if (!Number.isFinite(observedAtMs)) throw new Error("Invalid Kaira activity environment time");
+
+  const seen = new Set<string>();
+  const entries: KairaActivityEnvironmentEntry[] = snapshot.entries.map((entry) => {
+    const catalogId = key(entry.catalogId);
+    if (!catalogId) throw new Error("Invalid Kaira activity environment catalog id");
+    if (seen.has(catalogId)) throw new Error("Duplicate Kaira activity environment entry");
+    seen.add(catalogId);
+    if (!strictUnit(entry.contextFit) || !strictUnit(entry.risk)) {
+      throw new Error("Invalid Kaira activity environment assessment");
+    }
+    const evidenceIds = Array.from(new Set(entry.evidenceIds.map(key).filter(Boolean)));
+    if (!evidenceIds.length) throw new Error("Kaira activity environment evidence required");
+    return {
+      catalogId,
+      accessible: entry.accessible === true,
+      capabilities: normalizedCapabilities(entry.capabilities),
+      contextFit: entry.contextFit,
+      risk: entry.risk,
+      evidenceIds,
+    };
+  });
+
+  return {
+    schemaVersion: 1,
+    kairaInstanceId: instance.instanceId,
+    observedAt: new Date(observedAtMs).toISOString(),
+    entries,
+  };
+}
+
 /**
  * Environment/platform authority boundary for activity capability/access facts.
  * It never parses conversation/world-event prose and never interprets activity
@@ -55,52 +95,34 @@ export function projectKairaActivityEnvironmentSnapshot(input: {
   maxAgeMinutes?: number;
 }): KairaActivityWorldRuntimeFact[] {
   const instance = resolveKairaInstanceContext({ instanceId: input.kairaInstanceId });
-  const snapshotInstance = resolveKairaInstanceContext({ instanceId: input.snapshot.kairaInstanceId });
-  if (instance.instanceId !== snapshotInstance.instanceId) {
+  const snapshot = normalizeKairaActivityEnvironmentSnapshot(input.snapshot);
+  if (instance.instanceId !== snapshot.kairaInstanceId) {
     throw new Error("Kaira activity environment owner mismatch");
   }
-  if (input.snapshot.schemaVersion !== 1) {
-    throw new Error("Unsupported Kaira activity environment schema");
-  }
 
-  const observedAtMs = Date.parse(input.snapshot.observedAt);
+  const observedAtMs = Date.parse(snapshot.observedAt);
   const nowMs = Date.parse(input.now);
-  if (!Number.isFinite(observedAtMs) || !Number.isFinite(nowMs)) {
-    throw new Error("Invalid Kaira activity environment time");
-  }
+  if (!Number.isFinite(nowMs)) throw new Error("Invalid Kaira activity environment time");
   const maxAgeMinutes = Math.max(1, Math.min(24 * 60, input.maxAgeMinutes || 30));
   if (observedAtMs > nowMs + 60_000 || nowMs - observedAtMs > maxAgeMinutes * 60_000) {
     return [];
   }
 
   const catalogIds = new Set(input.catalog.map((entry) => key(entry.catalogId)).filter(Boolean));
-  const seen = new Set<string>();
   const result: KairaActivityWorldRuntimeFact[] = [];
 
-  for (const entry of input.snapshot.entries) {
-    const catalogId = key(entry.catalogId);
-    if (!catalogId || !catalogIds.has(catalogId)) continue;
-    if (seen.has(catalogId)) throw new Error("Duplicate Kaira activity environment entry");
-    seen.add(catalogId);
-    if (!strictUnit(entry.contextFit) || !strictUnit(entry.risk)) {
-      throw new Error("Invalid Kaira activity environment assessment");
-    }
-
-    const evidenceIds = Array.from(new Set([
-      ...entry.evidenceIds.map(key).filter(Boolean),
-      `environment_snapshot:${new Date(observedAtMs).toISOString()}`,
-    ]));
-    if (!evidenceIds.length) {
-      throw new Error("Kaira activity environment evidence required");
-    }
-
+  for (const entry of snapshot.entries) {
+    if (!catalogIds.has(entry.catalogId)) continue;
     result.push({
-      catalogId,
-      capabilityFacts: normalizedCapabilities(entry.capabilities),
-      accessible: entry.accessible === true,
+      catalogId: entry.catalogId,
+      capabilityFacts: { ...(entry.capabilities || {}) },
+      accessible: entry.accessible,
       baseContextFit: entry.contextFit,
       baseRisk: entry.risk,
-      evidenceIds,
+      evidenceIds: Array.from(new Set([
+        ...entry.evidenceIds,
+        `environment_snapshot:${snapshot.observedAt}`,
+      ])),
     });
   }
   return result;
