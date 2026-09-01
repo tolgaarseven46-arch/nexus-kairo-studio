@@ -30,14 +30,16 @@ const strictUnit = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 
 function normalizedCapabilities(input: Record<string, boolean> | undefined) {
+  const pairs = Object.entries(input || {})
+    .map(([rawKey, value]) => [key(rawKey), value === true] as const)
+    .filter(([capability]) => Boolean(capability))
+    .sort(([left], [right]) => left.localeCompare(right));
   const result: Record<string, boolean> = {};
-  for (const [rawKey, value] of Object.entries(input || {})) {
-    const capability = key(rawKey);
-    if (!capability) continue;
-    if (capability in result && result[capability] !== (value === true)) {
+  for (const [capability, value] of pairs) {
+    if (capability in result && result[capability] !== value) {
       throw new Error("Conflicting Kaira activity environment capability");
     }
-    result[capability] = value === true;
+    result[capability] = value;
   }
   return result;
 }
@@ -62,7 +64,7 @@ export function normalizeKairaActivityEnvironmentSnapshot(
     if (!strictUnit(entry.contextFit) || !strictUnit(entry.risk)) {
       throw new Error("Invalid Kaira activity environment assessment");
     }
-    const evidenceIds = Array.from(new Set(entry.evidenceIds.map(key).filter(Boolean)));
+    const evidenceIds = Array.from(new Set(entry.evidenceIds.map(key).filter(Boolean))).sort();
     if (!evidenceIds.length) throw new Error("Kaira activity environment evidence required");
     return {
       catalogId,
@@ -72,7 +74,7 @@ export function normalizeKairaActivityEnvironmentSnapshot(
       risk: entry.risk,
       evidenceIds,
     };
-  });
+  }).sort((left, right) => left.catalogId.localeCompare(right.catalogId));
 
   return {
     schemaVersion: 1,
