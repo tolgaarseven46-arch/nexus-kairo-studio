@@ -1,0 +1,38 @@
+name: one-time-epistemic-profile-fail-closed
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-epistemic-profile-fail-closed.yml'
+permissions:
+  contents: write
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - name: Apply fail-closed epistemic migration
+        run: node scripts/one-time-epistemic-profile-fail-closed.cjs
+      - name: Focused epistemic regressions
+        run: npx vitest run src/services/kairaKnowledgeProfileStore.test.ts src/services/kairaEpistemicGateContracts.test.ts src/services/kairaEpistemicResponsePolicy.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts
+      - name: Architecture contracts
+        run: npm run test:contracts
+      - name: Full tests
+        run: npm test
+      - name: TypeScript
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Commit product and clean helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-time-epistemic-profile-fail-closed.yml scripts/one-time-epistemic-profile-fail-closed.cjs
+          git add server.ts src/services/kairaEpistemicGate.ts src/services/kairaKnowledgeProfileStore.ts src/services/kairaKnowledgeProfileStore.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts
+          git commit -m "fix(kaira): fail closed on epistemic profile outage"
+          git push
