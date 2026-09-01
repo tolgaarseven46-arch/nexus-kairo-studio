@@ -14,9 +14,12 @@ describe("Kaira autobiographical runtime integration contracts", () => {
     expect(server).not.toContain("loadKairaCanonicalIdentity(");
   });
 
-  it("bypasses local short-circuit when canonical self-memory grounding is active", () => {
+  it("bypasses local short-circuit and places self-memory grounding before dialogue grounding", () => {
     expect(server).toContain("if (!selfMemoryInstruction && local.handled && local.reply) {");
-    expect(server).toContain("${selfMemoryInstruction}\\n${dialogueInstruction}");
+    const selfMemoryIndex = server.indexOf("${selfMemoryInstruction}");
+    const dialogueIndex = server.indexOf("${dialogueInstruction}", selfMemoryIndex);
+    expect(selfMemoryIndex).toBeGreaterThan(-1);
+    expect(dialogueIndex).toBeGreaterThan(selfMemoryIndex);
   });
 
   it("guards generated and post-enforcement fallback replies against unsupported autobiography", () => {
@@ -29,14 +32,16 @@ describe("Kaira autobiographical runtime integration contracts", () => {
     expect(server).toContain(
       "const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateSelfMemoryGuard.reply, epistemicAccess);",
     );
-    expect(server).toContain("worldMemoryGuard.changed || selfMemoryGuard.changed || epistemicGuard.changed");
+    expect(server).toMatch(
+      /worldMemoryGuard\.changed\s*\|\|\s*selfMemoryGuard\.changed\s*\|\|\s*epistemicGuard\.changed/,
+    );
   });
 
   it("exposes the typed recall decision in session metadata and API KDM output", () => {
     const occurrences = server.split("selfMemoryRuntime").length - 1;
     expect(occurrences).toBeGreaterThanOrEqual(8);
-    expect(server).toContain("epistemicAccess, selfMemoryRuntime, behaviorContract");
-    expect(server).toContain("epistemicAccess,\n          selfMemoryRuntime,\n          responsePlan,");
+    expect(server).toMatch(/epistemicAccess\s*,\s*selfMemoryRuntime\s*,\s*behaviorContract/);
+    expect(server).toMatch(/epistemicAccess\s*,\s*selfMemoryRuntime\s*,\s*responsePlan/);
   });
 
   it("does not create a second downstream self-memory parser", () => {
