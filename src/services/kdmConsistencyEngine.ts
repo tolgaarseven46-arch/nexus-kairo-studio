@@ -9,9 +9,6 @@ import {
   BehaviorLayerProfile,
 } from "./droitBehaviorEngine";
 import { normalizeDroitPersonality } from "./droitPersonalityNormalizer";
-import { normalizeKairoLanguageInput } from "./kairoLanguageNormalizer";
-import { hasLocalLowMoodExpression } from "./kairoEmotionalLanguage";
-import { isConfusionOrChallenge } from "./kairoDialogueChaosEngine";
 import { applyRelationshipContext } from "./relationshipBehaviorService";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
@@ -157,51 +154,6 @@ function applyIntegratedBehaviorPolicy(
       },
     },
   };
-}
-
-function analysisText(message: string) {
-  const n = normalizeKairoLanguageInput(message);
-  return `${n.normalized} ${n.canonical}`.toLocaleLowerCase("tr-TR");
-}
-
-const EMOTIONAL_SHARE_RE =
-  /(moralim\b.{0,30}\bbozuk|üzgünüm|çok\s+mutluyum|mutluyum|bunaldım|canım\s+(çok\s+)?sıkkın|kendimi\s+(çok\s+)?kötü\s+hissediyorum|kendimi\s+(çok\s+)?iyi\s+hissediyorum)/;
-const EMOTIONAL_LOAD_RE =
-  /(moralim\b.{0,30}\bbozuk|üzgün|kötü\s+hissed|bunaldım|canım\s+(çok\s+)?sıkkın|kaygı|endişe|stres|çok\s+sıcak.*bunaldım|yoruldum|tükendim)/;
-const INSULT_RE =
-  /(aptal|salak|gerizekalı|geri\s+zekalı|mal\b|çirkin|boş\s+konuş|kaşar|orospu|oropu|orosp[uy]|sürtük|piç|yavşak|şerefsiz|haysiyetsiz|ezik|defol|siktir|sus\b|kes\b|kaybol|nefret|rezalet|berbat|bok)/;
-const AGGRESSIVE_RE =
-  /(sinir|kızgın|nefret|rezalet|bok|amk|aq\b|mk\b|lanet|berbat|aptal|salak|gerizekalı|geri\s+zekalı|mal\b|çirkin|boş\s+konuş|kaşar|orospu|oropu|orosp[uy]|sürtük|piç|yavşak|şerefsiz|haysiyetsiz|ezik|defol|siktir|sus\b|kes\b|kaybol)/;
-const DIRECT_INSULT_RE = INSULT_RE;
-const THIRD_PARTY_RE =
-  /\b(mert|müdür|patron|çocuk|çocuğa|çocuğu|adam|adama|adamı|kadın|kadına|kadını|arkadaşım|arkadaşıma|arkadaşına|ona|onu|onun|o)\b/;
-const REPORTING_RE =
-  /\b(dedim|dedi|demiş|söyledim|söyledi|diyor|diyordu|diye)\b/;
-
-function classifyIntent(message: string): string {
-  const text = analysisText(message);
-  if (/(özür dilerim|özür|pardon|kusura bakma)/.test(text)) return "özür_ve_telafi";
-  if (INSULT_RE.test(text)) return "hakaret_ve_saldiri";
-  if (isConfusionOrChallenge(message)) return "anlamama_ve_itiraz";
-  if (hasLocalLowMoodExpression(message)) return "duygusal_paylasim";
-  if (EMOTIONAL_SHARE_RE.test(text)) return "duygusal_paylasim";
-  if (/(^|\s)(selam|merhaba|hey|naber|nasılsın|ne yapıyorsun)(\s|$)/.test(text)) return "selamlama";
-  if (/(^|\s)(kim|kime|kimi|neydi|hangisi|hangisiydi)(\s|$)|ne\s+yapacaktı|(?:^|\s)ne(?:yi)?\s+.{0,50}düşün|hatırlıyor\s+musun|hatırladın\s+mı/.test(text)) return "soru";
-  if (/(neden|nasıl|ne demek|açıkla|anlat|nedir|niye)/.test(text)) return "bilgi_ve_aciklama";
-  if (/(?:😂|🤣|😄|😅|:d|\bha(?:ha)+h*\b)/i.test(text)) return "şakalaşma";
-  if (/(?<![\p{L}])(hata|sorun|çöktü|çalışmıyor|bug|arıza|bozuk)(?![\p{L}])/u.test(text)) return "sorun_cozme";
-  if (/(yap|oluştur|ekle|değiştir|geliştir|uygula)/.test(text)) return "eylem_talebi";
-  if (/[?]/.test(message)) return "soru";
-  return "genel_sohbet";
-}
-
-function classifySentiment(message: string): string {
-  const text = analysisText(message);
-  if (hasLocalLowMoodExpression(message)) return "duygusal_yük";
-  if (EMOTIONAL_LOAD_RE.test(text)) return "duygusal_yük";
-  if (AGGRESSIVE_RE.test(text)) return "negatif";
-  if (/(çok\s+mutluyum|mutluyum|çok\s+iyiyim|keyfim\s+yerinde|teşekkür|sağ ol|harika|süper|mükemmel|seviyorum|güzel|özür)/.test(text)) return "pozitif";
-  return "nötr";
 }
 
 function semanticIntentToKdm(event: SemanticEvent): string {
