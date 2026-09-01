@@ -72,7 +72,13 @@ describe('beta conversation continuity regressions', () => {
       'evet',
       'Mert',
     );
-    expect(plan.move).toBe('natural_reaction');
+    expect(plan).toMatchObject({
+      move: 'complete_social_routine',
+      socialRoutine: 'agreement',
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+    });
+    expect(plan.move).not.toBe('follow_previous_answer');
   });
 
   it.each(['naber', 'nasılsın kank', 'ne yapıyorsun'])(

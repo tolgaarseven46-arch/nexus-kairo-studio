@@ -3,7 +3,11 @@ import {
   buildDialogueClaimLedger,
   type DialogueClaim,
 } from "./kairoDialogueChaosEngine";
-import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
+import {
+  interpretSemanticEvent,
+  type SemanticEvent,
+  type SemanticSocialRoutine,
+} from "./semanticEventEngine";
 import { projectSemanticEventToDialogueAnalysis } from "./kairaDialogueTurnProjection";
 import type { DialogueTurnAnalysis } from "./kairoDialogueChaosEngine";
 
@@ -16,11 +20,13 @@ export type DialogueMove =
   | "acknowledge_correction"
   | "join_banter"
   | "follow_topic_shift"
+  | "complete_social_routine"
   | "natural_reaction";
 
 export interface DialogueDecisionPlan {
   move: DialogueMove;
   target?: string;
+  socialRoutine?: SemanticSocialRoutine;
   allowFollowUpQuestion: boolean;
   allowSpeculation: boolean;
   maxSentences: number;
@@ -61,6 +67,7 @@ const SOCIAL_ONLY_MOVES = new Set<DialogueDecisionPlan["move"]>([
   "acknowledge_correction",
   "repair_or_rephrase",
   "follow_topic_shift",
+  "complete_social_routine",
 ]);
 const PROCRASTINATION_BANTER_RE =
   /\b(son dakikaya bırak\w*|ertele\w*|geciktir\w*|üşen\w*|yapmayıp bekle\w*)\b/i;
@@ -226,6 +233,26 @@ export function planDialogueResponse(
       hasSupportedTargetClaim: false,
       reason:
         "Kullanıcı Kaira'nın halini veya ne yaptığını doğrudan soruyor. Kısa cevap ver; doğal karşılıklılık için en fazla bir kısa 'sen?' / 'senden naber?' sorusu sorabilirsin.",
+    };
+  }
+
+  if (
+    event.socialRoutine === "greeting" ||
+    event.socialRoutine === "thanks" ||
+    event.socialRoutine === "agreement" ||
+    event.socialRoutine === "goodbye" ||
+    event.socialRoutine === "good_night"
+  ) {
+    return {
+      move: "complete_social_routine",
+      socialRoutine: event.socialRoutine,
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 8,
+      hasSupportedTargetClaim: false,
+      reason:
+        "Kanonik sosyal rutini aynı sosyal işlevle kısa biçimde tamamla. Yeni konu, açıklama, tahmin veya otomatik soru açma.",
     };
   }
 
@@ -434,6 +461,14 @@ export function buildGroundedDialogueFallback(
     return effectiveAllowQuestion ? "hmm niye" : "hmm";
   }
   if (plan.move === "repair_or_rephrase") return "biraz saçmaladım galiba";
+  if (plan.move === "complete_social_routine") {
+    if (plan.socialRoutine === "greeting") return "selam";
+    if (plan.socialRoutine === "thanks") return "rica ederim";
+    if (plan.socialRoutine === "agreement") return "aynen";
+    if (plan.socialRoutine === "goodbye") return "görüşürüz";
+    if (plan.socialRoutine === "good_night") return "iyi geceler";
+    return "tamam";
+  }
   if (plan.move === "follow_previous_answer") return "he tamam o zaman";
   if (plan.move === "acknowledge_correction") return "he doğru";
   if (plan.move === "natural_reaction") return "he anladım";
