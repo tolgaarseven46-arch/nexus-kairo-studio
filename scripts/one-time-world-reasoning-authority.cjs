@@ -71,16 +71,8 @@ const findBefore = (server.match(/findWorldModelResponseIssues\(/g) || []).lengt
 const enforceBefore = (server.match(/enforceWorldModelRecallResponse\(/g) || []).length;
 if (findBefore < 4) throw new Error(`Expected >=4 world issue seams, found ${findBefore}`);
 if (enforceBefore < 2) throw new Error(`Expected >=2 world enforcement seams, found ${enforceBefore}`);
-
-server = server.replace(
-  /findWorldModelResponseIssues\(([\s\S]*?),\s*retrievedWorldEvents\)/g,
-  'findWorldModelResponseIssues($1, retrievedWorldEvents, worldReasoningContext)',
-);
-server = server.replace(
-  /enforceWorldModelRecallResponse\(([\s\S]*?),\s*retrievedWorldEvents\)/g,
-  'enforceWorldModelRecallResponse($1, retrievedWorldEvents, worldReasoningContext)',
-);
-
+server = server.replace(/findWorldModelResponseIssues\(([\s\S]*?),\s*retrievedWorldEvents\)/g, 'findWorldModelResponseIssues($1, retrievedWorldEvents, worldReasoningContext)');
+server = server.replace(/enforceWorldModelRecallResponse\(([\s\S]*?),\s*retrievedWorldEvents\)/g, 'enforceWorldModelRecallResponse($1, retrievedWorldEvents, worldReasoningContext)');
 const findWithContext = (server.match(/findWorldModelResponseIssues\([\s\S]*?retrievedWorldEvents, worldReasoningContext\)/g) || []).length;
 const enforceWithContext = (server.match(/enforceWorldModelRecallResponse\([\s\S]*?retrievedWorldEvents, worldReasoningContext\)/g) || []).length;
 if (findWithContext < findBefore) throw new Error(`Not all world issue seams received canonical context (${findWithContext}/${findBefore})`);
@@ -90,84 +82,61 @@ write(serverPath, server);
 // 3) Direct guard contracts derive context explicitly at the test boundary.
 const contractsPath = 'src/services/kairaWorldModelResponseGuardContracts.test.ts';
 let contracts = read(contractsPath);
-contracts = replaceRequired(
-  contracts,
-  'import { rankWorldEventObservations } from "./worldEventRetrieval";\n',
-  'import { rankWorldEventObservations } from "./worldEventRetrieval";\nimport { appraiseRetrievedWorldState } from "./worldStateAppraisal";\nimport { deriveWorldReasoningPolicy } from "./worldReasoningPolicy";\n',
-  'guard contract context imports',
-);
+contracts = replaceRequired(contracts, 'import { rankWorldEventObservations } from "./worldEventRetrieval";\n', 'import { rankWorldEventObservations } from "./worldEventRetrieval";\nimport { appraiseRetrievedWorldState } from "./worldStateAppraisal";\nimport { deriveWorldReasoningPolicy } from "./worldReasoningPolicy";\n', 'guard contract context imports');
 const describeNeedle = 'describe("world-model response guard contracts", () => {';
-contracts = replaceRequired(
-  contracts,
-  describeNeedle,
-  'function reasoningContext(items: ReturnType<typeof rankWorldEventObservations>) {\n  const appraisal = appraiseRetrievedWorldState(items);\n  return { appraisal, policy: deriveWorldReasoningPolicy(appraisal) };\n}\n\n' + describeNeedle,
-  'guard contract context helper',
-);
-contracts = contracts.replace(
-  /findWorldModelResponseIssues\(([\s\S]*?),\s*retrieved\)/g,
-  'findWorldModelResponseIssues($1, retrieved, reasoningContext(retrieved))',
-);
-contracts = contracts.replace(
-  /enforceWorldModelRecallResponse\(([\s\S]*?),\s*retrieved\)/g,
-  'enforceWorldModelRecallResponse($1, retrieved, reasoningContext(retrieved))',
-);
-if (/findWorldModelResponseIssues\([\s\S]*?,\s*retrieved\)/.test(contracts)) throw new Error('Unmigrated direct findWorldModelResponseIssues call remains');
-if (/enforceWorldModelRecallResponse\([\s\S]*?,\s*retrieved\)/.test(contracts)) throw new Error('Unmigrated direct enforceWorldModelRecallResponse call remains');
+contracts = replaceRequired(contracts, describeNeedle, 'function reasoningContext(items: ReturnType<typeof rankWorldEventObservations>) {\n  const appraisal = appraiseRetrievedWorldState(items);\n  return { appraisal, policy: deriveWorldReasoningPolicy(appraisal) };\n}\n\n' + describeNeedle, 'guard contract context helper');
+contracts = contracts.replace(/findWorldModelResponseIssues\(([\s\S]*?),\s*retrieved\)/g, 'findWorldModelResponseIssues($1, retrieved, reasoningContext(retrieved))');
+contracts = contracts.replace(/enforceWorldModelRecallResponse\(([\s\S]*?),\s*retrieved\)/g, 'enforceWorldModelRecallResponse($1, retrieved, reasoningContext(retrieved))');
 write(contractsPath, contracts);
 
 // 4) Integration contract locks the single-authority invariant and new seams.
 const integrationPath = 'src/services/kairaWorldModelResponseGuardIntegrationContracts.test.ts';
 let integration = read(integrationPath);
-integration = replaceRequired(
-  integration,
-  'const persistence = fs.readFileSync(path.resolve(process.cwd(), "src/services/kdmPersistenceService.ts"), "utf8");',
-  'const persistence = fs.readFileSync(path.resolve(process.cwd(), "src/services/kdmPersistenceService.ts"), "utf8");\nconst guard = fs.readFileSync(path.resolve(process.cwd(), "src/services/worldModelResponseGuard.ts"), "utf8");',
-  'integration guard source',
-);
-integration = integration.replace(
-  'findWorldModelResponseIssues(repairedReply, retrievedWorldEvents)',
-  'findWorldModelResponseIssues(repairedReply, retrievedWorldEvents, worldReasoningContext)',
-);
-integration = integration.replace(
-  'findWorldModelResponseIssues(fallback, retrievedWorldEvents)',
-  'findWorldModelResponseIssues(fallback, retrievedWorldEvents, worldReasoningContext)',
-);
-integration = integration.replace(
-  'const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents)',
-  'const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext)',
-);
-integration = integration.replace(
-  'enforceWorldModelRecallResponse(reply, retrievedWorldEvents)',
-  'enforceWorldModelRecallResponse(reply, retrievedWorldEvents, worldReasoningContext)',
-);
+integration = replaceRequired(integration, 'const persistence = fs.readFileSync(path.resolve(process.cwd(), "src/services/kdmPersistenceService.ts"), "utf8");', 'const persistence = fs.readFileSync(path.resolve(process.cwd(), "src/services/kdmPersistenceService.ts"), "utf8");\nconst guard = fs.readFileSync(path.resolve(process.cwd(), "src/services/worldModelResponseGuard.ts"), "utf8");', 'integration guard source');
+integration = integration.replace('findWorldModelResponseIssues(repairedReply, retrievedWorldEvents)', 'findWorldModelResponseIssues(repairedReply, retrievedWorldEvents, worldReasoningContext)');
+integration = integration.replace('findWorldModelResponseIssues(fallback, retrievedWorldEvents)', 'findWorldModelResponseIssues(fallback, retrievedWorldEvents, worldReasoningContext)');
+integration = integration.replace('const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents)', 'const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext)');
+integration = integration.replace('enforceWorldModelRecallResponse(reply, retrievedWorldEvents)', 'enforceWorldModelRecallResponse(reply, retrievedWorldEvents, worldReasoningContext)');
 const persistNeedle = '  it("persists world reasoning observability fields", () => {';
-integration = replaceRequired(
-  integration,
-  persistNeedle,
-  '  it("shares one canonical appraisal/policy authority with deterministic enforcement", () => {\n    expect(server).toContain("const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy }");\n    expect(server).toContain("findWorldModelResponseIssues(repairedReply, retrievedWorldEvents, worldReasoningContext)");\n    expect(server).toContain("enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext)");\n    expect(guard).toContain("context: WorldModelReasoningContext");\n    expect(guard).not.toContain("appraiseRetrievedWorldState(");\n    expect(guard).not.toContain("deriveWorldReasoningPolicy(");\n  });\n\n' + persistNeedle,
-  'single authority integration contract',
-);
+integration = replaceRequired(integration, persistNeedle, '  it("shares one canonical appraisal/policy authority with deterministic enforcement", () => {\n    expect(server).toContain("const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy }");\n    expect(server).toContain("findWorldModelResponseIssues(repairedReply, retrievedWorldEvents, worldReasoningContext)");\n    expect(server).toContain("enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext)");\n    expect(guard).toContain("context: WorldModelReasoningContext");\n    expect(guard).not.toContain("appraiseRetrievedWorldState(");\n    expect(guard).not.toContain("deriveWorldReasoningPolicy(");\n  });\n\n' + persistNeedle, 'single authority integration contract');
 write(integrationPath, integration);
 
 // 5) Runtime policy integration explicitly locks final enforcement consumption.
 const policyIntegrationPath = 'src/services/kairaWorldReasoningPolicyIntegrationContracts.test.ts';
 let policyIntegration = read(policyIntegrationPath);
 const mutationNeedle = '  it("does not feed world reasoning policy into KDM state mutation", () => {';
-policyIntegration = replaceRequired(
-  policyIntegration,
-  mutationNeedle,
-  '  it("passes the canonical reasoning policy to deterministic final enforcement", () => {\n    expect(server).toContain("const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy }");\n    expect(server).toContain("retrievedWorldEvents, worldReasoningContext");\n  });\n\n' + mutationNeedle,
-  'policy final enforcement contract',
-);
+policyIntegration = replaceRequired(policyIntegration, mutationNeedle, '  it("passes the canonical reasoning policy to deterministic final enforcement", () => {\n    expect(server).toContain("const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy }");\n    expect(server).toContain("retrievedWorldEvents, worldReasoningContext");\n  });\n\n' + mutationNeedle, 'policy final enforcement contract');
 write(policyIntegrationPath, policyIntegration);
 
 // 6) Epistemic final-authority contract follows the same canonical world seam.
 const epistemicRuntimePath = 'src/services/kairaEpistemicRuntimeContracts.test.ts';
 let epistemicRuntime = read(epistemicRuntimePath);
-epistemicRuntime = replaceRequired(
-  epistemicRuntime,
-  'const candidateWorld = server.indexOf("const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents)");',
-  'const candidateWorld = server.indexOf("const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents, worldReasoningContext)");',
-  'epistemic final authority world seam',
-);
+epistemicRuntime = replaceRequired(epistemicRuntime, 'const candidateWorld = server.indexOf("const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents)");', 'const candidateWorld = server.indexOf("const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents, worldReasoningContext)");', 'epistemic final authority world seam');
 write(epistemicRuntimePath, epistemicRuntime);
+
+// 7) Full regression harnesses must model the same explicit appraisal -> policy boundary.
+const finalDeliveryPath = 'src/services/kairaFinalDeliveryAuthorityRegression.test.ts';
+let finalDelivery = read(finalDeliveryPath);
+finalDelivery = replaceRequired(finalDelivery, "import { rankWorldEventObservations } from './worldEventRetrieval';\n", "import { rankWorldEventObservations } from './worldEventRetrieval';\nimport { appraiseRetrievedWorldState } from './worldStateAppraisal';\nimport { deriveWorldReasoningPolicy } from './worldReasoningPolicy';\n", 'final delivery reasoning imports');
+finalDelivery = replaceRequired(finalDelivery, '    const guarded = enforceWorldModelRecallResponse(result.enforced.reply, retrieved);', '    const appraisal = appraiseRetrievedWorldState(retrieved);\n    const guarded = enforceWorldModelRecallResponse(result.enforced.reply, retrieved, {\n      appraisal,\n      policy: deriveWorldReasoningPolicy(appraisal),\n    });', 'final delivery direct guard context');
+write(finalDeliveryPath, finalDelivery);
+
+const mixedPath = 'src/services/kairaMixedConversationQualityRegression.test.ts';
+let mixed = read(mixedPath);
+mixed = replaceRequired(mixed, "        recallGuards.push(enforceWorldModelRecallResponse('Mert yarın istifa edecek.', retrieved));", "        recallGuards.push(enforceWorldModelRecallResponse('Mert yarın istifa edecek.', retrieved, { appraisal, policy }));", 'mixed quality direct guard context');
+write(mixedPath, mixed);
+
+const twentyPath = 'src/services/kairaTwentyTurnEndToEndContracts.test.ts';
+let twenty = read(twentyPath);
+const oldTwentyCall = '    const guard = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved);';
+const newTwentyCall = '    const guard = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved, { appraisal, policy });';
+const twentyCount = twenty.split(oldTwentyCall).length - 1;
+if (twentyCount !== 3) throw new Error(`Expected 3 direct twenty-turn guard calls, found ${twentyCount}`);
+twenty = twenty.split(oldTwentyCall).join(newTwentyCall);
+write(twentyPath, twenty);
+
+const parityPath = 'src/services/kairaLocalAiParityContracts.test.ts';
+let parity = read(parityPath);
+parity = replaceRequired(parity, '"const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents)"', '"const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext)"', 'local parity world guard literal');
+parity = replaceRequired(parity, '"const worldMemoryGuard = enforceWorldModelRecallResponse(reply, retrievedWorldEvents)"', '"const worldMemoryGuard = enforceWorldModelRecallResponse(reply, retrievedWorldEvents, worldReasoningContext)"', 'AI parity world guard literal');
+write(parityPath, parity);
