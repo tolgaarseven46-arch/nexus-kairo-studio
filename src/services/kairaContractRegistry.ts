@@ -153,10 +153,20 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
   {
     id: "epistemic-access",
     version: 1,
-    status: "active",
+    status: "superseded",
     ownerLayer: "epistemic-gate",
     consumerLayers: ["appraisal", "behavior-policy", "response-generation"],
     summary: "Model knowledge and Kaira knowledge are separate concepts. Until real knowledge state is connected, one compatibility gate returns known; future knowledge decisions must plug into this seam rather than scatter checks across layers.",
+    revisionReason: "V2 adds explicit knowledge-profile coverage semantics so absence can mean unknown only when the profile declares a complete bounded catalogue.",
+  },
+  {
+    id: "epistemic-access",
+    version: 2,
+    status: "active",
+    ownerLayer: "epistemic-gate",
+    consumerLayers: ["appraisal", "behavior-policy", "response-generation", "observability"],
+    summary: "Knowledge decisions consume an explicit per-instance knowledge profile. Known concepts retain provenance/confidence, low-confidence concepts remain partial, and absence becomes unknown only under bounded_catalog coverage; open or absent profiles preserve legacy broad-model compatibility.",
+    supersedes: "epistemic-access@1",
   },
   {
     id: "world-event-retrieval",
