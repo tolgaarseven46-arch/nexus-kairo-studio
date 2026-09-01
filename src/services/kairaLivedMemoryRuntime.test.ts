@@ -68,15 +68,26 @@ const baseMemory = {
   sourceWorldObservationIds: ["obs_1"],
   consolidationKey: "world:obs_1",
 };
+const activityReceipt = {
+  authority: "kaira_activity_executor" as const,
+  activityId: "theatre_01",
+  kairaInstanceId: "kaira_1",
+  sourceWorldObservationId: "obs_1",
+  status: "completed" as const,
+  preferenceProbe: {
+    preferenceKey: "preferred_performance_type",
+    experiencedValue: "theatre",
+  },
+  outcome: {
+    outcomeValence: 0.84,
+    appraisalConfidence: 0.9,
+    attributionConfidence: 0.88,
+  },
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
-  consolidation.appraise.mockReturnValue({
-    status: "consolidate",
-    score: 0.8,
-    reasons: ["test"],
-    memory: baseMemory,
-  });
+  consolidation.appraise.mockReturnValue({ status: "consolidate", score: 0.8, reasons: ["test"], memory: baseMemory });
 });
 
 describe("lived autobiographical runtime coordinator", () => {
@@ -84,56 +95,84 @@ describe("lived autobiographical runtime coordinator", () => {
     world.save.mockResolvedValue(persistedObservation);
     identity.append.mockResolvedValue({ status: "appended", memoryId: "lived_obs_1" });
     await expect(persistWorldEventAndMaybeConsolidateLivedMemory({
-      userId: "user_1",
-      instance: { instanceId: "kaira_1", instanceType: "individual" },
-      sessionId: "s1",
-      event,
-      dynamicStateAfter,
+      userId: "user_1", instance: { instanceId: "kaira_1", instanceType: "individual" }, sessionId: "s1", event, dynamicStateAfter,
     })).resolves.toMatchObject({ status: "consolidated", observationId: "obs_1", memoryId: "lived_obs_1" });
     expect(world.save.mock.invocationCallOrder[0]).toBeLessThan(identity.append.mock.invocationCallOrder[0]);
     expect(identity.revise).not.toHaveBeenCalled();
   });
 
-  it("applies self revision only after a canonical lived memory carrying typed evidence", async () => {
+  it("projects a trusted activity receipt into lived preference evidence before atomic revision", async () => {
     world.save.mockResolvedValue(persistedObservation);
-    consolidation.appraise.mockReturnValue({
-      status: "consolidate",
-      score: 0.9,
-      reasons: ["typed_self_evidence"],
-      memory: {
-        ...baseMemory,
-        selfRevisionEvidence: {
-          factKey: "preferred_music",
-          domain: "preference",
-          value: "ambient",
-          confidence: 0.9,
-        },
-      },
-    });
     identity.append.mockResolvedValue({ status: "appended", memoryId: "lived_obs_1" });
-    identity.revise.mockResolvedValue({
-      status: "unchanged",
-      decision: { status: "insufficient_evidence" },
-    });
+    identity.revise.mockResolvedValue({ status: "unchanged", decision: { status: "insufficient_evidence" } });
 
     const result = await persistWorldEventAndMaybeConsolidateLivedMemory({
       instance: { instanceId: "kaira_1", instanceType: "individual" },
       sessionId: "s1",
       event,
       dynamicStateAfter,
+      activityExperienceReceipt: activityReceipt,
     });
 
-    expect(identity.append.mock.invocationCallOrder[0]).toBeLessThan(identity.revise.mock.invocationCallOrder[0]);
-    expect(identity.revise).toHaveBeenCalledWith(
+    expect(identity.append).toHaveBeenCalledWith(
       expect.objectContaining({ instanceId: "kaira_1" }),
-      "preferred_music",
+      expect.objectContaining({
+        selfRevisionEvidence: expect.objectContaining({
+          factKey: "preferred_performance_type",
+          domain: "preference",
+          value: "theatre",
+        }),
+      }),
     );
+    expect(identity.append.mock.invocationCallOrder[0]).toBeLessThan(identity.revise.mock.invocationCallOrder[0]);
+    expect(identity.revise).toHaveBeenCalledWith(expect.objectContaining({ instanceId: "kaira_1" }), "preferred_performance_type");
     expect(result).toMatchObject({
       status: "consolidated",
-      selfRevisionFactKey: "preferred_music",
+      experiencePreferenceStatus: "projected",
+      selfRevisionFactKey: "preferred_performance_type",
       selfRevisionStatus: "unchanged",
-      selfRevisionDecision: "insufficient_evidence",
     });
+  });
+
+  it("fails closed on an activity receipt whose world provenance does not match the lived episode", async () => {
+    world.save.mockResolvedValue(persistedObservation);
+    identity.append.mockResolvedValue({ status: "appended", memoryId: "lived_obs_1" });
+
+    const result = await persistWorldEventAndMaybeConsolidateLivedMemory({
+      instance: { instanceId: "kaira_1", instanceType: "individual" },
+      sessionId: "s1",
+      event,
+      dynamicStateAfter,
+      activityExperienceReceipt: { ...activityReceipt, sourceWorldObservationId: "obs_other" },
+    });
+
+    expect(identity.append).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ selfRevisionEvidence: expect.anything() }),
+    );
+    expect(identity.revise).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: "consolidated",
+      experiencePreferenceStatus: "rejected",
+      experiencePreferenceReason: "provenance_mismatch",
+    });
+  });
+
+  it("applies self revision only after a canonical lived memory carrying typed evidence", async () => {
+    world.save.mockResolvedValue(persistedObservation);
+    consolidation.appraise.mockReturnValue({
+      status: "consolidate", score: 0.9, reasons: ["typed_self_evidence"],
+      memory: { ...baseMemory, selfRevisionEvidence: { factKey: "preferred_music", domain: "preference", value: "ambient", confidence: 0.9 } },
+    });
+    identity.append.mockResolvedValue({ status: "appended", memoryId: "lived_obs_1" });
+    identity.revise.mockResolvedValue({ status: "unchanged", decision: { status: "insufficient_evidence" } });
+
+    const result = await persistWorldEventAndMaybeConsolidateLivedMemory({
+      instance: { instanceId: "kaira_1", instanceType: "individual" }, sessionId: "s1", event, dynamicStateAfter,
+    });
+    expect(identity.append.mock.invocationCallOrder[0]).toBeLessThan(identity.revise.mock.invocationCallOrder[0]);
+    expect(identity.revise).toHaveBeenCalledWith(expect.objectContaining({ instanceId: "kaira_1" }), "preferred_music");
+    expect(result).toMatchObject({ status: "consolidated", selfRevisionFactKey: "preferred_music", selfRevisionStatus: "unchanged", selfRevisionDecision: "insufficient_evidence" });
   });
 
   it("does not touch autobiography when the world event is not persisted", async () => {
