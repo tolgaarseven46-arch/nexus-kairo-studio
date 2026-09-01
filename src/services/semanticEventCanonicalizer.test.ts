@@ -21,6 +21,25 @@ describe("semantic event canonicalizer", () => {
     expect(result.adviceRequested).toBe(false);
   });
 
+
+  it.each([
+    ["naber", "how_are_you"],
+    ["nasılsın kank", "how_are_you"],
+    ["ne yapıyorsun", "what_doing"],
+  ] as const)(
+    "refines coarse provider greeting to deterministic reciprocal routine: %s",
+    (message, expectedRoutine) => {
+      const providerEvent = {
+        ...interpretSemanticEvent(message),
+        intent: "greeting" as const,
+        socialRoutine: "greeting" as const,
+      };
+
+      const result = canonicalizeSemanticEvent(message, providerEvent);
+      expect(result.socialRoutine).toBe(expectedRoutine);
+    },
+  );
+
   it("preserves authoritative provider facets when present", () => {
     const base = interpretSemanticEvent("moralim bozuk ne yapmalıyım");
     const event = {

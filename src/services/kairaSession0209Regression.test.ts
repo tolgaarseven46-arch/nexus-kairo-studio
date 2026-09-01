@@ -3,6 +3,7 @@ import { analyzeKdmInteraction } from "./kdmConsistencyEngine";
 import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
 import { tryLocalKairoReply } from "./kairoLocalLanguageEngine";
 import type { SemanticEvent } from "./semanticEventEngine";
+import { canonicalizeSemanticEvent } from "./semanticEventCanonicalizer";
 
 const state = () => ({
   calmness: 76, anger: 20, stress: 16, happiness: 66, confidence: 86, surprise: 14,
@@ -61,7 +62,9 @@ describe("session 0209 regressions", () => {
         raw: message, normalized: message, intent: "greeting", socialRoutine: "greeting",
         target: "kaira",
       });
-      const plan = planDialogueResponse([], message, "Mert", coarseProviderEvent);
+      const canonicalEvent = canonicalizeSemanticEvent(message, coarseProviderEvent);
+      const plan = planDialogueResponse([], message, "Mert", canonicalEvent);
+      expect(canonicalEvent.socialRoutine).toMatch(/^(how_are_you|what_doing)$/);
       expect(plan).toMatchObject({ move: "natural_reaction", allowFollowUpQuestion: true });
     },
   );

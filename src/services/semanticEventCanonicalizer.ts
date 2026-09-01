@@ -13,12 +13,21 @@ export function canonicalizeSemanticEvent(
   event: SemanticEvent,
 ): SemanticEvent {
   const fallback = interpretSemanticEvent(message);
+  const deterministicRoutine = fallback.socialRoutine ?? "none";
+  const providerRoutine = event.socialRoutine ?? "none";
+  const deterministicReciprocal =
+    deterministicRoutine === "how_are_you" || deterministicRoutine === "what_doing";
+  const socialRoutine =
+    deterministicReciprocal &&
+    (providerRoutine === "none" || providerRoutine === "greeting")
+      ? deterministicRoutine
+      : event.socialRoutine ?? deterministicRoutine;
 
   return {
     ...event,
     raw: event.raw || message,
     normalized: event.normalized || fallback.normalized,
-    socialRoutine: event.socialRoutine ?? fallback.socialRoutine ?? "none",
+    socialRoutine,
     discourseAct: event.discourseAct ?? fallback.discourseAct ?? "none",
     adviceRequested: event.adviceRequested ?? fallback.adviceRequested ?? false,
   };
