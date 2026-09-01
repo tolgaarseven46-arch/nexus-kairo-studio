@@ -106,18 +106,19 @@ export async function transitionKairaActivityExecutionAtomic(input: {
       throw new Error("Kaira activity execution not found");
     }
     const record = snapshot.data() as KairaActivityExecutionRecord;
+    const expected = createKairaActivityExecution({
+      ownerUserId: input.ownerUserId,
+      kairaInstanceId: input.kairaInstanceId,
+      instanceType: record.instanceType,
+      activityId: input.activityId,
+      activityType: record.activityType,
+      permissionPolicy: record.permissionPolicy,
+      now: record.createdAt,
+    });
     if (
-      record.ownerUserId !== createKairaActivityExecution({
-        ownerUserId: input.ownerUserId,
-        kairaInstanceId: input.kairaInstanceId,
-        instanceType: record.instanceType,
-        activityId: input.activityId,
-        activityType: record.activityType,
-        permissionPolicy: record.permissionPolicy,
-        now: record.createdAt,
-      }).ownerUserId ||
-      record.kairaInstanceId !== input.kairaInstanceId ||
-      record.activityId !== canonicalKey(input.activityId)
+      record.ownerUserId !== expected.ownerUserId ||
+      record.kairaInstanceId !== expected.kairaInstanceId ||
+      record.activityId !== expected.activityId
     ) {
       throw new Error("Kaira activity execution owner mismatch");
     }
