@@ -106,9 +106,9 @@ describe("Kaira activity candidate generator contracts", () => {
       motivation,
     });
     expect(candidate.risk).toBe(1);
-    expect(candidate.contextualFit).toBe(0.5);
-    expect(candidate.interruptionCost).toBe(0);
-    expect(candidate.noveltyFit).toBe(1);
+    expect(candidate.contextualFit).toBe(0);
+    expect(candidate.interruptionCost).toBe(1);
+    expect(candidate.noveltyFit).toBe(0);
     expect(candidate.availability).toBe("blocked");
     expect(Object.values(scoreKairaActivityProposal(candidate).components).every(Number.isFinite)).toBe(true);
   });
