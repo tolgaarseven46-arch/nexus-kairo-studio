@@ -41,6 +41,20 @@ const TARGETS = new Set<SemanticTarget>(["kaira", "third_party", "event", "unkno
 const finite01 = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 
+const validKnowledgeQuery = (value: unknown) => {
+  if (value === undefined || value === null) return true;
+  if (!value || typeof value !== "object") return false;
+  const query = value as Record<string, unknown>;
+  return (
+    typeof query.surface === "string" &&
+    query.surface.trim().length > 0 &&
+    query.surface.trim().length <= 96 &&
+    (query.conceptId === undefined ||
+      (typeof query.conceptId === "string" && query.conceptId.trim().length > 0 && query.conceptId.trim().length <= 96)) &&
+    finite01(query.confidence)
+  );
+};
+
 /**
  * The trust boundary for semantic interpretation.
  *
@@ -59,6 +73,7 @@ export function isSemanticEvent(value: unknown): value is SemanticEvent {
     (event.socialRoutine === undefined || SOCIAL_ROUTINES.has(event.socialRoutine as SemanticSocialRoutine)) &&
     (event.discourseAct === undefined || DISCOURSE_ACTS.has(event.discourseAct as SemanticDiscourseAct)) &&
     (event.adviceRequested === undefined || typeof event.adviceRequested === "boolean") &&
+    validKnowledgeQuery(event.knowledgeQuery) &&
     VALENCES.has(event.valence as SemanticValence) &&
     TARGETS.has(event.target as SemanticTarget) &&
     finite01(event.severity) &&

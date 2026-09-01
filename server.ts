@@ -79,6 +79,12 @@ import {
   type KairaInstanceType,
 } from "./src/services/kairaInstanceContext";
 import { buildKairaRuntimeIdentityInstruction } from "./src/services/kairaRuntimeIdentity";
+import { loadKairaKnowledgeProfile } from "./src/services/kairaKnowledgeProfileStore";
+import { evaluateKairaKnowledge } from "./src/services/kairaEpistemicGate";
+import {
+  buildKairaEpistemicInstruction,
+  enforceKairaEpistemicResponse,
+} from "./src/services/kairaEpistemicResponsePolicy";
 import type {
   DroitDynamicState,
 } from "./src/types/nexus";
@@ -586,6 +592,32 @@ app.post("/api/chat", async (req, res) => {
       event: languageUnderstanding.event,
       source: languageUnderstanding.semanticSource,
     };
+    const knowledgeQuery =
+      canonicalSemantic.event.knowledgeQuery && canonicalSemantic.event.knowledgeQuery.confidence >= 0.72
+        ? canonicalSemantic.event.knowledgeQuery
+        : null;
+    const knowledgeProfile =
+      knowledgeQuery && kairaPolicy.persistentIdentity
+        ? await loadKairaKnowledgeProfile(kairaInstance.instanceId).catch(() => null)
+        : null;
+    const epistemicAccess = knowledgeQuery
+      ? {
+          query: {
+            kairaInstanceId: kairaInstance.instanceId,
+            ...(knowledgeQuery.conceptId ? { conceptId: knowledgeQuery.conceptId } : {}),
+            surface: knowledgeQuery.surface,
+          },
+          decision: evaluateKairaKnowledge(
+            {
+              kairaInstanceId: kairaInstance.instanceId,
+              ...(knowledgeQuery.conceptId ? { conceptId: knowledgeQuery.conceptId } : {}),
+              surface: knowledgeQuery.surface,
+            },
+            knowledgeProfile,
+          ),
+        }
+      : null;
+    const epistemicInstruction = buildKairaEpistemicInstruction(epistemicAccess);
     const dialogueAnalysis = projectSemanticEventToDialogueAnalysis(languageUnderstanding.event);
     const dialogueInstruction = buildDialogueBoardInstruction(
       cleanHistory,
@@ -698,15 +730,17 @@ app.post("/api/chat", async (req, res) => {
     kdm.trace.whoSent.userName = userName;
     if (local.handled && local.reply) {
       const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents),
-        baseEnforced = enforceKairoResponse(worldMemoryGuard.reply, kdm.trace, enforcementRules),
+        epistemicGuard = enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess),
+        baseEnforced = enforceKairoResponse(epistemicGuard.reply, kdm.trace, enforcementRules),
         contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract),
         enforced = {
           reply: contractEnforced.reply,
-          changed: worldMemoryGuard.changed || baseEnforced.changed || contractEnforced.changed,
+          changed: worldMemoryGuard.changed || epistemicGuard.changed || baseEnforced.changed || contractEnforced.changed,
           reasons: [
             ...baseEnforced.reasons,
             ...contractEnforced.reasons,
             ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),
+            ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),
           ],
         },
         reply = enforced.reply,
@@ -768,6 +802,7 @@ app.post("/api/chat", async (req, res) => {
           worldStateAppraisal,
           worldReasoningPolicy,
           worldMemoryGuard,
+          epistemicAccess,
           responsePlan,
         }),
         saveTestSessionTurn({
@@ -849,7 +884,7 @@ app.post("/api/chat", async (req, res) => {
         },
         enforcement: enforced,
         speechIdentity: speech,
-        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" } },
+        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, epistemicAccess, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" } },
         consistency,
         dialogue: dialogueAnalysis,
         timings,
@@ -876,7 +911,7 @@ app.post("/api/chat", async (req, res) => {
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
     const system = `${buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character)}\n${speechIdentityPrompt(speech)}\n${languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)}\
-${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
@@ -1012,15 +1047,18 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
       ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
       ];
     }
+    const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess);
+    reply = epistemicGuard.reply;
     const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules);
     const contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract);
     const enforced = {
       reply: contractEnforced.reply,
-      changed: worldMemoryGuard.changed || baseEnforced.changed || contractEnforced.changed,
+      changed: worldMemoryGuard.changed || epistemicGuard.changed || baseEnforced.changed || contractEnforced.changed,
       reasons: [
         ...baseEnforced.reasons,
         ...contractEnforced.reasons,
         ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),
+        ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),
       ],
     };
     reply = enforced.reply;
@@ -1101,6 +1139,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         worldStateAppraisal,
         worldReasoningPolicy,
         worldMemoryGuard,
+        epistemicAccess,
         responsePlan,
       }),
       saveTestSessionTurn({
@@ -1151,6 +1190,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           worldStateAppraisal,
           worldReasoningPolicy,
           worldMemoryGuard,
+          epistemicAccess,
           responsePlan,
           timings: { memoryMs, kdmMs, aiMs },
         },
@@ -1177,7 +1217,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: spontaneityDecision },
+      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, epistemicAccess, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: spontaneityDecision },
       consistency,
       dialogue: dialogueAnalysis,
       dialogueDecision,

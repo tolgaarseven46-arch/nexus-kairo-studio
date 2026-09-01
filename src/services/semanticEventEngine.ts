@@ -20,6 +20,11 @@ export type SemanticRepairSignal =
   | "none"
   | "clarification_request"
   | "relevance_challenge";
+export interface SemanticKnowledgeQuery {
+  surface: string;
+  conceptId?: string;
+  confidence: number;
+}
 export type SemanticIntent =
   | "greeting"
   | "question"
@@ -53,6 +58,7 @@ export interface SemanticEvent {
   discourseAct?: SemanticDiscourseAct;
   repairSignal?: SemanticRepairSignal;
   adviceRequested?: boolean;
+  knowledgeQuery?: SemanticKnowledgeQuery | null;
   valence: SemanticValence;
   target: SemanticTarget;
   relationalAct: RelationalAct;

@@ -22,6 +22,15 @@ export function canonicalizeSemanticEvent(
     (providerRoutine === "none" || providerRoutine === "greeting")
       ? deterministicRoutine
       : event.socialRoutine ?? deterministicRoutine;
+  const knowledgeQuery = event.knowledgeQuery
+    ? {
+        surface: event.knowledgeQuery.surface.trim().replace(/\s+/g, " ").slice(0, 96),
+        ...(event.knowledgeQuery.conceptId
+          ? { conceptId: event.knowledgeQuery.conceptId.trim().replace(/\s+/g, " ").slice(0, 96) }
+          : {}),
+        confidence: Math.max(0, Math.min(1, event.knowledgeQuery.confidence)),
+      }
+    : null;
 
   return {
     ...event,
@@ -31,5 +40,6 @@ export function canonicalizeSemanticEvent(
     discourseAct: event.discourseAct ?? fallback.discourseAct ?? "none",
     repairSignal: event.repairSignal ?? fallback.repairSignal ?? "none",
     adviceRequested: event.adviceRequested ?? fallback.adviceRequested ?? false,
+    knowledgeQuery,
   };
 }

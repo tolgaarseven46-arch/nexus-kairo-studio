@@ -70,6 +70,7 @@ export interface KairoChatResponse {
   worldStateAppraisal?: unknown;
   worldReasoningPolicy?: unknown;
   worldMemoryGuard?: unknown;
+  epistemicAccess?: unknown;
   responsePlan?: unknown;
   controlledSpontaneity?: unknown;
 }
@@ -288,7 +289,7 @@ export const droitChatService = {
         temperamentAdjustedState,
       });
       completeKairaChatRequestIdentity(retryFingerprint);
-      return { reply, profile: authoritativeBehaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId, kairaInstanceId: data.kairaInstanceId || kairaInstance.instanceId, kairaInstanceType: data.kairaInstanceType || kairaInstance.instanceType, languageUnderstanding, worldStateAppraisal: data.kdm?.worldStateAppraisal, worldReasoningPolicy: data.kdm?.worldReasoningPolicy, worldMemoryGuard: data.kdm?.worldMemoryGuard, responsePlan: data.kdm?.responsePlan, controlledSpontaneity: data.kdm?.controlledSpontaneity };
+      return { reply, profile: authoritativeBehaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId, kairaInstanceId: data.kairaInstanceId || kairaInstance.instanceId, kairaInstanceType: data.kairaInstanceType || kairaInstance.instanceType, languageUnderstanding, worldStateAppraisal: data.kdm?.worldStateAppraisal, worldReasoningPolicy: data.kdm?.worldReasoningPolicy, worldMemoryGuard: data.kdm?.worldMemoryGuard, epistemicAccess: data.kdm?.epistemicAccess, responsePlan: data.kdm?.responsePlan, controlledSpontaneity: data.kdm?.controlledSpontaneity };
     } catch (err: any) {
       if (err?.name === "AbortError") throw new Error("Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.");
       throw err;

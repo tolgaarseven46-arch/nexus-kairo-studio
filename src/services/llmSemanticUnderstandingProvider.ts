@@ -24,6 +24,7 @@ const semanticSchemaExample = {
   discourseAct: "none",
   repairSignal: "none",
   adviceRequested: false,
+  knowledgeQuery: null,
   valence: "neutral",
   target: "unknown",
   relationalAct: "none",
@@ -70,6 +71,7 @@ socialRoutine = none | greeting | how_are_you | what_doing | thanks | agreement 
 discourseAct = none | correction | topic_shift | recall_request | confusion_or_challenge
 repairSignal = none | clarification_request | relevance_challenge; yalnız discourse repair'in alt türünü belirtir, cevap davranışına karar vermez
 adviceRequested = boolean; kullanıcı açıkça ne yapması gerektiğini/tavsiye/öneri soruyorsa true
+knowledgeQuery = null veya {"surface":"kavram","confidence":0-1}; yalnız kullanıcı belirli bir kavram/konu hakkında bilgi, açıklama veya "biliyor musun" türü bilgi erişimi soruyorsa doldur. surface yalnız sorgulanan kısa kavram/konu olsun; cevabı, tanımı veya tahmini buraya yazma. Emin değilsen null bırak.
 valence = positive | negative | neutral
 target = kaira | third_party | event | unknown
 relationalAct = none | reassurance_seek | repair_probe | reconciliation_attempt | challenge | mockery | closeness_bid
