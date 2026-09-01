@@ -72,6 +72,28 @@ describe("Kaira activity environment store contracts", () => {
     expect(mocks.transaction.set).not.toHaveBeenCalled();
   });
 
+  it("treats entry/evidence/capability ordering as serialization, not semantics", async () => {
+    const existing = snapshot();
+    existing.entries = [
+      { ...existing.entries[0], capabilities: { beta: false, world_access: true }, evidenceIds: ["z", "a"] },
+      { catalogId: "experience_b", accessible: false, capabilities: { alpha: true }, contextFit: 0.2, risk: 0.7, evidenceIds: ["b"] },
+    ];
+    const incoming = snapshot();
+    incoming.entries = [
+      { catalogId: "experience_b", accessible: false, capabilities: { alpha: true }, contextFit: 0.2, risk: 0.7, evidenceIds: ["b"] },
+      { ...incoming.entries[0], capabilities: { world_access: true, beta: false }, evidenceIds: ["a", "z"] },
+    ];
+    mocks.transaction.get.mockResolvedValue({ exists: () => true, data: () => existing });
+    const result = await saveKairaActivityEnvironmentSnapshot({
+      kairaInstanceId: "kaira_a",
+      instanceType: "individual",
+      authority: "kaira_environment_controller",
+      snapshot: incoming,
+    });
+    expect(result.status).toBe("replayed");
+    expect(mocks.transaction.set).not.toHaveBeenCalled();
+  });
+
   it("allows a newer trusted snapshot to replace the previous one", async () => {
     mocks.transaction.get.mockResolvedValue({
       exists: () => true,
