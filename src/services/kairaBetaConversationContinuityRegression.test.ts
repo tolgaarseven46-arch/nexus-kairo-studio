@@ -74,4 +74,16 @@ describe('beta conversation continuity regressions', () => {
     );
     expect(plan.move).toBe('natural_reaction');
   });
+
+  it.each(['naber', 'nasılsın kank', 'ne yapıyorsun'])(
+    'allows one natural reciprocal question for direct social routine: %s',
+    (message) => {
+      const plan = planDialogueResponse([], message, 'Mert');
+      expect(plan).toMatchObject({
+        move: 'natural_reaction',
+        allowFollowUpQuestion: true,
+        allowSpeculation: false,
+      });
+    },
+  );
 });
