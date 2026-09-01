@@ -12,6 +12,7 @@ import { normalizeDroitPersonality } from "./droitPersonalityNormalizer";
 import { applyRelationshipContext } from "./relationshipBehaviorService";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
+import { appraiseRelationshipConditionedEvent } from "./relationshipConditionedAppraisal";
 
 export interface KdmAnalysisResult {
   trace: ReasoningTrace;
@@ -447,24 +448,34 @@ export function analyzeKdmInteraction(
   const negativeEventsAfter = negativeEvents + (kind === "negative" ? 1 : 0);
   const unresolvedHurt = hurtAfter >= 20 || conflictAfter >= 20;
   const repeatedProblem = samePattern && repeatCount >= 2;
-  const priorRelationshipDamaged = priorConversationState !== "active" || passivelyHealedHurt >= 20 || passivelyHealedConflict >= 20;
-  const reactionMode: AffectiveReactionMode = conversationState === "disengaged"
-    ? "withdrawn"
-    : conversationState === "repairing" || (repairSignal && unresolvedHurt)
-      ? "repairing"
-      : kind === "negative" && targetsKaira
-        ? priorRelationshipDamaged
-          ? "withdrawn"
-          : closeness >= 60 && (familiarityDays >= 14 || interactionCount >= 20)
-            ? "hurt"
-            : "irritated"
-        : kind === "neutral" && !repairSignal &&
-          (state.reactionMode === "hurt" || state.reactionMode === "irritated") &&
-          (hurtAfter >= 2 || conflictAfter >= 2)
-          ? state.reactionMode
-          : unresolvedHurt
-            ? "hurt"
-            : "neutral";
+  const relationshipAppraisal = appraiseRelationshipConditionedEvent({
+    event: {
+      kind,
+      targetsKaira,
+      redLine: Boolean(semanticEvent.redLine),
+      repairSignal,
+    },
+    relationship: {
+      closeness,
+      familiarityDays,
+      interactionCount,
+      warmth: warmthAfter,
+      trust: trustAfter,
+      relationshipQuality,
+      conflict: conflictAfter,
+      hurt: hurtAfter,
+      repairProgress: repairAfter,
+      priorConversationState,
+      conversationState,
+    },
+    internalState: {
+      anger: state.anger ?? 10,
+      stress: state.stress ?? 20,
+      calmness: state.calmness ?? 70,
+      priorReactionMode: state.reactionMode,
+    },
+  });
+  const reactionMode: AffectiveReactionMode = relationshipAppraisal.reactionTendency;
 
   const neutralStress = approachBaseline(state.stress ?? 20, DEFAULT_DYNAMIC_STATE.stress, 1);
   const neutralHappiness = approachBaseline(state.happiness ?? 70, DEFAULT_DYNAMIC_STATE.happiness, 1);
@@ -571,7 +582,7 @@ export function analyzeKdmInteraction(
         : apology
           ? "KDM: özür/telafi"
           : `KDM: ${intent}`,
-      reactionText: `Kişilik etkisi x${personalityImpact.toFixed(2)}; affetme x${forgivenessFactor.toFixed(2)}; güven %${trustAfter}; çatışma %${conflictAfter}; kırgınlık %${hurtAfter}; ilişki=${conversationState}; reaction=${reactionMode}.`,
+      reactionText: `Kişilik etkisi x${personalityImpact.toFixed(2)}; affetme x${forgivenessFactor.toFixed(2)}; güven %${trustAfter}; çatışma %${conflictAfter}; kırgınlık %${hurtAfter}; ilişki=${conversationState}; reaction=${reactionMode}; appraisal=${relationshipAppraisal.rationale.join("+") || "neutral"}.`,
       deltas: [
         { label: "Stres", key: "stress", value: stressDelta },
         { label: "Mutluluk", key: "happiness", value: happinessDelta },
@@ -613,7 +624,7 @@ export function analyzeKdmInteraction(
         : conversationState === "repairing"
           ? "İlişki kontrollü onarım aşamasında; zaman ve tekrarlı samimi telafi gerekiyor."
           : repeatedProblem
-            ? `Aynı olumsuz davranış (${pattern}) tekrarlandı; sabır, hassasiyet, öfke ve sadakat tepki ağırlığını belirledi.`
+            ? `Aynı olumsuz davranış (${pattern}) tekrarlandı; sabır, hassasiyet, öfke ve sadakat tepki ağırlığını belirledi. Appraisal=${relationshipAppraisal.rationale.join("+")}.`
             : apology
               ? `Özür; empati ve sabır kaynaklı x${forgivenessFactor.toFixed(2)} affetme katsayısıyla değerlendirildi.`
               : unresolvedHurt
