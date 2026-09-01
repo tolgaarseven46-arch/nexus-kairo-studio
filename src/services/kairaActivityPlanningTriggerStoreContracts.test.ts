@@ -101,7 +101,46 @@ describe("Kaira activity planning trigger store contracts", () => {
     })).rejects.toThrow("idempotency conflict");
   });
 
-  it("completes an owned claim idempotently", async () => {
+  it("persists a canonical planning outcome on completion", async () => {
+    mocks.transaction.get.mockResolvedValue({ exists: () => true, data: () => receipt() });
+    const completed = await completeKairaActivityPlanningTrigger({
+      kairaInstanceId: "kaira_a",
+      instanceType: "individual",
+      trigger,
+      now: "2026-09-02T12:03:00.000Z",
+      outcome: { kind: "selected", proposalId: "Planning:Idle 1:Archive" },
+    });
+    expect(completed).toMatchObject({
+      status: "completed",
+      planningOutcome: { kind: "selected", proposalId: "planning:idle_1:archive" },
+    });
+  });
+
+  it("replays the same completed outcome but rejects outcome drift", async () => {
+    const completed = receipt({
+      status: "completed",
+      completedAt: "2026-09-02T12:03:00.000Z",
+      planningOutcome: { kind: "none" },
+    });
+    mocks.transaction.get.mockResolvedValue({ exists: () => true, data: () => completed });
+    await expect(completeKairaActivityPlanningTrigger({
+      kairaInstanceId: "kaira_a",
+      instanceType: "individual",
+      trigger,
+      now: "2026-09-02T12:04:00.000Z",
+      outcome: { kind: "none" },
+    })).resolves.toEqual(completed);
+
+    await expect(completeKairaActivityPlanningTrigger({
+      kairaInstanceId: "kaira_a",
+      instanceType: "individual",
+      trigger,
+      now: "2026-09-02T12:04:00.000Z",
+      outcome: { kind: "selected", proposalId: "other" },
+    })).rejects.toThrow("outcome conflict");
+  });
+
+  it("completes an owned claim idempotently without requiring outcome metadata", async () => {
     mocks.transaction.get.mockResolvedValue({ exists: () => true, data: () => receipt() });
     const completed = await completeKairaActivityPlanningTrigger({
       kairaInstanceId: "kaira_a",
