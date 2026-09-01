@@ -1,0 +1,98 @@
+name: one-time-canonical-reciprocal-authority
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - name: Apply canonical reciprocal authority fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/services/kairoDialogueDecisionEngine.ts')
+          s = p.read_text()
+          old = '''function isReciprocalSocialRoutine(
+  userMessage: string,
+  event: SemanticEvent,
+): boolean {
+  const locallyObservedRoutine = interpretSemanticEvent(userMessage).socialRoutine;
+  const raw = userMessage
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[!?.,…]+$/u, "")
+    .trim();
+  const rawReciprocal =
+    /^(?:naber|nasılsın)(?:\\s+(?:kank[a-zçğıöşü]*|kaira|kairo))?$/u.test(raw) ||
+    /^ne\\s+yapıyorsun(?:\\s+(?:kank[a-zçğıöşü]*|kaira|kairo))?$/u.test(raw);
+  return (
+    rawReciprocal ||
+    event.socialRoutine === "how_are_you" ||
+    event.socialRoutine === "what_doing" ||
+    locallyObservedRoutine === "how_are_you" ||
+    locallyObservedRoutine === "what_doing"
+  );
+}
+'''
+          new = '''function isReciprocalSocialRoutine(event: SemanticEvent): boolean {
+  return (
+    event.socialRoutine === "how_are_you" ||
+    event.socialRoutine === "what_doing"
+  );
+}
+'''
+          if old not in s:
+              raise SystemExit('target reciprocal block not found')
+          s = s.replace(old, new)
+          s = s.replace('if (isReciprocalSocialRoutine(userMessage, event)) {', 'if (isReciprocalSocialRoutine(event)) {')
+          p.write_text(s)
+
+          t = Path('src/services/kairaTurnTakingSocialRoutineContracts.test.ts')
+          ts = t.read_text()
+          anchor = '''  it("consumes the supplied canonical routine instead of inventing a second raw-text meaning", () => {
+    const event = { ...interpretSemanticEvent("selam"), raw: "provider-normalized", normalized: "provider-normalized" };
+    const plan = planDialogueResponse([], "provider-normalized", "Ali", event);
+    expect(plan).toMatchObject({
+      move: "complete_social_routine",
+      socialRoutine: "greeting",
+    });
+  });
+'''
+          extra = anchor + '''\n  it("does not reparse raw text when canonical semantic authority says the reciprocal routine is absent", () => {
+    const event = {
+      ...interpretSemanticEvent("naber"),
+      socialRoutine: "none" as const,
+      intent: "general_chat" as const,
+    };
+    const plan = planDialogueResponse([], "naber", "Ali", event);
+    expect(plan.move).toBe("natural_reaction");
+    expect(plan.allowFollowUpQuestion).toBe(false);
+  });
+'''
+          if anchor not in ts:
+              raise SystemExit('test anchor not found')
+          t.write_text(ts.replace(anchor, extra))
+          PY
+      - name: Focused regression
+        run: npx vitest run src/services/kairaTurnTakingSocialRoutineContracts.test.ts src/services/kairoDialogueDecisionEngine.test.ts src/services/kairaSemanticConsumerAuthorityContracts.test.ts
+      - name: TypeScript
+        run: npm run lint
+      - name: Commit and remove helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kairoDialogueDecisionEngine.ts src/services/kairaTurnTakingSocialRoutineContracts.test.ts
+          git rm .github/workflows/one-time-canonical-reciprocal-authority.yml
+          git commit -m "fix(kaira): enforce canonical reciprocal routine authority"
+          git push origin main
