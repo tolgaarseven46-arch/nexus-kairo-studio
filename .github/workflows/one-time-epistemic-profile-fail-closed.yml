@@ -36,3 +36,4 @@ jobs:
           git add server.ts src/services/kairaEpistemicGate.ts src/services/kairaKnowledgeProfileStore.ts src/services/kairaKnowledgeProfileStore.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts
           git commit -m "fix(kaira): fail closed on epistemic profile outage"
           git push
+# retry: 2
