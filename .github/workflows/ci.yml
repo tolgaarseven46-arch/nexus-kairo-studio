@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  statuses: write
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -25,7 +29,45 @@ jobs:
         run: npm run test:contracts
 
       - name: Tests
-        run: npm test -- --run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set +e
+          npm test -- --run 2>&1 | tee /tmp/vitest.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            node <<'NODE'
+          const fs = require('fs');
+          const log = fs.readFileSync('/tmp/vitest.log', 'utf8');
+          const lines = log.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-12);
+          const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+          const headers = {
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'Content-Type': 'application/json',
+          };
+          (async () => {
+            for (let index = 0; index < lines.length; index += 1) {
+              const description = lines[index].replace(/\s+/g, ' ').slice(0, 135);
+              await fetch(`https://api.github.com/repos/${owner}/${repo}/statuses/${process.env.GITHUB_SHA}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  state: 'error',
+                  context: `ci-diagnostic/${String(index + 1).padStart(2, '0')}`,
+                  description,
+                }),
+              });
+            }
+          })().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
+          fi
+          exit "$code"
 
       - name: TypeScript check
         run: npm run lint
