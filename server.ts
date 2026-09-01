@@ -79,6 +79,8 @@ import {
   type KairaInstanceType,
 } from "./src/services/kairaInstanceContext";
 import { buildKairaRuntimeIdentityInstruction } from "./src/services/kairaRuntimeIdentity";
+import { resolveKairaAutobiographicalRecallRuntime } from "./src/services/kairaAutobiographicalRecallRuntime";
+import { enforceKairaAutobiographicalResponse } from "./src/services/kairaAutobiographicalResponseGuard";
 import { loadKairaKnowledgeProfileResult } from "./src/services/kairaKnowledgeProfileStore";
 import { evaluateKairaKnowledge, unavailableKairaKnowledgeDecision } from "./src/services/kairaEpistemicGate";
 import {
@@ -625,6 +627,11 @@ app.post("/api/chat", async (req, res) => {
         }
       : null;
     const epistemicInstruction = buildKairaEpistemicInstruction(epistemicAccess);
+    const selfMemoryRuntime = await resolveKairaAutobiographicalRecallRuntime({
+      instance: kairaInstance,
+      query: canonicalSemantic.event.selfMemoryQuery,
+    });
+    const selfMemoryInstruction = selfMemoryRuntime.instruction;
     const dialogueAnalysis = projectSemanticEventToDialogueAnalysis(languageUnderstanding.event);
     const dialogueInstruction = buildDialogueBoardInstruction(
       cleanHistory,
@@ -735,7 +742,7 @@ app.post("/api/chat", async (req, res) => {
         userMessage,
       );
     kdm.trace.whoSent.userName = userName;
-    if (local.handled && local.reply) {
+    if (!selfMemoryInstruction && local.handled && local.reply) {
       const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext),
         epistemicGuard = enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess),
         baseEnforced = enforceKairoResponse(epistemicGuard.reply, kdm.trace, enforcementRules),
@@ -811,6 +818,7 @@ app.post("/api/chat", async (req, res) => {
           worldReasoningPolicy,
           worldMemoryGuard,
           epistemicAccess,
+          selfMemoryRuntime,
           responsePlan,
         }),
         saveTestSessionTurn({
@@ -893,7 +901,7 @@ app.post("/api/chat", async (req, res) => {
         },
         enforcement: enforced,
         speechIdentity: speech,
-        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, epistemicAccess, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" } },
+        kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, epistemicAccess, selfMemoryRuntime, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" } },
         consistency,
         dialogue: dialogueAnalysis,
         timings,
@@ -920,7 +928,7 @@ app.post("/api/chat", async (req, res) => {
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
     const system = `${buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character)}\n${speechIdentityPrompt(speech)}\n${languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)}\
-${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${selfMemoryInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
@@ -1056,13 +1064,15 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
       ...findWorldModelResponseIssues(reply, retrievedWorldEvents, worldReasoningContext).map((issue) => issue.message),
       ];
     }
+    const selfMemoryGuard = enforceKairaAutobiographicalResponse(reply, selfMemoryRuntime);
+    reply = selfMemoryGuard.reply;
     const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess);
     reply = epistemicGuard.reply;
     const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules);
     const contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract);
     const enforced = {
       reply: contractEnforced.reply,
-      changed: worldMemoryGuard.changed || epistemicGuard.changed || baseEnforced.changed || contractEnforced.changed,
+      changed: worldMemoryGuard.changed || selfMemoryGuard.changed || epistemicGuard.changed || baseEnforced.changed || contractEnforced.changed,
       reasons: [
         ...baseEnforced.reasons,
         ...contractEnforced.reasons,
@@ -1078,7 +1088,8 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
       );
       if (planSafeFallback) {
         const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents, worldReasoningContext);
-        const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateWorldGuard.reply, epistemicAccess);
+        const candidateSelfMemoryGuard = enforceKairaAutobiographicalResponse(candidateWorldGuard.reply, selfMemoryRuntime);
+        const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateSelfMemoryGuard.reply, epistemicAccess);
         const candidateBaseEnforced = enforceKairoResponse(candidateEpistemicGuard.reply, kdm.trace, enforcementRules);
         const candidateContractEnforced = enforceBehaviorContract(candidateBaseEnforced.reply, kdm.trace, behaviorContract);
         const candidateReply = candidateContractEnforced.reply;
@@ -1214,6 +1225,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           worldReasoningPolicy,
           worldMemoryGuard,
           epistemicAccess,
+          selfMemoryRuntime,
           responsePlan,
           timings: { memoryMs, kdmMs, aiMs },
         },
@@ -1240,7 +1252,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
-      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, epistemicAccess, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: spontaneityDecision },
+      kdm: { trace: kdm.trace, dynamicState: kdm.nextDynamicState, semanticEvent: canonicalSemantic.event, semanticSource: canonicalSemantic.source, entityResolution: languageUnderstanding.entityResolution, worldEvent: languageUnderstanding.worldEvent, retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })), worldStateAppraisal, worldReasoningPolicy, worldMemoryGuard, epistemicAccess, selfMemoryRuntime, behaviorContract, behaviorProfile, responsePlan, controlledSpontaneity: spontaneityDecision },
       consistency,
       dialogue: dialogueAnalysis,
       dialogueDecision,
