@@ -81,18 +81,23 @@ export interface TemperamentRecoverableAffect {
  * controls how strongly the prior activation is retained. No elapsed time means
  * no recovery, so these stable traits never rewrite the immediate event reaction.
  */
+export const temperamentRecoveryFactor = (
+  profile: TemperamentProfile,
+  elapsedMinutes: number,
+): number => {
+  const elapsed = Math.max(0, elapsedMinutes);
+  if (elapsed <= 0) return 1;
+  const recoveryRatePerMinute = 0.002 + n(profile.recoverySpeed) * 0.012;
+  const persistenceResistance = 0.7 + n(profile.attentionPersistence) * 0.6;
+  return clamp01(Math.exp(-(elapsed * recoveryRatePerMinute) / persistenceResistance));
+};
+
 export const recoverTemperamentAffect = (
   state: TemperamentRecoverableAffect,
   profile: TemperamentProfile,
   elapsedMinutes: number,
 ): TemperamentRecoverableAffect => {
-  const elapsed = Math.max(0, elapsedMinutes);
-  if (elapsed <= 0) return { anger: clamp100(state.anger), stress: clamp100(state.stress) };
-
-  const recoveryRatePerMinute = 0.002 + n(profile.recoverySpeed) * 0.012;
-  const persistenceResistance = 0.7 + n(profile.attentionPersistence) * 0.6;
-  const decay = clamp01(Math.exp(-(elapsed * recoveryRatePerMinute) / persistenceResistance));
-
+  const decay = temperamentRecoveryFactor(profile, elapsedMinutes);
   return {
     anger: round1(clamp100(state.anger) * decay),
     stress: round1(clamp100(state.stress) * decay),

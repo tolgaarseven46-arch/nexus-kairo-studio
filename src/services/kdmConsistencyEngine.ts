@@ -13,6 +13,7 @@ import { applyRelationshipContext } from "./relationshipBehaviorService";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 import { appraiseRelationshipConditionedEvent } from "./relationshipConditionedAppraisal";
+import { recoverRelationshipConditionedState } from "./relationshipConditionedRecovery";
 
 export interface KdmAnalysisResult {
   trace: ReasoningTrace;
@@ -250,7 +251,7 @@ export function analyzeKdmInteraction(
   canonicalSemanticEvent?: SemanticEvent | null,
   behaviorPolicy?: BehaviorPolicyInput | null,
 ): KdmAnalysisResult {
-  const state: DroitDynamicState = {
+  let state: DroitDynamicState = {
     ...DEFAULT_DYNAMIC_STATE,
     ...(currentDynamicState || {}),
   };
@@ -308,6 +309,31 @@ export function analyzeKdmInteraction(
   const baseRepair = clamp(relationship.repairProgress ?? 0);
   const priorConversationState = relationship.conversationState ?? "active";
   const priorRepairAttempts = Math.max(0, relationship.repairAttempts ?? 0);
+  const elapsedSinceInteractionMinutes = relationship.lastInteractionAt && Number.isFinite(new Date(relationship.lastInteractionAt).getTime())
+    ? Math.max(0, (Date.now() - new Date(relationship.lastInteractionAt).getTime()) / 60000)
+    : 0;
+  const preTurnRecovery = recoverRelationshipConditionedState({
+    elapsedMinutes: elapsedSinceInteractionMinutes,
+    reactionMode: state.reactionMode,
+    state: {
+      anger: state.anger ?? 10,
+      stress: state.stress ?? 20,
+      happiness: state.happiness ?? 70,
+      calmness: state.calmness ?? 70,
+    },
+    relationship: {
+      hurt: baseHurt,
+      conflict: baseConflict,
+      repairProgress: baseRepair,
+      conversationState: priorConversationState,
+    },
+    repairSignal: Boolean(semanticEvent.apology || semanticEvent.repairAttempt),
+  });
+  state = {
+    ...state,
+    ...preTurnRecovery.state,
+    reactionMode: preTurnRecovery.reactionMode,
+  };
   const integratedDecision = behaviorPolicy?.decision;
   const integratedPriority = behaviorPolicyPriorityCode(integratedDecision?.priority);
   const integratedStance = behaviorPolicyStanceCode(integratedDecision?.stance);
@@ -549,7 +575,7 @@ export function analyzeKdmInteraction(
         : apology
           ? "KDM: özür/telafi"
           : `KDM: ${intent}`,
-      reactionText: `Kişilik etkisi x${personalityImpact.toFixed(2)}; affetme x${forgivenessFactor.toFixed(2)}; güven %${trustAfter}; çatışma %${conflictAfter}; kırgınlık %${hurtAfter}; ilişki=${conversationState}; reaction=${reactionMode}; appraisal=${relationshipAppraisal.rationale.join("+") || "neutral"}.`,
+      reactionText: `Kişilik etkisi x${personalityImpact.toFixed(2)}; affetme x${forgivenessFactor.toFixed(2)}; güven %${trustAfter}; çatışma %${conflictAfter}; kırgınlık %${hurtAfter}; ilişki=${conversationState}; reaction=${reactionMode}; recovery=${preTurnRecovery.rationale.join("+") || "none"}; appraisal=${relationshipAppraisal.rationale.join("+") || "neutral"}.`,
       deltas: [
         { label: "Stres", key: "stress", value: stressDelta },
         { label: "Mutluluk", key: "happiness", value: happinessDelta },
