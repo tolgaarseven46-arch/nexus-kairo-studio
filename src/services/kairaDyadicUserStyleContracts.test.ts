@@ -19,6 +19,7 @@ beforeEach(() => {
   profile.interactionCount = 0;
 });
 
+// Dyadic alignment may shape HOW only; relationship and canonical behavior remain authoritative.
 describe('dyadic user style projection contracts', () => {
   it('does not infer a stable style from one message', () => {
     observeUserLanguageStyle(userId, 'naber lan kanka');
