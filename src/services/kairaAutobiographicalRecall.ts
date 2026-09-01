@@ -55,6 +55,10 @@ function rankSelfFact(
   const queryTokens = tokens(query.surface);
   const reasons: string[] = [];
   let score = 0;
+  if (query.factKey && normalize(query.factKey) === normalize(fact.key)) {
+    score += 0.9;
+    reasons.push("canonical_fact_key_match");
+  }
   const keyOverlap = overlap(queryTokens, fact.key);
   const valueOverlap = overlap(queryTokens, fact.value);
   const domainOverlap = overlap(queryTokens, fact.domain);
@@ -69,12 +73,6 @@ function rankSelfFact(
   if (domainOverlap > 0) {
     score += domainOverlap * 0.1;
     reasons.push("domain_overlap");
-  }
-  if (/en sevdiğin|favori|tercih|seversin|inanırsın|nasıl birisin/u.test(normalize(query.surface))) {
-    if (fact.domain === "preference" || fact.domain === "belief" || fact.domain === "trait") {
-      score += 0.22;
-      reasons.push("self_fact_intent_match");
-    }
   }
   score += Math.min(0.08, fact.confidence * 0.08);
   return { fact, score: Math.min(1, score), reasons };
