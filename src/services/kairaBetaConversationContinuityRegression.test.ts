@@ -76,7 +76,7 @@ describe('beta conversation continuity regressions', () => {
   });
 
   it.each(['naber', 'nasılsın kank', 'ne yapıyorsun'])(
-    'allows one natural reciprocal question for direct social routine: %s',
+    'allows one natural reciprocal question for direct social routine, including informal vocative: %s',
     (message) => {
       const plan = planDialogueResponse([], message, 'Mert');
       expect(plan).toMatchObject({
