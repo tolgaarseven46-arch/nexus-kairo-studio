@@ -40,8 +40,8 @@ describe("Kaira autobiographical runtime integration contracts", () => {
   it("exposes the typed recall decision in session metadata and API KDM output", () => {
     const occurrences = server.split("selfMemoryRuntime").length - 1;
     expect(occurrences).toBeGreaterThanOrEqual(8);
-    expect(server).toMatch(/epistemicAccess\s*,\s*selfMemoryRuntime\s*,\s*behaviorContract/);
-    expect(server).toMatch(/epistemicAccess\s*,\s*selfMemoryRuntime\s*,\s*responsePlan/);
+    expect(server).toMatch(/epistemicAccess\s*,\s*selfMemoryRuntime\s*,\s*(?:livedMemoryRuntime\s*,\s*)?behaviorContract/);
+    expect(server).toMatch(/epistemicAccess\s*,\s*selfMemoryRuntime\s*,\s*(?:livedMemoryRuntime\s*,\s*)?responsePlan/);
   });
 
   it("does not create a second downstream self-memory parser", () => {
