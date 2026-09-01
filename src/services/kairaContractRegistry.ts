@@ -125,6 +125,14 @@ export const KAIRA_CONTRACT_REGISTRY: readonly KairaContractVersion[] = [
     summary: "Self facts, known concepts and autobiographical memories are canonical structured truth; a memory stores facts/emotions/provenance rather than a finished prose narration, and temporary lore fixtures are explicitly non-production data.",
   },
   {
+    id: "runtime-identity-projection",
+    version: 1,
+    status: "active",
+    ownerLayer: "runtime-identity",
+    consumerLayers: ["llm-verbalizer", "response-generation", "observability"],
+    summary: "Resolved instance identity plus configured name/role/type are projected into a bounded runtime self-anchor. The projection may preserve identity continuity but cannot create autobiographical memory, preferences, beliefs, relationship outcomes, emotions or canonical self facts.",
+  },
+  {
     id: "epistemic-access",
     version: 1,
     status: "active",
