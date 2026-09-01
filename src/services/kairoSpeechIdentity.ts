@@ -62,6 +62,7 @@ export function computeKairoSpeechIdentity(
   const conflict = relationship?.conflictScore ?? 0;
   const warmth = relationship?.warmth ?? 50;
   const relationshipLevel = resolveKairoRelationshipLevel(state);
+  const reactionMode = state.reactionMode ?? trace.currentMood?.reactionMode ?? "neutral";
 
   // Speech identity owns HOW only. It describes style from stable personality +
   // current social/emotional context; behavior permissions live in KairaResponsePlan.
@@ -74,13 +75,19 @@ export function computeKairoSpeechIdentity(
   const directness = clamp(45 + personality.authority * 0.3 + personality.decisionMaking * 0.2 + (negative ? 15 : 0));
   const warmthLevel = clamp(warmth + personality.empathy * 0.2 - hurt * 0.35 - conflict * 0.2);
   const register: KairoSpeechIdentity["register"] =
-    hurt >= 35
+    reactionMode === "hurt" || reactionMode === "withdrawn"
       ? "hurt"
-      : negative || conflict >= 30
+      : reactionMode === "irritated"
         ? "firm"
-        : warmthLevel >= 65
-          ? "casual"
-          : "balanced";
+        : reactionMode === "repairing"
+          ? "balanced"
+          : hurt >= 35
+            ? "hurt"
+            : negative || conflict >= 30
+              ? "firm"
+              : warmthLevel >= 65
+                ? "casual"
+                : "balanced";
   const sentenceLength: KairoSpeechIdentity["sentenceLength"] =
     register === "hurt"
       ? "very_short"
@@ -94,6 +101,16 @@ export function computeKairoSpeechIdentity(
     : relationshipLevel === "familiar"
       ? "İlişki dili rahat ama ölçülü olsun; aşırı samimi lakap ve sert küfür kullanma."
       : "İlişki dili yeni/tanıdık başlangıcı gibi kalsın; aşırı samimi lakap ve sert küfür kullanma.";
+
+  const reactionInstruction = reactionMode === "irritated"
+    ? "Nitel tepki irritated: rahatsızlığı net ve kısa hissettir; kırgın veya içe kapanmış bir ritme geçme."
+    : reactionMode === "hurt"
+      ? "Nitel tepki hurt: doğrudan öfkeden çok kırgınlık ve kısalan sosyal ritim hissedilsin; açıklama raporu yazma."
+      : reactionMode === "withdrawn"
+        ? "Nitel tepki withdrawn: cevap gerekiyorsa minimum sosyal yatırım ve belirgin mesafe kullan; yeniden yakınlaşma başlatma."
+        : reactionMode === "repairing"
+          ? "Nitel tepki repairing: özrü/telafiyi duyduğunu göster ama ilişkiyi tamamen düzelmiş ilan etme; kontrollü yumuşa."
+          : "Nitel tepki neutral: ek duygusal mesafe veya kırgınlık dayatma.";
 
   const humorModeInstruction = expressionStyle?.humorMode
     ? `Mizah izni açılırsa tercih edilen mizah biçimi: ${expressionStyle.humorMode}. Bu biçimi zorla kullanma.`
@@ -117,6 +134,7 @@ export function computeKairoSpeechIdentity(
     "Konuşma dili yazımları doğal miktarda kullanılabilir; bilerek yoğun yazım hatası veya okunması zor metin üretme.",
     "Konu değiştiğinde resmi geçiş ve özet cümlesi kurma; yeni konuya doğrudan uyum sağla.",
     relationshipInstruction,
+    reactionInstruction,
     register === "casual"
       ? "Kelime seçimi rahat ve samimi olsun."
       : register === "firm"
