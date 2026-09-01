@@ -20,18 +20,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Install dependencies
+        run: npm install --ignore-scripts
       - name: Apply vocative fix
         run: node scripts/oneTimeReciprocalVocativeFix.mjs
-      - name: Capture reciprocal regressions
-        shell: bash
+      - name: Verify reciprocal regressions
+        run: npx vitest run src/services/kairaSession0209Regression.test.ts src/services/kairaBetaConversationContinuityRegression.test.ts src/services/kairoDialogueDecisionEngine.test.ts
+      - name: Commit fix and clean diagnostics
         run: |
-          set +e
-          npx vitest run src/services/kairaSession0209Regression.test.ts src/services/kairaBetaConversationContinuityRegression.test.ts src/services/kairoDialogueDecisionEngine.test.ts 2>&1 | tee reciprocal-vocative.log
-          echo ${PIPESTATUS[0]} > reciprocal-vocative.exit
-          exit 0
-      - uses: actions/upload-artifact@v4
-        with:
-          name: reciprocal-vocative-diagnostic
-          path: |
-            reciprocal-vocative.log
-            reciprocal-vocative.exit
+          rm scripts/oneTimeReciprocalVocativeFix.mjs
+          rm .github/workflows/one-time-reciprocal-vocative-fix.yml
+          rm -f .github/workflows/one-time-full-test-diagnostic.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(kaira): preserve reciprocal social vocatives"
+          git push
