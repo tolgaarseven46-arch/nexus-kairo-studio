@@ -132,6 +132,19 @@ function isFirstEmotionalOpening(
     });
 }
 
+function isReciprocalSocialRoutine(
+  userMessage: string,
+  event: SemanticEvent,
+): boolean {
+  const locallyObservedRoutine = interpretSemanticEvent(userMessage).socialRoutine;
+  return (
+    event.socialRoutine === "how_are_you" ||
+    event.socialRoutine === "what_doing" ||
+    locallyObservedRoutine === "how_are_you" ||
+    locallyObservedRoutine === "what_doing"
+  );
+}
+
 function isShortAnswerToPreviousKairaTurn(
   history: ConversationTurn[],
   userMessage: string,
@@ -191,6 +204,19 @@ export function planDialogueResponse(
       hasSupportedTargetClaim: false,
       reason:
         "Bu kısa mesaj bağımsız bir konu değil, Kaira'nın yakın önceki sorusuna, teklifine veya seçeneklerine verilen cevaptır. Yalnızca açıkça doğrulanan şeyi bağla; beğeni, duygu, sebep, tercih veya yeni konu uydurma ve yeni soru açma.",
+    };
+  }
+
+  if (isReciprocalSocialRoutine(userMessage, event)) {
+    return {
+      move: "natural_reaction",
+      allowFollowUpQuestion: true,
+      allowSpeculation: false,
+      maxSentences: 2,
+      maxWords: 10,
+      hasSupportedTargetClaim: false,
+      reason:
+        "Kullanıcı Kaira'nın halini veya ne yaptığını doğrudan soruyor. Kısa cevap ver; doğal karşılıklılık için en fazla bir kısa 'sen?' / 'senden naber?' sorusu sorabilirsin.",
     };
   }
 

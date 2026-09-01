@@ -225,9 +225,21 @@ function semanticIntentToKdm(event: SemanticEvent): string {
   }
 }
 
+function hasActionableNegativeEvidence(event: SemanticEvent): boolean {
+  return Boolean(
+    event.redLine ||
+    event.insult ||
+    event.coercion > 0 ||
+    event.manipulation > 0 ||
+    event.privacyViolation > 0 ||
+    event.intent === "rejection" ||
+    event.severity >= 0.1
+  );
+}
+
 function semanticSentimentToKdm(event: SemanticEvent): string {
   if (event.emotionalLoad > 0) return "duygusal_yük";
-  if (event.valence === "negative") return "negatif";
+  if (event.valence === "negative" && hasActionableNegativeEvidence(event)) return "negatif";
   if (event.valence === "positive") return "pozitif";
   return "nötr";
 }
@@ -370,7 +382,11 @@ export function analyzeKdmInteraction(
     1 - 0.55 * familiarityFactor * (relationshipQuality / 100) + (passivelyHealedConflict / 100) * 0.25 + (passivelyHealedHurt / 100) * 0.2,
   );
 
-  const rawKind: EventKind = semanticEvent.valence === "positive" ? "positive" : semanticEvent.valence === "negative" ? "negative" : "neutral";
+  const rawKind: EventKind = semanticEvent.valence === "positive"
+    ? "positive"
+    : semanticEvent.valence === "negative" && hasActionableNegativeEvidence(semanticEvent)
+      ? "negative"
+      : "neutral";
   const negativeTarget: NegativeTarget | null = rawKind === "negative" ? semanticNegativeTarget(semanticEvent) : null;
   const targetsKaira = rawKind === "negative" && negativeTarget === "kaira";
   const kind: EventKind = rawKind === "negative" && !targetsKaira ? "neutral" : rawKind;

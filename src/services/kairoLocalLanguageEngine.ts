@@ -76,6 +76,15 @@ function localIntentFromSemanticEvent(
   const event = semanticEvent ?? interpretSemanticEvent(message);
   if (event.adviceRequested) return null;
 
+  // Exact local social routines are deterministic and narrower than a coarse external
+  // semantic label. Preserve reciprocal "naber/nasılsın/ne yapıyorsun" behavior even
+  // when an upstream provider collapses the turn to generic greeting/general chat.
+  const locallyObserved = interpretSemanticEvent(message);
+  const locallyObservedIntent = localIntentFromEvent(locallyObserved);
+  if (locallyObservedIntent === "how_are_you" || locallyObservedIntent === "what_doing") {
+    return locallyObservedIntent;
+  }
+
   const directIntent = localIntentFromEvent(event);
   if (directIntent) return directIntent;
 
