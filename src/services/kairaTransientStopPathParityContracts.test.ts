@@ -5,6 +5,7 @@ import { tryLocalKairoReply } from "./kairoLocalLanguageEngine";
 import { buildKairaResponsePlan, findKairaResponsePlanIssues } from "./kairaResponsePlan";
 import { enforceKairoResponse } from "./kairoResponseConsistency";
 import { interpretSemanticEvent } from "./semanticEventEngine";
+import type { ConversationTurn } from "./kairoConversationGrounding";
 
 const personality = {
   humor: 70,
@@ -52,9 +53,9 @@ const speech = {
   emojiLevel: 0,
 } as any;
 
-function pipeline(message: string) {
+function pipeline(message: string, history: ConversationTurn[] = []) {
   const event = interpretSemanticEvent(message);
-  const dialogue = planDialogueResponse([], message, "Ali", event);
+  const dialogue = planDialogueResponse(history, message, "Ali", event);
   const contract = buildBehaviorContract(state, trace, event);
   const responsePlan = buildKairaResponsePlan(contract, dialogue, speech);
   const local = tryLocalKairoReply(
@@ -123,7 +124,10 @@ describe("transient explicit-stop local/AI path parity", () => {
   });
 
   it("confusion + stopQuestions stays on the AI repair path with questions forbidden", () => {
-    const result = pipeline("ne diyon, soru sorma artık");
+    const result = pipeline(
+      "ne diyon, soru sorma artık",
+      [{ sender: "droit", text: "gereksiz uzun bir şey anlattım", participantName: "Kaira" }],
+    );
 
     expect(result.event.discourseAct).toBe("confusion_or_challenge");
     expect(result.dialogue.move).toBe("repair_or_rephrase");
