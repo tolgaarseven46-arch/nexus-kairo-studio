@@ -1,0 +1,38 @@
+name: one-time-reaction-specific-recovery
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-reaction-specific-recovery.yml'
+permissions:
+  contents: write
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - name: Apply reaction-specific recovery migration
+        run: node scripts/one-time-reaction-specific-recovery.cjs
+      - name: Focused recovery regressions
+        run: npx vitest run src/services/relationshipConditionedRecovery.test.ts src/services/kairaReactionSpecificRecoveryAuthorityContracts.test.ts src/services/kairaTemperamentRecoveryPersistenceWiringContracts.test.ts src/services/kairaRelationshipQualitativeReactionCharacterization.test.ts
+      - name: Architecture contracts
+        run: npm run test:contracts
+      - name: Full tests
+        run: npm test
+      - name: TypeScript
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Commit product and clean helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-time-reaction-specific-recovery.yml scripts/one-time-reaction-specific-recovery.cjs
+          git add src/services/temperamentEngine.ts src/services/relationshipConditionedRecovery.ts src/services/kdmConsistencyEngine.ts src/services/relationshipConditionedRecovery.test.ts src/services/kairaReactionSpecificRecoveryAuthorityContracts.test.ts
+          git commit -m "refactor(kaira): add reaction-specific recovery"
+          git push
