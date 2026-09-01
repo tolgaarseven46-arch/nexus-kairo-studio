@@ -114,6 +114,7 @@ export interface TestSessionTurnRecord {
     worldStateAppraisal?: unknown;
     worldReasoningPolicy?: unknown;
     worldMemoryGuard?: unknown;
+    selfMemoryRuntime?: unknown;
     responsePlan?: unknown;
   };
 }
