@@ -45,7 +45,7 @@ function normalizeDynamicState(value: unknown): DroitDynamicState | null {
 export interface KdmPersistencePayload { dynamicState: DroitDynamicState; reasoningTrace: ReasoningTrace; lastUserMessage: string; reply: string; userId?: string; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; }
 export interface KdmMemoryItem { userMessage: string; reply: string; createdAt?: string; reasoningTrace?: ReasoningTrace; dynamicState?: DroitDynamicState; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; }
 export interface KairoUserMemory { userName?: string; preferences: string[]; facts: string[]; goals: string[]; notes: string[]; updatedAt: string; }
-export interface KntTracePayload { userId?: string; userMessage: string; reply: string; reasoningTrace: ReasoningTrace; dynamicState: DroitDynamicState; timings: Record<string, number>; providerUsed?: string; languageStyleMemory?: unknown; controlledSpontaneity?: unknown; speechIdentity?: unknown; worldStateAppraisal?: unknown; worldReasoningPolicy?: unknown; worldMemoryGuard?: unknown; epistemicAccess?: unknown; responsePlan?: unknown; createdAt?: string; }
+export interface KntTracePayload { userId?: string; userMessage: string; reply: string; reasoningTrace: ReasoningTrace; dynamicState: DroitDynamicState; timings: Record<string, number>; providerUsed?: string; languageStyleMemory?: unknown; controlledSpontaneity?: unknown; speechIdentity?: unknown; worldStateAppraisal?: unknown; worldReasoningPolicy?: unknown; worldMemoryGuard?: unknown; epistemicAccess?: unknown; selfMemoryRuntime?: unknown; responsePlan?: unknown; createdAt?: string; }
 const emptyUserMemory = (): KairoUserMemory => ({ preferences: [], facts: [], goals: [], notes: [], updatedAt: new Date().toISOString() });
 const uniqueRecent = (items: string[]) => [...new Set(items.map((item) => item.trim()).filter(Boolean))].slice(-20);
 function extractMemoryCandidates(userMessage: string): Partial<KairoUserMemory> { const text = userMessage.trim(); const result: Partial<KairoUserMemory> = {}; const name = text.match(/(?:benim adım|adım|ismim)\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9_-]{2,40})/i); if (name) result.userName = name[1]; if (/(?:artık .*? sevmiyorum|artık .*? ilgilenmiyorum)/i.test(text) || /(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor|ilgileniyorum|ilgimi çekiyor|daha çok .*? ilgileniyorum)/i.test(text)) result.preferences = [text]; if (/(?:istiyorum|hedefim|amacım|planım|üzerinde çalışıyorum|geliştiriyorum)/i.test(text)) result.goals = [text]; if (/(?:yaşım|yaşındayım|mesleğim|işim|şehirde yaşıyorum|yaşıyorum|çalışıyorum)/i.test(text)) result.facts = [text]; return result; }
@@ -124,6 +124,7 @@ export interface SaveTestSessionTurnPayload {
     worldReasoningPolicy?: unknown;
     worldMemoryGuard?: unknown;
     epistemicAccess?: unknown;
+    selfMemoryRuntime?: unknown;
     responsePlan?: unknown;
   };
 }
@@ -241,6 +242,7 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
       worldStateAppraisal: payload.metadata?.worldStateAppraisal,
       worldReasoningPolicy: payload.metadata?.worldReasoningPolicy,
       worldMemoryGuard: payload.metadata?.worldMemoryGuard,
+      selfMemoryRuntime: payload.metadata?.selfMemoryRuntime,
       responsePlan: payload.metadata?.responsePlan,
     },
   };
@@ -459,4 +461,3 @@ export async function clearTestSession(sessionId: string): Promise<void> {
     console.warn('[TestSessionPersistence] clearTestSession failed:', err);
   }
 }
-
