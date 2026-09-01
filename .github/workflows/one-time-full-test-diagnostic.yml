@@ -1,0 +1,33 @@
+name: One-time full test diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-time-full-test-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - name: Capture full test output
+        shell: bash
+        run: |
+          set +e
+          npm test -- --run 2>&1 | tee full-test.log
+          echo ${PIPESTATUS[0]} > full-test.exit
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-test-diagnostic
+          path: |
+            full-test.log
+            full-test.exit
