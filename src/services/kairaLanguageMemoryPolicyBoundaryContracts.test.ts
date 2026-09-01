@@ -65,7 +65,7 @@ describe('language-memory policy read boundary', () => {
   it('keeps the local verbalizer gate explicit and defaults it on for direct callers', async () => {
     const local = await readFile('src/services/kairoLocalLanguageEngine.ts', 'utf8');
     expect(local).toContain('useLearnedMemory = true');
-    expect(local).toContain('useLearnedMemory,\n  );');
+    expect(local).toContain('useLearnedMemory,\n    relationshipLevel,\n  );');
   });
 
   it('gates language-memory debug hydration and summary reads by the resolved instance policy', async () => {

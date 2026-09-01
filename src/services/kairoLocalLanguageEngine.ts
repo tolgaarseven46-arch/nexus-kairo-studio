@@ -232,6 +232,7 @@ export function tryLocalKairoReply(
     pool,
     `${intent}|${normalization.canonical}|${state.anger}|${warmth}|${hurt}|${reactionMode}|${trace.decision.chosenTone}|q${allowQuestions ? 1 : 0}|h${allowHumor ? 1 : 0}`,
     useLearnedMemory,
+    relationshipLevel,
   );
   return { handled: true, intent, reply, confidence: intent === "emotional_opening" ? 0.96 : 0.97, source: "local_language", normalization };
 }

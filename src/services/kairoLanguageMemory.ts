@@ -6,6 +6,9 @@ export interface LanguageMemoryProfile {
   phraseWeights: Record<string, number>;
   recentReplies: string[];
   interactionCount: number;
+  userMarkerWeights: Record<string, number>;
+  recentUserWordCounts: number[];
+  userStyleInteractionCount: number;
 }
 
 export interface LanguageStyleMemorySignal {
@@ -15,6 +18,16 @@ export interface LanguageStyleMemorySignal {
   averageWords: number;
   lengthPreference: 'very_short' | 'short' | 'medium';
 }
+
+export interface DyadicUserStyleSignal {
+  interactionCount: number;
+  maturity: 'cold' | 'emerging' | 'learned';
+  preferredMarkers: string[];
+  averageWords: number;
+  lengthPreference: 'very_short' | 'short' | 'medium';
+}
+
+export type DyadicRelationshipLevel = 'new' | 'familiar' | 'close';
 
 const profiles = new Map<string, LanguageMemoryProfile>();
 const hydrated = new Set<string>();
@@ -31,6 +44,10 @@ const BASE_WORDS: Record<string, number> = {
   senden: 4,
 };
 const STYLE_MARKERS = ['kanka', 'ya', 'valla', 'aynen', 'he', 'be', 'işte', 'hani', 'yani', 'neyse', 'eyvallah', 'hadi', 'falan', 'filan', 'harbi', 'cidden'] as const;
+const SAFE_USER_STYLE_MARKERS = ['kanka', 'lan', 'aga', 'ya', 'be', 'valla', 'aynen', 'eyvallah', 'harbi', 'cidden', 'işte', 'hani', 'neyse'] as const;
+const USER_STYLE_MARKER_SET = new Set<string>(SAFE_USER_STYLE_MARKERS);
+const USER_STYLE_MARKER_THRESHOLD = 2.5;
+const USER_STYLE_RETENTION = 0.9;
 const MAX_WORD_WEIGHTS = 128;
 const MAX_PHRASE_WEIGHTS = 64;
 const MAX_LEARNED_WORD_DELTA = 2.1;
@@ -42,7 +59,15 @@ const MIN_LEARNED_WEIGHT = 0.05;
 const STYLE_DECAY_GRACE_REPLIES = 3;
 
 function createProfile(): LanguageMemoryProfile {
-  return { wordWeights: { ...BASE_WORDS }, phraseWeights: {}, recentReplies: [], interactionCount: 0 };
+  return {
+    wordWeights: { ...BASE_WORDS },
+    phraseWeights: {},
+    recentReplies: [],
+    interactionCount: 0,
+    userMarkerWeights: {},
+    recentUserWordCounts: [],
+    userStyleInteractionCount: 0,
+  };
 }
 
 function safeId(userId: string) {
@@ -113,6 +138,11 @@ function sanitize(raw: any): LanguageMemoryProfile {
     phraseWeights: boundedWeights(raw?.phraseWeights, MAX_PHRASE_WEIGHTS, 20),
     recentReplies: Array.isArray(raw?.recentReplies) ? raw.recentReplies.filter((x: any) => typeof x === 'string').slice(0, 8) : [],
     interactionCount: Number.isFinite(Number(raw?.interactionCount)) ? Math.max(0, Number(raw.interactionCount)) : 0,
+    userMarkerWeights: boundedWeights(raw?.userMarkerWeights, SAFE_USER_STYLE_MARKERS.length, 20),
+    recentUserWordCounts: Array.isArray(raw?.recentUserWordCounts)
+      ? raw.recentUserWordCounts.map(Number).filter((x: number) => Number.isFinite(x) && x >= 0).slice(0, 8)
+      : [],
+    userStyleInteractionCount: Number.isFinite(Number(raw?.userStyleInteractionCount)) ? Math.max(0, Number(raw.userStyleInteractionCount)) : 0,
   };
 }
 
@@ -186,6 +216,74 @@ function affinityForProfile(profile: LanguageMemoryProfile, reply: string) {
   return wordScore + phraseScore * 0.8;
 }
 
+function dyadicSignalFromProfile(profile: LanguageMemoryProfile): DyadicUserStyleSignal {
+  const preferredMarkers = SAFE_USER_STYLE_MARKERS
+    .map((marker) => ({ marker, weight: profile.userMarkerWeights[marker] ?? 0 }))
+    .filter((item) => item.weight >= USER_STYLE_MARKER_THRESHOLD)
+    .sort((a, b) => b.weight - a.weight || a.marker.localeCompare(b.marker, 'tr'))
+    .slice(0, 4)
+    .map((item) => item.marker);
+  const counts = profile.recentUserWordCounts.filter((count) => count > 0);
+  const averageWords = counts.length ? counts.reduce((sum, count) => sum + count, 0) / counts.length : 0;
+  const lengthPreference: DyadicUserStyleSignal['lengthPreference'] = averageWords <= 4
+    ? 'very_short'
+    : averageWords <= 8
+      ? 'short'
+      : 'medium';
+  const maturity = profile.userStyleInteractionCount >= 10 ? 'learned' : profile.userStyleInteractionCount >= 4 ? 'emerging' : 'cold';
+  return {
+    interactionCount: profile.userStyleInteractionCount,
+    maturity,
+    preferredMarkers,
+    averageWords: Number(averageWords.toFixed(1)),
+    lengthPreference,
+  };
+}
+
+export function observeUserLanguageStyle(userId: string, userMessage: string, useLearnedMemory = true) {
+  if (!useLearnedMemory) return;
+  const profile = getLanguageMemory(userId);
+  const words = normalizeLanguageText(userMessage).split(/\s+/).filter(Boolean);
+  const observed = new Set(words.filter((word) => USER_STYLE_MARKER_SET.has(word)));
+  for (const marker of SAFE_USER_STYLE_MARKERS) {
+    const current = profile.userMarkerWeights[marker] ?? 0;
+    const next = observed.has(marker) ? Math.min(20, current + 1) : current * USER_STYLE_RETENTION;
+    if (next < 0.1) delete profile.userMarkerWeights[marker];
+    else profile.userMarkerWeights[marker] = next;
+  }
+  profile.userStyleInteractionCount += 1;
+  profile.recentUserWordCounts = [words.length, ...profile.recentUserWordCounts].slice(0, 8);
+  schedulePersist(userId);
+}
+
+export function dyadicLanguageStyleSignal(userId: string, useLearnedMemory = true): DyadicUserStyleSignal {
+  if (!useLearnedMemory) {
+    return { interactionCount: 0, maturity: 'cold', preferredMarkers: [], averageWords: 0, lengthPreference: 'very_short' };
+  }
+  return dyadicSignalFromProfile(getLanguageMemory(userId));
+}
+
+function dyadicCandidateAffinity(profile: LanguageMemoryProfile, reply: string, relationshipLevel: DyadicRelationshipLevel) {
+  if (relationshipLevel === 'new') return 0;
+  const signal = dyadicSignalFromProfile(profile);
+  if (signal.maturity === 'cold') return 0;
+  const words = new Set(normalizeLanguageText(reply).split(/\s+/).filter(Boolean));
+  const relationshipWeight = relationshipLevel === 'close' ? 0.45 : 0.22;
+  return signal.preferredMarkers.reduce((sum, marker) => sum + (words.has(marker) ? relationshipWeight : 0), 0);
+}
+
+export function dyadicLanguageAlignmentInstruction(
+  userId: string,
+  relationshipLevel: DyadicRelationshipLevel,
+  useLearnedMemory = true,
+) {
+  const signal = dyadicLanguageStyleSignal(userId, useLearnedMemory);
+  if (relationshipLevel === 'new' || signal.maturity === 'cold') return '';
+  const allowedMarkers = signal.preferredMarkers.filter((marker) => relationshipLevel === 'close' || marker !== 'lan');
+  const markers = allowedMarkers.length ? allowedMarkers.join(', ') : 'belirgin güvenli marker yok';
+  return `KİŞİYE ÖZGÜ DİL UYUMU (HOW-ONLY, ÇOK DÜŞÜK OTORİTE):\nBu kullanıcıyla yerleşen güvenli yazım ritmi=${signal.lengthPreference} (~${signal.averageWords} kelime); tekrar eden güvenli markerlar=${markers}.\nYalnız doğal olduğunda hafifçe yakınsa. Küfür/hakaret, içerik, anı, duygu, niyet, ilişki sonucu veya davranış izni öğrenme/üretme. Kullanıcının cümlesini kopyalama. ResponsePlan ve SpeechIdentity her zaman üstündür.`;
+}
+
 export function learnLanguageReply(userId: string, reply: string) {
   const profile = getLanguageMemory(userId);
   profile.interactionCount += 1;
@@ -206,7 +304,13 @@ export function languageAffinity(userId: string, reply: string) {
   return affinityForProfile(getLanguageMemory(userId), reply);
 }
 
-export function chooseLanguageReply(userId: string, candidates: string[], seed: string, useLearnedMemory = true) {
+export function chooseLanguageReply(
+  userId: string,
+  candidates: string[],
+  seed: string,
+  useLearnedMemory = true,
+  relationshipLevel: DyadicRelationshipLevel = 'new',
+) {
   const profile = useLearnedMemory ? getLanguageMemory(userId) : createProfile();
   let hash = 0;
   for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
@@ -214,6 +318,7 @@ export function chooseLanguageReply(userId: string, candidates: string[], seed: 
     .map((reply, index) => ({
       reply,
       score: affinityForProfile(profile, reply)
+        + dyadicCandidateAffinity(profile, reply, relationshipLevel)
         - repetitionPenalty(profile, reply)
         + (((hash + index * 17) % 100) / 100) * 1.25,
     }))
