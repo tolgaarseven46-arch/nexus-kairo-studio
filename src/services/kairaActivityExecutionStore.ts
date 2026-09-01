@@ -22,6 +22,12 @@ const canonicalKey = (value: string) =>
     .replace(/^_+|_+$/g, "")
     .slice(0, 96);
 
+const canonicalOwner = (value: string) =>
+  String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9_@.+:-]+/g, "_")
+    .slice(0, 160);
+
 function executionDocumentId(ownerUserId: string, kairaInstanceId: string, activityId: string): string {
   const ownerScope = kairaOwnerScope(ownerUserId, kairaInstanceId);
   const activityKey = canonicalKey(activityId);
@@ -68,9 +74,62 @@ function sameExecutionSeed(
   );
 }
 
+function exactCommandAlreadyApplied(
+  record: KairaActivityExecutionRecord,
+  command: KairaActivityExecutionCommand,
+): boolean {
+  if (command.type === "grant_permission") {
+    return (
+      command.authority === "activity_permission_controller" &&
+      canonicalOwner(command.decidedByUserId) === record.ownerUserId &&
+      record.permissionStatus === "granted" &&
+      record.phase === "planned"
+    );
+  }
+  if (command.type === "deny_permission") {
+    return (
+      command.authority === "activity_permission_controller" &&
+      canonicalOwner(command.decidedByUserId) === record.ownerUserId &&
+      record.permissionStatus === "denied" &&
+      record.phase === "planned"
+    );
+  }
+  if (command.type === "start") return record.phase === "active";
+  if (command.type === "complete") return record.phase === "completed";
+  if (command.type === "cancel") return record.phase === "cancelled";
+  return record.phase === "failed";
+}
+
+function validateExecutionOwner(
+  record: KairaActivityExecutionRecord,
+  input: { ownerUserId: string; kairaInstanceId: string; activityId: string },
+): void {
+  const expected = createKairaActivityExecution({
+    ownerUserId: input.ownerUserId,
+    kairaInstanceId: input.kairaInstanceId,
+    instanceType: record.instanceType,
+    activityId: input.activityId,
+    activityType: record.activityType,
+    experienceSubject: record.experienceSubject,
+    permissionPolicy: record.permissionPolicy,
+    now: record.createdAt,
+  });
+  if (
+    record.ownerUserId !== expected.ownerUserId ||
+    record.kairaInstanceId !== expected.kairaInstanceId ||
+    record.activityId !== expected.activityId
+  ) {
+    throw new Error("Kaira activity execution owner mismatch");
+  }
+}
+
 export type KairaActivityExecutionCreateResult =
   | { status: "created"; record: KairaActivityExecutionRecord }
   | { status: "existing"; record: KairaActivityExecutionRecord };
+
+export type KairaActivityExecutionCommandResult =
+  | { status: "applied" | "replayed"; record: KairaActivityExecutionRecord }
+  | Extract<KairaActivityExecutionTransitionDecision, { status: "rejected" }>;
 
 export async function createKairaActivityExecutionAtomic(input: {
   ownerUserId: string;
@@ -118,30 +177,48 @@ export async function transitionKairaActivityExecutionAtomic(input: {
 
   return runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(ref);
-    if (!snapshot.exists()) {
-      throw new Error("Kaira activity execution not found");
-    }
+    if (!snapshot.exists()) throw new Error("Kaira activity execution not found");
     const record = snapshot.data() as KairaActivityExecutionRecord;
-    const expected = createKairaActivityExecution({
-      ownerUserId: input.ownerUserId,
-      kairaInstanceId: input.kairaInstanceId,
-      instanceType: record.instanceType,
-      activityId: input.activityId,
-      activityType: record.activityType,
-      experienceSubject: record.experienceSubject,
-      permissionPolicy: record.permissionPolicy,
-      now: record.createdAt,
-    });
-    if (
-      record.ownerUserId !== expected.ownerUserId ||
-      record.kairaInstanceId !== expected.kairaInstanceId ||
-      record.activityId !== expected.activityId
-    ) {
-      throw new Error("Kaira activity execution owner mismatch");
-    }
+    validateExecutionOwner(record, input);
 
     const decision = transitionKairaActivityExecution(record, input.command, input.now);
     if (decision.status === "applied") transaction.set(ref, decision.record);
+    return decision;
+  });
+}
+
+/**
+ * Retry-safe command seam. The pure state machine remains strict/immutable;
+ * only an exact command whose intended result is already canonical is replayed.
+ */
+export async function applyKairaActivityExecutionCommandAtomic(input: {
+  ownerUserId: string;
+  kairaInstanceId: string;
+  activityId: string;
+  command: KairaActivityExecutionCommand;
+  now: string;
+}): Promise<KairaActivityExecutionCommandResult> {
+  const ref = doc(
+    db,
+    ACTIVITY_EXECUTION_COLLECTION,
+    executionDocumentId(input.ownerUserId, input.kairaInstanceId, input.activityId),
+  );
+
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists()) throw new Error("Kaira activity execution not found");
+    const record = snapshot.data() as KairaActivityExecutionRecord;
+    validateExecutionOwner(record, input);
+
+    if (exactCommandAlreadyApplied(record, input.command)) {
+      return { status: "replayed", record } as const;
+    }
+
+    const decision = transitionKairaActivityExecution(record, input.command, input.now);
+    if (decision.status === "applied") {
+      transaction.set(ref, decision.record);
+      return { status: "applied", record: decision.record } as const;
+    }
     return decision;
   });
 }
