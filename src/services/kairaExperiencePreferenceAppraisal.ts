@@ -1,5 +1,8 @@
 import type { KairaAutobiographicalMemory } from "./kairaIdentityContracts";
-import type { KairaSelfRevisionEvidence } from "./kairaSelfRevisionEvidence";
+import {
+  normalizeKairaSelfRevisionEvidence,
+  type KairaSelfRevisionEvidence,
+} from "./kairaSelfRevisionEvidence";
 
 export type KairaExperienceCompletion = "completed" | "interrupted" | "ongoing";
 export type KairaExperienceOwnership = "kaira_direct" | "reported" | "inferred";
@@ -76,16 +79,15 @@ export function preferenceEvidenceFromExperienceAppraisal(
   const confidence = Math.max(0, Math.min(1,
     input.outcomeValence * 0.35 + input.appraisalConfidence * 0.3 + input.attributionConfidence * 0.35,
   ));
-  return {
-    status: "evidence",
-    evidence: {
-      factKey: preferenceKey,
-      domain: "preference",
-      value: typeof input.experiencedValue === "string" ? input.experiencedValue.trim() : input.experiencedValue,
-      confidence,
-    },
-    reason: "direct_completed_positive_outcome",
-  };
+  const evidence = normalizeKairaSelfRevisionEvidence({
+    factKey: preferenceKey,
+    domain: "preference",
+    value: input.experiencedValue,
+    confidence,
+  });
+  if (!evidence) return { status: "rejected", evidence: null, reason: "invalid" };
+
+  return { status: "evidence", evidence, reason: "direct_completed_positive_outcome" };
 }
 
 /** Binds one appraisal to its exact lived-memory/world-observation provenance. */
