@@ -12,6 +12,7 @@ vi.mock("../lib/firebase", () => ({ db: { kind: "mock-db" } }));
 import {
   knowledgeProfileOwnerId,
   loadKairaKnowledgeProfile,
+  loadKairaKnowledgeProfileResult,
   saveKairaKnowledgeProfile,
 } from "./kairaKnowledgeProfileStore";
 
@@ -100,4 +101,18 @@ describe("Kaira knowledge profile store", () => {
     });
     await expect(loadKairaKnowledgeProfile("kaira_individual_01")).resolves.toBeNull();
   });
+  it("distinguishes a missing profile from an unavailable profile store", async () => {
+    firestore.getDoc.mockResolvedValueOnce({ exists: () => false });
+    await expect(loadKairaKnowledgeProfileResult("kaira_individual_01")).resolves.toEqual({
+      status: "missing",
+      profile: null,
+    });
+
+    firestore.getDoc.mockRejectedValueOnce(new Error("firestore unavailable"));
+    await expect(loadKairaKnowledgeProfileResult("kaira_individual_01")).resolves.toEqual({
+      status: "unavailable",
+      profile: null,
+    });
+  });
+
 });

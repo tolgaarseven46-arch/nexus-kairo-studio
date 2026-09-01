@@ -13,7 +13,7 @@ describe("authoritative behavior profile boundary", () => {
   });
 
   it("returns the KDM behavior profile from both server response paths", () => {
-    const marker = "worldMemoryGuard, behaviorContract, behaviorProfile, responsePlan";
+    const marker = "worldMemoryGuard, epistemicAccess, behaviorContract, behaviorProfile, responsePlan";
     expect(server.split(marker).length - 1).toBeGreaterThanOrEqual(2);
   });
 

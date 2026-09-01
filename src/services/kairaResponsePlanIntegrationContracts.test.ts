@@ -28,14 +28,14 @@ describe("canonical KairaResponsePlan runtime integration", () => {
     expect(server).toContain("findKairaResponsePlanIssues(fallback, responsePlan)");
     expect(server).toContain("localPlanIssues = findKairaResponsePlanIssues(reply, responsePlan)");
     expect(server).toContain("postEnforcementPlanIssues = findKairaResponsePlanIssues(reply, responsePlan)");
-    expect(server).toContain("findKairaResponsePlanIssues(planSafeFallback, responsePlan)");
+    expect(server).toContain("findKairaResponsePlanIssues(candidateReply, responsePlan)");
     expect(server).toContain("response_plan_delivery_fallback");
-    expect(server).toContain("finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues])]");
+    expect(server).toContain("finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues])]");
   });
 
   it("persists response-plan observability in both local and AI paths", () => {
-    const kntPlanWrites = server.match(/worldMemoryGuard,\s*responsePlan,\s*\}\),/gu)?.length ?? 0;
-    const turnMetadataPlanWrites = server.match(/worldMemoryGuard,\s*responsePlan,\s*timings:/gu)?.length ?? 0;
+    const kntPlanWrites = server.match(/worldMemoryGuard,\s*epistemicAccess,\s*responsePlan,\s*\}\),/gu)?.length ?? 0;
+    const turnMetadataPlanWrites = server.match(/worldMemoryGuard,\s*epistemicAccess,\s*responsePlan,\s*timings:/gu)?.length ?? 0;
 
     expect(kntPlanWrites).toBeGreaterThanOrEqual(2);
     expect(turnMetadataPlanWrites).toBeGreaterThanOrEqual(2);

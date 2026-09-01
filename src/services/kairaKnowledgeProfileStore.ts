@@ -56,3 +56,21 @@ export async function loadKairaKnowledgeProfile(
   if (validateKairaKnowledgeProfile(profile).length) return null;
   return profile;
 }
+
+export type KairaKnowledgeProfileLoadResult =
+  | { status: "loaded"; profile: KairaKnowledgeProfile }
+  | { status: "missing"; profile: null }
+  | { status: "unavailable"; profile: null };
+
+export async function loadKairaKnowledgeProfileResult(
+  kairaInstanceId: string,
+): Promise<KairaKnowledgeProfileLoadResult> {
+  try {
+    const profile = await loadKairaKnowledgeProfile(kairaInstanceId);
+    return profile
+      ? { status: "loaded", profile }
+      : { status: "missing", profile: null };
+  } catch {
+    return { status: "unavailable", profile: null };
+  }
+}

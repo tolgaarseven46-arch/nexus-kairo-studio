@@ -20,7 +20,7 @@ describe("Kaira response rhythm server integration", () => {
     expect(server).toContain("findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move, speech.relationshipLevel)");
     expect(server).toContain("findKairoResponseRhythmIssues(repairedReply, cleanHistory, dialogueDecision.move, speech.relationshipLevel)");
     expect(server).toContain("findKairoResponseRhythmIssues(fallback, cleanHistory, dialogueDecision.move, speech.relationshipLevel)");
-    expect(server).toContain("findKairoResponseRhythmIssues(planSafeFallback, cleanHistory, dialogueDecision.move, speech.relationshipLevel)");
+    expect(server).toContain("findKairoResponseRhythmIssues(candidateReply, cleanHistory, dialogueDecision.move, speech.relationshipLevel)");
   });
 
   it("passes canonical dialogue move and relationship level through every AI rhythm seam", () => {

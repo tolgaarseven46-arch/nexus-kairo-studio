@@ -22,7 +22,7 @@ describe("Kaira epistemic runtime contracts", () => {
 
   it("wires instance-owned knowledge through the epistemic gate before behavior enforcement", () => {
     const server = readFileSync("server.ts", "utf8");
-    expect(server).toContain('loadKairaKnowledgeProfile(kairaInstance.instanceId)');
+    expect(server).toContain('loadKairaKnowledgeProfileResult(kairaInstance.instanceId)');
     expect(server).toContain('evaluateKairaKnowledge(');
     expect(server).toContain('buildKairaEpistemicInstruction(epistemicAccess)');
     expect(server).toContain('enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess)');
@@ -44,6 +44,14 @@ describe("Kaira epistemic runtime contracts", () => {
     expect(candidateEpistemic).toBeLessThan(candidateSocial);
     expect(candidateSocial).toBeLessThan(candidateContract);
     expect(candidateContract).toBeLessThan(finalEpistemic);
+  });
+
+  it("fails closed when the instance knowledge profile cannot be read", () => {
+    const server = readFileSync("server.ts", "utf8");
+    expect(server).toContain('await loadKairaKnowledgeProfileResult(kairaInstance.instanceId)');
+    expect(server).toContain('knowledgeProfileLoad?.status === "unavailable"');
+    expect(server).toContain('unavailableKairaKnowledgeDecision()');
+    expect(server).not.toContain('loadKairaKnowledgeProfile(kairaInstance.instanceId).catch(() => null)');
   });
 
   it("does not read Firestore knowledge profiles for ordinary non-knowledge turns", () => {

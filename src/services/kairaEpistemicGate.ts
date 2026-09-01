@@ -11,7 +11,7 @@ export interface KairaEpistemicQuery {
 
 export interface KairaEpistemicDecision {
   status: KairaKnowledgeStatus;
-  source: "legacy_allow_all" | "species_canon" | "instance_knowledge" | "learned";
+  source: "legacy_allow_all" | "species_canon" | "instance_knowledge" | "learned" | "knowledge_profile_unavailable";
   confidence: number;
 }
 
@@ -76,6 +76,14 @@ export function evaluateKairaKnowledge(
   return {
     status: "known",
     source: "legacy_allow_all",
+    confidence: 1,
+  };
+}
+
+export function unavailableKairaKnowledgeDecision(): KairaEpistemicDecision {
+  return {
+    status: "unknown",
+    source: "knowledge_profile_unavailable",
     confidence: 1,
   };
 }

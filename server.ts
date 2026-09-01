@@ -79,8 +79,8 @@ import {
   type KairaInstanceType,
 } from "./src/services/kairaInstanceContext";
 import { buildKairaRuntimeIdentityInstruction } from "./src/services/kairaRuntimeIdentity";
-import { loadKairaKnowledgeProfile } from "./src/services/kairaKnowledgeProfileStore";
-import { evaluateKairaKnowledge } from "./src/services/kairaEpistemicGate";
+import { loadKairaKnowledgeProfileResult } from "./src/services/kairaKnowledgeProfileStore";
+import { evaluateKairaKnowledge, unavailableKairaKnowledgeDecision } from "./src/services/kairaEpistemicGate";
 import {
   buildKairaEpistemicInstruction,
   enforceKairaEpistemicResponse,
@@ -597,10 +597,12 @@ app.post("/api/chat", async (req, res) => {
       canonicalSemantic.event.knowledgeQuery && canonicalSemantic.event.knowledgeQuery.confidence >= 0.72
         ? canonicalSemantic.event.knowledgeQuery
         : null;
-    const knowledgeProfile =
+    const knowledgeProfileLoad =
       knowledgeQuery && kairaPolicy.persistentIdentity
-        ? await loadKairaKnowledgeProfile(kairaInstance.instanceId).catch(() => null)
+        ? await loadKairaKnowledgeProfileResult(kairaInstance.instanceId)
         : null;
+    const knowledgeProfile =
+      knowledgeProfileLoad?.status === "loaded" ? knowledgeProfileLoad.profile : null;
     const epistemicAccess = knowledgeQuery
       ? {
           query: {
@@ -608,14 +610,17 @@ app.post("/api/chat", async (req, res) => {
             ...(knowledgeQuery.conceptId ? { conceptId: knowledgeQuery.conceptId } : {}),
             surface: knowledgeQuery.surface,
           },
-          decision: evaluateKairaKnowledge(
-            {
-              kairaInstanceId: kairaInstance.instanceId,
-              ...(knowledgeQuery.conceptId ? { conceptId: knowledgeQuery.conceptId } : {}),
-              surface: knowledgeQuery.surface,
-            },
-            knowledgeProfile,
-          ),
+          decision:
+            knowledgeProfileLoad?.status === "unavailable"
+              ? unavailableKairaKnowledgeDecision()
+              : evaluateKairaKnowledge(
+                  {
+                    kairaInstanceId: kairaInstance.instanceId,
+                    ...(knowledgeQuery.conceptId ? { conceptId: knowledgeQuery.conceptId } : {}),
+                    surface: knowledgeQuery.surface,
+                  },
+                  knowledgeProfile,
+                ),
         }
       : null;
     const epistemicInstruction = buildKairaEpistemicInstruction(epistemicAccess);
