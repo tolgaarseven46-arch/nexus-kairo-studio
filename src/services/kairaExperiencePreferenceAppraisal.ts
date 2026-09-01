@@ -3,6 +3,13 @@ import type { KairaSelfRevisionEvidence } from "./kairaSelfRevisionEvidence";
 
 export type KairaExperienceCompletion = "completed" | "interrupted" | "ongoing";
 export type KairaExperienceOwnership = "kaira_direct" | "reported" | "inferred";
+export type KairaExperiencePreferenceRejectionReason =
+  | "invalid"
+  | "not_direct"
+  | "not_completed"
+  | "weak_or_negative_outcome"
+  | "low_appraisal_confidence"
+  | "low_attribution_confidence";
 
 /**
  * A typed, Kaira-owned appraisal of one completed lived experience.
@@ -28,26 +35,14 @@ export interface KairaExperiencePreferenceAppraisal {
 
 export type KairaExperiencePreferenceEvidenceDecision =
   | { status: "evidence"; evidence: KairaSelfRevisionEvidence; reason: "direct_completed_positive_outcome" }
-  | {
-      status: "rejected";
-      evidence: null;
-      reason:
-        | "invalid"
-        | "not_direct"
-        | "not_completed"
-        | "weak_or_negative_outcome"
-        | "low_appraisal_confidence"
-        | "low_attribution_confidence";
-    };
+  | { status: "rejected"; evidence: null; reason: KairaExperiencePreferenceRejectionReason };
 
 export type KairaExperiencePreferenceProjectionDecision =
   | { status: "projected"; memory: KairaAutobiographicalMemory }
   | {
       status: "rejected";
       memory: KairaAutobiographicalMemory;
-      reason: KairaExperiencePreferenceEvidenceDecision extends infer _T
-        ? "not_lived_memory" | "provenance_mismatch" | Exclude<KairaExperiencePreferenceEvidenceDecision extends { reason: infer R } ? R : never, "direct_completed_positive_outcome">
-        : never;
+      reason: "not_lived_memory" | "provenance_mismatch" | KairaExperiencePreferenceRejectionReason;
     };
 
 const finiteInRange = (value: number, min: number, max: number) =>
