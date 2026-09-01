@@ -36,4 +36,4 @@ jobs:
           git add server.ts src/services/worldModelResponseGuard.ts src/services/kairaWorldModelResponseGuardContracts.test.ts src/services/kairaWorldModelResponseGuardIntegrationContracts.test.ts src/services/kairaWorldReasoningPolicyIntegrationContracts.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts src/services/kairaFinalDeliveryAuthorityRegression.test.ts src/services/kairaMixedConversationQualityRegression.test.ts src/services/kairaTwentyTurnEndToEndContracts.test.ts src/services/kairaLocalAiParityContracts.test.ts
           git commit -m "refactor(kaira): unify world reasoning authority"
           git push
-# retry: 4
+# retry: 5
