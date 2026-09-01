@@ -21,6 +21,7 @@ describe("Kaira contract registry", () => {
       "instance-state-ownership",
       "instance-provisioning",
       "identity-memory-truth",
+      "runtime-identity-projection",
       "epistemic-access",
       "world-event-retrieval",
       "temporal-reference-resolution",
@@ -108,6 +109,15 @@ describe("Kaira contract registry", () => {
     expect(policy?.ownerLayer).toBe("world-reasoning-policy");
     expect(policy?.consumerLayers).toContain("response-generation");
     expect(policy?.consumerLayers).not.toContain("relationship-state");
+  });
+
+  it("keeps runtime identity bounded away from autobiographical ownership", () => {
+    const identity = activeContractVersion("runtime-identity-projection");
+    expect(identity?.version).toBe(1);
+    expect(identity?.ownerLayer).toBe("runtime-identity");
+    expect(identity?.consumerLayers).toContain("llm-verbalizer");
+    expect(identity?.consumerLayers).not.toContain("future-autobiographical-memory");
+    expect(identity?.consumerLayers).not.toContain("relationship-state");
   });
 
   it("registers the response plan as the verbalizer/validator behavior seam", () => {
