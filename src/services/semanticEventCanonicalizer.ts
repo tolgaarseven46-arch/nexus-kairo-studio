@@ -2,6 +2,10 @@ import {
   interpretSemanticEvent,
   type SemanticEvent,
 } from "./semanticEventEngine";
+import {
+  inferFallbackSelfMemoryQuery,
+  normalizeSemanticSelfMemoryQuery,
+} from "./kairaSelfMemoryQuery";
 
 /**
  * Completes consumer-facing semantic facets at the single language-understanding
@@ -31,6 +35,12 @@ export function canonicalizeSemanticEvent(
         confidence: Math.max(0, Math.min(1, event.knowledgeQuery.confidence)),
       }
     : null;
+  const selfMemoryQuery =
+    normalizeSemanticSelfMemoryQuery(event.selfMemoryQuery) ??
+    inferFallbackSelfMemoryQuery(message, {
+      discourseAct: event.discourseAct ?? fallback.discourseAct,
+      intent: event.intent,
+    });
 
   return {
     ...event,
@@ -41,5 +51,6 @@ export function canonicalizeSemanticEvent(
     repairSignal: event.repairSignal ?? fallback.repairSignal ?? "none",
     adviceRequested: event.adviceRequested ?? fallback.adviceRequested ?? false,
     knowledgeQuery,
+    selfMemoryQuery,
   };
 }
