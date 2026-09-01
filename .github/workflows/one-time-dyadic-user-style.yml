@@ -56,6 +56,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server.ts src/services/kairoLanguageMemory.ts src/services/kairoLocalLanguageEngine.ts src/services/kairaLanguageMemoryPolicyBoundaryContracts.test.ts src/services/kairaDyadicUserStyleContracts.test.ts
-          git rm .github/workflows/one-time-dyadic-user-style.yml .github/scripts/one-time-dyadic-user-style.py
+          git rm -f .github/workflows/one-time-dyadic-user-style.yml .github/scripts/one-time-dyadic-user-style.py
           git commit -m "feat(kaira): add dyadic user style alignment"
           git push origin main
