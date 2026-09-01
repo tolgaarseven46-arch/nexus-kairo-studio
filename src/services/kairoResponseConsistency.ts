@@ -258,11 +258,18 @@ export function validateKairoResponse(reply: string, trace: ReasoningTrace): Res
   if (!length) issues.push('Aşırı uzun yanıt');
   if (!traceCompleteness) issues.push('Reasoning trace eksik');
 
-  const emotionalContext = hasAny(`${intent} ${sentiment}`, [
-    /(destek|duyg|stres|yorgun|üzgün|kayg|hassas)/,
+  // Generic "duygusal_yük" is also used for benign social routines such as
+  // greetings, so it must not by itself create a support obligation.
+  const emotionalIntent = hasAny(intent, [
+    /(destek|duygusal_paylasim|duygusal_destek|stres|yorgun|üzgün|kayg|hassas)/,
   ]);
+  const explicitEmotionalSentiment = hasAny(sentiment, [
+    /(stres|yorgun|üzgün|kayg|hassas)/,
+  ]);
+  const emotionalContext = emotionalIntent || explicitEmotionalSentiment;
   const emotionalResponse = hasAny(lower, [
     /(anlıyorum|destek|sakin|yanınd|buraday|konuş|geçecek|zor|can sık|haklısın)/,
+    /^(?:(?:hmm|off)\s+)?(?:niye|neden|ne oldu|noldu|hayırdır)(?:\s+ya)?[?…]*$/,
   ]);
   const warmTone = hasAny(tone, [/(sıcak|empatik|destek|şefkat|samimi|warm)/]);
   const warmResponse = hasAny(lower, [

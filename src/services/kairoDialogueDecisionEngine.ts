@@ -65,9 +65,10 @@ const SOCIAL_ONLY_MOVES = new Set<DialogueDecisionPlan["move"]>([
 const PROCRASTINATION_BANTER_RE =
   /\b(son dakikaya bırak\w*|ertele\w*|geciktir\w*|üşen\w*|yapmayıp bekle\w*)\b/i;
 const SHORT_CONTEXTUAL_ANSWER_RE =
-  /^(?:hiç\s*biri|hiçbiri|ikisi\s+de|hepsi|hiçbiri\s+değil|yok|hayır|evet|aynen|olmadı|bilmiyorum|fark\s+etmez|sen\s+seç|öbürü|diğeri|ilki|ikincisi)(?:\s+(?:ya|işte|kanka))?[.!?…]*$/i;
-const PREVIOUS_PROMPT_RE =
-  /[?？]|\b(?:hangisi|hangisini|seç|mı|mi|mu|mü|ne dersin|sence)\b/i;
+  /^(?:hiç\s*biri|hiçbiri|ikisi\s+de|hepsi|hiçbiri\s+değil|yok|hayır|evet|aynen|tamam|tamamdır|peki|olur|olmadı|bilmiyorum|fark\s+etmez|sen\s+seç|öbürü|diğeri|ilki|ikincisi)(?:\s+(?:ya|işte|kanka))?[.!?…]*$/i;
+const KAIRA_SHORT_ACK_RE = /^(?:tamam|tamamdır|peki|olur|evet|aynen|hmm|he|hee)[.!?…]*$/i;
+const PREVIOUS_CONTEXT_INVITE_RE =
+  /[?？]|\b(?:hangisi|hangisini|seç|mı|mi|mu|mü|ne dersin|sence|istersen|ister misin|ister miydin)\b/i;
 
 function responseUnitCount(reply: string): number {
   return reply
@@ -135,12 +136,23 @@ function isShortAnswerToPreviousKairaTurn(
   history: ConversationTurn[],
   userMessage: string,
 ): boolean {
+  if (!SHORT_CONTEXTUAL_ANSWER_RE.test(userMessage.trim())) return false;
   const previous = history.at(-1);
   if (!previous || previous.sender !== "droit") return false;
   const previousText = String(previous.text || "");
-  return (
-    PREVIOUS_PROMPT_RE.test(previousText) &&
-    SHORT_CONTEXTUAL_ANSWER_RE.test(userMessage.trim())
+  if (PREVIOUS_CONTEXT_INVITE_RE.test(previousText)) return true;
+
+  // Keep a bounded acknowledgement chain attached to the last explicit prompt/offer.
+  // Example: Kaira offers more recommendations -> user "tamam" -> Kaira "evet"
+  // -> user "evet". The final "evet" must not become a fresh topic or inferred feeling.
+  if (!KAIRA_SHORT_ACK_RE.test(previousText.trim())) return false;
+  const previousUser = history.at(-2);
+  const priorKaira = history.at(-3);
+  return Boolean(
+    previousUser?.sender === "user" &&
+    SHORT_CONTEXTUAL_ANSWER_RE.test(String(previousUser.text || "").trim()) &&
+    priorKaira?.sender === "droit" &&
+    PREVIOUS_CONTEXT_INVITE_RE.test(String(priorKaira.text || ""))
   );
 }
 
@@ -178,7 +190,7 @@ export function planDialogueResponse(
       maxWords: 8,
       hasSupportedTargetClaim: false,
       reason:
-        "Bu kısa mesaj bağımsız bir konu değil, Kaira'nın hemen önceki sorusuna veya seçeneklerine verilen cevaptır. Yalnızca o cevaba bağlan; yeni duygu, sebep veya konu uydurma.",
+        "Bu kısa mesaj bağımsız bir konu değil, Kaira'nın yakın önceki sorusuna, teklifine veya seçeneklerine verilen cevaptır. Yalnızca açıkça doğrulanan şeyi bağla; beğeni, duygu, sebep, tercih veya yeni konu uydurma ve yeni soru açma.",
     };
   }
 
