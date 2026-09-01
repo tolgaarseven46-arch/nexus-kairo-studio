@@ -53,11 +53,11 @@ export interface KairaActivityPlanningCommitInput {
   learnedPreferences?: KairaLearnedActivityPreferenceSignal[];
   recentActivities?: KairaRecentActivitySignal[];
   policy?: KairaActivityPlanningPolicy;
-  previousPlanningAt?: string;
+  lastPlanningEvaluationAt?: string;
   now: string;
   leaseMinutes?: number;
   cooldownMinutes?: number;
-  scheduleHorizonMinutes?: number;
+  upcomingScheduleBlockMinutes?: number;
   maxEnvironmentAgeMinutes?: number;
   defaultWindowMinutes?: number;
 }
@@ -116,9 +116,9 @@ export async function evaluateAndCommitKairaActivityPlanningTrigger(
     ...(input.learnedPreferences ? { learnedPreferences: input.learnedPreferences } : {}),
     ...(input.recentActivities ? { recentActivities: input.recentActivities } : {}),
     ...(input.policy ? { policy: input.policy } : {}),
-    ...(input.previousPlanningAt ? { previousPlanningAt: input.previousPlanningAt } : {}),
+    ...(input.lastPlanningEvaluationAt ? { lastPlanningEvaluationAt: input.lastPlanningEvaluationAt } : {}),
     ...(input.cooldownMinutes ? { cooldownMinutes: input.cooldownMinutes } : {}),
-    ...(input.scheduleHorizonMinutes ? { scheduleHorizonMinutes: input.scheduleHorizonMinutes } : {}),
+    ...(input.upcomingScheduleBlockMinutes ? { upcomingScheduleBlockMinutes: input.upcomingScheduleBlockMinutes } : {}),
     ...(input.maxEnvironmentAgeMinutes ? { maxEnvironmentAgeMinutes: input.maxEnvironmentAgeMinutes } : {}),
     ...(input.defaultWindowMinutes ? { defaultWindowMinutes: input.defaultWindowMinutes } : {}),
   });
