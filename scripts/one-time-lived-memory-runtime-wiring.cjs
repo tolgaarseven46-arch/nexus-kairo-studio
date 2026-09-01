@@ -48,38 +48,65 @@ function normalizeMemoryObservability(body) {
     `\n${indent}epistemicAccess,\n${indent}selfMemoryRuntime,\n${indent}livedMemoryRuntime,`,
   );
 }
+function replaceInFile(file, needle, replacement, expected, label) {
+  let text = fs.readFileSync(file, 'utf8');
+  const count = text.split(needle).length - 1;
+  if (count !== expected) throw new Error(`${label}: expected ${expected} occurrences, got ${count}`);
+  text = text.split(needle).join(replacement);
+  fs.writeFileSync(file, text);
+}
 
 once(
   'import { saveWorldEventObservation, loadRecentWorldEventObservations } from "./src/services/worldModelEventStore";',
   'import { loadRecentWorldEventObservations } from "./src/services/worldModelEventStore";\nimport { persistWorldEventAndMaybeConsolidateLivedMemory } from "./src/services/kairaLivedMemoryRuntime";',
   'world import',
 );
-
 regexAll(
   /\s*kairaPolicy\.persistentWorldModel \? saveWorldEventObservation\(\{\n\s*userId,\n\s*kairaInstanceId: kairaInstance\.instanceId,\n\s*sessionId,\n\s*speakerName: userName,\n\s*event: languageUnderstanding\.worldEvent,\n\s*\}\) : Promise\.resolve\(\),\n/g,
-  '\n',
-  2,
-  'direct world write',
+  '\n', 2, 'direct world write',
 );
-
 regexAll(
   /^(\s*)const postStart = now\(\);\n\1let savedTurnId = "";\n\1await Promise\.allSettled\(\[/gm,
   (_, indent) => `${indent}const postStart = now();\n${indent}const livedMemoryRuntime = await persistWorldEventAndMaybeConsolidateLivedMemory({\n${indent}  userId,\n${indent}  instance: kairaInstance,\n${indent}  sessionId,\n${indent}  speakerName: userName,\n${indent}  event: languageUnderstanding.worldEvent,\n${indent}  dynamicStateAfter: kdm.nextDynamicState,\n${indent}});\n${indent}let savedTurnId = "";\n${indent}await Promise.allSettled([`,
-  2,
-  'persistence start',
+  2, 'persistence start',
 );
-
 patchObjectCalls('saveKntTrace', 2, normalizeMemoryObservability);
 patchObjectCalls('saveTestSessionTurn', 2, normalizeMemoryObservability);
-
 regexAll(
   /worldMemoryGuard, epistemicAccess, selfMemoryRuntime, behaviorContract/g,
   'worldMemoryGuard, epistemicAccess, selfMemoryRuntime, livedMemoryRuntime, behaviorContract',
-  2,
-  'api kdm payload',
+  2, 'api kdm payload',
 );
-
 if (s.includes('saveWorldEventObservation({')) throw new Error('direct world persistence seam remains');
 if ((s.match(/persistWorldEventAndMaybeConsolidateLivedMemory\(\{/g) || []).length !== 2) throw new Error('coordinator must be used in both response paths');
 if ((s.match(/livedMemoryRuntime/g) || []).length !== 8) throw new Error('lived memory observability wiring incomplete');
 fs.writeFileSync(path, s);
+
+replaceInFile(
+  'src/services/kdmPersistenceService.ts',
+  'epistemicAccess?: unknown; selfMemoryRuntime?: unknown; responsePlan?: unknown;',
+  'epistemicAccess?: unknown; selfMemoryRuntime?: unknown; livedMemoryRuntime?: unknown; responsePlan?: unknown;',
+  1,
+  'KNT lived memory type',
+);
+replaceInFile(
+  'src/services/kdmPersistenceService.ts',
+  '    epistemicAccess?: unknown;\n    selfMemoryRuntime?: unknown;\n    responsePlan?: unknown;',
+  '    epistemicAccess?: unknown;\n    selfMemoryRuntime?: unknown;\n    livedMemoryRuntime?: unknown;\n    responsePlan?: unknown;',
+  1,
+  'turn payload lived memory type',
+);
+replaceInFile(
+  'src/services/kdmPersistenceService.ts',
+  '      selfMemoryRuntime: payload.metadata?.selfMemoryRuntime,\n      responsePlan: payload.metadata?.responsePlan,',
+  '      selfMemoryRuntime: payload.metadata?.selfMemoryRuntime,\n      livedMemoryRuntime: payload.metadata?.livedMemoryRuntime,\n      responsePlan: payload.metadata?.responsePlan,',
+  1,
+  'turn record lived memory persistence',
+);
+replaceInFile(
+  'src/types/nexus.ts',
+  '    selfMemoryRuntime?: unknown;\n    responsePlan?: unknown;',
+  '    selfMemoryRuntime?: unknown;\n    livedMemoryRuntime?: unknown;\n    responsePlan?: unknown;',
+  1,
+  'nexus lived memory metadata type',
+);
