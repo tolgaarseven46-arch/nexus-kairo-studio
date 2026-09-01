@@ -3,12 +3,13 @@ import { describe, expect, it } from 'vitest';
 
 const server = readFileSync('server.ts', 'utf8');
 const count = (needle: string) => server.split(needle).length - 1;
+const localBranchMarker = 'if (!selfMemoryInstruction && local.handled && local.reply)';
 
 describe('mixed local / AI provider state continuity contracts', () => {
   it('computes canonical KDM state once before the local-vs-AI response branch', () => {
     const kdm = server.indexOf('kdm = analyzeKdmInteraction(');
     const local = server.indexOf('local = tryLocalKairoReply(');
-    const branch = server.indexOf('if (local.handled && local.reply)');
+    const branch = server.indexOf(localBranchMarker);
 
     expect(kdm).toBeGreaterThan(-1);
     expect(local).toBeGreaterThan(kdm);
@@ -28,7 +29,7 @@ describe('mixed local / AI provider state continuity contracts', () => {
     expect(count('dynamicStateBefore: requestState,')).toBe(0);
 
     const persistedFallback = server.indexOf('effective = dynamicState?.relationship');
-    const localBranch = server.indexOf('if (local.handled && local.reply)');
+    const localBranch = server.indexOf(localBranchMarker);
     expect(persistedFallback).toBeGreaterThan(-1);
     expect(localBranch).toBeGreaterThan(persistedFallback);
   });
@@ -36,7 +37,7 @@ describe('mixed local / AI provider state continuity contracts', () => {
   it('records KDM quality metrics on both local and AI response paths', () => {
     expect(count('recordKdmMetric({')).toBe(2);
 
-    const localBranch = server.indexOf('if (local.handled && local.reply)');
+    const localBranch = server.indexOf(localBranchMarker);
     const aiBranch = server.indexOf('const relationship = kdm.trace.relationship;', localBranch);
     const localWindow = server.slice(localBranch, aiBranch);
     const aiWindow = server.slice(aiBranch);
@@ -50,7 +51,7 @@ describe('mixed local / AI provider state continuity contracts', () => {
   });
 
   it('returns the same canonical state envelope to clients regardless of provider path', () => {
-    const localBranch = server.indexOf('if (local.handled && local.reply)');
+    const localBranch = server.indexOf(localBranchMarker);
     const aiBranch = server.indexOf('const relationship = kdm.trace.relationship;', localBranch);
     const localWindow = server.slice(localBranch, aiBranch);
     const aiWindow = server.slice(aiBranch);
