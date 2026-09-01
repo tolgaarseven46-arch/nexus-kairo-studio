@@ -10,6 +10,7 @@ import {
   validateKairaCanonicalIdentity,
   type KairaCanonicalIdentityState,
 } from "./kairaCanonicalIdentity";
+import { retainKairaAutobiographicalMemories } from "./kairaAutobiographicalRetention";
 
 const CANONICAL_IDENTITY_COLLECTION = "kairaCanonicalIdentities";
 
@@ -66,7 +67,9 @@ export async function saveKairaCanonicalIdentity(
     ...state,
     kairaInstanceId: resolveKairaInstanceContext({ instanceId: state.kairaInstanceId }).instanceId,
     selfFacts: state.selfFacts.map((fact) => ({ ...fact })),
-    autobiographicalMemories: state.autobiographicalMemories.map(cloneMemory),
+    autobiographicalMemories: retainKairaAutobiographicalMemories(
+      state.autobiographicalMemories.map(cloneMemory),
+    ),
   };
 
   if (normalized.kairaInstanceId !== ownerId) {
@@ -187,10 +190,10 @@ export async function appendKairaAutobiographicalMemoryAtomic(
 
     const next: KairaCanonicalIdentityState = {
       ...current,
-      autobiographicalMemories: [
+      autobiographicalMemories: retainKairaAutobiographicalMemories([
         ...current.autobiographicalMemories.map(cloneMemory),
         cloneMemory(memory),
-      ],
+      ]),
     };
     const issues = validateKairaCanonicalIdentity(next);
     if (issues.length) {
