@@ -38,12 +38,20 @@ const tokens = (value: unknown) =>
       .filter((token) => token.length >= 2),
   );
 
+const relatedToken = (left: string, right: string) => {
+  if (left === right) return true;
+  if (Math.min(left.length, right.length) < 4) return false;
+  return left.startsWith(right) || right.startsWith(left);
+};
+
 const overlap = (queryTokens: Set<string>, value: unknown) => {
   const valueTokens = tokens(value);
   if (!queryTokens.size || !valueTokens.size) return 0;
   let matched = 0;
   for (const token of queryTokens) {
-    if (valueTokens.has(token)) matched += 1;
+    if ([...valueTokens].some((valueToken) => relatedToken(token, valueToken))) {
+      matched += 1;
+    }
   }
   return matched / Math.max(1, queryTokens.size);
 };
