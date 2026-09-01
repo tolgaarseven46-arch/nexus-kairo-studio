@@ -150,12 +150,17 @@ export function appraiseLivedMemoryCandidate(input: {
     return { status: "skip_low_salience", score, reasons, memory: null };
   }
 
+  const selfIds = new Set([
+    instance.instanceId.toLocaleLowerCase("tr-TR"),
+    "kaira",
+    "current_kaira",
+  ]);
   const memory: KairaAutobiographicalMemory = {
     id: `lived_${observation.id}`,
     origin: "lived",
     occurredAt: observation.createdAt,
     participantIds: [event.actor?.id, event.target?.id]
-      .filter((value): value is string => Boolean(value && value !== instance.instanceId)),
+      .filter((value): value is string => Boolean(value && !selfIds.has(value.toLocaleLowerCase("tr-TR")))),
     eventType: event.eventType,
     facts: compactFacts(observation),
     emotions: memoryEmotions(input.dynamicStateAfter),
