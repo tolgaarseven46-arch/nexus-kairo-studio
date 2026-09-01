@@ -1,6 +1,6 @@
 import type { KairaAutobiographicalMemory } from "./kairaIdentityContracts";
 import type { KairaInstanceContext } from "./kairaInstanceContext";
-import { resolveKairaInstanceContext } from "./kairaInstanceContext";
+import { instancePolicy, resolveKairaInstanceContext } from "./kairaInstanceContext";
 import type { WorldEventObservation } from "./worldModelEventStore";
 import {
   experiencePreferenceAppraisalFromActivityReceipt,
@@ -10,9 +10,11 @@ import { preferenceEvidenceFromExperienceAppraisal } from "./kairaExperiencePref
 
 export type KairaActivityAutobiographicalProjectionStatus =
   | "projected"
+  | "skip_ephemeral_instance"
   | "skip_not_activity"
   | "skip_unpersisted"
   | "skip_owner_mismatch"
+  | "skip_not_grounded"
   | "skip_invalid_activity"
   | "skip_not_completed"
   | "skip_missing_receipt"
@@ -30,6 +32,13 @@ export interface KairaActivityAutobiographicalProjectionDecision {
 }
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const canonicalKey = (value: string) =>
+  String(value || "")
+    .trim()
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9_:-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 96);
 const valueKey = (value: string | number | boolean) =>
   `${typeof value}:${typeof value === "string" ? value.trim().toLocaleLowerCase("tr-TR") : String(value)}`;
 
@@ -42,7 +51,7 @@ function exactExperienceSubjectMatch(
   if (!subject && !probe) return true;
   if (!subject || !probe) return false;
   return (
-    subject.preferenceKey === probe.preferenceKey.trim().toLocaleLowerCase("en-US").replace(/[^a-z0-9_:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96) &&
+    subject.preferenceKey === canonicalKey(probe.preferenceKey) &&
     valueKey(subject.experiencedValue) === valueKey(probe.experiencedValue)
   );
 }
@@ -58,6 +67,11 @@ export function projectKairaActivityObservationToAutobiography(input: {
   receipt?: KairaActivityExecutionReceipt;
 }): KairaActivityAutobiographicalProjectionDecision {
   const instance = resolveKairaInstanceContext(input.instance);
+  const policy = instancePolicy(instance.instanceType);
+  if (!policy.persistentAutobiography || !policy.canConsolidateCoreMemories) {
+    return { status: "skip_ephemeral_instance", score: 0, reasons: ["instance_policy"], memory: null };
+  }
+
   const observation = input.observation;
   if (observation.kind !== "kaira_activity") {
     return { status: "skip_not_activity", score: 0, reasons: ["kaira_activity_required"], memory: null };
@@ -67,6 +81,9 @@ export function projectKairaActivityObservationToAutobiography(input: {
   }
   if (resolveKairaInstanceContext({ instanceId: observation.kairaInstanceId }).instanceId !== instance.instanceId) {
     return { status: "skip_owner_mismatch", score: 0, reasons: ["instance_owner_mismatch"], memory: null };
+  }
+  if (observation.status !== "grounded") {
+    return { status: "skip_not_grounded", score: 0, reasons: ["grounded_activity_required"], memory: null };
   }
   const activity = observation.activity;
   if (!activity?.activityId || !activity.activityType) {
@@ -81,7 +98,7 @@ export function projectKairaActivityObservationToAutobiography(input: {
   const receipt = input.receipt;
   if (
     receipt.sourceWorldObservationId !== observation.id ||
-    receipt.activityId.trim().toLocaleLowerCase("en-US").replace(/[^a-z0-9_:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96) !== activity.activityId ||
+    canonicalKey(receipt.activityId) !== activity.activityId ||
     receipt.status !== activity.status ||
     !exactExperienceSubjectMatch(observation, receipt)
   ) {
