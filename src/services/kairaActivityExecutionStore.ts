@@ -5,6 +5,7 @@ import {
   createKairaActivityExecution,
   transitionKairaActivityExecution,
   type KairaActivityExecutionCommand,
+  type KairaActivityExecutionExperienceSubject,
   type KairaActivityExecutionRecord,
   type KairaActivityExecutionTransitionDecision,
   type KairaActivityPermissionPolicy,
@@ -27,6 +28,18 @@ function executionDocumentId(ownerUserId: string, kairaInstanceId: string, activ
   return `${ownerScope}__activity__${activityKey}`.slice(0, 480);
 }
 
+const valueKey = (value: string | number | boolean) =>
+  `${typeof value}:${typeof value === "string" ? value.trim().toLocaleLowerCase("tr-TR") : String(value)}`;
+
+function sameExperienceSubject(
+  left?: KairaActivityExecutionExperienceSubject,
+  right?: KairaActivityExecutionExperienceSubject,
+): boolean {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  return left.preferenceKey === right.preferenceKey && valueKey(left.experiencedValue) === valueKey(right.experiencedValue);
+}
+
 function sameExecutionSeed(
   record: KairaActivityExecutionRecord,
   input: {
@@ -35,6 +48,7 @@ function sameExecutionSeed(
     instanceType: KairaInstanceContext["instanceType"];
     activityId: string;
     activityType: string;
+    experienceSubject?: KairaActivityExecutionExperienceSubject;
     permissionPolicy?: KairaActivityPermissionPolicy;
   },
 ): boolean {
@@ -49,7 +63,8 @@ function sameExecutionSeed(
     record.instanceType === expected.instanceType &&
     record.activityId === expected.activityId &&
     record.activityType === expected.activityType &&
-    record.permissionPolicy === expected.permissionPolicy
+    record.permissionPolicy === expected.permissionPolicy &&
+    sameExperienceSubject(record.experienceSubject, expected.experienceSubject)
   );
 }
 
@@ -63,6 +78,7 @@ export async function createKairaActivityExecutionAtomic(input: {
   instanceType: KairaInstanceContext["instanceType"];
   activityId: string;
   activityType: string;
+  experienceSubject?: KairaActivityExecutionExperienceSubject;
   permissionPolicy?: KairaActivityPermissionPolicy;
   now: string;
 }): Promise<KairaActivityExecutionCreateResult> {
@@ -112,6 +128,7 @@ export async function transitionKairaActivityExecutionAtomic(input: {
       instanceType: record.instanceType,
       activityId: input.activityId,
       activityType: record.activityType,
+      experienceSubject: record.experienceSubject,
       permissionPolicy: record.permissionPolicy,
       now: record.createdAt,
     });
