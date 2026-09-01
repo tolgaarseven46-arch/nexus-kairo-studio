@@ -53,6 +53,7 @@ export function validateKairaCanonicalIdentity(
   }
 
   const ids = new Set<string>();
+  const selfFactKeys = new Set<string>();
   const consolidationKeys = new Set<string>();
   const collectId = (id: string, type: string) => {
     const normalized = id.trim();
@@ -73,6 +74,20 @@ export function validateKairaCanonicalIdentity(
 
   for (const fact of state.selfFacts) {
     collectId(fact.id, "self-fact");
+    const key = fact.key.trim().toLocaleLowerCase("en-US");
+    if (!key) {
+      issues.push({
+        invariant: "canonical_identity.self_fact_key_required",
+        message: `${fact.id} self-fact key boş olamaz.`,
+      });
+    } else if (selfFactKeys.has(key)) {
+      issues.push({
+        invariant: "canonical_identity.self_fact_key_unique",
+        message: `Tekrarlanan canonical self-fact key: ${key}`,
+      });
+    } else {
+      selfFactKeys.add(key);
+    }
     if (fact.canonical !== true) {
       issues.push({
         invariant: "canonical_identity.self_fact_canonical",
@@ -83,6 +98,16 @@ export function validateKairaCanonicalIdentity(
       issues.push({
         invariant: "canonical_identity.confidence_bounded",
         message: `${fact.id} confidence 0..1 olmalı.`,
+      });
+    }
+    if (
+      fact.source === "lived_revision" &&
+      fact.domain !== "preference" &&
+      fact.domain !== "belief"
+    ) {
+      issues.push({
+        invariant: "canonical_identity.lived_revision_domain",
+        message: `${fact.id} lived revision yalnız preference/belief domain'inde olabilir.`,
       });
     }
   }
