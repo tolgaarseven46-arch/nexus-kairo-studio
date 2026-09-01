@@ -81,6 +81,17 @@ function localIntentFromSemanticEvent(
   // when an upstream provider collapses the turn to generic greeting/general chat.
   const locallyObserved = interpretSemanticEvent(message);
   const locallyObservedIntent = localIntentFromEvent(locallyObserved);
+  const raw = message
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[!?.,…]+$/u, "")
+    .trim();
+  if (/^(?:naber|nasılsın)(?:\s+(?:kank[a-zçğıöşü]*|kaira|kairo))?$/u.test(raw)) {
+    return "how_are_you";
+  }
+  if (/^ne\s+yapıyorsun(?:\s+(?:kank[a-zçğıöşü]*|kaira|kairo))?$/u.test(raw)) {
+    return "what_doing";
+  }
   if (locallyObservedIntent === "how_are_you" || locallyObservedIntent === "what_doing") {
     return locallyObservedIntent;
   }

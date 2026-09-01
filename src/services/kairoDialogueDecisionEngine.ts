@@ -137,7 +137,16 @@ function isReciprocalSocialRoutine(
   event: SemanticEvent,
 ): boolean {
   const locallyObservedRoutine = interpretSemanticEvent(userMessage).socialRoutine;
+  const raw = userMessage
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[!?.,…]+$/u, "")
+    .trim();
+  const rawReciprocal =
+    /^(?:naber|nasılsın)(?:\s+(?:kank[a-zçğıöşü]*|kaira|kairo))?$/u.test(raw) ||
+    /^ne\s+yapıyorsun(?:\s+(?:kank[a-zçğıöşü]*|kaira|kairo))?$/u.test(raw);
   return (
+    rawReciprocal ||
     event.socialRoutine === "how_are_you" ||
     event.socialRoutine === "what_doing" ||
     locallyObservedRoutine === "how_are_you" ||
