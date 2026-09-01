@@ -30,6 +30,9 @@ export function canonicalIdentityFromSeed(
       participantIds: [...memory.participantIds],
       facts: [...memory.facts],
       emotions: memory.emotions.map((emotion) => ({ ...emotion })),
+      ...(memory.sourceWorldObservationIds
+        ? { sourceWorldObservationIds: [...memory.sourceWorldObservationIds] }
+        : {}),
     })),
   };
 }
@@ -46,6 +49,7 @@ export function validateKairaCanonicalIdentity(
   }
 
   const ids = new Set<string>();
+  const consolidationKeys = new Set<string>();
   const collectId = (id: string, type: string) => {
     const normalized = id.trim();
     if (!normalized) {
@@ -104,6 +108,35 @@ export function validateKairaCanonicalIdentity(
         invariant: "canonical_identity.memory_truth_not_prose",
         message: `${memory.id} canonical anı bitmiş anlatım metni taşıyamaz.`,
       });
+    }
+    if (memory.origin === "lived") {
+      const sources = (memory.sourceWorldObservationIds || []).map((id) => id.trim()).filter(Boolean);
+      if (!sources.length) {
+        issues.push({
+          invariant: "canonical_identity.lived_memory_world_provenance",
+          message: `${memory.id} lived anısı canonical world observation provenance taşımalı.`,
+        });
+      }
+      if (new Set(sources).size !== sources.length) {
+        issues.push({
+          invariant: "canonical_identity.lived_memory_source_unique",
+          message: `${memory.id} aynı world observation kaynağını tekrarlayamaz.`,
+        });
+      }
+      const consolidationKey = memory.consolidationKey?.trim();
+      if (!consolidationKey) {
+        issues.push({
+          invariant: "canonical_identity.lived_memory_consolidation_key",
+          message: `${memory.id} lived anısı idempotent consolidation key taşımalı.`,
+        });
+      } else if (consolidationKeys.has(consolidationKey)) {
+        issues.push({
+          invariant: "canonical_identity.consolidation_key_unique",
+          message: `Tekrarlanan lived memory consolidation key: ${consolidationKey}`,
+        });
+      } else {
+        consolidationKeys.add(consolidationKey);
+      }
     }
     for (const emotion of memory.emotions) {
       if (!in01(emotion.intensity)) {
