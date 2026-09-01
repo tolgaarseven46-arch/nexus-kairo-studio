@@ -18,7 +18,7 @@ const input = () => ({
     motivationAffinity: { curiosity: 1 },
     requiredCapabilities: ["archive_access"],
     noveltyPotential: 0.9,
-    permissionPolicy: "not_required" as const,
+    permissionPolicy: "none" as const,
     evidenceIds: ["catalog:archive"],
   }],
   environment: {
