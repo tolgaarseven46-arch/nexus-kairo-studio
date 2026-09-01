@@ -19,7 +19,7 @@ jobs:
       - name: Apply appraisal emotion delta migration
         run: node scripts/one-time-appraisal-emotion-delta-authority.cjs
       - name: Focused appraisal regressions
-        run: npx vitest run src/services/relationshipConditionedEmotionDelta.test.ts src/services/kairaRelationshipQualitativeReactionCharacterization.test.ts src/services/kairaRelationshipEmotionDeltaAuthorityContracts.test.ts
+        run: npx vitest run src/services/relationshipConditionedEmotionDelta.test.ts src/services/kairaRelationshipConditionedAppraisalContracts.test.ts src/services/kairaRelationshipQualitativeReactionCharacterization.test.ts src/services/kairaRelationshipEmotionDeltaAuthorityContracts.test.ts
       - name: Architecture contracts
         run: npm run test:contracts
       - name: Full tests
@@ -33,6 +33,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/one-time-appraisal-emotion-delta-authority.yml scripts/one-time-appraisal-emotion-delta-authority.cjs
-          git add src/services/relationshipConditionedAppraisal.ts src/services/kdmConsistencyEngine.ts src/services/relationshipConditionedEmotionDelta.test.ts src/services/kairaRelationshipEmotionDeltaAuthorityContracts.test.ts
+          git add src/services/relationshipConditionedAppraisal.ts src/services/kdmConsistencyEngine.ts src/services/relationshipConditionedEmotionDelta.test.ts src/services/kairaRelationshipEmotionDeltaAuthorityContracts.test.ts src/services/kairaRelationshipConditionedAppraisalContracts.test.ts
           git commit -m "refactor(kaira): let appraisal own emotion deltas"
           git push
+# retry: 2
