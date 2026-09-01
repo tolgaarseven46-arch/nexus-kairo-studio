@@ -90,6 +90,15 @@ function rankMemory(
   query: SemanticSelfMemoryQuery,
   memory: KairaAutobiographicalMemory,
 ): RankedKairaAutobiographicalMemory {
+  if (query.retrievalMode === "broad") {
+    const emotionalWeight = Math.max(0, ...memory.emotions.map((emotion) => emotion.intensity));
+    return {
+      memory,
+      score: Math.min(1, memory.salience * 0.9 + emotionalWeight * 0.1),
+      reasons: ["broad_autobiography_salience"],
+    };
+  }
+
   const queryTokens = tokens(query.surface);
   const reasons: string[] = [];
   let score = 0;
