@@ -32,6 +32,20 @@ describe("Kaira epistemic runtime contracts", () => {
     expect(server).toContain('const finalEpistemicIssues = findKairaEpistemicResponseIssues(reply, epistemicAccess)');
   });
 
+  it("keeps every post-plan fallback behind world, epistemic and social final authority", () => {
+    const server = readFileSync("server.ts", "utf8");
+    const candidateWorld = server.indexOf("const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents)");
+    const candidateEpistemic = server.indexOf("const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateWorldGuard.reply, epistemicAccess)");
+    const candidateSocial = server.indexOf("const candidateBaseEnforced = enforceKairoResponse(candidateEpistemicGuard.reply, kdm.trace, enforcementRules)");
+    const candidateContract = server.indexOf("const candidateContractEnforced = enforceBehaviorContract(candidateBaseEnforced.reply, kdm.trace, behaviorContract)");
+    const finalEpistemic = server.indexOf("const finalEpistemicIssues = findKairaEpistemicResponseIssues(reply, epistemicAccess)");
+    expect(candidateWorld).toBeGreaterThan(-1);
+    expect(candidateWorld).toBeLessThan(candidateEpistemic);
+    expect(candidateEpistemic).toBeLessThan(candidateSocial);
+    expect(candidateSocial).toBeLessThan(candidateContract);
+    expect(candidateContract).toBeLessThan(finalEpistemic);
+  });
+
   it("does not read Firestore knowledge profiles for ordinary non-knowledge turns", () => {
     const server = readFileSync("server.ts", "utf8");
     expect(server).toMatch(/knowledgeQuery && kairaPolicy\.persistentIdentity[\s\S]*loadKairaKnowledgeProfile/);
