@@ -4,14 +4,19 @@ const firestore = vi.hoisted(() => ({
   doc: vi.fn((_db: unknown, collection: string, id: string) => ({ collection, id })),
   getDoc: vi.fn(),
   setDoc: vi.fn(),
+  transactionGet: vi.fn(),
+  transactionSet: vi.fn(),
+  runTransaction: vi.fn(async (_db: unknown, callback: (transaction: { get: typeof firestore.transactionGet; set: typeof firestore.transactionSet }) => unknown) =>
+    callback({ get: firestore.transactionGet, set: firestore.transactionSet })),
 }));
 
 vi.mock("firebase/firestore", () => firestore);
 vi.mock("../lib/firebase", () => ({ db: { kind: "mock-db" } }));
 
 import { canonicalIdentityFromSeed } from "./kairaCanonicalIdentity";
-import { buildKairaIdentityTestFixture } from "./kairaIdentityContracts";
+import { buildKairaIdentityTestFixture, type KairaAutobiographicalMemory } from "./kairaIdentityContracts";
 import {
+  appendKairaAutobiographicalMemoryAtomic,
   loadKairaCanonicalIdentity,
   loadKairaCanonicalIdentityResult,
   saveKairaCanonicalIdentity,
@@ -19,6 +24,21 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+const livedMemory = (id = "lived_obs_1"): KairaAutobiographicalMemory => ({
+  id,
+  origin: "lived",
+  occurredAt: "2026-09-01T10:00:00.000Z",
+  participantIds: ["user_1"],
+  eventType: "insult",
+  facts: ["salak", "actor:user_1"],
+  emotions: [{ label: "kırgınlık", intensity: 0.7 }],
+  salience: 0.8,
+  sensitivity: "ordinary",
+  canonical: true,
+  sourceWorldObservationIds: ["obs_1"],
+  consolidationKey: "world:obs_1",
 });
 
 describe("Kaira canonical identity store", () => {
@@ -58,6 +78,13 @@ describe("Kaira canonical identity store", () => {
     await expect(
       loadKairaCanonicalIdentityResult({ instanceId: "welcome_demo", instanceType: "welcome" }),
     ).resolves.toEqual({ status: "ephemeral", state: null });
+    await expect(
+      appendKairaAutobiographicalMemoryAtomic(
+        { instanceId: "welcome_demo", instanceType: "welcome" },
+        livedMemory(),
+      ),
+    ).resolves.toEqual({ status: "ephemeral", memoryId: null });
+    expect(firestore.runTransaction).not.toHaveBeenCalled();
   });
 
   it("rejects cross-instance ownership before Firestore mutation", async () => {
@@ -102,5 +129,45 @@ describe("Kaira canonical identity store", () => {
       ),
     ).rejects.toThrow("memory_truth_not_prose");
     expect(firestore.setDoc).not.toHaveBeenCalled();
+  });
+
+  it("atomically appends a lived memory without replacing existing autobiography", async () => {
+    const current = canonicalIdentityFromSeed(buildKairaIdentityTestFixture("kaira_a"));
+    firestore.transactionGet.mockResolvedValue({ exists: () => true, data: () => current });
+
+    await expect(
+      appendKairaAutobiographicalMemoryAtomic(
+        { instanceId: "kaira_a", instanceType: "individual" },
+        livedMemory(),
+      ),
+    ).resolves.toEqual({ status: "appended", memoryId: "lived_obs_1" });
+
+    expect(firestore.transactionSet).toHaveBeenCalledTimes(1);
+    expect(firestore.transactionSet.mock.calls[0][1].autobiographicalMemories).toHaveLength(2);
+  });
+
+  it("treats a retried source observation as an idempotent duplicate", async () => {
+    const current = canonicalIdentityFromSeed(buildKairaIdentityTestFixture("kaira_a"));
+    current.autobiographicalMemories.push(livedMemory());
+    firestore.transactionGet.mockResolvedValue({ exists: () => true, data: () => current });
+
+    await expect(
+      appendKairaAutobiographicalMemoryAtomic(
+        { instanceId: "kaira_a", instanceType: "individual" },
+        livedMemory("different_id_same_source"),
+      ),
+    ).resolves.toEqual({ status: "duplicate", memoryId: "lived_obs_1" });
+    expect(firestore.transactionSet).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when provisioning has not created canonical identity", async () => {
+    firestore.transactionGet.mockResolvedValue({ exists: () => false });
+    await expect(
+      appendKairaAutobiographicalMemoryAtomic(
+        { instanceId: "kaira_a", instanceType: "individual" },
+        livedMemory(),
+      ),
+    ).resolves.toEqual({ status: "missing_identity", memoryId: null });
+    expect(firestore.transactionSet).not.toHaveBeenCalled();
   });
 });
