@@ -17,7 +17,13 @@ jobs:
           node-version: 20
       - run: npm install --ignore-scripts
       - name: Apply reaction-specific recovery migration
-        run: node scripts/one-time-reaction-specific-recovery.cjs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/one-time-reaction-specific-recovery.cjs')
+          p.write_text(p.read_text().replace('${', r'\${'))
+          PY
+          node scripts/one-time-reaction-specific-recovery.cjs
       - name: Focused recovery regressions
         run: npx vitest run src/services/relationshipConditionedRecovery.test.ts src/services/kairaReactionSpecificRecoveryAuthorityContracts.test.ts src/services/kairaTemperamentRecoveryPersistenceWiringContracts.test.ts src/services/kairaRelationshipQualitativeReactionCharacterization.test.ts
       - name: Architecture contracts
