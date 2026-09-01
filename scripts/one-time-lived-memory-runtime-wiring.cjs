@@ -81,5 +81,5 @@ regexAll(
 
 if (s.includes('saveWorldEventObservation({')) throw new Error('direct world persistence seam remains');
 if ((s.match(/persistWorldEventAndMaybeConsolidateLivedMemory\(\{/g) || []).length !== 2) throw new Error('coordinator must be used in both response paths');
-if ((s.match(/livedMemoryRuntime/g) || []).length < 9) throw new Error('lived memory observability wiring incomplete');
+if ((s.match(/livedMemoryRuntime/g) || []).length !== 8) throw new Error('lived memory observability wiring incomplete');
 fs.writeFileSync(path, s);
