@@ -16,6 +16,12 @@ import {
   type KairaActivityCatalogEntry,
   type KairaActivityCatalogRuntimeContext,
 } from "./kairaActivityCatalogAuthority";
+import {
+  projectKairaActivityRuntimeFacts,
+  type KairaActivityWorldRuntimeFact,
+} from "./kairaActivityRuntimeFacts";
+import type { KairaActivityExecutionRecord } from "./kairaActivityExecution";
+import type { KairaActivityScheduleRecord } from "./kairaActivitySchedule";
 import type { KairaActivityProposalCandidate } from "./kairaActivityPlanningPolicy";
 
 export type KairaActivityCandidateRuntimeResult =
@@ -39,6 +45,13 @@ export interface KairaActivityCandidateRuntimeCommonInput {
   recentActivities?: KairaRecentActivitySignal[];
 }
 
+const disabledResult = (): KairaActivityCandidateRuntimeResult => ({
+  status: "disabled",
+  reason: "autonomous_activity_planning_disabled",
+  motivation: null,
+  candidates: [],
+});
+
 /**
  * Pure runtime seam. Upstream authorities own preference/history loading and
  * descriptor discovery; this adapter only derives motivation and candidates.
@@ -46,14 +59,7 @@ export interface KairaActivityCandidateRuntimeCommonInput {
 export function generateKairaActivityCandidatesForRuntime(
   input: KairaActivityCandidateRuntimeCommonInput & { descriptors: KairaActivityDescriptor[] },
 ): KairaActivityCandidateRuntimeResult {
-  if (!instancePolicy(input.instanceType).autonomousActivityPlanning) {
-    return {
-      status: "disabled",
-      reason: "autonomous_activity_planning_disabled",
-      motivation: null,
-      candidates: [],
-    };
-  }
+  if (!instancePolicy(input.instanceType).autonomousActivityPlanning) return disabledResult();
 
   const motivation = deriveKairaActivityMotivation(input.dynamicState, input.motivationContext);
   const candidates = generateKairaActivityCandidates({
@@ -76,14 +82,7 @@ export function generateKairaActivityCandidatesFromCatalogForRuntime(
     catalogRuntime: KairaActivityCatalogRuntimeContext;
   },
 ): KairaActivityCandidateRuntimeResult {
-  if (!instancePolicy(input.instanceType).autonomousActivityPlanning) {
-    return {
-      status: "disabled",
-      reason: "autonomous_activity_planning_disabled",
-      motivation: null,
-      candidates: [],
-    };
-  }
+  if (!instancePolicy(input.instanceType).autonomousActivityPlanning) return disabledResult();
 
   const descriptors = materializeKairaActivityDescriptors({
     catalog: input.catalog,
@@ -93,6 +92,45 @@ export function generateKairaActivityCandidatesFromCatalogForRuntime(
     instanceType: input.instanceType,
     dynamicState: input.dynamicState,
     descriptors,
+    motivationContext: input.motivationContext,
+    learnedPreferences: input.learnedPreferences,
+    recentActivities: input.recentActivities,
+  });
+}
+
+/**
+ * Highest pure runtime seam for autonomous activity discovery. Canonical source
+ * snapshots are projected into ephemeral runtime facts, joined with stable
+ * catalog semantics, then passed through the existing motivation/candidate path.
+ * No source is loaded or mutated here.
+ */
+export function generateKairaActivityCandidatesFromCanonicalRuntimeFacts(
+  input: KairaActivityCandidateRuntimeCommonInput & {
+    catalog: KairaActivityCatalogEntry[];
+    worldFacts: KairaActivityWorldRuntimeFact[];
+    activeExecutions: KairaActivityExecutionRecord[];
+    schedules: KairaActivityScheduleRecord[];
+    now: string;
+    defaultWindowMinutes?: number;
+  },
+): KairaActivityCandidateRuntimeResult {
+  if (!instancePolicy(input.instanceType).autonomousActivityPlanning) return disabledResult();
+
+  const catalogRuntime = projectKairaActivityRuntimeFacts({
+    catalog: input.catalog,
+    worldFacts: input.worldFacts,
+    activeExecutions: input.activeExecutions,
+    schedules: input.schedules,
+    dynamicState: input.dynamicState,
+    now: input.now,
+    defaultWindowMinutes: input.defaultWindowMinutes,
+  });
+
+  return generateKairaActivityCandidatesFromCatalogForRuntime({
+    instanceType: input.instanceType,
+    dynamicState: input.dynamicState,
+    catalog: input.catalog,
+    catalogRuntime,
     motivationContext: input.motivationContext,
     learnedPreferences: input.learnedPreferences,
     recentActivities: input.recentActivities,
