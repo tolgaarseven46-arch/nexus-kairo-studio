@@ -10,12 +10,14 @@ describe("Kaira self-memory semantic authority contracts", () => {
       selfMemoryQuery: {
         surface: "  en sevdiğin   çiçek  ",
         scope: "self_fact",
+        factKey: " Favorite Flower ",
         confidence: 1.4,
       },
     });
     expect(event.selfMemoryQuery).toEqual({
       surface: "en sevdiğin çiçek",
       scope: "self_fact",
+      factKey: "favorite_flower",
       confidence: 1,
     });
   });
@@ -27,6 +29,13 @@ describe("Kaira self-memory semantic authority contracts", () => {
       scope: "autobiographical_memory",
     });
     expect(event.selfMemoryQuery?.confidence).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it("does not invent a fact key in deterministic fallback", () => {
+    const message = "senin en sevdiğin çiçek ne?";
+    const event = canonicalizeSemanticEvent(message, interpretSemanticEvent(message));
+    expect(event.selfMemoryQuery).toMatchObject({ scope: "self_fact" });
+    expect(event.selfMemoryQuery).not.toHaveProperty("factKey");
   });
 
   it("does not turn third-party or user recall into Kaira autobiography", () => {
