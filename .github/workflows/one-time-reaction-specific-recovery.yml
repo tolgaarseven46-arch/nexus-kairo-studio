@@ -46,7 +46,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/one-time-reaction-specific-recovery.yml scripts/one-time-reaction-specific-recovery.cjs
+          git rm -f .github/workflows/one-time-reaction-specific-recovery.yml scripts/one-time-reaction-specific-recovery.cjs
           git add src/services/temperamentEngine.ts src/services/relationshipConditionedRecovery.ts src/services/kdmConsistencyEngine.ts src/services/relationshipConditionedRecovery.test.ts src/services/kairaReactionSpecificRecoveryAuthorityContracts.test.ts
           git commit -m "refactor(kaira): add reaction-specific recovery"
           git push
