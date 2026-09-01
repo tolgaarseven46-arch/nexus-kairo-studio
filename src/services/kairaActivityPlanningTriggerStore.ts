@@ -5,6 +5,10 @@ import type { KairaActivityPlanningTrigger } from "./kairaActivityPlanningTrigge
 
 const COLLECTION = "kairaActivityPlanningTriggers";
 
+export type KairaActivityPlanningTriggerOutcome =
+  | { kind: "none" }
+  | { kind: "selected"; proposalId: string };
+
 export interface KairaActivityPlanningTriggerReceipt {
   schemaVersion: 1;
   kairaInstanceId: string;
@@ -17,6 +21,7 @@ export interface KairaActivityPlanningTriggerReceipt {
   claimedAt: string;
   leaseUntil: string;
   completedAt?: string;
+  planningOutcome?: KairaActivityPlanningTriggerOutcome;
 }
 
 export type KairaActivityPlanningTriggerClaimResult =
@@ -24,6 +29,22 @@ export type KairaActivityPlanningTriggerClaimResult =
   | { status: "busy" | "replayed"; receipt: KairaActivityPlanningTriggerReceipt };
 
 const key = (value: unknown) => String(value || "").trim().toLocaleLowerCase("en-US").replace(/[^a-z0-9_:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 120);
+
+function normalizeOutcome(outcome?: KairaActivityPlanningTriggerOutcome): KairaActivityPlanningTriggerOutcome | undefined {
+  if (!outcome) return undefined;
+  if (outcome.kind === "none") return { kind: "none" };
+  const proposalId = key(outcome.proposalId);
+  if (!proposalId) throw new Error("Invalid Kaira planning trigger selected outcome");
+  return { kind: "selected", proposalId };
+}
+
+function sameOutcome(left?: KairaActivityPlanningTriggerOutcome, right?: KairaActivityPlanningTriggerOutcome) {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  if (left.kind !== right.kind) return false;
+  if (left.kind === "none" && right.kind === "none") return true;
+  return left.kind === "selected" && right.kind === "selected" && left.proposalId === right.proposalId;
+}
 
 function identity(input: { kairaInstanceId: string; instanceType: KairaInstanceContext["instanceType"]; trigger: KairaActivityPlanningTrigger }) {
   const instance = resolveKairaInstanceContext({ instanceId: input.kairaInstanceId, instanceType: input.instanceType });
@@ -68,6 +89,7 @@ export async function claimKairaActivityPlanningTrigger(input: {
         claimedAt: new Date(nowMs).toISOString(),
         leaseUntil: new Date(nowMs + leaseMinutes * 60_000).toISOString(),
         completedAt: undefined,
+        planningOutcome: undefined,
       };
       transaction.set(ref, reclaimed);
       return { status: "reclaimed", receipt: reclaimed } as const;
@@ -95,18 +117,30 @@ export async function completeKairaActivityPlanningTrigger(input: {
   instanceType: KairaInstanceContext["instanceType"];
   trigger: KairaActivityPlanningTrigger;
   now: string;
+  outcome?: KairaActivityPlanningTriggerOutcome;
 }): Promise<KairaActivityPlanningTriggerReceipt> {
   const normalized = identity(input);
   const nowMs = Date.parse(input.now);
   if (!Number.isFinite(nowMs)) throw new Error("Invalid Kaira planning trigger completion time");
+  const outcome = normalizeOutcome(input.outcome);
   const ref = doc(db, COLLECTION, `${normalized.instance.instanceId}__${normalized.triggerId}`.slice(0, 480));
   return runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists()) throw new Error("Kaira planning trigger claim not found");
     const existing = snapshot.data() as KairaActivityPlanningTriggerReceipt;
     if (!sameTrigger(existing, { ...normalized, triggerKind: input.trigger.kind })) throw new Error("Kaira planning trigger idempotency conflict");
-    if (existing.status === "completed") return existing;
-    const completed = { ...existing, status: "completed" as const, completedAt: new Date(nowMs).toISOString() };
+    if (existing.status === "completed") {
+      if (outcome && existing.planningOutcome && !sameOutcome(existing.planningOutcome, outcome)) {
+        throw new Error("Kaira planning trigger outcome conflict");
+      }
+      return existing;
+    }
+    const completed = {
+      ...existing,
+      status: "completed" as const,
+      completedAt: new Date(nowMs).toISOString(),
+      ...(outcome ? { planningOutcome: outcome } : {}),
+    };
     transaction.set(ref, completed);
     return completed;
   });
