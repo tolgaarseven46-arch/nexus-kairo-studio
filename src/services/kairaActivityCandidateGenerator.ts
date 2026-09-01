@@ -52,6 +52,11 @@ const unit = (value: unknown, fallback: number) => {
   if (!Number.isFinite(numeric)) return fallback;
   return Math.max(0, Math.min(1, numeric));
 };
+const strictUnit = (value: unknown, fallback: number) => {
+  const numeric = typeof value === "number" ? value : Number.NaN;
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 1) return fallback;
+  return numeric;
+};
 const affinity = (value: unknown, fallback = 0) => {
   const numeric = typeof value === "number" ? value : Number.NaN;
   if (!Number.isFinite(numeric)) return fallback;
@@ -155,10 +160,10 @@ export function generateKairaActivityCandidates(
         affinity: learnedPreference.affinity,
         confidence: learnedPreference.confidence,
       },
-      noveltyFit: unit(descriptor.noveltyPotential, 0.5) * (1 - repetition.pressure),
-      contextualFit: unit(descriptor.contextualFit, 0.5),
-      interruptionCost: unit(descriptor.interruptionCost, 0.5),
-      risk: unit(descriptor.risk, 1),
+      noveltyFit: strictUnit(descriptor.noveltyPotential, 0) * (1 - repetition.pressure),
+      contextualFit: strictUnit(descriptor.contextualFit, 0),
+      interruptionCost: strictUnit(descriptor.interruptionCost, 1),
+      risk: strictUnit(descriptor.risk, 1),
       repetitionPressure: repetition.pressure,
       availability: descriptor.availability === "available" ? "available" : "blocked",
       permissionPolicy: descriptor.permissionPolicy || "owner_approval",
