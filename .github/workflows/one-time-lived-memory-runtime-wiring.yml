@@ -33,7 +33,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm -f .github/workflows/one-time-lived-memory-runtime-wiring.yml scripts/one-time-lived-memory-runtime-wiring.cjs
-          git add server.ts
+          git add server.ts src/services/kdmPersistenceService.ts src/types/nexus.ts
           git commit -m "feat(kaira): wire lived autobiographical memory runtime"
           git push
-# retry: 3
+# retry: 4
