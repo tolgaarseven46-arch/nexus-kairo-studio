@@ -22,13 +22,38 @@ describe("Kaira self-memory semantic authority contracts", () => {
     });
   });
 
-  it("infers fallback only at the canonical semantic boundary", () => {
+  it("infers targeted fallback only at the canonical semantic boundary", () => {
     const message = "senin geçmişinde başına gelen o yağmur olayını hatırlıyor musun?";
     const event = canonicalizeSemanticEvent(message, interpretSemanticEvent(message));
     expect(event.selfMemoryQuery).toMatchObject({
       scope: "autobiographical_memory",
+      retrievalMode: "targeted",
     });
     expect(event.selfMemoryQuery?.confidence).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it("marks open-ended autobiography as broad at the canonical boundary", () => {
+    const message = "senin geçmişinde neler yaşadın?";
+    const event = canonicalizeSemanticEvent(message, interpretSemanticEvent(message));
+    expect(event.selfMemoryQuery).toMatchObject({
+      scope: "autobiographical_memory",
+      retrievalMode: "broad",
+    });
+  });
+
+  it("normalizes provider retrieval mode without inventing broad recall", () => {
+    const message = "senin Mert'le yaşadığın olayı hatırlıyor musun?";
+    const base = interpretSemanticEvent(message);
+    const event = canonicalizeSemanticEvent(message, {
+      ...base,
+      selfMemoryQuery: {
+        surface: "Mert ile yaşadığın olay",
+        scope: "autobiographical_memory",
+        retrievalMode: "unsupported" as never,
+        confidence: 0.9,
+      },
+    });
+    expect(event.selfMemoryQuery?.retrievalMode).toBe("targeted");
   });
 
   it("does not invent a fact key in deterministic fallback", () => {
