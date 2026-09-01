@@ -9,6 +9,7 @@ vi.mock("firebase/firestore", () => firestore);
 vi.mock("../lib/firebase", () => ({ db: { kind: "mock-db" } }));
 
 import {
+  applyKairaActivityExecutionCommandAtomic,
   createKairaActivityExecutionAtomic,
   transitionKairaActivityExecutionAtomic,
 } from "./kairaActivityExecutionStore";
@@ -30,6 +31,10 @@ describe("Kaira activity execution store contracts", () => {
       instanceType: "individual" as const,
       activityId: "Theatre 01",
       activityType: "Theatre",
+      experienceSubject: {
+        preferenceKey: "preferred_performance_type",
+        experiencedValue: "theatre",
+      },
       permissionPolicy: "owner_approval" as const,
       now: "2026-09-02T00:00:00.000Z",
     };
@@ -39,6 +44,7 @@ describe("Kaira activity execution store contracts", () => {
       ownerUserId: "owner_1",
       activityId: "theatre_01",
       activityType: "theatre",
+      experienceSubject: input.experienceSubject,
       permissionStatus: "pending",
     });
     expect(set).toHaveBeenCalledTimes(1);
@@ -64,6 +70,10 @@ describe("Kaira activity execution store contracts", () => {
       instanceType: "individual" as const,
       activityId: "theatre_01",
       activityType: "theatre",
+      experienceSubject: {
+        preferenceKey: "preferred_performance_type",
+        experiencedValue: "theatre",
+      },
       phase: "planned" as const,
       permissionPolicy: "none" as const,
       permissionStatus: "not_required" as const,
@@ -83,9 +93,48 @@ describe("Kaira activity execution store contracts", () => {
         instanceType: "individual",
         activityId: "theatre_01",
         activityType: "concert",
+        experienceSubject: existing.experienceSubject,
         now: "2026-09-02T00:00:01.000Z",
       }),
     ).rejects.toThrow("idempotency conflict");
+  });
+
+  it("does not allow experience subject mutation after planning", async () => {
+    const existing = {
+      schemaVersion: 1 as const,
+      ownerUserId: "owner_1",
+      kairaInstanceId: "kaira_a",
+      instanceType: "individual" as const,
+      activityId: "theatre_01",
+      activityType: "theatre",
+      experienceSubject: {
+        preferenceKey: "preferred_performance_type",
+        experiencedValue: "theatre",
+      },
+      phase: "planned" as const,
+      permissionPolicy: "none" as const,
+      permissionStatus: "not_required" as const,
+      createdAt: "2026-09-02T00:00:00.000Z",
+      updatedAt: "2026-09-02T00:00:00.000Z",
+    };
+    firestore.runTransaction.mockImplementationOnce(async (_db: unknown, callback: (tx: any) => unknown) =>
+      callback({
+        get: vi.fn().mockResolvedValue({ exists: () => true, data: () => existing }),
+        set: vi.fn(),
+      }),
+    );
+    await expect(createKairaActivityExecutionAtomic({
+      ownerUserId: "owner_1",
+      kairaInstanceId: "kaira_a",
+      instanceType: "individual",
+      activityId: "theatre_01",
+      activityType: "theatre",
+      experienceSubject: {
+        preferenceKey: "preferred_food",
+        experiencedValue: "pizza",
+      },
+      now: "2026-09-02T00:00:01.000Z",
+    })).rejects.toThrow("idempotency conflict");
   });
 
   it("transitions inside one Firestore transaction and persists only applied decisions", async () => {
@@ -153,5 +202,49 @@ describe("Kaira activity execution store contracts", () => {
     });
     expect(result).toMatchObject({ status: "rejected", reason: "permission_required" });
     expect(set).not.toHaveBeenCalled();
+  });
+
+  it("replays only the exact command result and does not reopen a different terminal state", async () => {
+    const completed = {
+      schemaVersion: 1 as const,
+      ownerUserId: "owner_1",
+      kairaInstanceId: "kaira_a",
+      instanceType: "individual" as const,
+      activityId: "theatre_01",
+      activityType: "theatre",
+      phase: "completed" as const,
+      permissionPolicy: "none" as const,
+      permissionStatus: "not_required" as const,
+      createdAt: "2026-09-02T00:00:00.000Z",
+      updatedAt: "2026-09-02T00:20:00.000Z",
+      completedAt: "2026-09-02T00:20:00.000Z",
+    };
+    firestore.runTransaction.mockImplementationOnce(async (_db: unknown, callback: (tx: any) => unknown) =>
+      callback({
+        get: vi.fn().mockResolvedValue({ exists: () => true, data: () => completed }),
+        set: vi.fn(),
+      }),
+    );
+    await expect(applyKairaActivityExecutionCommandAtomic({
+      ownerUserId: "owner_1",
+      kairaInstanceId: "kaira_a",
+      activityId: "theatre_01",
+      command: { type: "complete", authority: "kaira_activity_executor" },
+      now: "2026-09-02T00:21:00.000Z",
+    })).resolves.toEqual({ status: "replayed", record: completed });
+
+    firestore.runTransaction.mockImplementationOnce(async (_db: unknown, callback: (tx: any) => unknown) =>
+      callback({
+        get: vi.fn().mockResolvedValue({ exists: () => true, data: () => completed }),
+        set: vi.fn(),
+      }),
+    );
+    await expect(applyKairaActivityExecutionCommandAtomic({
+      ownerUserId: "owner_1",
+      kairaInstanceId: "kaira_a",
+      activityId: "theatre_01",
+      command: { type: "cancel", authority: "kaira_activity_executor" },
+      now: "2026-09-02T00:22:00.000Z",
+    })).resolves.toMatchObject({ status: "rejected", reason: "terminal_activity" });
   });
 });
