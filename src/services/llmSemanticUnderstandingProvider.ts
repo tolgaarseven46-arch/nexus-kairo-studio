@@ -4,6 +4,7 @@ import type {
   TurkishMorphologyResult,
 } from "./languageUnderstandingService";
 import type { SemanticEvent } from "./semanticEventEngine";
+import type { SemanticSelfMemoryQuery } from "./kairaSelfMemoryQuery";
 
 export type SemanticTextGenerator = (input: {
   system: string;
@@ -25,6 +26,7 @@ const semanticSchemaExample = {
   repairSignal: "none",
   adviceRequested: false,
   knowledgeQuery: null,
+  selfMemoryQuery: null as SemanticSelfMemoryQuery | null,
   valence: "neutral",
   target: "unknown",
   relationalAct: "none",
@@ -60,6 +62,7 @@ Yalnızca kullanıcının mesajında gerçekte ne olduğunu yapılandırılmış
 - Özür ile ilişkiyi onarma girişimini ayır.
 - Bilmediğin şeyi uydurma; belirsizlik varsa daha düşük severity/intensity seç.
 - Türkçe eklerden dolayı yüzey biçimine takılma; varsa morfoloji/lemma bilgisini kullan.
+- Kaira'nın kendi geçmişi, tercihi, inancı, biyografisi veya yaşadığı bir olaya ilişkin soru ile genel dünya/bilgi sorusunu ayır.
 
 SADECE geçerli JSON döndür. Markdown, açıklama veya kod bloğu ekleme.
 JSON tam olarak şu alanları içermeli:
@@ -72,6 +75,7 @@ discourseAct = none | correction | topic_shift | recall_request | confusion_or_c
 repairSignal = none | clarification_request | relevance_challenge; yalnız discourse repair'in alt türünü belirtir, cevap davranışına karar vermez
 adviceRequested = boolean; kullanıcı açıkça ne yapması gerektiğini/tavsiye/öneri soruyorsa true
 knowledgeQuery = null veya {"surface":"kavram","confidence":0-1}; yalnız kullanıcı belirli bir kavram/konu hakkında bilgi, açıklama veya "biliyor musun" türü bilgi erişimi soruyorsa doldur. surface yalnız sorgulanan kısa kavram/konu olsun; cevabı, tanımı veya tahmini buraya yazma. Emin değilsen null bırak.
+selfMemoryQuery = null veya {"surface":"kullanıcının Kaira'nın benliği/geçmişi hakkında sorduğu kısa konu","scope":"self_fact|autobiographical_memory|any","confidence":0-1}; yalnız soru Kaira'nın KENDİ tercihi/inancı/özelliği/biyografisi ya da Kaira'nın KENDİ yaşadığı geçmiş bir olay hakkındaysa doldur. Başka insanların anıları, konuşma geçmişindeki kullanıcı bilgileri veya genel dünya bilgisi için doldurma. Tercih/inanç/trait/biography sorusunda scope=self_fact; yaşanmış olay/anı/geçmiş deneyim sorusunda scope=autobiographical_memory; ikisi gerçekten ayrıştırılamıyorsa any.
 valence = positive | negative | neutral
 target = kaira | third_party | event | unknown
 relationalAct = none | reassurance_seek | repair_probe | reconciliation_attempt | challenge | mockery | closeness_bid
