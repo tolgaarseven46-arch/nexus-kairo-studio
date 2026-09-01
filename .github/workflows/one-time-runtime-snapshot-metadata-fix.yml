@@ -24,3 +24,4 @@ jobs:
           git add src/services/kdmPersistenceService.ts scripts/one-time-runtime-snapshot-metadata-fix.mjs .github/workflows/one-time-runtime-snapshot-metadata-fix.yml
           git commit -m "fix(kaira): persist complete runtime snapshot metadata"
           git push
+# trigger
