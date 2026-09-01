@@ -8,6 +8,7 @@ export type SemanticSelfMemoryScope =
 export interface SemanticSelfMemoryQuery {
   surface: string;
   scope: SemanticSelfMemoryScope;
+  factKey?: string;
   confidence: number;
 }
 
@@ -23,6 +24,14 @@ const normalizeSurface = (value: string) =>
     .replace(/\s+/g, " ")
     .slice(0, 160);
 
+const normalizeFactKey = (value?: string) =>
+  String(value || "")
+    .trim()
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9_:-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 96);
+
 export function normalizeSemanticSelfMemoryQuery(
   query?: SemanticSelfMemoryQuery | null,
 ): SemanticSelfMemoryQuery | null {
@@ -33,9 +42,11 @@ export function normalizeSemanticSelfMemoryQuery(
     query.scope === "self_fact" || query.scope === "autobiographical_memory"
       ? query.scope
       : "any";
+  const factKey = normalizeFactKey(query.factKey);
   return {
     surface,
     scope,
+    ...(factKey && scope !== "autobiographical_memory" ? { factKey } : {}),
     confidence: Math.max(0, Math.min(1, Number(query.confidence) || 0)),
   };
 }
@@ -43,6 +54,8 @@ export function normalizeSemanticSelfMemoryQuery(
 /**
  * Deterministic fallback at the canonical semantic boundary only.
  * Downstream consumers must not re-parse these phrases independently.
+ * The fallback intentionally does not invent factKey values; exact canonical
+ * keys should come from a semantic provider or another typed upstream source.
  */
 export function inferFallbackSelfMemoryQuery(
   message: string,
