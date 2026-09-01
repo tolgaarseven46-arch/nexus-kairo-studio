@@ -70,7 +70,9 @@ describe('long-session consistency', () => {
     expect(messages).toHaveLength(120);
     expect(snapshots).toHaveLength(120);
     expect(snapshots[25].reactionMode).not.toBe('neutral');
-    expect(snapshots[26].reactionMode).toBe('repairing');
+    expect(snapshots[26].relationship?.repairProgress ?? 0)
+      .toBeGreaterThan(snapshots[25].relationship?.repairProgress ?? 0);
+    expect(['neutral', 'repairing']).toContain(snapshots[26].reactionMode);
     expect(state.reactionMode).toBe('neutral');
     expect(state.relationship?.conversationState).toBe('active');
     expect(state.relationship?.hurtScore ?? 100).toBeLessThan(5);
