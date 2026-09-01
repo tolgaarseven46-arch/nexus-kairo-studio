@@ -4,7 +4,7 @@ import {
   type KairaInstanceContext,
 } from "./kairaInstanceContext";
 
-export type KairaActivityScheduleStatus = "scheduled" | "dispatched" | "cancelled";
+export type KairaActivityScheduleStatus = "scheduled" | "dispatched" | "cancelled" | "expired";
 
 export interface KairaActivityScheduleRecord {
   schemaVersion: 1;
@@ -19,6 +19,7 @@ export interface KairaActivityScheduleRecord {
   updatedAt: string;
   dispatchedAt?: string;
   cancelledAt?: string;
+  expiredAt?: string;
 }
 
 export type KairaActivityScheduleEvaluation =
@@ -41,6 +42,12 @@ const canonicalOwner = (value: string) =>
     .trim()
     .replace(/[^a-zA-Z0-9_@.+:-]+/g, "_")
     .slice(0, 160);
+
+const canonicalTime = (value: string) => {
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) throw new Error("Invalid Kaira activity schedule time");
+  return { time, iso: new Date(time).toISOString() };
+};
 
 export function createKairaActivitySchedule(input: {
   ownerUserId: string;
@@ -101,6 +108,7 @@ export function evaluateKairaActivitySchedule(
   }
   if (record.status === "dispatched") return { status: "already_dispatched", record };
   if (record.status === "cancelled") return { status: "cancelled", record };
+  if (record.status === "expired") return { status: "expired", record };
   if (expiresAtMs !== undefined && nowMs > expiresAtMs) return { status: "expired", record };
   if (nowMs < notBeforeMs) return { status: "not_due", record };
   return { status: "due", record };
@@ -113,12 +121,28 @@ export function markKairaActivityScheduleDispatched(
   const evaluation = evaluateKairaActivitySchedule(record, now);
   if (evaluation.status === "already_dispatched") return record;
   if (evaluation.status !== "due") throw new Error(`Kaira activity schedule cannot dispatch: ${evaluation.status}`);
-  const dispatchedAt = new Date(Date.parse(now)).toISOString();
+  const { iso } = canonicalTime(now);
   return {
     ...record,
     status: "dispatched",
-    updatedAt: dispatchedAt,
-    dispatchedAt,
+    updatedAt: iso,
+    dispatchedAt: iso,
+  };
+}
+
+export function markKairaActivityScheduleExpired(
+  record: KairaActivityScheduleRecord,
+  now: string,
+): KairaActivityScheduleRecord {
+  const evaluation = evaluateKairaActivitySchedule(record, now);
+  if (record.status === "expired") return record;
+  if (evaluation.status !== "expired") throw new Error(`Kaira activity schedule cannot expire: ${evaluation.status}`);
+  const { iso } = canonicalTime(now);
+  return {
+    ...record,
+    status: "expired",
+    updatedAt: iso,
+    expiredAt: iso,
   };
 }
 
@@ -127,13 +151,13 @@ export function cancelKairaActivitySchedule(
   now: string,
 ): KairaActivityScheduleRecord {
   if (record.status === "dispatched") throw new Error("Dispatched Kaira activity schedule cannot be cancelled");
+  if (record.status === "expired") throw new Error("Expired Kaira activity schedule cannot be cancelled");
   if (record.status === "cancelled") return record;
-  const cancelledAt = new Date(Date.parse(now)).toISOString();
-  if (!Number.isFinite(Date.parse(now))) throw new Error("Invalid Kaira activity schedule time");
+  const { iso } = canonicalTime(now);
   return {
     ...record,
     status: "cancelled",
-    updatedAt: cancelledAt,
-    cancelledAt,
+    updatedAt: iso,
+    cancelledAt: iso,
   };
 }
