@@ -20,6 +20,10 @@ import {
   projectKairaActivityRuntimeFacts,
   type KairaActivityWorldRuntimeFact,
 } from "./kairaActivityRuntimeFacts";
+import {
+  projectKairaActivityEnvironmentSnapshot,
+  type KairaActivityEnvironmentSnapshot,
+} from "./kairaActivityEnvironmentAuthority";
 import type { KairaActivityExecutionRecord } from "./kairaActivityExecution";
 import type { KairaActivityScheduleRecord } from "./kairaActivitySchedule";
 import type { KairaActivityProposalCandidate } from "./kairaActivityPlanningPolicy";
@@ -99,10 +103,8 @@ export function generateKairaActivityCandidatesFromCatalogForRuntime(
 }
 
 /**
- * Highest pure runtime seam for autonomous activity discovery. Canonical source
- * snapshots are projected into ephemeral runtime facts, joined with stable
- * catalog semantics, then passed through the existing motivation/candidate path.
- * No source is loaded or mutated here.
+ * Pure source-snapshot seam. Typed world/environment facts plus canonical
+ * execution/schedule/state snapshots become ephemeral runtime assessment.
  */
 export function generateKairaActivityCandidatesFromCanonicalRuntimeFacts(
   input: KairaActivityCandidateRuntimeCommonInput & {
@@ -131,6 +133,48 @@ export function generateKairaActivityCandidatesFromCanonicalRuntimeFacts(
     dynamicState: input.dynamicState,
     catalog: input.catalog,
     catalogRuntime,
+    motivationContext: input.motivationContext,
+    learnedPreferences: input.learnedPreferences,
+    recentActivities: input.recentActivities,
+  });
+}
+
+/**
+ * Highest current pure discovery seam. A trusted environment snapshot owns
+ * capability/access/context/risk truth; process/state snapshots only modulate
+ * runtime feasibility. No raw dialogue/world-event text is parsed here.
+ */
+export function generateKairaActivityCandidatesFromEnvironmentForRuntime(
+  input: KairaActivityCandidateRuntimeCommonInput & {
+    kairaInstanceId: string;
+    catalog: KairaActivityCatalogEntry[];
+    environment: KairaActivityEnvironmentSnapshot;
+    activeExecutions: KairaActivityExecutionRecord[];
+    schedules: KairaActivityScheduleRecord[];
+    now: string;
+    maxEnvironmentAgeMinutes?: number;
+    defaultWindowMinutes?: number;
+  },
+): KairaActivityCandidateRuntimeResult {
+  if (!instancePolicy(input.instanceType).autonomousActivityPlanning) return disabledResult();
+
+  const worldFacts = projectKairaActivityEnvironmentSnapshot({
+    kairaInstanceId: input.kairaInstanceId,
+    catalog: input.catalog,
+    snapshot: input.environment,
+    now: input.now,
+    maxAgeMinutes: input.maxEnvironmentAgeMinutes,
+  });
+
+  return generateKairaActivityCandidatesFromCanonicalRuntimeFacts({
+    instanceType: input.instanceType,
+    dynamicState: input.dynamicState,
+    catalog: input.catalog,
+    worldFacts,
+    activeExecutions: input.activeExecutions,
+    schedules: input.schedules,
+    now: input.now,
+    defaultWindowMinutes: input.defaultWindowMinutes,
     motivationContext: input.motivationContext,
     learnedPreferences: input.learnedPreferences,
     recentActivities: input.recentActivities,
