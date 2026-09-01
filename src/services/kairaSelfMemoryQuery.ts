@@ -64,21 +64,24 @@ export function inferFallbackSelfMemoryQuery(
   const text = normalizeSurface(message).toLocaleLowerCase("tr-TR");
   if (!text) return null;
 
-  const explicitSelf = /\b(senin|seninle|sana|kendin|kendi|hayatında|geçmişinde)\b/u.test(text);
+  const userSelf = /\b(ben|benim|bana|beni)\b/u.test(text);
+  const explicitKairaSelf = /\b(senin|seninle|kendin|kendi|hayatında|geçmişinde)\b/u.test(text);
+  if (userSelf && !/\bsenin\b/u.test(text)) return null;
+
   const recallCue = /hatırlıyor musun|hatırladın mı|hatırlıyor muydun|anı(?:n|ların|larını)?|geçmiş(?:in|inde)?|başına gel|yaşadığın|yaşamış mıydın|olmuş muydu/u.test(text);
   const factCue = /en sevdiğin|sevdiğin|tercih ettiğin|favori(?:n)?|hangi .* seversin|ne seversin|neyi seversin|neye inanırsın|nasıl birisin/u.test(text);
 
-  if (explicitSelf && factCue) {
+  if (explicitKairaSelf && factCue) {
     return { surface: normalizeSurface(message), scope: "self_fact", confidence: 0.88 };
   }
-  if (explicitSelf && recallCue) {
+  if (explicitKairaSelf && recallCue) {
     return {
       surface: normalizeSurface(message),
       scope: "autobiographical_memory",
       confidence: 0.9,
     };
   }
-  if (explicitSelf && event.discourseAct === "recall_request") {
+  if (explicitKairaSelf && event.discourseAct === "recall_request") {
     return { surface: normalizeSurface(message), scope: "any", confidence: 0.8 };
   }
   return null;
