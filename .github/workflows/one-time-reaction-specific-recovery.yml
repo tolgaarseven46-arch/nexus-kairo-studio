@@ -24,6 +24,14 @@ jobs:
           p.write_text(p.read_text().replace('${', r'\${'))
           PY
           node scripts/one-time-reaction-specific-recovery.cjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/services/relationshipConditionedRecovery.ts')
+          s = p.read_text()
+          s = s.replace('if (elapsed <= 0) {', 'if (elapsed < 1) {')
+          s = s.replace('reaction === "hurt" && injury < 12 && state.stress <= 25', 'reaction === "hurt" && injury < 2 && state.stress <= 25')
+          p.write_text(s)
+          PY
       - name: Focused recovery regressions
         run: npx vitest run src/services/relationshipConditionedRecovery.test.ts src/services/kairaReactionSpecificRecoveryAuthorityContracts.test.ts src/services/kairaTemperamentRecoveryPersistenceWiringContracts.test.ts src/services/kairaRelationshipQualitativeReactionCharacterization.test.ts
       - name: Architecture contracts
