@@ -45,19 +45,24 @@ replaceOnce(
   `    const knowledgeProfileLoad =\n      knowledgeQuery && kairaPolicy.persistentIdentity\n        ? await loadKairaKnowledgeProfileResult(kairaInstance.instanceId)\n        : null;\n    const knowledgeProfile =\n      knowledgeProfileLoad?.status === "loaded" ? knowledgeProfileLoad.profile : null;\n    const epistemicAccess = knowledgeQuery\n      ? {\n          query: {\n            kairaInstanceId: kairaInstance.instanceId,\n            ...(knowledgeQuery.conceptId ? { conceptId: knowledgeQuery.conceptId } : {}),\n            surface: knowledgeQuery.surface,\n          },\n          decision:\n            knowledgeProfileLoad?.status === "unavailable"\n              ? unavailableKairaKnowledgeDecision()\n              : evaluateKairaKnowledge(\n                  {\n                    kairaInstanceId: kairaInstance.instanceId,\n                    ...(knowledgeQuery.conceptId ? { conceptId: knowledgeQuery.conceptId } : {}),\n                    surface: knowledgeQuery.surface,\n                  },\n                  knowledgeProfile,\n                ),\n        }\n      : null;`,
 );
 
-// 4) Runtime contract locks fail-closed ordering and forbids the old fail-open catch.
+// 4) Runtime contract locks the typed loader, fail-closed outage handling and final authority ordering.
 const runtimeTestPath = 'src/services/kairaEpistemicRuntimeContracts.test.ts';
 let runtimeTest = read(runtimeTestPath);
+runtimeTest = runtimeTest.replace(
+  "expect(server).toContain('loadKairaKnowledgeProfile(kairaInstance.instanceId)');",
+  "expect(server).toContain('loadKairaKnowledgeProfileResult(kairaInstance.instanceId)');",
+);
 const runtimeNeedle = '  it("does not read Firestore knowledge profiles for ordinary non-knowledge turns", () => {';
 if (!runtimeTest.includes('fails closed when the instance knowledge profile cannot be read')) {
+  if (!runtimeTest.includes(runtimeNeedle)) throw new Error('Runtime contract insertion point not found');
   runtimeTest = runtimeTest.replace(
     runtimeNeedle,
     `  it("fails closed when the instance knowledge profile cannot be read", () => {\n    const server = readFileSync("server.ts", "utf8");\n    expect(server).toContain('await loadKairaKnowledgeProfileResult(kairaInstance.instanceId)');\n    expect(server).toContain('knowledgeProfileLoad?.status === "unavailable"');\n    expect(server).toContain('unavailableKairaKnowledgeDecision()');\n    expect(server).not.toContain('loadKairaKnowledgeProfile(kairaInstance.instanceId).catch(() => null)');\n  });\n\n${runtimeNeedle}`,
   );
-  write(runtimeTestPath, runtimeTest);
 }
+write(runtimeTestPath, runtimeTest);
 
-// 5) Store regression proves typed distinction between missing profile and read outage.
+// 5) Store regression proves typed distinction between a genuinely missing profile and a read outage.
 const storeTestPath = 'src/services/kairaKnowledgeProfileStore.test.ts';
 let storeTest = read(storeTestPath);
 storeTest = storeTest.replace(
@@ -65,9 +70,9 @@ storeTest = storeTest.replace(
   '  loadKairaKnowledgeProfile,\n  loadKairaKnowledgeProfileResult,\n  saveKairaKnowledgeProfile,',
 );
 if (!storeTest.includes('distinguishes a missing profile from an unavailable profile store')) {
-  storeTest = storeTest.replace(
-    '\n});\n',
-    `\n  it("distinguishes a missing profile from an unavailable profile store", async () => {\n    firestore.getDoc.mockResolvedValueOnce({ exists: () => false });\n    await expect(loadKairaKnowledgeProfileResult("kaira_individual_01")).resolves.toEqual({\n      status: "missing",\n      profile: null,\n    });\n\n    firestore.getDoc.mockRejectedValueOnce(new Error("firestore unavailable"));\n    await expect(loadKairaKnowledgeProfileResult("kaira_individual_01")).resolves.toEqual({\n      status: "unavailable",\n      profile: null,\n    });\n  });\n});\n`,
-  );
-  write(storeTestPath, storeTest);
+  const closing = storeTest.lastIndexOf('\n});\n');
+  if (closing < 0) throw new Error('Store contract describe closing not found');
+  const test = `\n  it("distinguishes a missing profile from an unavailable profile store", async () => {\n    firestore.getDoc.mockResolvedValueOnce({ exists: () => false });\n    await expect(loadKairaKnowledgeProfileResult("kaira_individual_01")).resolves.toEqual({\n      status: "missing",\n      profile: null,\n    });\n\n    firestore.getDoc.mockRejectedValueOnce(new Error("firestore unavailable"));\n    await expect(loadKairaKnowledgeProfileResult("kaira_individual_01")).resolves.toEqual({\n      status: "unavailable",\n      profile: null,\n    });\n  });\n`;
+  storeTest = storeTest.slice(0, closing) + test + storeTest.slice(closing);
 }
+write(storeTestPath, storeTest);
