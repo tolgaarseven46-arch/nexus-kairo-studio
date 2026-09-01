@@ -13,6 +13,7 @@ describe("Kaira contract registry", () => {
   it("keeps the core producer-consumer seams explicitly registered", () => {
     for (const id of [
       "semantic-event",
+      "dialogue-sequence",
       "entity-resolution",
       "canonical-world-event",
       "event-modality",
@@ -38,11 +39,34 @@ describe("Kaira contract registry", () => {
       "relationship-state",
       "state-to-behavior",
       "learned-policy-boundary",
+      "dyadic-language-alignment",
       "response-plan",
       "retrieval-to-response",
     ]) {
       expect(activeContractVersion(id)?.status).toBe("active");
     }
+  });
+
+  it("activates canonical SemanticEvent v2 for dialogue consumers", () => {
+    const semantic = activeContractVersion("semantic-event");
+    expect(semantic?.version).toBe(2);
+    expect(semantic?.ownerLayer).toBe("language-understanding");
+    expect(semantic?.consumerLayers).toContain("dialogue-decision");
+    expect(semantic?.consumerLayers).toContain("kdm");
+    expect(
+      KAIRA_CONTRACT_REGISTRY.find(
+        (item) => item.id === "semantic-event" && item.version === 1,
+      )?.status,
+    ).toBe("superseded");
+  });
+
+  it("keeps dialogue sequence below canonical semantics and social behavior authority", () => {
+    const sequence = activeContractVersion("dialogue-sequence");
+    expect(sequence?.version).toBe(1);
+    expect(sequence?.ownerLayer).toBe("dialogue-decision");
+    expect(sequence?.consumerLayers).toContain("response-plan");
+    expect(sequence?.consumerLayers).not.toContain("relationship-state");
+    expect(sequence?.consumerLayers).not.toContain("language-understanding");
   });
 
   it("activates Canonical World Event v3 after explicit semantic revision", () => {
@@ -118,6 +142,16 @@ describe("Kaira contract registry", () => {
     expect(identity?.consumerLayers).toContain("llm-verbalizer");
     expect(identity?.consumerLayers).not.toContain("future-autobiographical-memory");
     expect(identity?.consumerLayers).not.toContain("relationship-state");
+  });
+
+  it("keeps dyadic language alignment HOW-only and below behavior authority", () => {
+    const alignment = activeContractVersion("dyadic-language-alignment");
+    expect(alignment?.version).toBe(1);
+    expect(alignment?.ownerLayer).toBe("language-memory");
+    expect(alignment?.consumerLayers).toContain("local-verbalizer");
+    expect(alignment?.consumerLayers).toContain("llm-verbalizer");
+    expect(alignment?.consumerLayers).not.toContain("relationship-state");
+    expect(alignment?.consumerLayers).not.toContain("behavior-policy");
   });
 
   it("registers the response plan as the verbalizer/validator behavior seam", () => {
