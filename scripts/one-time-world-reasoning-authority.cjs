@@ -73,11 +73,12 @@ write(mixedPath, mixed);
 
 const twentyPath = 'src/services/kairaTwentyTurnEndToEndContracts.test.ts';
 let twenty = read(twentyPath);
-const oldTwentyCall = '    const guard = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved);';
-const newTwentyCall = '    const guard = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved, { appraisal, policy });';
-if (!twenty.includes(oldTwentyCall)) throw new Error('No legacy twenty-turn guard calls found');
-twenty = twenty.split(oldTwentyCall).join(newTwentyCall);
-if (twenty.includes(oldTwentyCall)) throw new Error('Legacy twenty-turn guard call remains after migration');
+for (const draft of ['Ali yarın istifa edecek.', 'Ali istifa edecek.']) {
+  const oldCall = `    const guard = enforceWorldModelRecallResponse("${draft}", retrieved);`;
+  const newCall = `    const guard = enforceWorldModelRecallResponse("${draft}", retrieved, { appraisal, policy });`;
+  if (twenty.includes(oldCall)) twenty = twenty.split(oldCall).join(newCall);
+}
+if (/enforceWorldModelRecallResponse\([^\n]+, retrieved\);/.test(twenty)) throw new Error('Legacy two-argument twenty-turn guard call remains');
 write(twentyPath, twenty);
 
 const parityPath = 'src/services/kairaLocalAiParityContracts.test.ts';
