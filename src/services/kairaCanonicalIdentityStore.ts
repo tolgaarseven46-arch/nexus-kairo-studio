@@ -11,6 +11,11 @@ import {
   type KairaCanonicalIdentityState,
 } from "./kairaCanonicalIdentity";
 import { retainKairaAutobiographicalMemories } from "./kairaAutobiographicalRetention";
+import {
+  applyKairaSelfFactRevisionDecision,
+  evaluateKairaSelfFactRevision,
+  type KairaSelfFactRevisionDecision,
+} from "./kairaSelfFactRevision";
 
 const CANONICAL_IDENTITY_COLLECTION = "kairaCanonicalIdentities";
 
@@ -28,6 +33,9 @@ function cloneMemory(memory: KairaAutobiographicalMemory): KairaAutobiographical
     emotions: memory.emotions.map((emotion) => ({ ...emotion })),
     ...(memory.sourceWorldObservationIds
       ? { sourceWorldObservationIds: [...memory.sourceWorldObservationIds] }
+      : {}),
+    ...(memory.selfRevisionEvidence
+      ? { selfRevisionEvidence: { ...memory.selfRevisionEvidence } }
       : {}),
   };
 }
@@ -137,11 +145,7 @@ export type KairaAutobiographicalAppendResult =
   | { status: "missing_identity"; memoryId: null }
   | { status: "ephemeral"; memoryId: null };
 
-/**
- * Atomic, instance-owned append for lived autobiography.
- * The transaction prevents concurrent turns from overwriting one another and
- * the consolidation key makes retries idempotent.
- */
+/** Atomic, instance-owned append for lived autobiography. */
 export async function appendKairaAutobiographicalMemoryAtomic(
   input: Pick<KairaInstanceContext, "instanceId" | "instanceType">,
   memory: KairaAutobiographicalMemory,
@@ -161,32 +165,21 @@ export async function appendKairaAutobiographicalMemoryAtomic(
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists()) return { status: "missing_identity", memoryId: null } as const;
 
-    const current = stateFromData(
-      ownerId,
-      snapshot.data() as Partial<KairaCanonicalIdentityState>,
-    );
+    const current = stateFromData(ownerId, snapshot.data() as Partial<KairaCanonicalIdentityState>);
     if (resolveKairaInstanceContext({ instanceId: current.kairaInstanceId }).instanceId !== ownerId) {
       throw new Error("Canonical identity owner mismatch");
     }
     const currentIssues = validateKairaCanonicalIdentity(current);
     if (currentIssues.length) {
-      throw new Error(
-        `Invalid existing Kaira canonical identity: ${currentIssues.map((issue) => issue.invariant).join(", ")}`,
-      );
+      throw new Error(`Invalid existing Kaira canonical identity: ${currentIssues.map((issue) => issue.invariant).join(", ")}`);
     }
 
     const duplicate = current.autobiographicalMemories.find((existing) =>
       existing.id === memory.id ||
       (memory.consolidationKey && existing.consolidationKey === memory.consolidationKey) ||
-      Boolean(
-        memory.sourceWorldObservationIds?.some((sourceId) =>
-          existing.sourceWorldObservationIds?.includes(sourceId),
-        ),
-      ),
+      Boolean(memory.sourceWorldObservationIds?.some((sourceId) => existing.sourceWorldObservationIds?.includes(sourceId))),
     );
-    if (duplicate) {
-      return { status: "duplicate", memoryId: duplicate.id } as const;
-    }
+    if (duplicate) return { status: "duplicate", memoryId: duplicate.id } as const;
 
     const next: KairaCanonicalIdentityState = {
       ...current,
@@ -197,15 +190,50 @@ export async function appendKairaAutobiographicalMemoryAtomic(
     };
     const issues = validateKairaCanonicalIdentity(next);
     if (issues.length) {
-      throw new Error(
-        `Invalid Kaira canonical identity append: ${issues.map((issue) => issue.invariant).join(", ")}`,
-      );
+      throw new Error(`Invalid Kaira canonical identity append: ${issues.map((issue) => issue.invariant).join(", ")}`);
     }
 
-    transaction.set(ref, {
-      ...next,
-      updatedAt: new Date().toISOString(),
-    });
+    transaction.set(ref, { ...next, updatedAt: new Date().toISOString() });
     return { status: "appended", memoryId: memory.id } as const;
+  });
+}
+
+export type KairaSelfFactRevisionApplyResult =
+  | { status: "applied"; decision: KairaSelfFactRevisionDecision }
+  | { status: "unchanged"; decision: KairaSelfFactRevisionDecision }
+  | { status: "missing_identity"; decision: null }
+  | { status: "ephemeral"; decision: null };
+
+/**
+ * Re-evaluates evidence inside the transaction before mutating self-facts.
+ * One stale/precomputed proposal therefore cannot overwrite a newer identity.
+ */
+export async function applyKairaSelfFactRevisionAtomic(
+  input: Pick<KairaInstanceContext, "instanceId" | "instanceType">,
+  factKey: string,
+): Promise<KairaSelfFactRevisionApplyResult> {
+  const instance = canonicalIdentityContext(input);
+  const policy = instancePolicy(instance.instanceType);
+  if (!policy.persistentIdentity || !policy.persistentAutobiography || !policy.canConsolidateCoreMemories) {
+    return { status: "ephemeral", decision: null };
+  }
+  const ownerId = instance.instanceId;
+  const ref = doc(db, CANONICAL_IDENTITY_COLLECTION, ownerId);
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists()) return { status: "missing_identity", decision: null } as const;
+    const current = stateFromData(ownerId, snapshot.data() as Partial<KairaCanonicalIdentityState>);
+    const issues = validateKairaCanonicalIdentity(current);
+    if (issues.length) throw new Error(`Invalid existing Kaira canonical identity: ${issues.map((issue) => issue.invariant).join(", ")}`);
+
+    const decision = evaluateKairaSelfFactRevision(current, factKey);
+    if (decision.status !== "revised" && decision.status !== "reinforced") {
+      return { status: "unchanged", decision } as const;
+    }
+    const next = applyKairaSelfFactRevisionDecision(current, decision);
+    const nextIssues = validateKairaCanonicalIdentity(next);
+    if (nextIssues.length) throw new Error(`Invalid Kaira self-fact revision: ${nextIssues.map((issue) => issue.invariant).join(", ")}`);
+    transaction.set(ref, { ...next, updatedAt: new Date().toISOString() });
+    return { status: "applied", decision } as const;
   });
 }
