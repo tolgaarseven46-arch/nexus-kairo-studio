@@ -18,6 +18,12 @@ export type KairaActivityPermissionStatus =
   | "granted"
   | "denied";
 
+/** Process-owned immutable experience target fixed when the activity is planned. */
+export interface KairaActivityExecutionExperienceSubject {
+  preferenceKey: string;
+  experiencedValue: string | number | boolean;
+}
+
 export interface KairaActivityExecutionRecord {
   schemaVersion: 1;
   ownerUserId: string;
@@ -25,6 +31,7 @@ export interface KairaActivityExecutionRecord {
   instanceType: KairaInstanceContext["instanceType"];
   activityId: string;
   activityType: string;
+  experienceSubject?: KairaActivityExecutionExperienceSubject;
   phase: KairaActivityExecutionPhase;
   permissionPolicy: KairaActivityPermissionPolicy;
   permissionStatus: KairaActivityPermissionStatus;
@@ -80,6 +87,11 @@ const canonicalOwner = (value: string) =>
     .replace(/[^a-zA-Z0-9_@.+:-]+/g, "_")
     .slice(0, 160);
 
+const validExperienceValue = (value: unknown): value is string | number | boolean =>
+  (typeof value === "string" && Boolean(value.trim())) ||
+  (typeof value === "number" && Number.isFinite(value)) ||
+  typeof value === "boolean";
+
 const terminal = (phase: KairaActivityExecutionPhase) =>
   phase === "completed" || phase === "cancelled" || phase === "failed";
 
@@ -89,6 +101,7 @@ export function createKairaActivityExecution(input: {
   instanceType: KairaInstanceContext["instanceType"];
   activityId: string;
   activityType: string;
+  experienceSubject?: KairaActivityExecutionExperienceSubject;
   permissionPolicy?: KairaActivityPermissionPolicy;
   now: string;
 }): KairaActivityExecutionRecord {
@@ -109,6 +122,22 @@ export function createKairaActivityExecution(input: {
     throw new Error("Invalid Kaira activity execution seed");
   }
 
+  let experienceSubject: KairaActivityExecutionExperienceSubject | undefined;
+  if (input.experienceSubject) {
+    const preferenceKey = canonicalKey(input.experienceSubject.preferenceKey);
+    const experiencedValue = input.experienceSubject.experiencedValue;
+    if (!preferenceKey || !validExperienceValue(experiencedValue)) {
+      throw new Error("Invalid Kaira activity execution experience subject");
+    }
+    experienceSubject = {
+      preferenceKey,
+      experiencedValue:
+        typeof experiencedValue === "string"
+          ? experiencedValue.trim().slice(0, 160)
+          : experiencedValue,
+    };
+  }
+
   const permissionPolicy = input.permissionPolicy || "none";
   return {
     schemaVersion: 1,
@@ -117,6 +146,7 @@ export function createKairaActivityExecution(input: {
     instanceType: instance.instanceType,
     activityId,
     activityType,
+    ...(experienceSubject ? { experienceSubject } : {}),
     phase: "planned",
     permissionPolicy,
     permissionStatus: permissionPolicy === "owner_approval" ? "pending" : "not_required",
