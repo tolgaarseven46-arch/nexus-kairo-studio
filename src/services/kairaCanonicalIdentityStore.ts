@@ -1,10 +1,11 @@
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, runTransaction, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import {
   instancePolicy,
   resolveKairaInstanceContext,
   type KairaInstanceContext,
 } from "./kairaInstanceContext";
+import type { KairaAutobiographicalMemory } from "./kairaIdentityContracts";
 import {
   validateKairaCanonicalIdentity,
   type KairaCanonicalIdentityState,
@@ -16,6 +17,32 @@ function canonicalIdentityContext(
   input: Pick<KairaInstanceContext, "instanceId" | "instanceType">,
 ): KairaInstanceContext {
   return resolveKairaInstanceContext(input);
+}
+
+function cloneMemory(memory: KairaAutobiographicalMemory): KairaAutobiographicalMemory {
+  return {
+    ...memory,
+    participantIds: [...memory.participantIds],
+    facts: [...memory.facts],
+    emotions: memory.emotions.map((emotion) => ({ ...emotion })),
+    ...(memory.sourceWorldObservationIds
+      ? { sourceWorldObservationIds: [...memory.sourceWorldObservationIds] }
+      : {}),
+  };
+}
+
+function stateFromData(
+  ownerId: string,
+  data: Partial<KairaCanonicalIdentityState>,
+): KairaCanonicalIdentityState {
+  return {
+    kairaInstanceId: String(data.kairaInstanceId || ownerId),
+    schemaVersion: 1,
+    selfFacts: Array.isArray(data.selfFacts) ? data.selfFacts.map((fact) => ({ ...fact })) : [],
+    autobiographicalMemories: Array.isArray(data.autobiographicalMemories)
+      ? data.autobiographicalMemories.map(cloneMemory)
+      : [],
+  };
 }
 
 export function canonicalIdentityOwnerId(
@@ -39,12 +66,7 @@ export async function saveKairaCanonicalIdentity(
     ...state,
     kairaInstanceId: resolveKairaInstanceContext({ instanceId: state.kairaInstanceId }).instanceId,
     selfFacts: state.selfFacts.map((fact) => ({ ...fact })),
-    autobiographicalMemories: state.autobiographicalMemories.map((memory) => ({
-      ...memory,
-      participantIds: [...memory.participantIds],
-      facts: [...memory.facts],
-      emotions: memory.emotions.map((emotion) => ({ ...emotion })),
-    })),
+    autobiographicalMemories: state.autobiographicalMemories.map(cloneMemory),
   };
 
   if (normalized.kairaInstanceId !== ownerId) {
@@ -74,16 +96,7 @@ export async function loadKairaCanonicalIdentity(
   const snapshot = await getDoc(doc(db, CANONICAL_IDENTITY_COLLECTION, ownerId));
   if (!snapshot.exists()) return null;
 
-  const data = snapshot.data() as Partial<KairaCanonicalIdentityState>;
-  const state: KairaCanonicalIdentityState = {
-    kairaInstanceId: String(data.kairaInstanceId || ownerId),
-    schemaVersion: 1,
-    selfFacts: Array.isArray(data.selfFacts) ? data.selfFacts : [],
-    autobiographicalMemories: Array.isArray(data.autobiographicalMemories)
-      ? data.autobiographicalMemories
-      : [],
-  };
-
+  const state = stateFromData(ownerId, snapshot.data() as Partial<KairaCanonicalIdentityState>);
   if (resolveKairaInstanceContext({ instanceId: state.kairaInstanceId }).instanceId !== ownerId) {
     return null;
   }
@@ -113,4 +126,83 @@ export async function loadKairaCanonicalIdentityResult(
   } catch {
     return { status: "unavailable", state: null };
   }
+}
+
+export type KairaAutobiographicalAppendResult =
+  | { status: "appended"; memoryId: string }
+  | { status: "duplicate"; memoryId: string }
+  | { status: "missing_identity"; memoryId: null }
+  | { status: "ephemeral"; memoryId: null };
+
+/**
+ * Atomic, instance-owned append for lived autobiography.
+ * The transaction prevents concurrent turns from overwriting one another and
+ * the consolidation key makes retries idempotent.
+ */
+export async function appendKairaAutobiographicalMemoryAtomic(
+  input: Pick<KairaInstanceContext, "instanceId" | "instanceType">,
+  memory: KairaAutobiographicalMemory,
+): Promise<KairaAutobiographicalAppendResult> {
+  const instance = canonicalIdentityContext(input);
+  const policy = instancePolicy(instance.instanceType);
+  if (!policy.persistentIdentity || !policy.persistentAutobiography || !policy.canConsolidateCoreMemories) {
+    return { status: "ephemeral", memoryId: null };
+  }
+  if (memory.origin !== "lived") {
+    throw new Error("Atomic autobiographical append only accepts lived memories");
+  }
+
+  const ownerId = instance.instanceId;
+  const ref = doc(db, CANONICAL_IDENTITY_COLLECTION, ownerId);
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists()) return { status: "missing_identity", memoryId: null } as const;
+
+    const current = stateFromData(
+      ownerId,
+      snapshot.data() as Partial<KairaCanonicalIdentityState>,
+    );
+    if (resolveKairaInstanceContext({ instanceId: current.kairaInstanceId }).instanceId !== ownerId) {
+      throw new Error("Canonical identity owner mismatch");
+    }
+    const currentIssues = validateKairaCanonicalIdentity(current);
+    if (currentIssues.length) {
+      throw new Error(
+        `Invalid existing Kaira canonical identity: ${currentIssues.map((issue) => issue.invariant).join(", ")}`,
+      );
+    }
+
+    const duplicate = current.autobiographicalMemories.find((existing) =>
+      existing.id === memory.id ||
+      (memory.consolidationKey && existing.consolidationKey === memory.consolidationKey) ||
+      Boolean(
+        memory.sourceWorldObservationIds?.some((sourceId) =>
+          existing.sourceWorldObservationIds?.includes(sourceId),
+        ),
+      ),
+    );
+    if (duplicate) {
+      return { status: "duplicate", memoryId: duplicate.id } as const;
+    }
+
+    const next: KairaCanonicalIdentityState = {
+      ...current,
+      autobiographicalMemories: [
+        ...current.autobiographicalMemories.map(cloneMemory),
+        cloneMemory(memory),
+      ],
+    };
+    const issues = validateKairaCanonicalIdentity(next);
+    if (issues.length) {
+      throw new Error(
+        `Invalid Kaira canonical identity append: ${issues.map((issue) => issue.invariant).join(", ")}`,
+      );
+    }
+
+    transaction.set(ref, {
+      ...next,
+      updatedAt: new Date().toISOString(),
+    });
+    return { status: "appended", memoryId: memory.id } as const;
+  });
 }
