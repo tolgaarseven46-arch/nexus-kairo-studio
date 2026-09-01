@@ -1,6 +1,10 @@
 import { doc, getDoc, runTransaction } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { instancePolicy, resolveKairaInstanceContext } from "./kairaInstanceContext";
+import {
+  instancePolicy,
+  resolveKairaInstanceContext,
+  type KairaInstanceContext,
+} from "./kairaInstanceContext";
 import {
   normalizeKairaActivityEnvironmentSnapshot,
   type KairaActivityEnvironmentSnapshot,
@@ -27,13 +31,17 @@ const semanticSnapshot = (snapshot: KairaActivityEnvironmentSnapshot) =>
  */
 export async function saveKairaActivityEnvironmentSnapshot(input: {
   kairaInstanceId: string;
+  instanceType: KairaInstanceContext["instanceType"];
   authority: "kaira_environment_controller";
   snapshot: KairaActivityEnvironmentSnapshot;
 }): Promise<KairaActivityEnvironmentSaveResult> {
   if (input.authority !== "kaira_environment_controller") {
     throw new Error("Invalid Kaira activity environment authority");
   }
-  const instance = resolveKairaInstanceContext({ instanceId: input.kairaInstanceId });
+  const instance = resolveKairaInstanceContext({
+    instanceId: input.kairaInstanceId,
+    instanceType: input.instanceType,
+  });
   if (!instancePolicy(instance.instanceType).autonomousActivityPlanning) {
     throw new Error("Kaira instance cannot own activity environment");
   }
@@ -70,10 +78,14 @@ export async function saveKairaActivityEnvironmentSnapshot(input: {
   });
 }
 
-export async function loadKairaActivityEnvironmentSnapshot(
-  kairaInstanceId: string,
-): Promise<KairaActivityEnvironmentSnapshot | null> {
-  const instance = resolveKairaInstanceContext({ instanceId: kairaInstanceId });
+export async function loadKairaActivityEnvironmentSnapshot(input: {
+  kairaInstanceId: string;
+  instanceType: KairaInstanceContext["instanceType"];
+}): Promise<KairaActivityEnvironmentSnapshot | null> {
+  const instance = resolveKairaInstanceContext({
+    instanceId: input.kairaInstanceId,
+    instanceType: input.instanceType,
+  });
   if (!instancePolicy(instance.instanceType).autonomousActivityPlanning) return null;
   const snapshot = await getDoc(doc(db, COLLECTION, instance.instanceId));
   if (!snapshot.exists()) return null;
