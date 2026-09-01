@@ -1,4 +1,4 @@
-// Canonical social routines are sequence moves; downstream dialogue planning must not collapse them back to generic raw-text reactions.
+// Canonical social routines, including reciprocal routines, are sequence moves; downstream dialogue planning must consume the supplied SemanticEvent instead of reparsing raw text.
 import { describe, expect, it } from "vitest";
 import { interpretSemanticEvent } from "./semanticEventEngine";
 import {
