@@ -144,6 +144,20 @@ describe("Kaira contract registry", () => {
     expect(identity?.consumerLayers).not.toContain("relationship-state");
   });
 
+  it("activates profile-aware epistemic access v2", () => {
+    const epistemic = activeContractVersion("epistemic-access");
+    expect(epistemic?.version).toBe(2);
+    expect(epistemic?.ownerLayer).toBe("epistemic-gate");
+    expect(epistemic?.consumerLayers).toContain("response-generation");
+    expect(epistemic?.consumerLayers).toContain("observability");
+    expect(epistemic?.consumerLayers).not.toContain("relationship-state");
+    expect(
+      KAIRA_CONTRACT_REGISTRY.find(
+        (item) => item.id === "epistemic-access" && item.version === 1,
+      )?.status,
+    ).toBe("superseded");
+  });
+
   it("keeps dyadic language alignment HOW-only and below behavior authority", () => {
     const alignment = activeContractVersion("dyadic-language-alignment");
     expect(alignment?.version).toBe(1);
