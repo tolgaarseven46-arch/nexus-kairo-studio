@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   patch:
-    if: github.event.head_commit.message == 'chore(kaira): stage self-memory runtime patch'
+    if: "${{ github.event.head_commit.message == 'chore(kaira): stage self-memory runtime patch' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
