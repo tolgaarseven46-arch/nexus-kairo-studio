@@ -1,3 +1,4 @@
+// Other-initiated conversational repair is an adjacency relation: a confusion/challenge may repair only an immediately prior Kaira turn, never raw text in isolation.
 import { describe, expect, it } from "vitest";
 import {
   buildDialogueDecisionInstruction,
