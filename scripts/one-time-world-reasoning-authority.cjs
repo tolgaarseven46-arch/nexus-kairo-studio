@@ -160,3 +160,14 @@ policyIntegration = replaceRequired(
   'policy final enforcement contract',
 );
 write(policyIntegrationPath, policyIntegration);
+
+// 6) Epistemic final-authority contract follows the same canonical world seam.
+const epistemicRuntimePath = 'src/services/kairaEpistemicRuntimeContracts.test.ts';
+let epistemicRuntime = read(epistemicRuntimePath);
+epistemicRuntime = replaceRequired(
+  epistemicRuntime,
+  'const candidateWorld = server.indexOf("const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents)");',
+  'const candidateWorld = server.indexOf("const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents, worldReasoningContext)");',
+  'epistemic final authority world seam',
+);
+write(epistemicRuntimePath, epistemicRuntime);
