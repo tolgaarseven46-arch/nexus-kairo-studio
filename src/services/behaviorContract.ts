@@ -29,7 +29,10 @@ export function buildBehaviorContract(
   const conflict = Number(relationship?.conflictScore ?? trace?.relationship?.conflictScore ?? 0);
   const repairProgress = Number(relationship?.repairProgress ?? trace?.relationship?.repairProgress ?? 0);
   const repairAttempts = Number(relationship?.repairAttempts ?? trace?.relationship?.repairAttempts ?? 0);
-  const unresolvedDamage = hurt >= 20 || conflict >= 20 || repairProgress > 0 || state !== "active";
+  // repairProgress is positive recovery evidence, not damage by itself. In active,
+  // low-hurt relationships it commonly grows after normal positive turns; treating
+  // it as unresolved damage made early conversations falsely distant.
+  const unresolvedDamage = hurt >= 20 || conflict >= 20 || state !== "active";
   const stopTalking = semanticEvent?.stopTalking === true;
   const stopQuestions = semanticEvent?.stopQuestions === true;
   const reasons: string[] = [];
