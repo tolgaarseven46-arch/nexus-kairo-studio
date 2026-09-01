@@ -35,6 +35,14 @@ export interface KairaAutobiographicalMemory {
   salience: number;
   sensitivity: KairaMemorySensitivity;
   canonical: true;
+  /**
+   * Lived memories retain provenance to the canonical world observation that
+   * caused consolidation. The autobiography stores Kaira's lived projection,
+   * not a second copy of the world-model record.
+   */
+  sourceWorldObservationIds?: string[];
+  /** Stable idempotency key for consolidation of one lived episode. */
+  consolidationKey?: string;
   /** Canonical memory stores facts, never a finished prose story. */
   narrationText?: never;
 }
