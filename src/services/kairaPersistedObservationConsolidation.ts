@@ -61,7 +61,7 @@ async function maybeApplySelfRevision(
 function selectAutobiographicalCandidate(input: {
   instance: KairaInstanceContext;
   observation: WorldEventObservation;
-  dynamicStateAfter: DroitDynamicState;
+  dynamicStateAfter?: DroitDynamicState;
   activityExperienceReceipt?: KairaActivityExecutionReceipt;
 }): {
   status: string;
@@ -96,6 +96,21 @@ function selectAutobiographicalCandidate(input: {
     };
   }
 
+  if (!input.dynamicStateAfter) {
+    return {
+      status: "skip_missing_dynamic_state",
+      score: 0,
+      reasons: ["social_dynamic_state_required"],
+      memory: null,
+      observability: input.activityExperienceReceipt
+        ? {
+            experiencePreferenceStatus: "rejected",
+            experiencePreferenceReason: "activity_receipt_requires_kaira_activity",
+          }
+        : {},
+    };
+  }
+
   const socialDecision = appraiseLivedMemoryCandidate({
     instance: input.instance,
     observation: input.observation,
@@ -124,7 +139,7 @@ function selectAutobiographicalCandidate(input: {
 export async function consolidatePersistedWorldObservation(input: {
   instance: Pick<KairaInstanceContext, "instanceId" | "instanceType">;
   observation: WorldEventObservation;
-  dynamicStateAfter: DroitDynamicState;
+  dynamicStateAfter?: DroitDynamicState;
   activityExperienceReceipt?: KairaActivityExecutionReceipt;
 }): Promise<KairaPersistedObservationConsolidationResult> {
   const instance = resolveKairaInstanceContext(input.instance);
