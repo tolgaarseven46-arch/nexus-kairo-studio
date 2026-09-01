@@ -76,3 +76,31 @@ if (!storeTest.includes('distinguishes a missing profile from an unavailable pro
   storeTest = storeTest.slice(0, closing) + test + storeTest.slice(closing);
 }
 write(storeTestPath, storeTest);
+
+// 6) Existing architecture contracts follow the canonical epistemic observability boundary.
+replaceOnce(
+  'src/services/kairaBehaviorProfileAuthorityContracts.test.ts',
+  'const marker = "worldMemoryGuard, behaviorContract, behaviorProfile, responsePlan";',
+  'const marker = "worldMemoryGuard, epistemicAccess, behaviorContract, behaviorProfile, responsePlan";',
+);
+
+let responsePlanContracts = read('src/services/kairaResponsePlanIntegrationContracts.test.ts');
+responsePlanContracts = responsePlanContracts.replace(
+  'expect(server).toContain("findKairaResponsePlanIssues(planSafeFallback, responsePlan)");',
+  'expect(server).toContain("findKairaResponsePlanIssues(candidateReply, responsePlan)");',
+);
+responsePlanContracts = responsePlanContracts.replace(
+  '/worldMemoryGuard,\\s*responsePlan,\\s*\\}\\),/gu',
+  '/worldMemoryGuard,\\s*epistemicAccess,\\s*responsePlan,\\s*\\}\\),/gu',
+);
+responsePlanContracts = responsePlanContracts.replace(
+  '/worldMemoryGuard,\\s*responsePlan,\\s*timings:/gu',
+  '/worldMemoryGuard,\\s*epistemicAccess,\\s*responsePlan,\\s*timings:/gu',
+);
+write('src/services/kairaResponsePlanIntegrationContracts.test.ts', responsePlanContracts);
+
+replaceOnce(
+  'src/services/kairaWorldStateAppraisalIntegrationContracts.test.ts',
+  'expect(server).toContain("${worldEventMemoryInstruction}\\\\n${worldStateAppraisalInstruction}\\\\n${worldReasoningPolicyInstruction}\\\\n${dialogueInstruction}");',
+  'expect(server).toContain("${worldEventMemoryInstruction}\\\\n${worldStateAppraisalInstruction}\\\\n${worldReasoningPolicyInstruction}\\\\n${epistemicInstruction}\\\\n${dialogueInstruction}");',
+);
