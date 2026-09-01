@@ -8,6 +8,7 @@ const evidenceMemory = (
   factKey: string,
   value: string,
   confidence = 0.9,
+  overrides: Partial<KairaAutobiographicalMemory> = {},
 ): KairaAutobiographicalMemory => ({
   id,
   origin: "lived",
@@ -27,6 +28,7 @@ const evidenceMemory = (
     value,
     confidence,
   },
+  ...overrides,
 });
 
 describe("Kaira self-fact revision contracts", () => {
@@ -66,6 +68,47 @@ describe("Kaira self-fact revision contracts", () => {
     );
     const decision = evaluateKairaSelfFactRevision(state, "preferred_music");
     expect(["insufficient_evidence", "conflicted_evidence"]).toContain(decision.status);
+    expect(decision.fact).toBeNull();
+  });
+
+  it("fails closed when the same fact key changes semantic domain", () => {
+    const state = canonicalIdentityFromSeed(buildKairaIdentityTestFixture("kaira_a"));
+    state.autobiographicalMemories.push(
+      evidenceMemory("m01", "preferred_music", "ambient"),
+      evidenceMemory("m02", "preferred_music", "ambient"),
+      evidenceMemory("m03", "preferred_music", "ambient", 0.9, {
+        selfRevisionEvidence: {
+          factKey: "preferred_music",
+          domain: "belief",
+          value: "ambient",
+          confidence: 0.9,
+        },
+      }),
+    );
+    const decision = evaluateKairaSelfFactRevision(state, "preferred_music");
+    expect(decision.status).toBe("domain_mismatch");
+    expect(decision.fact).toBeNull();
+  });
+
+  it("counts one world observation only once even if duplicate memory records exist", () => {
+    const state = canonicalIdentityFromSeed(buildKairaIdentityTestFixture("kaira_a"));
+    state.autobiographicalMemories.push(
+      evidenceMemory("m01", "preferred_music", "ambient", 0.95, {
+        sourceWorldObservationIds: ["obs_shared"],
+        consolidationKey: "world:shared:1",
+      }),
+      evidenceMemory("m02", "preferred_music", "ambient", 0.95, {
+        sourceWorldObservationIds: ["obs_shared"],
+        consolidationKey: "world:shared:2",
+      }),
+      evidenceMemory("m03", "preferred_music", "ambient", 0.95, {
+        sourceWorldObservationIds: ["obs_unique"],
+        consolidationKey: "world:unique",
+      }),
+    );
+    const decision = evaluateKairaSelfFactRevision(state, "preferred_music");
+    expect(decision.status).toBe("insufficient_evidence");
+    expect(decision.supportCount).toBe(2);
     expect(decision.fact).toBeNull();
   });
 
