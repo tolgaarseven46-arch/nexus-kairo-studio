@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createKairaActivityExecution } from "./kairaActivityExecution";
 import { createKairaActivityPermissionDialogueRequest } from "./kairaActivityPermissionDialogue";
+import { createKairaActivityPermissionSessionPointer } from "./kairaActivityPermissionSessionPointer";
 
 const mocks = vi.hoisted(() => ({
   applyExecution: vi.fn(),
   createRequest: vi.fn(),
   settleRequest: vi.fn(),
+  createPointer: vi.fn(),
+  loadPointer: vi.fn(),
+  clearPointer: vi.fn(),
 }));
 
 vi.mock("./kairaActivityExecutionCoordinator", () => ({
@@ -14,6 +18,11 @@ vi.mock("./kairaActivityExecutionCoordinator", () => ({
 vi.mock("./kairaActivityPermissionDialogueStore", () => ({
   createKairaActivityPermissionRequestAtomic: mocks.createRequest,
   settleKairaActivityPermissionRequestAtomic: mocks.settleRequest,
+}));
+vi.mock("./kairaActivityPermissionSessionPointerStore", () => ({
+  createKairaActivityPermissionSessionPointerAtomic: mocks.createPointer,
+  loadActiveKairaActivityPermissionSessionPointer: mocks.loadPointer,
+  clearKairaActivityPermissionSessionPointerAtomic: mocks.clearPointer,
 }));
 
 import {
@@ -43,15 +52,22 @@ const request = () =>
 beforeEach(() => vi.clearAllMocks());
 
 describe("Kaira activity permission dialogue coordinator contracts", () => {
-  it("persists the exact correlated request opened from execution state", async () => {
-    mocks.createRequest.mockImplementation(async (value) => ({ status: "created", request: value }));
+  it("persists the correlated request then binds the session pointer", async () => {
+    const pending = request();
+    const pointer = createKairaActivityPermissionSessionPointer(pending);
+    mocks.createRequest.mockResolvedValue({ status: "created", request: pending });
+    mocks.createPointer.mockResolvedValue({ status: "created", pointer });
+
     const result = await openKairaActivityPermissionDialogue({
       execution: execution(),
       sessionId: "session_1",
       promptTurnId: "assistant_42",
       now: "2026-09-02T10:01:00.000Z",
     });
-    expect(result.status).toBe("created");
+    expect(result).toMatchObject({
+      request: { status: "created" },
+      pointer: { status: "created", pointer: { status: "active" } },
+    });
     expect(mocks.createRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         activityId: "theatre_01",
@@ -60,6 +76,8 @@ describe("Kaira activity permission dialogue coordinator contracts", () => {
         status: "pending",
       }),
     );
+    expect(mocks.createRequest.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.createPointer.mock.invocationCallOrder[0]);
   });
 
   it("does not touch executor or persistence for an uncorrelated generic yes", async () => {
@@ -74,10 +92,12 @@ describe("Kaira activity permission dialogue coordinator contracts", () => {
     expect(result.status).toBe("unmatched");
     expect(mocks.applyExecution).not.toHaveBeenCalled();
     expect(mocks.settleRequest).not.toHaveBeenCalled();
+    expect(mocks.clearPointer).not.toHaveBeenCalled();
   });
 
-  it("applies canonical execution permission before settling dialogue request", async () => {
+  it("applies canonical permission then settles request and clears its pointer", async () => {
     const pending = request();
+    const pointer = createKairaActivityPermissionSessionPointer(pending);
     mocks.applyExecution.mockResolvedValue({
       execution: {
         status: "applied",
@@ -89,6 +109,8 @@ describe("Kaira activity permission dialogue coordinator contracts", () => {
       status: "granted",
       resolvedAt: now,
     }));
+    mocks.loadPointer.mockResolvedValue(pointer);
+    mocks.clearPointer.mockResolvedValue({ ...pointer, status: "cleared" });
 
     const result = await applyKairaActivityPermissionDialogueReply({
       request: pending,
@@ -112,9 +134,11 @@ describe("Kaira activity permission dialogue coordinator contracts", () => {
     );
     expect(mocks.applyExecution.mock.invocationCallOrder[0])
       .toBeLessThan(mocks.settleRequest.mock.invocationCallOrder[0]);
+    expect(mocks.settleRequest.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.clearPointer.mock.invocationCallOrder[0]);
   });
 
-  it("keeps the dialogue request pending when canonical execution rejects", async () => {
+  it("keeps request and pointer pending when canonical execution rejects", async () => {
     mocks.applyExecution.mockResolvedValue({
       execution: {
         status: "rejected",
@@ -132,9 +156,12 @@ describe("Kaira activity permission dialogue coordinator contracts", () => {
     });
     expect(result.status).toBe("execution_rejected");
     expect(mocks.settleRequest).not.toHaveBeenCalled();
+    expect(mocks.clearPointer).not.toHaveBeenCalled();
   });
 
-  it("can finish request settlement after an exact executor replay", async () => {
+  it("can finish request settlement and pointer cleanup after exact executor replay", async () => {
+    const pending = request();
+    const pointer = createKairaActivityPermissionSessionPointer(pending);
     mocks.applyExecution.mockResolvedValue({
       execution: {
         status: "replayed",
@@ -146,8 +173,11 @@ describe("Kaira activity permission dialogue coordinator contracts", () => {
       status: "granted",
       resolvedAt: now,
     }));
+    mocks.loadPointer.mockResolvedValue(pointer);
+    mocks.clearPointer.mockResolvedValue({ ...pointer, status: "cleared" });
+
     const result = await applyKairaActivityPermissionDialogueReply({
-      request: request(),
+      request: pending,
       replyingUserId: "owner_1",
       sessionId: "session_1",
       previousAssistantTurnId: "assistant_42",
@@ -155,5 +185,6 @@ describe("Kaira activity permission dialogue coordinator contracts", () => {
       now: "2026-09-02T10:03:00.000Z",
     });
     expect(result).toMatchObject({ status: "applied", request: { status: "granted" } });
+    expect(mocks.clearPointer).toHaveBeenCalledTimes(1);
   });
 });
