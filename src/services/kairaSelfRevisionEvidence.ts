@@ -32,3 +32,17 @@ export function normalizeKairaSelfRevisionEvidence(
     confidence: Math.max(0, Math.min(1, confidence)),
   };
 }
+
+export function isCanonicalKairaSelfRevisionEvidence(
+  input?: KairaSelfRevisionEvidence | null,
+): boolean {
+  if (!input) return false;
+  const normalized = normalizeKairaSelfRevisionEvidence(input);
+  return Boolean(
+    normalized &&
+      normalized.factKey === input.factKey &&
+      normalized.domain === input.domain &&
+      normalized.value === input.value &&
+      normalized.confidence === input.confidence,
+  );
+}
