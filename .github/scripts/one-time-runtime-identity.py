@@ -135,8 +135,8 @@ if server.count(import_marker) != 1:
     raise SystemExit(f'import marker count={server.count(import_marker)}')
 server = server.replace(import_marker, import_replacement, 1)
 
-system_marker = 'const system = `Sen ${character.name || "KAIRO"} adlı Droit\'sun. ${speechIdentityPrompt(speech)}\\\n'
-system_replacement = 'const system = `${buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character)}\\n${speechIdentityPrompt(speech)}\\\n'
+system_marker = 'const system = `Sen ${character.name || "KAIRO"} adlı Droit\'sun. ${speechIdentityPrompt(speech)}'
+system_replacement = 'const system = `${buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character)}\\n${speechIdentityPrompt(speech)}'
 if server.count(system_marker) != 1:
     raise SystemExit(f'system marker count={server.count(system_marker)}')
 server = server.replace(system_marker, system_replacement, 1)
