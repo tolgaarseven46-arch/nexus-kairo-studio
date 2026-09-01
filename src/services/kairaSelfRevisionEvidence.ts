@@ -1,6 +1,4 @@
-import type { KairaSelfFactDomain } from "./kairaIdentityContracts";
-
-export type KairaRevisableSelfFactDomain = Extract<KairaSelfFactDomain, "preference" | "belief">;
+export type KairaRevisableSelfFactDomain = "preference" | "belief";
 
 export interface KairaSelfRevisionEvidence {
   factKey: string;
@@ -24,9 +22,7 @@ export function normalizeKairaSelfRevisionEvidence(
   const confidence = Number(input.confidence);
   if (!Number.isFinite(confidence)) return null;
   const value = input.value;
-  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
-    return null;
-  }
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") return null;
   if (typeof value === "number" && !Number.isFinite(value)) return null;
   if (typeof value === "string" && !value.trim()) return null;
   return {
