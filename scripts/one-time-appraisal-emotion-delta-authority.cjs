@@ -2,11 +2,6 @@ const fs = require('fs');
 
 function read(path) { return fs.readFileSync(path, 'utf8'); }
 function write(path, content) { fs.writeFileSync(path, content); }
-function replaceOnce(path, needle, replacement) {
-  const source = read(path);
-  if (!source.includes(needle)) throw new Error(`Target not found in ${path}: ${needle.slice(0, 180)}`);
-  write(path, source.replace(needle, replacement));
-}
 
 // 1) Appraisal owns qualitative emotion-state deltas.
 const appraisalPath = 'src/services/relationshipConditionedAppraisal.ts';
@@ -49,3 +44,19 @@ write('src/services/relationshipConditionedEmotionDelta.test.ts', `import { desc
 
 // 4) Architecture contract: KDM may consume but must not re-derive qualitative deltas.
 write('src/services/kairaRelationshipEmotionDeltaAuthorityContracts.test.ts', `import { describe, expect, it } from "vitest";\nimport { readFileSync } from "node:fs";\n\ndescribe("relationship emotion delta authority contracts", () => {\n  it("keeps qualitative emotion deltas owned by relationship appraisal", () => {\n    const appraisal = readFileSync("src/services/relationshipConditionedAppraisal.ts", "utf8");\n    const kdm = readFileSync("src/services/kdmConsistencyEngine.ts", "utf8");\n    expect(appraisal).toContain("emotionDelta:");\n    expect(appraisal).toContain('reactionTendency === "irritated"');\n    expect(appraisal).toContain('reactionTendency === "hurt"');\n    expect(appraisal).toContain('reactionTendency === "withdrawn"');\n    expect(appraisal).toContain('reactionTendency === "repairing"');\n    expect(kdm).toContain("relationshipAppraisal.emotionDelta");\n    expect(kdm).not.toContain('if (kind === "negative" && targetsKaira) {\\n    stressDelta');\n  });\n});\n`);
+
+// 5) Existing direct appraisal contracts now provide the typed modulation boundary explicitly.
+const existingContractPath = 'src/services/kairaRelationshipConditionedAppraisalContracts.test.ts';
+let existingContract = read(existingContractPath);
+if (!existingContract.includes('const modulation = {')) {
+  existingContract = existingContract.replace(
+    'const internalState = { anger: 10, stress: 20, calmness: 70 };',
+    'const internalState = { anger: 10, stress: 20, calmness: 70 };\nconst modulation = { repeatEscalation: 1, personalityImpact: 1, negativeSensitivity: 1, angerTrait: 50, toleranceMultiplier: 1, forgivenessFactor: 1 };',
+  );
+}
+existingContract = existingContract.replace(/, internalState \}\);/g, ', internalState, modulation });');
+existingContract = existingContract.replace(
+  'internalState: { anger: 95, stress: 90, calmness: 10 } });',
+  'internalState: { anger: 95, stress: 90, calmness: 10 }, modulation });',
+);
+write(existingContractPath, existingContract);
