@@ -125,9 +125,9 @@ export async function saveWorldEventObservation(input: {
   sessionId: string;
   speakerName?: string;
   event: CanonicalWorldEvent;
-}): Promise<void> {
+}): Promise<WorldEventObservation | null> {
   const classification = classifyWorldEventObservation(input.event);
-  if (!classification.persist) return;
+  if (!classification.persist) return null;
 
   const createdAt = new Date().toISOString();
   const userId = scope(input.userId);
@@ -150,17 +150,22 @@ export async function saveWorldEventObservation(input: {
       ? referenceObservation?.id
       : undefined;
 
-  await addDoc(collection(parent, EVENT_COLLECTION), {
+  const persisted: Omit<WorldEventObservation, "id"> = {
     userId,
     kairaInstanceId: instance.instanceId,
     sessionId: input.sessionId,
-    speakerName: input.speakerName || null,
+    ...(input.speakerName ? { speakerName: input.speakerName } : {}),
     kind: classification.kind,
     status: classification.status,
     event,
     createdAt,
     ...(temporalReferenceObservationId ? { temporalReferenceObservationId } : {}),
+  };
+  const ref = await addDoc(collection(parent, EVENT_COLLECTION), {
+    ...persisted,
+    speakerName: input.speakerName || null,
   });
+  return { id: ref.id, ...persisted };
 }
 
 export async function loadRecentWorldEventObservations(
