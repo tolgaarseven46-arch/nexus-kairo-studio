@@ -117,7 +117,8 @@ export function appraiseLivedMemoryCandidate(input: {
   if (!policy.persistentAutobiography || !policy.canConsolidateCoreMemories) {
     return { status: "skip_ephemeral_instance", score: 0, reasons: ["instance_policy"], memory: null };
   }
-  if (!observation.id) {
+  const observationId = observation.id;
+  if (!observationId) {
     return { status: "skip_unpersisted_world_event", score: 0, reasons: ["observation_id_required"], memory: null };
   }
   if (observation.status !== "grounded") {
@@ -156,7 +157,7 @@ export function appraiseLivedMemoryCandidate(input: {
     "current_kaira",
   ]);
   const memory: KairaAutobiographicalMemory = {
-    id: `lived_${observation.id}`,
+    id: `lived_${observationId}`,
     origin: "lived",
     occurredAt: observation.createdAt,
     participantIds: [event.actor?.id, event.target?.id]
@@ -167,8 +168,8 @@ export function appraiseLivedMemoryCandidate(input: {
     salience: score,
     sensitivity: "ordinary",
     canonical: true,
-    sourceWorldObservationIds: [observation.id],
-    consolidationKey: `world:${observation.id}`,
+    sourceWorldObservationIds: [observationId],
+    consolidationKey: `world:${observationId}`,
   };
 
   return { status: "consolidate", score, reasons, memory };
