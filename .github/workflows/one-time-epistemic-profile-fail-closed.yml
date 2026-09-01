@@ -18,17 +18,26 @@ jobs:
       - run: npm install --ignore-scripts
       - name: Apply fail-closed epistemic migration
         run: node scripts/one-time-epistemic-profile-fail-closed.cjs
-      - name: Align final issue authority contract
+      - name: Align final authority contracts
         run: |
           node - <<'NODE'
           const fs = require('fs');
-          const path = 'src/services/kairaResponsePlanIntegrationContracts.test.ts';
-          let source = fs.readFileSync(path, 'utf8');
-          source = source.replace(
+
+          const responsePlanPath = 'src/services/kairaResponsePlanIntegrationContracts.test.ts';
+          let responsePlan = fs.readFileSync(responsePlanPath, 'utf8');
+          responsePlan = responsePlan.replace(
             'expect(server).toContain("finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues])]");',
             'expect(server).toContain("finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues])]");',
           );
-          fs.writeFileSync(path, source);
+          fs.writeFileSync(responsePlanPath, responsePlan);
+
+          const rhythmPath = 'src/services/kairaResponseRhythmIntegrationContracts.test.ts';
+          let rhythm = fs.readFileSync(rhythmPath, 'utf8');
+          rhythm = rhythm.replace(
+            'expect(server).toContain("findKairoResponseRhythmIssues(planSafeFallback, cleanHistory, dialogueDecision.move, speech.relationshipLevel)");',
+            'expect(server).toContain("findKairoResponseRhythmIssues(candidateReply, cleanHistory, dialogueDecision.move, speech.relationshipLevel)");',
+          );
+          fs.writeFileSync(rhythmPath, rhythm);
           NODE
       - name: Focused epistemic regressions
         run: npx vitest run src/services/kairaKnowledgeProfileStore.test.ts src/services/kairaEpistemicGateContracts.test.ts src/services/kairaEpistemicResponsePolicy.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts
@@ -45,7 +54,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/one-time-epistemic-profile-fail-closed.yml scripts/one-time-epistemic-profile-fail-closed.cjs
-          git add server.ts src/services/kairaEpistemicGate.ts src/services/kairaKnowledgeProfileStore.ts src/services/kairaKnowledgeProfileStore.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts src/services/kairaBehaviorProfileAuthorityContracts.test.ts src/services/kairaResponsePlanIntegrationContracts.test.ts src/services/kairaWorldStateAppraisalIntegrationContracts.test.ts
+          git add server.ts src/services/kairaEpistemicGate.ts src/services/kairaKnowledgeProfileStore.ts src/services/kairaKnowledgeProfileStore.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts src/services/kairaBehaviorProfileAuthorityContracts.test.ts src/services/kairaResponsePlanIntegrationContracts.test.ts src/services/kairaWorldStateAppraisalIntegrationContracts.test.ts src/services/kairaResponseRhythmIntegrationContracts.test.ts
           git commit -m "fix(kaira): fail closed on epistemic profile outage"
           git push
-# retry: 4
+# retry: 5
