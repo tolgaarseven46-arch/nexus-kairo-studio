@@ -6,7 +6,7 @@ const serverSource = fs.readFileSync(path.resolve(process.cwd(), 'server.ts'), '
 
 describe('chat idempotency server integration contracts', () => {
   it('claims request identity before language understanding and KDM work', () => {
-    const claimIndex = serverSource.indexOf('claimKairaChatRequest<any>(idempotencyKey)');
+    const claimIndex = serverSource.indexOf('claimCoordinatedKairaChatRequest<any>(idempotencyKey)');
     const languageIndex = serverSource.indexOf('const languageUnderstanding = await resolveServerLanguageUnderstanding', claimIndex);
     const kdmIndex = serverSource.indexOf('analyzeKdmInteraction(', claimIndex);
 
@@ -24,11 +24,11 @@ describe('chat idempotency server integration contracts', () => {
   it('completes both local and AI final responses through one payload gate', () => {
     const occurrences = serverSource.match(/sendChatPayload\(\{/g) ?? [];
     expect(occurrences).toHaveLength(2);
-    expect(serverSource).toContain('completeKairaChatRequest(idempotencyKey, payload)');
+    expect(serverSource).toContain('completeCoordinatedKairaChatRequest(idempotencyKey, payload)');
   });
 
   it('releases an owned claim when the request fails', () => {
-    expect(serverSource).toContain('failKairaChatRequest(idempotencyKey, e)');
+    expect(serverSource).toContain('failCoordinatedKairaChatRequest(idempotencyKey, e)');
     expect(serverSource).toContain('ownsIdempotencyClaim = false;');
   });
 });
