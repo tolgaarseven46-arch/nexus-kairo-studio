@@ -1,0 +1,35 @@
+name: One-time session 0209 fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/oneTimeSession0209Fix.mjs
+      - .github/workflows/one-time-session-0209-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply bounded session fixes
+        run: node scripts/oneTimeSession0209Fix.mjs
+      - name: Run focused regressions
+        run: npx vitest run src/services/kairaSession0209Regression.test.ts src/services/kdmConsistencyEngine.test.ts src/services/kairoDialogueDecisionEngine.test.ts
+      - name: Commit fix and self-clean
+        run: |
+          rm scripts/oneTimeSession0209Fix.mjs
+          rm .github/workflows/one-time-session-0209-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(kaira): preserve reciprocal routines and zero-severity relationship neutrality"
+          git push
