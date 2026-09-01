@@ -139,25 +139,10 @@ function isFirstEmotionalOpening(
     });
 }
 
-function isReciprocalSocialRoutine(
-  userMessage: string,
-  event: SemanticEvent,
-): boolean {
-  const locallyObservedRoutine = interpretSemanticEvent(userMessage).socialRoutine;
-  const raw = userMessage
-    .trim()
-    .toLocaleLowerCase("tr-TR")
-    .replace(/[!?.,…]+$/u, "")
-    .trim();
-  const rawReciprocal =
-    /^(?:naber|nasılsın)(?:\s+(?:kank[a-zçğıöşü]*|kaira|kairo))?$/u.test(raw) ||
-    /^ne\s+yapıyorsun(?:\s+(?:kank[a-zçğıöşü]*|kaira|kairo))?$/u.test(raw);
+function isReciprocalSocialRoutine(event: SemanticEvent): boolean {
   return (
-    rawReciprocal ||
     event.socialRoutine === "how_are_you" ||
-    event.socialRoutine === "what_doing" ||
-    locallyObservedRoutine === "how_are_you" ||
-    locallyObservedRoutine === "what_doing"
+    event.socialRoutine === "what_doing"
   );
 }
 
@@ -223,7 +208,7 @@ export function planDialogueResponse(
     };
   }
 
-  if (isReciprocalSocialRoutine(userMessage, event)) {
+  if (isReciprocalSocialRoutine(event)) {
     return {
       move: "natural_reaction",
       allowFollowUpQuestion: true,

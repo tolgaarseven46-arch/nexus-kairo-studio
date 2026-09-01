@@ -58,4 +58,15 @@ describe("canonical turn-taking social routines", () => {
       socialRoutine: "greeting",
     });
   });
+
+  it("does not reparse raw text when canonical semantic authority says the reciprocal routine is absent", () => {
+    const event = {
+      ...interpretSemanticEvent("naber"),
+      socialRoutine: "none" as const,
+      intent: "general_chat" as const,
+    };
+    const plan = planDialogueResponse([], "naber", "Ali", event);
+    expect(plan.move).toBe("natural_reaction");
+    expect(plan.allowFollowUpQuestion).toBe(false);
+  });
 });
