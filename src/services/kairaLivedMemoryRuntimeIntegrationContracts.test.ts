@@ -43,8 +43,23 @@ describe("Kaira lived autobiographical runtime integration", () => {
 
   it("keeps world truth and autobiography as separate authorities", () => {
     const runtime = readFileSync("src/services/kairaLivedMemoryRuntime.ts", "utf8");
-    expect(runtime.indexOf("saveWorldEventObservation({")).toBeLessThan(runtime.indexOf("appraiseLivedMemoryCandidate({"));
-    expect(runtime.indexOf("appraiseLivedMemoryCandidate({")).toBeLessThan(runtime.indexOf("appendKairaAutobiographicalMemoryAtomic(instance, decision.memory)"));
+    const postPersistence = readFileSync("src/services/kairaPersistedObservationConsolidation.ts", "utf8");
+
+    expect(runtime).toContain("saveWorldEventObservation({");
+    expect(runtime).toContain("consolidatePersistedWorldObservation({");
+    expect(runtime.indexOf("saveWorldEventObservation({")).toBeLessThan(
+      runtime.indexOf("consolidatePersistedWorldObservation({"),
+    );
+    expect(runtime).not.toContain("appraiseLivedMemoryCandidate({");
+    expect(runtime).not.toContain("appendKairaAutobiographicalMemoryAtomic(");
     expect(runtime).not.toContain("saveKairaCanonicalIdentity(");
+
+    expect(postPersistence).not.toContain("saveWorldEventObservation({");
+    expect(postPersistence.indexOf("appraiseLivedMemoryCandidate({")).toBeLessThan(
+      postPersistence.indexOf("appendKairaAutobiographicalMemoryAtomic(instance, memory)"),
+    );
+    expect(postPersistence.indexOf("appendKairaAutobiographicalMemoryAtomic(instance, memory)")).toBeLessThan(
+      postPersistence.indexOf("maybeApplySelfRevision(instance, memory.selfRevisionEvidence?.factKey)"),
+    );
   });
 });
