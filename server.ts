@@ -571,6 +571,7 @@ app.post("/api/chat", async (req, res) => {
     const worldStateAppraisal = appraiseRetrievedWorldState(retrievedWorldEvents);
     const worldStateAppraisalInstruction = buildWorldStateAppraisalInstruction(worldStateAppraisal);
     const worldReasoningPolicy = deriveWorldReasoningPolicy(worldStateAppraisal);
+    const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy };
     const worldReasoningPolicyInstruction = buildWorldReasoningPolicyInstruction(worldReasoningPolicy);
     const languageUnderstanding = await resolveServerLanguageUnderstanding({
       message: userMessage,
@@ -735,7 +736,7 @@ app.post("/api/chat", async (req, res) => {
       );
     kdm.trace.whoSent.userName = userName;
     if (local.handled && local.reply) {
-      const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents),
+      const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext),
         epistemicGuard = enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess),
         baseEnforced = enforceKairoResponse(epistemicGuard.reply, kdm.trace, enforcementRules),
         contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract),
@@ -961,7 +962,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
       ...findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move, speech.relationshipLevel),
       ...findKairaResponsePlanIssues(reply, responsePlan),
       ...findKairoAffectiveResponseIssues(reply, kdm.trace),
-      ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
+      ...findWorldModelResponseIssues(reply, retrievedWorldEvents, worldReasoningContext).map((issue) => issue.message),
     ];
     let repairAttempts = 0;
     if (groundingIssues.length && now() - aiStart < 24000) {
@@ -995,7 +996,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           ...findKairoResponseRhythmIssues(repairedReply, cleanHistory, dialogueDecision.move, speech.relationshipLevel),
           ...findKairaResponsePlanIssues(repairedReply, responsePlan),
           ...findKairoAffectiveResponseIssues(repairedReply, kdm.trace),
-          ...findWorldModelResponseIssues(repairedReply, retrievedWorldEvents).map((issue) => issue.message),
+          ...findWorldModelResponseIssues(repairedReply, retrievedWorldEvents, worldReasoningContext).map((issue) => issue.message),
         ];
         if (repairedIssues.length < groundingIssues.length) {
           reply = repairedReply;
@@ -1034,7 +1035,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           ...findKairoResponseRhythmIssues(fallback, cleanHistory, dialogueDecision.move, speech.relationshipLevel),
           ...findKairaResponsePlanIssues(fallback, responsePlan),
           ...findKairoAffectiveResponseIssues(fallback, kdm.trace),
-          ...findWorldModelResponseIssues(fallback, retrievedWorldEvents).map((issue) => issue.message),
+          ...findWorldModelResponseIssues(fallback, retrievedWorldEvents, worldReasoningContext).map((issue) => issue.message),
         ];
         if (fallbackIssues.length < groundingIssues.length) {
           reply = fallback;
@@ -1042,7 +1043,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         }
       }
     }
-    const worldMemoryGuard = enforceWorldModelRecallResponse(reply, retrievedWorldEvents);
+    const worldMemoryGuard = enforceWorldModelRecallResponse(reply, retrievedWorldEvents, worldReasoningContext);
     if (worldMemoryGuard.changed) {
       reply = worldMemoryGuard.reply;
       groundingIssues = [
@@ -1052,7 +1053,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         ...findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move, speech.relationshipLevel),
         ...findKairaResponsePlanIssues(reply, responsePlan),
       ...findKairoAffectiveResponseIssues(reply, kdm.trace),
-      ...findWorldModelResponseIssues(reply, retrievedWorldEvents).map((issue) => issue.message),
+      ...findWorldModelResponseIssues(reply, retrievedWorldEvents, worldReasoningContext).map((issue) => issue.message),
       ];
     }
     const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess);
@@ -1076,7 +1077,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         dialogueDecision, cleanHistory, userMessage, userName, dialogueAnalysis, responsePlan.allowQuestion,
       );
       if (planSafeFallback) {
-        const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents);
+        const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents, worldReasoningContext);
         const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateWorldGuard.reply, epistemicAccess);
         const candidateBaseEnforced = enforceKairoResponse(candidateEpistemicGuard.reply, kdm.trace, enforcementRules);
         const candidateContractEnforced = enforceBehaviorContract(candidateBaseEnforced.reply, kdm.trace, behaviorContract);
@@ -1088,7 +1089,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           ...findKairoResponseRhythmIssues(candidateReply, cleanHistory, dialogueDecision.move, speech.relationshipLevel),
           ...findKairaResponsePlanIssues(candidateReply, responsePlan),
           ...findKairoAffectiveResponseIssues(candidateReply, kdm.trace),
-          ...findWorldModelResponseIssues(candidateReply, retrievedWorldEvents).map((issue) => issue.message),
+          ...findWorldModelResponseIssues(candidateReply, retrievedWorldEvents, worldReasoningContext).map((issue) => issue.message),
           ...findKairaEpistemicResponseIssues(candidateReply, epistemicAccess),
         ];
         if (planSafeIssues.length === 0) {

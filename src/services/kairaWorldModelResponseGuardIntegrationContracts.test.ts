@@ -4,17 +4,27 @@ import path from "node:path";
 
 const server = fs.readFileSync(path.resolve(process.cwd(), "server.ts"), "utf8");
 const persistence = fs.readFileSync(path.resolve(process.cwd(), "src/services/kdmPersistenceService.ts"), "utf8");
+const guard = fs.readFileSync(path.resolve(process.cwd(), "src/services/worldModelResponseGuard.ts"), "utf8");
 
 describe("world-model response guard runtime integration contract", () => {
   it("wires grounded-memory issues into initial, repair and fallback validation", () => {
     expect(server).toContain('from "./src/services/worldModelResponseGuard"');
     expect(server.match(/findWorldModelResponseIssues\(/g)?.length).toBeGreaterThanOrEqual(4);
-    expect(server).toContain("findWorldModelResponseIssues(repairedReply, retrievedWorldEvents)");
-    expect(server).toContain("findWorldModelResponseIssues(fallback, retrievedWorldEvents)");
+    expect(server).toContain("findWorldModelResponseIssues(repairedReply, retrievedWorldEvents, worldReasoningContext)");
+    expect(server).toContain("findWorldModelResponseIssues(fallback, retrievedWorldEvents, worldReasoningContext)");
   });
 
   it("guards local-language early returns too", () => {
-    expect(server).toContain("const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents)");
+    expect(server).toContain("const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext)");
+  });
+
+  it("shares one canonical appraisal/policy authority with deterministic enforcement", () => {
+    expect(server).toContain("const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy }");
+    expect(server).toContain("findWorldModelResponseIssues(repairedReply, retrievedWorldEvents, worldReasoningContext)");
+    expect(server).toContain("enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext)");
+    expect(guard).toContain("context: WorldModelReasoningContext");
+    expect(guard).not.toContain("appraiseRetrievedWorldState(");
+    expect(guard).not.toContain("deriveWorldReasoningPolicy(");
   });
 
   it("persists world reasoning observability fields", () => {
@@ -24,7 +34,7 @@ describe("world-model response guard runtime integration contract", () => {
   });
 
   it("runs deterministic recall enforcement before behavior enforcement", () => {
-    const guardIndex = server.indexOf("enforceWorldModelRecallResponse(reply, retrievedWorldEvents)");
+    const guardIndex = server.indexOf("enforceWorldModelRecallResponse(reply, retrievedWorldEvents, worldReasoningContext)");
     const behaviorIndex = server.indexOf("enforceKairoResponse(reply, kdm.trace, enforcementRules)", guardIndex);
 
     expect(guardIndex).toBeGreaterThan(0);

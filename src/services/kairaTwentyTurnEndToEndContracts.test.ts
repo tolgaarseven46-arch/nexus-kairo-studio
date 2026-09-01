@@ -146,7 +146,7 @@ describe("KAIRA 20-turn end-to-end contracts", () => {
     );
     const appraisal = appraiseRetrievedWorldState(retrieved);
     const policy = deriveWorldReasoningPolicy(appraisal);
-    const guard = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved);
+    const guard = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved, { appraisal, policy });
 
     expect(appraisal.evidencePosture).toBe("grounded_reported");
     expect(policy.mustQualify).toBe(true);
@@ -166,7 +166,7 @@ describe("KAIRA 20-turn end-to-end contracts", () => {
     );
     const appraisal = appraiseRetrievedWorldState(retrieved);
     const policy = deriveWorldReasoningPolicy(appraisal);
-    const guard = enforceWorldModelRecallResponse("Ali istifa edecek.", retrieved);
+    const guard = enforceWorldModelRecallResponse("Ali istifa edecek.", retrieved, { appraisal, policy });
 
     expect(appraisal.truthPosture).toBe("conflicting");
     expect(policy.mode).toBe("preserve_conflict");
@@ -185,7 +185,7 @@ describe("KAIRA 20-turn end-to-end contracts", () => {
     );
     const appraisal = appraiseRetrievedWorldState(retrieved);
     const policy = deriveWorldReasoningPolicy(appraisal);
-    const guard = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved);
+    const guard = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved, { appraisal, policy });
 
     expect(appraisal.evidencePosture).toBe("grounded_direct");
     expect(policy.mustPreserveReportedAttribution).toBe(false);

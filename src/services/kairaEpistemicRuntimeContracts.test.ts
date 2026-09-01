@@ -34,7 +34,7 @@ describe("Kaira epistemic runtime contracts", () => {
 
   it("keeps every post-plan fallback behind world, epistemic and social final authority", () => {
     const server = readFileSync("server.ts", "utf8");
-    const candidateWorld = server.indexOf("const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents)");
+    const candidateWorld = server.indexOf("const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents, worldReasoningContext)");
     const candidateEpistemic = server.indexOf("const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateWorldGuard.reply, epistemicAccess)");
     const candidateSocial = server.indexOf("const candidateBaseEnforced = enforceKairoResponse(candidateEpistemicGuard.reply, kdm.trace, enforcementRules)");
     const candidateContract = server.indexOf("const candidateContractEnforced = enforceBehaviorContract(candidateBaseEnforced.reply, kdm.trace, behaviorContract)");

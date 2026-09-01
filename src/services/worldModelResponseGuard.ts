@@ -1,6 +1,6 @@
 import type { RetrievedWorldEvent } from "./worldEventRetrieval";
-import { appraiseRetrievedWorldState } from "./worldStateAppraisal";
-import { deriveWorldReasoningPolicy } from "./worldReasoningPolicy";
+import type { WorldStateAppraisal } from "./worldStateAppraisal";
+import type { WorldReasoningPolicy } from "./worldReasoningPolicy";
 
 export interface WorldModelResponseIssue {
   code:
@@ -16,6 +16,11 @@ export interface WorldModelResponseGuardResult {
   changed: boolean;
   issues: WorldModelResponseIssue[];
   reason?: string;
+}
+
+export interface WorldModelReasoningContext {
+  appraisal: WorldStateAppraisal;
+  policy: WorldReasoningPolicy;
 }
 
 const normalize = (value: string) =>
@@ -34,17 +39,18 @@ function grounded(items: RetrievedWorldEvent[]) {
 /**
  * Deterministic response boundary for canonical world-memory reasoning.
  *
- * The guard derives the same read-only WorldReasoningPolicy used by prompt
- * generation, so model compliance is not trusted as the only enforcement
- * mechanism. It never mutates relationship, emotion, personality or dynamic
- * state; it may only reject/replace the generated world-memory wording.
+ * The guard consumes the exact read-only appraisal/policy already derived by
+ * the canonical runtime, so prompt generation and deterministic enforcement
+ * share one reasoning authority. It never mutates relationship, emotion,
+ * personality or dynamic state; it may only reject/replace generated
+ * world-memory wording.
  */
 export function findWorldModelResponseIssues(
   reply: string,
   items: RetrievedWorldEvent[],
+  context: WorldModelReasoningContext,
 ): WorldModelResponseIssue[] {
-  const appraisal = appraiseRetrievedWorldState(items);
-  const policy = deriveWorldReasoningPolicy(appraisal);
+  const { appraisal, policy } = context;
   const text = normalize(reply);
   const issues: WorldModelResponseIssue[] = [];
 
@@ -100,12 +106,14 @@ function compactEvidenceText(item: RetrievedWorldEvent): string {
   return raw.replace(/[?？]+$/u, "").slice(0, 220);
 }
 
-export function buildWorldModelRecallFallback(items: RetrievedWorldEvent[]): string {
+export function buildWorldModelRecallFallback(
+  items: RetrievedWorldEvent[],
+  context: WorldModelReasoningContext,
+): string {
   const evidence = grounded(items);
   if (!evidence.length) return "";
 
-  const appraisal = appraiseRetrievedWorldState(items);
-  const policy = deriveWorldReasoningPolicy(appraisal);
+  const { policy } = context;
   if (policy.mustPreserveConflict) {
     const distinct = Array.from(
       new Set(evidence.map(compactEvidenceText).filter(Boolean)),
@@ -131,11 +139,12 @@ export function buildWorldModelRecallFallback(items: RetrievedWorldEvent[]): str
 export function enforceWorldModelRecallResponse(
   reply: string,
   items: RetrievedWorldEvent[],
+  context: WorldModelReasoningContext,
 ): WorldModelResponseGuardResult {
-  const issues = findWorldModelResponseIssues(reply, items);
+  const issues = findWorldModelResponseIssues(reply, items, context);
   if (!issues.length) return { reply, changed: false, issues: [] };
 
-  const fallback = buildWorldModelRecallFallback(items);
+  const fallback = buildWorldModelRecallFallback(items, context);
   if (!fallback) return { reply, changed: false, issues };
   return {
     reply: fallback,

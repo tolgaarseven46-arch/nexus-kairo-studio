@@ -15,10 +15,10 @@ function count(source: string, needle: string) {
 describe("KAIRA local-language / AI parity contracts", () => {
   it("runs deterministic world-memory guard on both response paths", () => {
     expect(server).toContain(
-      "const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents)",
+      "const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext)",
     );
     expect(server).toContain(
-      "const worldMemoryGuard = enforceWorldModelRecallResponse(reply, retrievedWorldEvents)",
+      "const worldMemoryGuard = enforceWorldModelRecallResponse(reply, retrievedWorldEvents, worldReasoningContext)",
     );
   });
 

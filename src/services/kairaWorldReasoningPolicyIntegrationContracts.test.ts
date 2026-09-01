@@ -23,6 +23,11 @@ describe("world reasoning policy runtime integration contract", () => {
     expect(behaviorIndex).toBeGreaterThan(dialogueIndex);
   });
 
+  it("passes the canonical reasoning policy to deterministic final enforcement", () => {
+    expect(server).toContain("const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy }");
+    expect(server).toContain("retrievedWorldEvents, worldReasoningContext");
+  });
+
   it("does not feed world reasoning policy into KDM state mutation", () => {
     const kdmCallStart = server.indexOf("kdm = analyzeKdmInteraction(");
     const kdmCallEnd = server.indexOf(");", kdmCallStart);

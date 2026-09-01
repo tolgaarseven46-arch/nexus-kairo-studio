@@ -137,7 +137,7 @@ describe('mixed local/AI + recall + relationship repair quality regression', () 
         const appraisal = appraiseRetrievedWorldState(retrieved);
         const policy = deriveWorldReasoningPolicy(appraisal);
         expect(policy.mustPreserveReportedAttribution).toBe(true);
-        recallGuards.push(enforceWorldModelRecallResponse('Mert yarın istifa edecek.', retrieved));
+        recallGuards.push(enforceWorldModelRecallResponse('Mert yarın istifa edecek.', retrieved, { appraisal, policy }));
       }
     }
 

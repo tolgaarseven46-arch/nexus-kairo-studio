@@ -9,6 +9,8 @@ import { buildKairaResponsePlan, findKairaResponsePlanIssues } from './kairaResp
 import { enforceKairoResponse } from './kairoResponseConsistency';
 import type { WorldEventObservation } from './worldModelEventStore';
 import { rankWorldEventObservations } from './worldEventRetrieval';
+import { appraiseRetrievedWorldState } from './worldStateAppraisal';
+import { deriveWorldReasoningPolicy } from './worldReasoningPolicy';
 import { enforceWorldModelRecallResponse } from './worldModelResponseGuard';
 
 function finalize(message: string, draft: string, previousState?: ReturnType<typeof analyzeKdmInteraction>['nextDynamicState']) {
@@ -123,7 +125,8 @@ describe('final delivery authority regression', () => {
       5,
       '2026-08-31T18:10:00.000Z',
     );
-    const guarded = enforceWorldModelRecallResponse(result.enforced.reply, retrieved);
+    const appraisal = appraiseRetrievedWorldState(retrieved);
+    const guarded = enforceWorldModelRecallResponse(result.enforced.reply, retrieved, { appraisal, policy: deriveWorldReasoningPolicy(appraisal) });
 
     expect(guarded.changed).toBe(true);
     expect(guarded.reply).toContain('Mert');

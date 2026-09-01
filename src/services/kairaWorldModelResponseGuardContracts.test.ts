@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { WorldEventObservation } from "./worldModelEventStore";
 import { rankWorldEventObservations } from "./worldEventRetrieval";
+import { appraiseRetrievedWorldState } from "./worldStateAppraisal";
+import { deriveWorldReasoningPolicy } from "./worldReasoningPolicy";
 import {
   enforceWorldModelRecallResponse,
   findWorldModelResponseIssues,
@@ -47,6 +49,11 @@ function row(input: {
   };
 }
 
+function reasoningContext(items: ReturnType<typeof rankWorldEventObservations>) {
+  const appraisal = appraiseRetrievedWorldState(items);
+  return { appraisal, policy: deriveWorldReasoningPolicy(appraisal) };
+}
+
 describe("world-model response guard contracts", () => {
   it("cannot deny memory existence when grounded retrieval exists", () => {
     const retrieved = rankWorldEventObservations(
@@ -55,7 +62,7 @@ describe("world-model response guard contracts", () => {
       5,
     );
 
-    const guarded = enforceWorldModelRecallResponse("Valla hatırlamıyorum, kaydım yok.", retrieved);
+    const guarded = enforceWorldModelRecallResponse("Valla hatırlamıyorum, kaydım yok.", retrieved, reasoningContext(retrieved));
 
     expect(guarded.changed).toBe(true);
     expect(guarded.reason).toBe("world_reasoning_policy_guard");
@@ -72,9 +79,9 @@ describe("world-model response guard contracts", () => {
       2,
     );
 
-    expect(findWorldModelResponseIssues("Emin değilim, iki farklı şey söylemişsin.", retrieved)).toEqual([]);
+    expect(findWorldModelResponseIssues("Emin değilim, iki farklı şey söylemişsin.", retrieved, reasoningContext(retrieved))).toEqual([]);
 
-    const guarded = enforceWorldModelRecallResponse("Ali istifa edecek.", retrieved);
+    const guarded = enforceWorldModelRecallResponse("Ali istifa edecek.", retrieved, reasoningContext(retrieved));
     expect(guarded.changed).toBe(true);
     expect(guarded.issues.some((issue) => issue.code === "conflict_collapsed")).toBe(true);
     expect(guarded.reply).toMatch(/çelişen/iu);
@@ -92,9 +99,9 @@ describe("world-model response guard contracts", () => {
       2,
     );
 
-    expect(findWorldModelResponseIssues("Emin değilim, iki farklı şey söylemişsin.", retrieved)).toEqual([]);
+    expect(findWorldModelResponseIssues("Emin değilim, iki farklı şey söylemişsin.", retrieved, reasoningContext(retrieved))).toEqual([]);
 
-    const guarded = enforceWorldModelRecallResponse("Bununla ilgili kaydım yok.", retrieved);
+    const guarded = enforceWorldModelRecallResponse("Bununla ilgili kaydım yok.", retrieved, reasoningContext(retrieved));
     expect(guarded.changed).toBe(true);
     expect(guarded.reply).toMatch(/çelişen/iu);
   });
@@ -106,10 +113,10 @@ describe("world-model response guard contracts", () => {
       5,
     );
 
-    const issues = findWorldModelResponseIssues("Ali yarın istifa edecek.", retrieved);
+    const issues = findWorldModelResponseIssues("Ali yarın istifa edecek.", retrieved, reasoningContext(retrieved));
     expect(issues.some((issue) => issue.code === "reported_attribution_lost")).toBe(true);
 
-    const guarded = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved);
+    const guarded = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved, reasoningContext(retrieved));
     expect(guarded.changed).toBe(true);
     expect(guarded.reply).toMatch(/Bana daha önce/iu);
   });
@@ -121,7 +128,7 @@ describe("world-model response guard contracts", () => {
       5,
     );
 
-    expect(findWorldModelResponseIssues("Bana daha önce Ali yarın istifa edecek demiştin.", retrieved)).toEqual([]);
+    expect(findWorldModelResponseIssues("Bana daha önce Ali yarın istifa edecek demiştin.", retrieved, reasoningContext(retrieved))).toEqual([]);
   });
 
   it("does not invent user-source attribution for direct interaction evidence", () => {
@@ -136,11 +143,11 @@ describe("world-model response guard contracts", () => {
       5,
     );
 
-    const issues = findWorldModelResponseIssues("Ali yarın istifa edecek.", retrieved);
+    const issues = findWorldModelResponseIssues("Ali yarın istifa edecek.", retrieved, reasoningContext(retrieved));
     expect(issues.some((issue) => issue.code === "reported_attribution_lost")).toBe(false);
     expect(issues.some((issue) => issue.code === "epistemic_qualifier_lost")).toBe(true);
 
-    const guarded = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved);
+    const guarded = enforceWorldModelRecallResponse("Ali yarın istifa edecek.", retrieved, reasoningContext(retrieved));
     expect(guarded.changed).toBe(true);
     expect(guarded.reply).toMatch(/Hatırladığım kayda göre/iu);
     expect(guarded.reply).not.toMatch(/Bana daha önce/iu);
@@ -158,7 +165,7 @@ describe("world-model response guard contracts", () => {
       5,
     );
 
-    expect(findWorldModelResponseIssues("Hatırladığım kayda göre Ali yarın istifa edecek.", retrieved)).toEqual([]);
+    expect(findWorldModelResponseIssues("Hatırladığım kayda göre Ali yarın istifa edecek.", retrieved, reasoningContext(retrieved))).toEqual([]);
   });
 
   it("uses appraisal conflict posture for historical recall without projected state", () => {
@@ -172,9 +179,9 @@ describe("world-model response guard contracts", () => {
     );
 
     expect(retrieved.every((item) => item.projectedState === undefined)).toBe(true);
-    expect(findWorldModelResponseIssues("Emin değilim, iki çelişen kayıt var.", retrieved)).toEqual([]);
+    expect(findWorldModelResponseIssues("Emin değilim, iki çelişen kayıt var.", retrieved, reasoningContext(retrieved))).toEqual([]);
 
-    const guarded = enforceWorldModelRecallResponse("Hatırlamıyorum, kaydım yok.", retrieved);
+    const guarded = enforceWorldModelRecallResponse("Hatırlamıyorum, kaydım yok.", retrieved, reasoningContext(retrieved));
     expect(guarded.changed).toBe(true);
     expect(guarded.reply).toMatch(/çelişen/iu);
   });
@@ -191,7 +198,7 @@ describe("world-model response guard contracts", () => {
       5,
     );
 
-    const guarded = enforceWorldModelRecallResponse("Hatırlamıyorum.", retrieved);
+    const guarded = enforceWorldModelRecallResponse("Hatırlamıyorum.", retrieved, reasoningContext(retrieved));
     expect(guarded.changed).toBe(false);
   });
 });
