@@ -20,8 +20,19 @@ jobs:
         with:
           node-version: 20
       - run: npm install --ignore-scripts
-      - name: Normalize migration occurrence counts
-        run: sed -i 's/minimum=2/minimum=1/g' .github/scripts/one-time-dyadic-user-style.py
+      - name: Normalize migration script
+        run: |
+          sed -i 's/minimum=2/minimum=1/g' .github/scripts/one-time-dyadic-user-style.py
+          python <<'PY'
+          from pathlib import Path
+          p = Path('.github/scripts/one-time-dyadic-user-style.py')
+          s = p.read_text()
+          marker = 'replace_all(\n    "server.ts",\n    """${languageStyleMemoryInstruction'
+          start = s.index(marker)
+          end = s.index('\n\n# Existing policy contract', start)
+          replacement = '''prompt_marker = "${languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)}"\nprompt_insert = prompt_marker + chr(92) + "\\n" + "${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}"\nreplace_all("server.ts", prompt_marker, prompt_insert, minimum=1)'''
+          p.write_text(s[:start] + replacement + s[end:])
+          PY
       - name: Apply migration
         run: python .github/scripts/one-time-dyadic-user-style.py
       - name: Focused regressions
