@@ -84,6 +84,7 @@ import { evaluateKairaKnowledge } from "./src/services/kairaEpistemicGate";
 import {
   buildKairaEpistemicInstruction,
   enforceKairaEpistemicResponse,
+  findKairaEpistemicResponseIssues,
 } from "./src/services/kairaEpistemicResponsePolicy";
 import type {
   DroitDynamicState,
@@ -745,12 +746,13 @@ app.post("/api/chat", async (req, res) => {
         },
         reply = enforced.reply,
         localPlanIssues = findKairaResponsePlanIssues(reply, responsePlan),
+        localEpistemicIssues = findKairaEpistemicResponseIssues(reply, epistemicAccess),
         localBaseConsistency = validateKairoResponse(reply, kdm.trace),
         consistency = {
           ...localBaseConsistency,
-          accepted: localBaseConsistency.accepted && localPlanIssues.length === 0,
-          score: Math.max(0, localBaseConsistency.score - localPlanIssues.length * 15),
-          issues: [...localBaseConsistency.issues, ...localPlanIssues],
+          accepted: localBaseConsistency.accepted && localPlanIssues.length === 0 && localEpistemicIssues.length === 0,
+          score: Math.max(0, localBaseConsistency.score - (localPlanIssues.length + localEpistemicIssues.length) * 15),
+          issues: [...localBaseConsistency.issues, ...localPlanIssues, ...localEpistemicIssues],
         };
       if (kairaPolicy.persistentUserMemory && consistency.accepted) {
         learnLanguageReply(stateUserId, reply);
@@ -853,6 +855,7 @@ app.post("/api/chat", async (req, res) => {
             worldStateAppraisal,
             worldReasoningPolicy,
             worldMemoryGuard,
+            epistemicAccess,
             responsePlan,
             timings: { memoryMs, kdmMs, aiMs: 0 },
           },
@@ -1068,26 +1071,40 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         dialogueDecision, cleanHistory, userMessage, userName, dialogueAnalysis, responsePlan.allowQuestion,
       );
       if (planSafeFallback) {
+        const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents);
+        const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateWorldGuard.reply, epistemicAccess);
+        const candidateBaseEnforced = enforceKairoResponse(candidateEpistemicGuard.reply, kdm.trace, enforcementRules);
+        const candidateContractEnforced = enforceBehaviorContract(candidateBaseEnforced.reply, kdm.trace, behaviorContract);
+        const candidateReply = candidateContractEnforced.reply;
         const planSafeIssues = [
-          ...findKairoGroundingIssues(planSafeFallback, cleanHistory, userMessage),
-          ...findDialogueAttributionIssues(planSafeFallback, cleanHistory, userMessage, userName, dialogueAnalysis),
-          ...findDialogueDecisionIssues(planSafeFallback, dialogueDecision, dialogueOutputStyle),
-          ...findKairoResponseRhythmIssues(planSafeFallback, cleanHistory, dialogueDecision.move, speech.relationshipLevel),
-          ...findKairaResponsePlanIssues(planSafeFallback, responsePlan),
-          ...findWorldModelResponseIssues(planSafeFallback, retrievedWorldEvents).map((issue) => issue.message),
+          ...findKairoGroundingIssues(candidateReply, cleanHistory, userMessage),
+          ...findDialogueAttributionIssues(candidateReply, cleanHistory, userMessage, userName, dialogueAnalysis),
+          ...findDialogueDecisionIssues(candidateReply, dialogueDecision, dialogueOutputStyle),
+          ...findKairoResponseRhythmIssues(candidateReply, cleanHistory, dialogueDecision.move, speech.relationshipLevel),
+          ...findKairaResponsePlanIssues(candidateReply, responsePlan),
+          ...findKairoAffectiveResponseIssues(candidateReply, kdm.trace),
+          ...findWorldModelResponseIssues(candidateReply, retrievedWorldEvents).map((issue) => issue.message),
+          ...findKairaEpistemicResponseIssues(candidateReply, epistemicAccess),
         ];
         if (planSafeIssues.length === 0) {
-          reply = planSafeFallback;
+          reply = candidateReply;
           postEnforcementPlanIssues = [];
           enforced.changed = true;
-          enforced.reasons.push("response_plan_delivery_fallback");
+          enforced.reasons.push(
+            "response_plan_delivery_fallback",
+            ...(candidateWorldGuard.reason ? [candidateWorldGuard.reason] : []),
+            ...(candidateEpistemicGuard.reason ? [candidateEpistemicGuard.reason] : []),
+            ...candidateBaseEnforced.reasons,
+            ...candidateContractEnforced.reasons,
+          );
         }
       }
     }
     const aiMs = Math.round(now() - aiStart);
     const baseConsistency = validateKairoResponse(reply, kdm.trace);
     const finalPlanIssues = postEnforcementPlanIssues;
-    const finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues])];
+    const finalEpistemicIssues = findKairaEpistemicResponseIssues(reply, epistemicAccess);
+    const finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues])];
     const consistency = {
       ...baseConsistency,
       accepted: baseConsistency.accepted && finalIssues.length === 0,

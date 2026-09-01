@@ -28,6 +28,8 @@ describe("Kaira epistemic runtime contracts", () => {
     expect(server).toContain('enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess)');
     expect(server.indexOf('const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess)')).toBeLessThan(server.indexOf('const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules)'));
     expect(server).toContain('epistemicAccess, behaviorContract');
+    expect(server).toContain('const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateWorldGuard.reply, epistemicAccess)');
+    expect(server).toContain('const finalEpistemicIssues = findKairaEpistemicResponseIssues(reply, epistemicAccess)');
   });
 
   it("does not read Firestore knowledge profiles for ordinary non-knowledge turns", () => {
