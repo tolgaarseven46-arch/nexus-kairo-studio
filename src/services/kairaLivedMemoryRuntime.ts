@@ -7,7 +7,10 @@ import {
 } from "./kairaInstanceContext";
 import { saveWorldEventObservation } from "./worldModelEventStore";
 import { appraiseLivedMemoryCandidate } from "./kairaLivedMemoryConsolidation";
-import { appendKairaAutobiographicalMemoryAtomic } from "./kairaCanonicalIdentityStore";
+import {
+  appendKairaAutobiographicalMemoryAtomic,
+  applyKairaSelfFactRevisionAtomic,
+} from "./kairaCanonicalIdentityStore";
 
 export type KairaLivedMemoryRuntimeStatus =
   | "not_applicable"
@@ -26,13 +29,36 @@ export interface KairaLivedMemoryRuntimeResult {
   consolidationDecision?: string;
   score?: number;
   reasons?: string[];
+  selfRevisionFactKey?: string;
+  selfRevisionStatus?: "applied" | "unchanged" | "missing_identity" | "ephemeral" | "unavailable";
+  selfRevisionDecision?: string;
+}
+
+async function maybeApplySelfRevision(
+  instance: KairaInstanceContext,
+  factKey?: string,
+): Promise<Pick<KairaLivedMemoryRuntimeResult, "selfRevisionFactKey" | "selfRevisionStatus" | "selfRevisionDecision">> {
+  if (!factKey) return {};
+  try {
+    const result = await applyKairaSelfFactRevisionAtomic(instance, factKey);
+    return {
+      selfRevisionFactKey: factKey,
+      selfRevisionStatus: result.status,
+      ...(result.decision ? { selfRevisionDecision: result.decision.status } : {}),
+    };
+  } catch {
+    return {
+      selfRevisionFactKey: factKey,
+      selfRevisionStatus: "unavailable",
+    };
+  }
 }
 
 /**
  * Canonical mutation coordinator:
  * world-model persistence happens first, then that exact persisted observation
- * may be projected into Kaira-owned autobiography. Autobiography never becomes
- * an alternate source of world truth.
+ * may be projected into Kaira-owned autobiography. Typed self-revision evidence,
+ * when present, is evaluated only after the lived memory itself is canonical.
  */
 export async function persistWorldEventAndMaybeConsolidateLivedMemory(input: {
   userId?: string;
@@ -44,9 +70,7 @@ export async function persistWorldEventAndMaybeConsolidateLivedMemory(input: {
 }): Promise<KairaLivedMemoryRuntimeResult> {
   const instance = resolveKairaInstanceContext(input.instance);
   const policy = instancePolicy(instance.instanceType);
-  if (!policy.persistentWorldModel) {
-    return { status: "not_applicable" };
-  }
+  if (!policy.persistentWorldModel) return { status: "not_applicable" };
 
   let observation;
   try {
@@ -79,24 +103,19 @@ export async function persistWorldEventAndMaybeConsolidateLivedMemory(input: {
 
   try {
     const append = await appendKairaAutobiographicalMemoryAtomic(instance, decision.memory);
-    if (append.status === "appended") {
+    if (append.status === "appended" || append.status === "duplicate") {
+      const selfRevision = await maybeApplySelfRevision(
+        instance,
+        decision.memory.selfRevisionEvidence?.factKey,
+      );
       return {
-        status: "consolidated",
+        status: append.status === "appended" ? "consolidated" : "duplicate",
         observationId: observation.id,
         memoryId: append.memoryId,
         consolidationDecision: decision.status,
         score: decision.score,
         reasons: decision.reasons,
-      };
-    }
-    if (append.status === "duplicate") {
-      return {
-        status: "duplicate",
-        observationId: observation.id,
-        memoryId: append.memoryId,
-        consolidationDecision: decision.status,
-        score: decision.score,
-        reasons: decision.reasons,
+        ...selfRevision,
       };
     }
     if (append.status === "missing_identity") {
