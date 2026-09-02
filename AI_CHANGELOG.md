@@ -12,4 +12,5 @@
 
 ---
 
+- 2026-09-02 [codex] PR#- <pending> — beta regression seam sıkılaştırıldı: `test:beta` artık epistemic runtime, controlled spontaneity, autonomous-state chat wiring ve beta conversation continuity sözleşmelerini full suite öncesinde zorunlu çalıştırıyor — ileri beta davranışındaki regressions daha erken fail etsin.
 - 2026-09-02 [claude] PR#- <pending> — governance seam eklendi: `AI_CONTEXT.md`, `AI_CHANGELOG.md`, `CLAUDE.md`, `AGENTS.md`, `docs/adr/0000-0003`, `docs/branch-protection.md`, `.github/CODEOWNERS`, `.github/pull_request_template.md`, `.github/architecture-risky-paths.txt`, `.github/scripts/match-risky-paths.sh`, `.github/workflows/architecture-review.yml`, `.gitattributes`; `.github/workflows/ci.yml`'e docs-guard job'ı + action SHA-pin eklendi (mevcut test kapıları değişmedi) — Claude–Codex ortak çalışma sistemi minimum güvenli iskele.

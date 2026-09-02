@@ -19,6 +19,11 @@ const required = [
   'kairaLanguageMemoryStalePhraseSelection.test.ts',
   'kairaResponsePlanFinalAuthorityContracts.test.ts',
   'kairaKntTurnDebugUiContracts.test.ts',
+  // Advanced beta behavior seams must remain in the fast pre-full-suite gate.
+  'kairaEpistemicRuntimeContracts.test.ts',
+  'kairaControlledSpontaneityIntegrationContracts.test.ts',
+  'kairaAutonomousStateChatWiringContracts.test.ts',
+  'kairaBetaConversationContinuityRegression.test.ts',
 ];
 
 describe('beta runtime regression gate', () => {
