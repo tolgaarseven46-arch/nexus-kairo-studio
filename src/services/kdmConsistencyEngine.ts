@@ -160,7 +160,7 @@ export function applyIntegratedBehaviorPolicy(
   };
 }
 
-function semanticIntentToKdm(event: SemanticEvent): string {
+export function semanticIntentToKdm(event: SemanticEvent): string {
   switch (event.intent) {
     case "greeting": return "selamlama";
     case "question": return "soru";
@@ -193,7 +193,7 @@ function hasActionableNegativeEvidence(event: SemanticEvent): boolean {
   );
 }
 
-function semanticSentimentToKdm(event: SemanticEvent): string {
+export function semanticSentimentToKdm(event: SemanticEvent): string {
   if (event.emotionalLoad > 0) return "duygusal_yük";
   if (event.valence === "negative" && hasActionableNegativeEvidence(event)) return "negatif";
   if (event.valence === "positive") return "pozitif";
@@ -275,6 +275,8 @@ export function analyzeKdmInteraction(
       behaviorPolicy: behaviorPolicy ?? null,
       applyIntegrated: applyIntegratedBehaviorPolicy,
       semanticPattern,
+      semanticIntentToKdm,
+      semanticSentimentToKdm,
     });
   }
   const intent = semanticIntentToKdm(semanticEvent);

@@ -404,12 +404,18 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     // to repair it must not accumulate; it decays toward 0 so a long friendly
     // chat never arrives at a fake "mid-repair" state (PR1-review fix).
     const injuryToRepair = Math.max(conflictBefore, hurtBefore) >= config.recovery.repairInjuryFloor;
+    const explicitRepairAct = Boolean(signal.apology || signal.repairAttempt);
     if (!injuryToRepair) {
       repairProgress = Math.max(0, repairProgress - config.recovery.repairDecayNoInjury);
-      if (signal.apology || kind === "positive") trust = clamp100(trust + (signal.apology ? 1.5 : 1));
-    } else if (signal.apology) {
+      if (explicitRepairAct || kind === "positive") trust = clamp100(trust + (signal.apology ? 1.5 : 1));
+    } else if (explicitRepairAct) {
       repairProgress = clamp100(repairProgress + config.recovery.repairGainApology * (0.6 + signal.sincerityConfidence * 0.4));
       trust = clamp100(trust + 1.5);
+    } else if (prev.conversationState === "disengaged") {
+      // While disengaged, only an explicit repair act (apology / repair attempt)
+      // advances repairProgress. A calm plea, neutral chat or flirting is NOT
+      // repair — it must not chip away at a boundary the user has not addressed.
+      repairProgress = clamp100(repairProgress);
     } else if (kind === "positive") {
       repairProgress = clamp100(repairProgress + config.recovery.repairGainPositive);
       trust = clamp100(trust + 1);

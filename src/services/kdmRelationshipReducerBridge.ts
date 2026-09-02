@@ -42,6 +42,9 @@ export interface KdmCanonicalInput {
     behaviorPolicy?: BehaviorPolicyInput | null,
   ) => BehaviorLayerProfile;
   semanticPattern: (event: SemanticEvent) => string | null;
+  /** Legacy label projections, passed in to avoid an import cycle. */
+  semanticIntentToKdm: (event: SemanticEvent) => string;
+  semanticSentimentToKdm: (event: SemanticEvent) => string;
 }
 
 export interface KdmCanonicalResult {
@@ -114,6 +117,15 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
   const nowIso = new Date().toISOString();
   const prevRel: RelationshipState = state.relationship ?? {};
   const negativePattern = input.semanticPattern(semanticEvent);
+  // Legacy label vocabulary for the trace (projection only — not a decision).
+  const samePattern = !!negativePattern && prevRel.lastNegativePattern === negativePattern;
+  const repeatedProblem = samePattern && (prevRel.repeatedNegativeCount ?? 0) >= 1;
+  const kdmIntent = semanticEvent.apology
+    ? "özür_ve_telafi"
+    : repeatedProblem
+      ? "tekrarlanan_olumsuz_davranış"
+      : input.semanticIntentToKdm(semanticEvent);
+  const kdmSentiment = input.semanticSentimentToKdm(semanticEvent);
 
   const signal = buildTurnSignal(semanticEvent, negativePattern);
   const elapsedMinutesSincePrev = minutesBetween(prevRel.lastInteractionAt, nowIso);
@@ -250,9 +262,8 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
         : `Canonical reducer: ${result.rationale.join("; ")}.`,
     },
     messageInterpretation: {
-      intent: input.semanticPattern(semanticEvent) ?? (semanticEvent.intent as string),
-      sentiment:
-        signal.valence === "negative" ? "negatif" : signal.valence === "positive" ? "pozitif" : "nötr",
+      intent: kdmIntent,
+      sentiment: kdmSentiment,
       explanation: `Canonical SemanticInterpretation@2: primary=${interpretationFromLegacyEvent(semanticEvent).primaryIntent}, hedef=${interpretationFromLegacyEvent(semanticEvent).target}, present-severity=${Math.max(
         signal.severity.disrespect,
         signal.severity.coercion,

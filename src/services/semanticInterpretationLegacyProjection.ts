@@ -48,6 +48,11 @@ const FOOD_CONTEXT_RE =
 // Serious-conflict framing: corroborates that a slur is a real attack, not banter.
 const FIGHT_CONTEXT_RE =
   /(?<![\p{L}])(kavga|kavgan|tartış|hesaplaş|haddin|had+in|bağır|çekiş|kapış|restleş|yüzüne\s+söyl|sinir\s+ediyor|gıcık|nefret\s+ediyor|iğreniyor)(?![\p{L}])|herif(?![\p{L}])/iu;
+// A slur/insult stem standing as a trailing vocative in a multi-word turn
+// ("... köle", "... kaşar herif", "... orospu") — an address, not a passing
+// mention. A lone one-word slur is excluded (that stays a candidate).
+const TRAILING_VOCATIVE_RE =
+  /(?<![\p{L}])(orosp\p{L}*|kaşa[rs]\p{L}*|sürtük|kahpe|yavşak|piç\p{L}*|köle|şerefsiz|haysiyetsiz|aptal\p{L}*|salak\p{L}*|gerizekal\p{L}*|dangalak|öküz|ezik)\s*(herif|adam|kadın|kız|çocuğu|çocuk|moruk)?\s*[.!?…]*\s*$/iu;
 
 // Inflection-tolerant lexical cues. `interpretSemanticEvent`'s slur/insult
 // regexes are word-boundary bound and miss Turkish suffixed forms
@@ -115,14 +120,29 @@ function readLexicalHostility(message: string, event: SemanticEvent): LexicalHos
   if (lexCue && frustration >= 0.4) hostilityEvidence.push("frustration");
   if (lexCue && (clamp01(event.coercion ?? 0) >= 0.4 || event.intent === "rejection"))
     hostilityEvidence.push("coercion-or-rejection");
-  // A bare, unaddressed slur ("kaşar" alone) is NOT evidence — target and intent
-  // are genuinely unresolved. It stays a candidate until context corroborates it.
+  if (
+    lexCue &&
+    wc >= 2 &&
+    wc <= 9 &&
+    !hasJoke &&
+    !hasFoodContext &&
+    TRAILING_VOCATIVE_RE.test(message.trim())
+  )
+    hostilityEvidence.push("trailing-vocative-slur");
+  // A bare, unaddressed one-word slur ("kaşar" alone) is NOT evidence — target
+  // and intent are genuinely unresolved. It stays a candidate.
 
   // A benign food/compound use with no corroborating hostility is not an attack.
   const benignCompound = lexCue && hasFoodContext && hostilityEvidence.length === 0;
   // Lexical hit stands alone with nothing to back it → ambiguous, never a hard-stop.
   const lexicalCandidateOnly = lexCue && !benignCompound && hostilityEvidence.length === 0;
   const evidenced = lexCue && hostilityEvidence.length > 0;
+  // Evidence that also fixes the target on Kaira (an address, not a mention).
+  const addressedAtKaira =
+    pointed ||
+    hasFightContext ||
+    hostilityEvidence.includes("trailing-vocative-slur") ||
+    hostilityEvidence.includes("addressed-2nd-person");
 
   let disrespect: number;
   if (benignCompound) {
@@ -134,6 +154,7 @@ function readLexicalHostility(message: string, event: SemanticEvent): LexicalHos
   } else if (evidenced) {
     disrespect = lexRedline ? 0.6 : 0.45;
     if (pointed) disrespect += 0.25;
+    else if (addressedAtKaira) disrespect += 0.2;
     else if (directYou) disrespect += 0.1;
     if (hasFightContext) disrespect += 0.1;
     if (!pointed && hostilityEvidence.length >= 3) disrespect += 0.1;
@@ -181,7 +202,7 @@ function readLexicalHostility(message: string, event: SemanticEvent): LexicalHos
   if (lexCue && isShort && !pointed && !hasFightContext) uncertaintyOverall += 0.1;
   if (lexCue && hasJoke && !hasFightContext) uncertaintyOverall += 0.15; // mixed signals
   if (event.target === "unknown" && !pointed) uncertaintyOverall += 0.12;
-  if (evidenced && (pointed || hasFightContext) && !hasJoke) uncertaintyOverall -= 0.3;
+  if (evidenced && addressedAtKaira && !hasJoke) uncertaintyOverall -= 0.3;
   uncertaintyOverall = Math.max(0.12, Math.min(0.92, uncertaintyOverall));
 
   let target = targetFromLegacy(event.target);
@@ -191,7 +212,7 @@ function readLexicalHostility(message: string, event: SemanticEvent): LexicalHos
     // bare slur, no 2nd-person, no fight framing — don't claim it's aimed at Kaira
     target = "unknown";
   }
-  if (evidenced && (pointed || hasFightContext) && !isReporting && target !== "third_party") {
+  if (evidenced && addressedAtKaira && !isReporting && target !== "third_party") {
     target = "kaira";
   }
 
