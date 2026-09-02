@@ -57,9 +57,9 @@ describe("Kaira activity planning source snapshot contracts", () => {
   });
 
   it.each([
-    ["catalog_missing", "catalog", null],
-    ["environment_missing", "environment", null],
-    ["dynamic_state_missing", "dynamicState", null],
+    ["catalog_missing", "catalog"],
+    ["environment_missing", "environment"],
+    ["dynamic_state_missing", "dynamicState"],
   ] as const)("fails closed with %s instead of inventing defaults", async (reason, source) => {
     if (source === "catalog") catalog.load.mockResolvedValue(null);
     if (source === "environment") environment.load.mockResolvedValue(null);
