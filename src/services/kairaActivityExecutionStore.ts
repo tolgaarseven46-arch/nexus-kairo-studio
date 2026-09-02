@@ -1,6 +1,14 @@
-import { doc, runTransaction } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDocs,
+  limit,
+  query,
+  runTransaction,
+  where,
+} from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { kairaOwnerScope } from "./kairaInstanceContext";
+import { kairaOwnerScope, resolveKairaInstanceContext } from "./kairaInstanceContext";
 import {
   createKairaActivityExecution,
   transitionKairaActivityExecution,
@@ -13,6 +21,8 @@ import {
 import type { KairaInstanceContext } from "./kairaInstanceContext";
 
 const ACTIVITY_EXECUTION_COLLECTION = "kairaActivityExecutions";
+const DEFAULT_OPEN_EXECUTION_BATCH_SIZE = 25;
+const MAX_OPEN_EXECUTION_BATCH_SIZE = 100;
 
 const canonicalKey = (value: string) =>
   String(value || "")
@@ -27,6 +37,12 @@ const canonicalOwner = (value: string) =>
     .trim()
     .replace(/[^a-zA-Z0-9_@.+:-]+/g, "_")
     .slice(0, 160);
+
+function boundedOpenExecutionBatchSize(value?: number): number {
+  if (value === undefined) return DEFAULT_OPEN_EXECUTION_BATCH_SIZE;
+  if (!Number.isFinite(value)) throw new Error("Invalid Kaira open execution discovery batch size");
+  return Math.max(1, Math.min(MAX_OPEN_EXECUTION_BATCH_SIZE, Math.trunc(value)));
+}
 
 function executionDocumentId(ownerUserId: string, kairaInstanceId: string, activityId: string): string {
   const ownerScope = kairaOwnerScope(ownerUserId, kairaInstanceId);
@@ -123,6 +139,23 @@ function validateExecutionOwner(
   }
 }
 
+function isOpenExecutionForScope(
+  value: unknown,
+  ownerUserId: string,
+  kairaInstanceId: string,
+): value is KairaActivityExecutionRecord {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Partial<KairaActivityExecutionRecord>;
+  return Boolean(
+    record.schemaVersion === 1 &&
+    record.ownerUserId === ownerUserId &&
+    record.kairaInstanceId === kairaInstanceId &&
+    (record.phase === "planned" || record.phase === "active") &&
+    String(record.activityId || "").trim() &&
+    String(record.activityType || "").trim(),
+  );
+}
+
 export type KairaActivityExecutionCreateResult =
   | { status: "created"; record: KairaActivityExecutionRecord }
   | { status: "existing"; record: KairaActivityExecutionRecord };
@@ -160,6 +193,32 @@ export async function createKairaActivityExecutionAtomic(input: {
     transaction.set(ref, seed);
     return { status: "created", record: seed } as const;
   });
+}
+
+/**
+ * Canonical planning read surface for work that still contributes execution load.
+ * Scope is explicit and server-derived callers can never mix another owner/instance.
+ */
+export async function listOpenKairaActivityExecutions(input: {
+  ownerUserId: string;
+  kairaInstanceId: string;
+  batchSize?: number;
+}): Promise<KairaActivityExecutionRecord[]> {
+  const ownerUserId = canonicalOwner(input.ownerUserId);
+  const kairaInstanceId = resolveKairaInstanceContext({ instanceId: input.kairaInstanceId }).instanceId;
+  if (!ownerUserId) throw new Error("Invalid Kaira open execution discovery owner");
+  const batchSize = boundedOpenExecutionBatchSize(input.batchSize);
+  const snapshot = await getDocs(query(
+    collection(db, ACTIVITY_EXECUTION_COLLECTION),
+    where("ownerUserId", "==", ownerUserId),
+    where("kairaInstanceId", "==", kairaInstanceId),
+    where("phase", "in", ["planned", "active"]),
+    limit(batchSize),
+  ));
+  return snapshot.docs
+    .map((item) => item.data())
+    .filter((record) => isOpenExecutionForScope(record, ownerUserId, kairaInstanceId))
+    .map((record) => ({ ...record }));
 }
 
 export async function transitionKairaActivityExecutionAtomic(input: {
