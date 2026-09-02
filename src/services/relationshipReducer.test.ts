@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   computeFamiliarity,
@@ -277,5 +278,55 @@ describe("RelationshipReducer — in-session exit from disengaged (RC-3 / S9)", 
     });
     const r2 = reduceRelationshipTurn(state);
     expect(r2.conversationState).not.toBe("disengaged");
+  });
+});
+
+describe("RelationshipReducer — repairProgress requires real injury (PR1-review fix)", () => {
+  it("does not accumulate on calm turns when there is no injury to repair", () => {
+    let s = baseInput({ prev: { scores: { warmth: 50, trust: 50, conflict: 0, hurt: 0, repairProgress: 0 } } as never });
+    let rp = 0;
+    for (let k = 0; k < 8; k += 1) {
+      const r = reduceRelationshipTurn(s);
+      rp = r.scores.repairProgress;
+      s = baseInput({ prev: { scores: r.scores } as never });
+    }
+    expect(rp).toBe(0);
+  });
+
+  it("decays toward 0 once injury drops below the floor, then grows again if injury returns", () => {
+    // start with real injury + some repairProgress
+    const withInjury = reduceRelationshipTurn(
+      baseInput({
+        prev: { scores: { warmth: 40, trust: 50, conflict: 18, hurt: 20, repairProgress: 18 } } as never,
+        signal: { valence: "positive", support: 0.4 },
+      }),
+    );
+    expect(withInjury.scores.repairProgress).toBeGreaterThanOrEqual(18); // injury present -> gains apply
+
+    // now injury is gone -> repairProgress must bleed off, not hold/grow
+    const injuryCleared = reduceRelationshipTurn(
+      baseInput({
+        prev: { scores: { warmth: 50, trust: 55, conflict: 1, hurt: 2, repairProgress: 25 } } as never,
+        signal: { valence: "positive", support: 0.4 },
+      }),
+    );
+    expect(injuryCleared.scores.repairProgress).toBeLessThan(25);
+  });
+});
+
+describe("RelationshipReducer — config has no dead knobs (PR1-review fix)", () => {
+  it("every leaf key in DEFAULT_RELATIONSHIP_REDUCER_CONFIG is read by the reducer", () => {
+    const src = readFileSync(new URL("./relationshipReducer.ts", import.meta.url), "utf8");
+    const leaves: string[] = [];
+    const walk = (obj: Record<string, unknown>) => {
+      for (const [k, v] of Object.entries(obj)) {
+        if (v && typeof v === "object" && !Array.isArray(v)) walk(v as Record<string, unknown>);
+        else leaves.push(k);
+      }
+    };
+    walk(DEFAULT_RELATIONSHIP_REDUCER_CONFIG as unknown as Record<string, unknown>);
+    const ignore = new Set(["version"]);
+    const unused = leaves.filter((k) => !ignore.has(k) && !new RegExp(`\\b${k}\\b`).test(src));
+    expect(unused).toEqual([]);
   });
 });

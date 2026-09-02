@@ -79,7 +79,13 @@ function buildTurnSignal(
     support: interp.support,
     compliment: interp.compliment,
     affection: interp.affection,
-    userStop: interp.stopRequest && /(\bsus\b|konuşma|kes\s|yeter\s+konuş|bitti\s+bu|konuşmak istemiyorum)/iu.test(event.raw),
+    // Only a genuine "end the conversation" intent — not the noun "konuşma"
+    // (STOP_TALKING_RE in the regex engine also matches "bu konuşma güzeldi").
+    userStop:
+      interp.stopRequest &&
+      /(^|\s)(sus|kes\s+(?:artık|şunu)|yeter\s+(?:artık|konuş)|konuşmak\s+istemiyorum|görüşmek\s+istemiyorum|bitir\s+(?:bu|şu)|bırak\s+beni)(\s|$)/iu.test(
+        event.raw,
+      ),
     uncertainty: interp.uncertainty.overall,
     negativePattern,
   };
