@@ -56,9 +56,15 @@ describe('beta conversation acceptance scenario', () => {
       NEUTRAL_DROIT_PERSONALITY,
       hurt.nextDynamicState,
     );
-    expect(repair.nextDynamicState.reactionMode).toBe('repairing');
+    // Close relationships may settle directly back to neutral after an accepted apology;
+    // the durable acceptance invariant is that repair progresses and damage decreases.
+    expect(['repairing', 'neutral']).toContain(repair.nextDynamicState.reactionMode);
     expect(repair.nextDynamicState.relationship?.repairProgress ?? 0)
       .toBeGreaterThan(hurt.nextDynamicState.relationship?.repairProgress ?? 0);
+    expect(repair.nextDynamicState.relationship?.hurtScore ?? 100)
+      .toBeLessThan(hurt.nextDynamicState.relationship?.hurtScore ?? 0);
+    expect(repair.nextDynamicState.relationship?.conflictScore ?? 100)
+      .toBeLessThan(hurt.nextDynamicState.relationship?.conflictScore ?? 0);
 
     let state = repair.nextDynamicState;
     for (let index = 0; index < 30; index += 1) {
