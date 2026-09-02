@@ -5,6 +5,7 @@ import { readKairaProposalRecoveryWorkerHealth } from "./kairaProposalRecoveryWo
 import { resolveKairaProposalRecoveryWorkerHealthConfig } from "./kairaProposalRecoveryWorkerHealthConfig";
 import { runKairaAutonomousLifeWorkerDurable } from "./kairaAutonomousLifeWorkerDurableRunCoordinator";
 import { readKairaAutonomousLifeWorkerHealth } from "./kairaAutonomousLifeWorkerHealthRuntime";
+import { resolveKairaAutonomousLifeWorkerHealthConfig } from "./kairaAutonomousLifeWorkerHealthConfig";
 
 const clampLimit = (value: unknown) => {
   const parsed = Number(value);
@@ -127,10 +128,7 @@ export function registerKairaProposalRecoveryWorkerRoute(app: Express) {
   app.get("/internal/workers/kaira/autonomous-life/health", async (req: Request, res: Response) => {
     if (!authorizeRequest(req, res)) return;
 
-    const config = resolveKairaProposalRecoveryWorkerHealthConfig();
-    if (config.status === "disabled") {
-      return res.status(503).json({ ok: false, error: config.reason });
-    }
+    const config = resolveKairaAutonomousLifeWorkerHealthConfig();
     if (config.status === "invalid") {
       return res.status(500).json({ ok: false, error: config.reason });
     }
@@ -139,7 +137,7 @@ export function registerKairaProposalRecoveryWorkerRoute(app: Express) {
     try {
       const health = await readKairaAutonomousLifeWorkerHealth({
         now,
-        maxTerminalRunAgeMinutes: config.thresholds.maxSuccessfulRunAgeMinutes,
+        maxTerminalRunAgeMinutes: config.maxTerminalRunAgeMinutes,
         recentRunLimit: config.recentRunLimit,
       });
       return res.status(health.status === "unhealthy" ? 503 : 200).json({

@@ -1,0 +1,36 @@
+name: Kaira Autonomous Life Wakeup
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: Maximum work items per autonomous stage
+        required: false
+        default: "25"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kaira-autonomous-life-production
+  cancel-in-progress: false
+
+jobs:
+  wakeup:
+    if: ${{ vars.KAIRA_AUTONOMOUS_LIFE_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run and verify one durable autonomous-life tick
+        run: node scripts/run-kaira-autonomous-life-wakeup.mjs
+        env:
+          KAIRA_AUTONOMOUS_LIFE_URL: ${{ vars.KAIRA_AUTONOMOUS_LIFE_URL }}
+          KAIRA_INTERNAL_WORKER_SECRET: ${{ secrets.KAIRA_INTERNAL_WORKER_SECRET }}
+          KAIRA_AUTONOMOUS_LIFE_RUN_ID: gha-autonomous-${{ github.run_id }}
+          KAIRA_AUTONOMOUS_LIFE_LIMIT: ${{ inputs.limit || vars.KAIRA_AUTONOMOUS_LIFE_LIMIT || '25' }}

@@ -1208,3 +1208,15 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Production wakeup ownership is still external to this repository. Verify the deployed scheduler/cron invokes `/internal/workers/kaira/autonomous-life` with a stable unique run id and `KAIRA_INTERNAL_WORKER_SECRET`, then perform a real Firestore smoke test covering receipt creation, replay, degraded health and recovery to healthy.
+
+## 123. Repository-owned production wakeup and HTTP/Firestore smoke contract — 2026-09-02
+- GitHub Actions now owns a non-overlapping five-minute autonomous-life wakeup. It is enabled only when the repository variable `KAIRA_AUTONOMOUS_LIFE_URL` is configured, so an unknown deployment target is never guessed.
+- The scheduler uses `github.run_id` as the stable logical wakeup identity and deliberately excludes `run_attempt`; a GitHub rerun therefore replays the same durable worker receipt instead of applying the tick twice.
+- `KAIRA_INTERNAL_WORKER_SECRET` is read only from GitHub Actions secrets and is never stored or printed by the repository.
+- The native Node runner invokes the authenticated worker, repeats the same run id to prove the Firestore receipt replays without outcome drift, then reads holistic health and requires that the new durable run is visible.
+- Completed and degraded ticks are accepted; partial/failed ticks, non-JSON responses, run correlation drift, replay failure, unhealthy/unknown health and missing receipt visibility fail the scheduled job.
+- Permanent autonomous runtime CI gates cron cadence/concurrency, stable identity, secret handling, replay verification and health verification.
+- Holistic health uses a separate autonomous deployment config with cadence-aligned defaults (15-minute stale threshold, 20 recent receipts); it no longer incorrectly depends on proposal-recovery backlog thresholds.
+
+### Next verified development question
+- Configure the production host and GitHub with the same `KAIRA_INTERNAL_WORKER_SECRET`, set repository variable `KAIRA_AUTONOMOUS_LIFE_URL` to the real HTTPS deployment origin, manually dispatch one wakeup, and verify the first live receipt/health result before relying on cron.

@@ -8,8 +8,9 @@ vi.mock("./kairaInternalWorkerAuth", () => ({ authorizeKairaInternalWorker: auth
 vi.mock("./kairaAutonomousLifeWorkerDurableRunCoordinator", () => ({ runKairaAutonomousLifeWorkerDurable: autonomous.run }));
 vi.mock("./kairaProposalRecoveryWorkerRunCoordinator", () => ({ runKairaProposalRecoveryWorker: vi.fn() }));
 vi.mock("./kairaProposalRecoveryWorkerHealthRuntime", () => ({ readKairaProposalRecoveryWorkerHealth: vi.fn() }));
-vi.mock("./kairaProposalRecoveryWorkerHealthConfig", () => ({ resolveKairaProposalRecoveryWorkerHealthConfig: health.config }));
+vi.mock("./kairaProposalRecoveryWorkerHealthConfig", () => ({ resolveKairaProposalRecoveryWorkerHealthConfig: vi.fn() }));
 vi.mock("./kairaAutonomousLifeWorkerHealthRuntime", () => ({ readKairaAutonomousLifeWorkerHealth: health.read }));
+vi.mock("./kairaAutonomousLifeWorkerHealthConfig", () => ({ resolveKairaAutonomousLifeWorkerHealthConfig: health.config }));
 
 import { registerKairaProposalRecoveryWorkerRoute } from "./kairaProposalRecoveryWorkerRoute";
 
@@ -51,7 +52,7 @@ beforeEach(() => {
   process.env.KAIRA_INTERNAL_WORKER_SECRET = "secret";
   health.config.mockReturnValue({
     status: "configured",
-    thresholds: { maxSuccessfulRunAgeMinutes: 15 },
+    maxTerminalRunAgeMinutes: 15,
     recentRunLimit: 20,
   });
 });
