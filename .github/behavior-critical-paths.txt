@@ -1,0 +1,51 @@
+# Behavior-critical path listesi — ci.yml `behavior-guard` job'ının girdisi
+# (AI_CONTEXT.md §8 Hata Azaltma Protokolü, madde 8.2).
+#
+# Bu path'lerden birine dokunan PR:
+#   - diff'te en az bir  src/**/*.test.ts        içermeli (§8.10 fix + çürütücü test)
+#   - diff'te en az bir  *Regression* / *GoldenSession* / *LongSession* test dosyası
+#     içermeli (§8.5 golden long-session regression eklendi/güncellendi)
+#
+# Desen kuralları `.github/scripts/match-risky-paths.sh` ile aynı:
+#   dir/**      -> "dir/" ile başlayan her değişen dosya
+#   *.uzanti    -> bu uzantıyla biten her değişen dosya
+#   tam/yol.ext -> birebir eşleşme
+#
+# Bu, `.github/architecture-risky-paths.txt`'in davranış çekirdeğine daralan alt
+# kümesidir; genel governance kapıları (docs-guard, architecture-review) risky-paths
+# üzerinden ayrıca uygulanır.
+
+server.ts
+
+src/services/relationshipReducer.ts
+src/services/relationshipReducerConfig.ts
+src/services/relationshipConditionedAppraisal.ts
+src/services/relationshipConditionedRecovery.ts
+src/services/relationshipBehaviorService.ts
+src/services/kdmConsistencyEngine.ts
+src/services/kdmRelationshipReducerBridge.ts
+src/services/kdmChatBridge.ts
+src/services/kdmResponseRepairPolicy.ts
+src/services/behaviorContract.ts
+src/services/behaviorContractEnforcer.ts
+src/services/behaviorIntegrationEngine.ts
+src/services/behaviorPolicyInput.ts
+src/services/droitBehaviorEngine.ts
+src/services/learnedBehaviorPolicyBoundary.ts
+src/services/semanticEventEngine.ts
+src/services/semanticEventCanonicalizer.ts
+src/services/semanticEventAuthority.ts
+src/services/semanticInterpretationSchema.ts
+src/services/semanticInterpretationLegacyProjection.ts
+src/services/kairaResponsePlan.ts
+src/services/kairaPlanResolver.ts
+src/services/kairaHardConstraints.ts
+src/services/kairaSoftTendencies.ts
+src/services/kairoDialogueDecisionEngine.ts
+src/services/kairaDialogueTurnProjection.ts
+src/services/kairoSpeechIdentity.ts
+src/services/kairoResponseConsistency.ts
+src/services/worldModelResponseGuard.ts
+src/services/kairaAutobiographicalResponseGuard.ts
+src/services/appraisalEngine.ts
+src/services/temperamentEngine.ts

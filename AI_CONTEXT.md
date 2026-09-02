@@ -102,3 +102,60 @@ Lockfile: repo hem `package-lock.json` hem `bun.lock` tutar (bilinçli). CI `npm
 3. Kullanıcının son hedefi ile repo arasındaki fark kontrol edilir; tamamlanmış iş tekrar edilmez.
 4. Emin olunmayan geçmiş bilgi varsayılmaz; repo + bu katman esas alınır.
 5. İş sonunda `PROJECT_STATE.md`'ye yeni state eklenir (+ gerekiyorsa `AI_CHANGELOG.md` / yeni ADR).
+
+## 8. Değişiklik disiplini — Hata Azaltma Protokolü
+
+> Kalıcı proje geliştirme yasası (bkz. `docs/adr/0007`). Her agent her değişiklikte
+> uyar; **B/C sınıfı** (davranış/mimari/kontrat) değişikliklerinde zorunludur.
+> "B/C sınıfı" = §6 riskli path'e dokunan veya kabul edilmiş bir ADR'yi ilgilendiren değişiklik.
+
+### 8.1 Prensipler
+
+1. **Kanıt standardı.** Varsayım yok, kanıt var. Kod/log/test'ten doğrula.
+   **Test yeşil olması davranışın doğru olduğu anlamına gelmez** — yeşil suite
+   yalnızca yazılmış assertion'ların geçtiğini gösterir.
+2. **Minimal repro + karşı-örnek.** Önce bug'ı en küçük senaryoda üret. Sonra
+   ters/komşu örneklerle (yakın-ama-farklı girdiler) düzeltmeyi **çürütmeye çalış**;
+   çürütülemezse geçerlidir.
+3. **Tek karar kaynağı.** B/C değişikliklerinde davranışı belirleyen tek yetkili
+   karar/kaynak **yazılı olarak** doğrulanmalı (ADR, `PROJECT_STATE` state'i veya
+   kullanıcı talimatı) — sözlü/örtük değil.
+4. **Etki haritası.** B/C değişikliklerinde etki haritası **güncel dependency/consumer
+   haritasına** dayanır: neyin bu modülü import ettiği, hangi katmanın çıktısını
+   tükettiği koddan çıkarılır; "muhtemelen etkilenmez" yasak.
+5. **Golden long-session regression.** State/relationship/behavior değişikliklerinde
+   uzun-oturum golden regression testi CI'da **zorunlu** çalışır; PR ilgili golden/
+   long-session testini **ekler veya günceller** (bkz. §8.2).
+6. **İkinci göz.** B/C değişikliklerinde §6 Claude–Codex architecture review
+   (`/arch-approve <head-sha>`) ikinci göz olarak **zorunludur**.
+7. **Tekrar eden bug sınıfı → root-cause.** Aynı bug sınıfı ikinci kez görülürse,
+   yeni patch eklemeden **önce** root-cause incelemesi yapılır ve bulgu
+   `PROJECT_STATE.md`'ye bir state olarak yazılır. Semptom-üstüne-patch yasak.
+8. **Feature flag + eski/yeni karşılaştırma.** Büyük ve geri dönüşü riskli behavior
+   değişiklikleri feature flag arkasına alınır (flag OFF = eski davranış bit-birebir),
+   ve eski/yeni davranış aynı golden senaryoda karşılaştırılıp PR'da raporlanır.
+9. **KNT telemetry görünürlüğü.** Yeni kritik state/decision alanı KNT
+   telemetry'de (trace + `testSessionLayerAudit` + KNT export) **görünmeden merge edilmez**.
+10. **Çürütücü test zorunlu.** Fix'i *doğrulayan* test kadar, fix'i *çürütmeye çalışan*
+    test de yazılır (yanlış-pozitif/yanlış-negatif komşu vakalar).
+
+### 8.2 CI ile otomatik zorlanan maddeler
+
+`.github/workflows/ci.yml` `behavior-guard` job'ı (girdi: `.github/behavior-critical-paths.txt`)
+— bir behavior-critical path'e dokunan PR şunları içermek **zorundadır**:
+
+| Madde | CI kapısı |
+|---|---|
+| §8.5 golden regression testi eklendi/güncellendi | `behavior-guard`: diff'te `*Regression*` / `*GoldenSession*` / `*LongSession*` test dosyası olmalı |
+| §8.10 fix + çürütücü test | `behavior-guard`: diff'te en az bir `src/**/*.test.ts` olmalı |
+| §8.5 golden long-session her PR'da koşar | `validate` job'ı `test:beta` + `Beta conversation acceptance` adımları (uzun-oturum regression'ları içerir) |
+| §8.3 / §8.7 doküman izi | `docs-guard`: riskli path → `PROJECT_STATE.md` veya `docs/adr/**` güncellenmiş olmalı |
+| §8.6 ikinci göz | `architecture-review.yml`: riskli path → `architecture-review-required` + `/arch-approve <head-sha>` |
+| §8.1 doğrulama komutları | `validate` job'ı `lint` + `test` + `build` |
+
+**CI ile zorlanamayan (insan/review + PR şablonu ile):** §8.1 "kanıt standardı",
+§8.2 "minimal repro + karşı-örneğin gerçekten çürütücü olması", §8.3 karar kaynağının
+doğruluğu, §8.4 etki haritasının eksiksizliği, §8.7 root-cause'un yeterliliği,
+§8.8 "büyük/riskli" takdiri, §8.9 telemetri alanının anlamlılığı. Bunlar
+`.github/pull_request_template.md` "Hata Azaltma Protokolü" bölümü + architecture
+review ile denetlenir.
