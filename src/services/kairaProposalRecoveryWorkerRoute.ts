@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { authorizeKairaInternalWorker } from "./kairaInternalWorkerAuth";
-import { recoverSelectedKairaActivityProposalBatch } from "./kairaActivityProposalRecoveryBatch";
+import { recoverSelectedKairaActivityProposals } from "./kairaActivityProposalRecoveryDiscovery";
 
 const clampLimit = (value: unknown) => {
   const parsed = Number(value);
@@ -21,7 +21,7 @@ export function registerKairaProposalRecoveryWorkerRoute(app: Express) {
     const now = new Date().toISOString();
     const limit = clampLimit(req.body?.limit);
     try {
-      const result = await recoverSelectedKairaActivityProposalBatch({ now, limit });
+      const result = await recoverSelectedKairaActivityProposals({ now, batchSize: limit });
       return res.json({
         ok: true,
         processedAt: now,
