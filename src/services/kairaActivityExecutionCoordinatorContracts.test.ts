@@ -184,10 +184,11 @@ describe("Kaira activity execution coordinator contracts", () => {
   });
 
   it("routes completed activity with outcome through experience authority before planning trigger", async () => {
+    const completedAt = "2026-09-02T00:20:00.000Z";
     const completedRecord = record({
       phase: "completed",
-      updatedAt: "2026-09-02T00:20:00.000Z",
-      completedAt: "2026-09-02T00:20:00.000Z",
+      updatedAt: completedAt,
+      completedAt,
     });
     store.command.mockResolvedValue({ status: "applied", record: completedRecord });
     const completed = {
@@ -202,14 +203,14 @@ describe("Kaira activity execution coordinator contracts", () => {
       kairaInstanceId: "kaira_a",
       activityId: "theatre_01",
       command: { type: "complete", authority: "kaira_activity_executor" },
-      now: "2026-09-02T00:20:00.000Z",
+      now: completedAt,
       outcome: { outcomeValence: 0.8, appraisalConfidence: 0.9, attributionConfidence: 0.9 },
     });
 
     expect(store.command.mock.invocationCallOrder[0]).toBeLessThan(experience.complete.mock.invocationCallOrder[0]);
     expect(experience.complete.mock.invocationCallOrder[0]).toBeLessThan(inbox.enqueue.mock.invocationCallOrder[0]);
     expect(inbox.enqueue).toHaveBeenCalledWith(expect.objectContaining({
-      trigger: expect.objectContaining({ terminalPhase: "completed", occurredAt: completedRecord.completedAt }),
+      trigger: expect.objectContaining({ terminalPhase: "completed", occurredAt: completedAt }),
     }));
     expect(result.completedExperience).toBe(completed);
   });
