@@ -122,11 +122,6 @@ export const EMPTY_SEVERITY_VECTOR: Readonly<SeverityVector> = Object.freeze({
   aggression: 0,
 });
 
-/** Highest single component — a convenience for logging only, never for gating. */
-export function severityMagnitude(v: SeverityVector): number {
-  return Math.max(v.disrespect, v.coercion, v.manipulation, v.privacy, v.aggression);
-}
-
 /** L2-ish aggregate used by the reducer for graded (not gated) effects. */
 export function severityLoad(v: SeverityVector): number {
   const sq =

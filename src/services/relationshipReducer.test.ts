@@ -138,13 +138,48 @@ describe("RelationshipReducer — combined-signal redline, config-driven (RC-2 /
   });
 
   it("thresholds are config-driven: lowering hardStopThreshold flips the borderline case", () => {
-    const borderline = baseSignal({ valence: "negative", targetsKaira: true, severity: { disrespect: 0.35, coercion: 0, manipulation: 0, privacy: 0, aggression: 0.12 }, sincerityConfidence: 0.8, uncertainty: 0.2 });
+    // present-turn severity is above the gate but only borderline against the score threshold
+    const borderline = baseSignal({ valence: "negative", targetsKaira: true, severity: { disrespect: 0.56, coercion: 0, manipulation: 0, privacy: 0, aggression: 0.1 }, sincerityConfidence: 0.8, uncertainty: 0.25 });
     const prev = { scores: { repeatedNegativeCount: 0 }, conversationState: "active" as const, reactionMode: "neutral" as const, affect: { anger: 10, stress: 20, happiness: 70, calmness: 70 } };
     const strict = evaluateRedline(borderline, prev, DEFAULT_RELATIONSHIP_REDUCER_CONFIG);
     const lenient = { ...DEFAULT_RELATIONSHIP_REDUCER_CONFIG, redline: { ...DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline, hardStopThreshold: 0.2 } };
     const loose = evaluateRedline(borderline, prev, lenient);
     expect(strict.disengage).toBe(false);
     expect(loose.disengage).toBe(true);
+  });
+
+  it("CRITICAL FIX: an apology (zero present severity) after prior conflict + boundary never hard-stops", () => {
+    const apology = baseSignal({ valence: "positive", targetsKaira: true, apology: true, sincerityConfidence: 0.85, uncertainty: 0.3 });
+    const withHistory = {
+      scores: { repeatedNegativeCount: 2 },
+      conversationState: "active" as const,
+      reactionMode: "irritated" as const,
+      affect: { anger: 25, stress: 45, happiness: 55, calmness: 55 },
+      boundarySetByKaira: true,
+    };
+    const r = evaluateRedline(apology, withHistory, DEFAULT_RELATIONSHIP_REDUCER_CONFIG);
+    expect(r.disengage).toBe(false);
+    expect(r.presentSeverity).toBeLessThan(DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline.minPresentSeverity);
+  });
+
+  it("CRITICAL FIX: a mild remark below minPresentSeverity cannot hard-stop from history alone", () => {
+    const mild = baseSignal({ valence: "negative", targetsKaira: true, severity: { disrespect: 0.45, coercion: 0, manipulation: 0, privacy: 0, aggression: 0.2 }, sincerityConfidence: 0.9 });
+    const heavyHistory = {
+      scores: { repeatedNegativeCount: 3 },
+      conversationState: "distancing" as const,
+      reactionMode: "hurt" as const,
+      affect: { anger: 30, stress: 55, happiness: 45, calmness: 45 },
+      boundarySetByKaira: true,
+    };
+    expect(evaluateRedline(mild, heavyHistory, DEFAULT_RELATIONSHIP_REDUCER_CONFIG).disengage).toBe(false);
+  });
+
+  it("repetition + prior boundary AMPLIFY a genuinely severe present turn (still gated on present harm)", () => {
+    const severeNow = baseSignal({ valence: "negative", targetsKaira: true, severity: { disrespect: 0.9, coercion: 0.2, manipulation: 0, privacy: 0, aggression: 0.7 }, sincerityConfidence: 0.9 });
+    const noHistory = evaluateRedline(severeNow, { scores: { repeatedNegativeCount: 0 }, conversationState: "active", reactionMode: "neutral", affect: { anger: 10, stress: 20, happiness: 70, calmness: 70 } }, DEFAULT_RELATIONSHIP_REDUCER_CONFIG);
+    const withHistory = evaluateRedline(severeNow, { scores: { repeatedNegativeCount: 2 }, conversationState: "distancing", reactionMode: "hurt", affect: { anger: 25, stress: 40, happiness: 55, calmness: 55 }, boundarySetByKaira: true }, DEFAULT_RELATIONSHIP_REDUCER_CONFIG);
+    expect(withHistory.score).toBeGreaterThan(noHistory.score);
+    expect(withHistory.disengage).toBe(true);
   });
 });
 

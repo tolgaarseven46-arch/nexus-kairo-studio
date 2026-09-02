@@ -1,7 +1,6 @@
 {
-  "$schema": "./relationship-reducer.schema.json",
   "version": 1,
-  "note": "ADR-0006 canonical relationship reducer weights. NOT permanent truth — calibrated from fixtures/telemetry in PR6. No downstream code may hardcode these numbers.",
+  "note": "ADR-0006 canonical relationship reducer weights. NOT permanent truth — calibrated from fixtures/telemetry in PR6. No downstream code may hardcode these numbers. Mirrors DEFAULT_RELATIONSHIP_REDUCER_CONFIG.",
 
   "familiarity": {
     "ageScaleDays": 21,
@@ -21,7 +20,8 @@
   "redline": {
     "hardStopThreshold": 0.78,
     "minCombinedSignals": 2,
-    "soloSignalCap": 0.6,
+    "minPresentSeverity": 0.55,
+    "note": "PR1-review fix: no hard-stop unless THIS turn's top harm dimension >= minPresentSeverity. repetition/priorBoundarySet are AMPLIFIERS of present harm, never independent contributors — so an apology or a benign remark can never hard-stop from history alone.",
     "weights": {
       "disrespect": 0.9,
       "coercion": 0.85,
@@ -61,17 +61,20 @@
     "calmTurnStrength": 0.12,
     "positiveTurnStrength": 0.18,
     "nonRepetitionStrength": 0.08,
-    "conflictDecayScale": 22,
-    "hurtDecayScale": 26,
+    "conflictDecayScale": 6,
+    "hurtDecayScale": 5,
     "repairGainApology": 12,
     "repairGainCalm": 3,
-    "repairGainPositive": 4
+    "repairGainPositive": 4,
+    "repairInjuryFloor": 6,
+    "repairDecayNoInjury": 4,
+    "note": "conflictDecayScale/hurtDecayScale now cap ABSOLUTE points recoverable per turn (paired with maxSingleTurnRecovery). repairProgress does not grow when max(conflict,hurt) < repairInjuryFloor; it decays by repairDecayNoInjury instead."
   },
 
   "warmthHomeostasis": {
     "baseline": 50,
     "driftPerCalmTurn": 0.6,
-    "note": "warmth drifts gently back toward baseline on calm turns so ordinary friendly chat does not ratchet down."
+    "note": "warmth drifts gently toward baseline on calm turns so ordinary friendly chat does not ratchet down."
   },
 
   "conversationState": {
@@ -107,7 +110,7 @@
     "withdrawnMaxStressPerTurn": 4,
     "hurtMaxStressPerTurn": 4,
     "irritatedMaxStressPerTurn": 4,
-    "note": "these are CAPS scaled by this-turn signal magnitude, NOT floors. A neutral turn while withdrawn produces ~0.",
+    "note": "CAPS scaled by this-turn signal magnitude, NOT floors. A neutral turn while withdrawn produces ~0.",
     "towardBaselineStep": 1
   }
 }

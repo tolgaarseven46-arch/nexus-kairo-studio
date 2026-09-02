@@ -8,7 +8,8 @@
 export interface RedlinePolicyConfig {
   hardStopThreshold: number;
   minCombinedSignals: number;
-  soloSignalCap: number;
+  /** No hard-stop is possible unless THIS turn's top harm dimension reaches this. */
+  minPresentSeverity: number;
   weights: {
     disrespect: number;
     coercion: number;
@@ -62,11 +63,17 @@ export interface RelationshipReducerConfig {
     calmTurnStrength: number;
     positiveTurnStrength: number;
     nonRepetitionStrength: number;
+    /** Max ABSOLUTE conflict points recoverable in one turn (caps big backlogs). */
     conflictDecayScale: number;
+    /** Max ABSOLUTE hurt points recoverable in one turn. */
     hurtDecayScale: number;
     repairGainApology: number;
     repairGainCalm: number;
     repairGainPositive: number;
+    /** Below this max(conflict,hurt), repairProgress does not accumulate. */
+    repairInjuryFloor: number;
+    /** repairProgress bled off per turn while there is no injury to repair. */
+    repairDecayNoInjury: number;
   };
   warmthHomeostasis: {
     baseline: number;
@@ -119,7 +126,7 @@ export const DEFAULT_RELATIONSHIP_REDUCER_CONFIG: RelationshipReducerConfig = {
   redline: {
     hardStopThreshold: 0.78,
     minCombinedSignals: 2,
-    soloSignalCap: 0.6,
+    minPresentSeverity: 0.55,
     weights: {
       disrespect: 0.9,
       coercion: 0.85,
@@ -157,11 +164,13 @@ export const DEFAULT_RELATIONSHIP_REDUCER_CONFIG: RelationshipReducerConfig = {
     calmTurnStrength: 0.12,
     positiveTurnStrength: 0.18,
     nonRepetitionStrength: 0.08,
-    conflictDecayScale: 22,
-    hurtDecayScale: 26,
+    conflictDecayScale: 6,
+    hurtDecayScale: 5,
     repairGainApology: 12,
     repairGainCalm: 3,
     repairGainPositive: 4,
+    repairInjuryFloor: 6,
+    repairDecayNoInjury: 4,
   },
   warmthHomeostasis: { baseline: 50, driftPerCalmTurn: 0.6 },
   conversationState: {

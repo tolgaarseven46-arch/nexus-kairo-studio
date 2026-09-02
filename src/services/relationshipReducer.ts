@@ -168,59 +168,80 @@ interface RedlineEvaluation {
   disengage: boolean;
   score: number;
   contributors: number;
+  presentSeverity: number;
   reason: string | null;
 }
 
+/** Highest actual-harm dimension in THIS turn's message. */
+function presentSeverityOf(s: SeverityVector): number {
+  return Math.max(s.disrespect, s.coercion, s.aggression, s.manipulation, s.privacy);
+}
+
 /**
- * Combined-signal hard-stop decision. Config-driven; never fires on a single
- * lexical hit; joking + uncertainty dampen it. `minCombinedSignals` distinct
- * non-trivial contributors are required unless the user explicitly stops.
+ * Combined-signal hard-stop decision. Config-driven.
+ *
+ * Fixed (was the critical PR1-review bug): historical traces
+ * (`repeatedNegativeCount`, `boundarySetByKaira`) can no longer create a
+ * hard-stop on their own. They are AMPLIFIERS of harm that is actually present
+ * in the current turn — never independent contributors. A message whose
+ * present-turn severity is below `minPresentSeverity` (e.g. an apology, a benign
+ * remark) can never hard-stop, regardless of history. Only an explicit user stop
+ * bypasses the severity gate.
  */
 export function evaluateRedline(
   signal: RelationshipTurnSignal,
   prev: RelationshipReducerPrev,
   config: RelationshipReducerConfig,
 ): RedlineEvaluation {
-  if (signal.userStop) {
-    return { disengage: true, score: 1, contributors: 1, reason: "user_stop" };
-  }
-  const w = config.redline.weights;
-  const floor = config.redline.signalFloor;
   const s = signal.severity;
-  const repeated = num(prev.scores.repeatedNegativeCount, 0);
-  const repetitionFactor = clamp01(repeated / 2);
+  const presentSeverity = presentSeverityOf(s);
 
-  const rawContributors: Array<[string, number]> = [
+  if (signal.userStop) {
+    return { disengage: true, score: 1, contributors: 1, presentSeverity, reason: "user_stop" };
+  }
+
+  const rl = config.redline;
+  const w = rl.weights;
+  const floor = rl.signalFloor;
+
+  // Severity gate: no present harm -> no hard-stop, history irrelevant.
+  if (presentSeverity < rl.minPresentSeverity) {
+    return { disengage: false, score: 0, contributors: 0, presentSeverity, reason: null };
+  }
+
+  // Harm base: only real-harm dimensions (+ target). Context is NOT here.
+  const harmContributors: Array<[string, number]> = [
     ["disrespect", w.disrespect * s.disrespect],
     ["coercion", w.coercion * s.coercion],
     ["aggression", w.aggression * s.aggression],
     ["manipulation", w.manipulation * s.manipulation],
     ["privacy", w.privacy * s.privacy],
-    ["targetsKaira", signal.targetsKaira ? w.targetsKaira : 0],
-    ["repetition", w.repetition * repetitionFactor],
-    ["priorBoundary", prev.boundarySetByKaira ? w.priorBoundarySet : 0],
   ];
+  const contributors =
+    harmContributors.filter(([, v]) => v >= floor).length + (signal.targetsKaira ? 1 : 0);
+  const base =
+    harmContributors.reduce((acc, [, v]) => acc + v, 0) + (signal.targetsKaira ? w.targetsKaira : 0);
 
-  const contributors = rawContributors.filter(([, v]) => v >= floor).length;
-  let score = rawContributors.reduce((acc, [, v]) => acc + v, 0);
+  // Context AMPLIFIES present harm; it can raise the score but only because harm
+  // is already present (base > 0). It cannot manufacture a hard-stop.
+  const repetitionFactor = clamp01(num(prev.scores.repeatedNegativeCount, 0) / 2);
+  const amp =
+    1 + w.repetition * repetitionFactor + (prev.boundarySetByKaira ? w.priorBoundarySet : 0);
 
-  // A single dimension, however severe, is capped: needs corroboration.
-  const soloDim = rawContributors.filter(([k]) => k !== "targetsKaira").filter(([, v]) => v >= floor).length <= 1;
-  if (soloDim && contributors < config.redline.minCombinedSignals) {
-    score = Math.min(score, config.redline.soloSignalCap);
-  }
-
-  // Playful framing + interpretation doubt both pull the score down.
-  score *= 1 - config.redline.jokingDampen * signal.jokingConfidence * (1 - signal.sincerityConfidence);
-  score *= 1 - config.redline.uncertaintyDampen * signal.uncertainty;
+  let score = base * amp;
+  score *= 1 - rl.jokingDampen * signal.jokingConfidence * (1 - signal.sincerityConfidence);
+  score *= 1 - rl.uncertaintyDampen * signal.uncertainty;
 
   const disengage =
-    contributors >= config.redline.minCombinedSignals && score >= config.redline.hardStopThreshold;
+    presentSeverity >= rl.minPresentSeverity &&
+    contributors >= rl.minCombinedSignals &&
+    score >= rl.hardStopThreshold;
 
   return {
     disengage,
-    score: clamp01(score),
+    score,
     contributors,
+    presentSeverity,
     reason: disengage ? "combined_boundary_violation" : null,
   };
 }
@@ -358,8 +379,11 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   let lastConflictAt = prev.lastConflictAt;
   let lastNegativePattern = prev.lastNegativePattern;
 
-  const recoveredConflictDrop = recovery.strength * (conflictBefore / Math.max(1, config.recovery.conflictDecayScale)) * config.recovery.conflictDecayScale;
-  const recoveredHurtDrop = recovery.strength * (hurtBefore / Math.max(1, config.recovery.hurtDecayScale)) * config.recovery.hurtDecayScale;
+  // Points of conflict/hurt that recover this turn. `*DecayScale` is now an
+  // effective knob: it caps the ABSOLUTE points recoverable per turn, so a big
+  // backlog cannot vanish in one calm turn (paired with maxSingleTurnRecovery).
+  const recoveredConflictDrop = recovery.strength * Math.min(conflictBefore, config.recovery.conflictDecayScale);
+  const recoveredHurtDrop = recovery.strength * Math.min(hurtBefore, config.recovery.hurtDecayScale);
 
   if (kind === "negative") {
     conflict = clamp100(conflict + inj.baseConflict * injuryScale);
@@ -375,7 +399,15 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     // recovery applies on non-injury turns
     conflict = clamp100(conflict - recoveredConflictDrop);
     hurt = clamp100(hurt - recoveredHurtDrop);
-    if (signal.apology) {
+
+    // repairProgress is progress toward repairing ACTUAL damage. With no injury
+    // to repair it must not accumulate; it decays toward 0 so a long friendly
+    // chat never arrives at a fake "mid-repair" state (PR1-review fix).
+    const injuryToRepair = Math.max(conflictBefore, hurtBefore) >= config.recovery.repairInjuryFloor;
+    if (!injuryToRepair) {
+      repairProgress = Math.max(0, repairProgress - config.recovery.repairDecayNoInjury);
+      if (signal.apology || kind === "positive") trust = clamp100(trust + (signal.apology ? 1.5 : 1));
+    } else if (signal.apology) {
       repairProgress = clamp100(repairProgress + config.recovery.repairGainApology * (0.6 + signal.sincerityConfidence * 0.4));
       trust = clamp100(trust + 1.5);
     } else if (kind === "positive") {
