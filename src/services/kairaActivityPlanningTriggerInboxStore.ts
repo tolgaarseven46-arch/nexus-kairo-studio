@@ -66,12 +66,23 @@ function boundedBatchSize(value?: number): number {
   return Math.max(1, Math.min(MAX_BATCH_SIZE, Math.trunc(value)));
 }
 
+function validInstanceType(value: unknown): value is KairaInstanceContext["instanceType"] {
+  return value === "reference" || value === "welcome" || value === "individual";
+}
+
 function normalizeRecord(value: unknown): KairaActivityPlanningTriggerInboxRecord {
   if (!value || typeof value !== "object") throw new Error("Invalid persisted Kaira planning trigger inbox record");
   const record = value as Partial<KairaActivityPlanningTriggerInboxRecord>;
+  if (
+    record.schemaVersion !== 1 ||
+    !String(record.kairaInstanceId || "").trim() ||
+    !validInstanceType(record.instanceType)
+  ) {
+    throw new Error("Invalid persisted Kaira planning trigger inbox record");
+  }
   const ownerUserId = ownerKey(record.ownerUserId);
   const instance = resolveKairaInstanceContext({
-    instanceId: String(record.kairaInstanceId || ""),
+    instanceId: record.kairaInstanceId,
     instanceType: record.instanceType,
   });
   if (!ownerUserId || !record.trigger || (record.status !== "pending" && record.status !== "consumed")) {
