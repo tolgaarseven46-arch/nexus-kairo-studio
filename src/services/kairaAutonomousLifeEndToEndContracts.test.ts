@@ -69,6 +69,21 @@ vi.mock("./kairaActivityScheduleStore", () => ({
   }),
 }));
 
+vi.mock("./kairaActivityPlanningTriggerInboxStore", () => ({
+  enqueueKairaActivityPlanningTriggerAtomic: vi.fn(async (input: any) => ({
+    status: "enqueued",
+    record: {
+      schemaVersion: 1,
+      ownerUserId: input.ownerUserId,
+      kairaInstanceId: input.kairaInstanceId,
+      instanceType: input.instanceType,
+      trigger: input.trigger,
+      status: "pending",
+      enqueuedAt: input.now,
+    },
+  })),
+}));
+
 vi.mock("./worldModelEventStore", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./worldModelEventStore")>();
   return {
@@ -299,6 +314,16 @@ describe("Autonomous Life E2E v1", () => {
       status: "consolidated",
       experiencePreferenceStatus: "projected",
       selfRevisionFactKey: "preferred_archive_mode",
+    });
+    expect(completed.planningTriggerInbox).toMatchObject({
+      status: "enqueued",
+      record: {
+        kairaInstanceId: "kaira_e2e",
+        trigger: {
+          kind: "execution_terminal",
+          terminalPhase: "completed",
+        },
+      },
     });
 
     expect(state.memories).toHaveLength(1);

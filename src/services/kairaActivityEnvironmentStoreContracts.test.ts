@@ -20,6 +20,7 @@ vi.mock("../lib/firebase", () => ({ db: { kind: "mock-db" } }));
 import type { KairaActivityEnvironmentSnapshot } from "./kairaActivityEnvironmentAuthority";
 import {
   loadKairaActivityEnvironmentSnapshot,
+  provisionOrRefreshKairaActivityEnvironmentAtomic,
   saveKairaActivityEnvironmentSnapshot,
 } from "./kairaActivityEnvironmentStore";
 
@@ -175,5 +176,29 @@ describe("Kaira activity environment store contracts", () => {
       kairaInstanceId: "kaira_a",
       instanceType: "individual",
     })).resolves.toBeNull();
+  });
+
+  it("provisions or refreshes only the exact built-in environment semantics", async () => {
+    mocks.transaction.get.mockResolvedValueOnce({ exists: () => false });
+    await expect(provisionOrRefreshKairaActivityEnvironmentAtomic({
+      kairaInstanceId: "kaira_a", instanceType: "individual", snapshot: snapshot(),
+    })).resolves.toMatchObject({ status: "provisioned" });
+
+    mocks.transaction.get.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => snapshot("2026-09-02T12:00:00.000Z"),
+    });
+    await expect(provisionOrRefreshKairaActivityEnvironmentAtomic({
+      kairaInstanceId: "kaira_a", instanceType: "individual", snapshot: snapshot("2026-09-02T12:05:00.000Z"),
+    })).resolves.toMatchObject({ status: "refreshed", snapshot: { observedAt: "2026-09-02T12:05:00.000Z" } });
+
+    const custom = snapshot("2026-09-02T12:00:00.000Z");
+    custom.entries[0] = { ...custom.entries[0], accessible: false };
+    mocks.transaction.get.mockResolvedValueOnce({ exists: () => true, data: () => custom });
+    const before = mocks.transaction.set.mock.calls.length;
+    await expect(provisionOrRefreshKairaActivityEnvironmentAtomic({
+      kairaInstanceId: "kaira_a", instanceType: "individual", snapshot: snapshot("2026-09-02T12:10:00.000Z"),
+    })).resolves.toMatchObject({ status: "existing", snapshot: { entries: [{ accessible: false }] } });
+    expect(mocks.transaction.set).toHaveBeenCalledTimes(before);
   });
 });

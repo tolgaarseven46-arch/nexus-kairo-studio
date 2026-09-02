@@ -25,7 +25,10 @@ export async function readKairaActivityPlanningSourceSnapshot(input: {
   occupancyBatchSize?: number;
 }): Promise<KairaActivityPlanningSourceSnapshotResult> {
   const [catalog, environment, occupancy, dynamicState] = await Promise.all([
-    loadActiveKairaActivityCatalog(),
+    loadActiveKairaActivityCatalog({
+      kairaInstanceId: input.record.kairaInstanceId,
+      instanceType: input.record.instanceType,
+    }),
     loadKairaActivityEnvironmentSnapshot({
       kairaInstanceId: input.record.kairaInstanceId,
       instanceType: input.record.instanceType,

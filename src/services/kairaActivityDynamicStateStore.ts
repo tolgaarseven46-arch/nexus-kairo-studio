@@ -179,3 +179,39 @@ export async function saveKairaActivityDynamicStateAtomic(input: {
     return { status: "saved", snapshot: first } as const;
   });
 }
+
+/** Seeds one canonical instance-owned baseline only when no observed state exists yet. */
+export async function provisionKairaActivityDynamicStateIfMissingAtomic(input: {
+  kairaInstanceId: string;
+  instanceType: KairaInstanceContext["instanceType"];
+  state: DroitDynamicState;
+  observedAt: string;
+  sourceId: string;
+}): Promise<{ status: "provisioned" | "existing"; snapshot: KairaActivityDynamicStateSnapshot }> {
+  const instance = resolveKairaInstanceContext({
+    instanceId: input.kairaInstanceId,
+    instanceType: input.instanceType,
+  });
+  if (!instancePolicy(instance.instanceType).autonomousActivityPlanning) {
+    throw new Error("Kaira instance cannot own autonomous dynamic state");
+  }
+  const sourceId = sourceKey(input.sourceId);
+  if (!sourceId) throw new Error("Invalid Kaira activity dynamic state source");
+  const next: KairaActivityDynamicStateSnapshot = {
+    schemaVersion: 1,
+    kairaInstanceId: instance.instanceId,
+    instanceType: instance.instanceType,
+    state: projectKairaActivityDynamicState(input.state),
+    observedAt: canonicalTime(input.observedAt),
+    sourceId,
+  };
+  const ref = doc(db, COLLECTION, instance.instanceId);
+  return runTransaction(db, async (transaction) => {
+    const currentSnapshot = await transaction.get(ref);
+    if (currentSnapshot.exists()) {
+      return { status: "existing", snapshot: normalizeSnapshot(currentSnapshot.data()) } as const;
+    }
+    transaction.set(ref, next);
+    return { status: "provisioned", snapshot: next } as const;
+  });
+}

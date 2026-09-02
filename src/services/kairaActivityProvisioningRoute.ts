@@ -32,8 +32,13 @@ function instanceType(value: unknown): KairaInstanceContext["instanceType"] | nu
 export function registerKairaActivityProvisioningRoute(app: Express) {
   app.get("/internal/kaira/activity-catalog", async (req: Request, res: Response) => {
     if (!authorize(req, res)) return;
+    const kairaInstanceId = String(req.query?.kairaInstanceId || "").trim();
+    const resolvedType = instanceType(req.query?.instanceType);
+    if (!kairaInstanceId || !resolvedType) {
+      return res.status(400).json({ ok: false, error: "invalid_activity_catalog_identity" });
+    }
     try {
-      const snapshot = await loadActiveKairaActivityCatalog();
+      const snapshot = await loadActiveKairaActivityCatalog({ kairaInstanceId, instanceType: resolvedType });
       if (!snapshot) return res.status(404).json({ ok: false, error: "activity_catalog_missing" });
       return res.json({ ok: true, snapshot });
     } catch (error: any) {
@@ -44,13 +49,17 @@ export function registerKairaActivityProvisioningRoute(app: Express) {
   app.post("/internal/kaira/activity-catalog", async (req: Request, res: Response) => {
     if (!authorize(req, res)) return;
     const catalogVersion = String(req.body?.catalogVersion || "").trim();
+    const kairaInstanceId = String(req.body?.kairaInstanceId || "").trim();
+    const resolvedType = instanceType(req.body?.instanceType);
     const entries = req.body?.entries;
-    if (!catalogVersion || !Array.isArray(entries)) {
+    if (!kairaInstanceId || !resolvedType || !catalogVersion || !Array.isArray(entries)) {
       return res.status(400).json({ ok: false, error: "invalid_activity_catalog_payload" });
     }
     try {
       const publishedAt = new Date().toISOString();
       const result = await publishKairaActivityCatalogAtomic({
+        kairaInstanceId,
+        instanceType: resolvedType,
         catalogVersion,
         entries: entries as KairaActivityCatalogEntry[],
         publishedAt,

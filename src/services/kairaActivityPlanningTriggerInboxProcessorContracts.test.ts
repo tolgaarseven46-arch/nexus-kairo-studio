@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const inbox = vi.hoisted(() => ({ list: vi.fn(), consume: vi.fn(), defer: vi.fn() }));
 const sources = vi.hoisted(() => ({ read: vi.fn() }));
 const planning = vi.hoisted(() => ({ commit: vi.fn() }));
+const provisioning = vi.hoisted(() => ({ provision: vi.fn() }));
 
 vi.mock("./kairaActivityPlanningTriggerInboxStore", () => ({
   listPendingKairaActivityPlanningTriggers: inbox.list,
@@ -14,6 +15,9 @@ vi.mock("./kairaActivityPlanningSourceSnapshot", () => ({
 }));
 vi.mock("./kairaActivityPlanningCommitCoordinator", () => ({
   evaluateAndCommitKairaActivityPlanningTrigger: planning.commit,
+}));
+vi.mock("./kairaActivityPlanningAuthorityProvisioning", () => ({
+  provisionKairaActivityPlanningAuthorities: provisioning.provision,
 }));
 
 import { processPendingKairaActivityPlanningTriggers } from "./kairaActivityPlanningTriggerInboxProcessor";
@@ -50,6 +54,7 @@ beforeEach(() => {
   inbox.defer.mockResolvedValue({ status: "deferred" });
   sources.read.mockResolvedValue(ready);
   planning.commit.mockResolvedValue({ status: "completed_none" });
+  provisioning.provision.mockResolvedValue({});
 });
 
 describe("Kaira planning trigger inbox processor contracts", () => {
@@ -61,6 +66,11 @@ describe("Kaira planning trigger inbox processor contracts", () => {
       occupancyBatchSize: 20,
     });
     expect(inbox.list).toHaveBeenCalledWith({ now: "2026-09-02T02:05:00.000Z", batchSize: 10 });
+    expect(provisioning.provision).toHaveBeenCalledWith({
+      record: record("trigger_1"),
+      now: "2026-09-02T02:05:00.000Z",
+    });
+    expect(provisioning.provision.mock.invocationCallOrder[0]).toBeLessThan(sources.read.mock.invocationCallOrder[0]);
     expect(sources.read).toHaveBeenCalledWith({ record: record("trigger_1"), occupancyBatchSize: 20 });
     expect(planning.commit.mock.invocationCallOrder[0]).toBeLessThan(inbox.consume.mock.invocationCallOrder[0]);
     expect(result).toMatchObject({ discovered: 1, completed: 1, busy: 0, deferred: 0, failed: 0 });
