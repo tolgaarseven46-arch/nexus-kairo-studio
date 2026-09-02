@@ -10,6 +10,12 @@ import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguag
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
 import { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";
 import { buildKairaResponsePlan, findKairaResponsePlanIssues, kairaResponsePlanInstruction } from "./src/services/kairaResponsePlan";
+import { isCanonicalBehaviorFlagEnabled } from "./src/config/canonicalBehaviorFlags";
+import {
+  buildCanonicalBehaviorBlock,
+  buildCanonicalObservationalContext,
+  buildCanonicalDialogueMoveContext,
+} from "./src/services/kairaCanonicalPromptBuilder";
 import {
   decideKairaControlledSpontaneity,
   kairaControlledSpontaneityInstruction,
@@ -721,21 +727,30 @@ app.post("/api/chat", async (req, res) => {
         behaviorPolicy?.expressionStyle,
       ),
       responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech),
+      canonicalPromptOn = isCanonicalBehaviorFlagEnabled("CANONICAL_PROMPT_BUILDER"),
       spontaneityDecision = decideKairaControlledSpontaneity({
         responsePlan,
         dynamicState: kdm.nextDynamicState,
         history: cleanHistory,
       }),
       responsePlanInstruction = [
-        kairaResponsePlanInstruction(responsePlan),
+        canonicalPromptOn
+          ? buildCanonicalBehaviorBlock(responsePlan)
+          : kairaResponsePlanInstruction(responsePlan),
         kairaControlledSpontaneityInstruction(spontaneityDecision, responsePlan),
       ].join("\n"),
-      dialogueDecisionInstruction = buildDialogueDecisionInstruction(
-        dialogueDecision,
-        responsePlan.allowQuestion,
-        responsePlan.maxSentences,
-        responsePlan.maxWords,
-      ),
+      dialogueDecisionInstruction = canonicalPromptOn
+        ? buildCanonicalDialogueMoveContext(
+            dialogueDecision.move,
+            dialogueDecision.target,
+            dialogueDecision.reason,
+          )
+        : buildDialogueDecisionInstruction(
+            dialogueDecision,
+            responsePlan.allowQuestion,
+            responsePlan.maxSentences,
+            responsePlan.maxWords,
+          ),
       enforcementRules = {
         continueConversation: responsePlan.continueConversation,
         humorAllowed: responsePlan.allowHumor,
@@ -994,8 +1009,25 @@ app.post("/api/chat", async (req, res) => {
     const relationshipInstruction = behaviorProfile.relationshipInstruction
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
+    // Flag ON: KDM scores/intent become observational-only context (no gate
+    // verbs); the single canonical behavior block is the sole decision surface.
+    const canonicalObservationalContext = canonicalPromptOn
+      ? buildCanonicalObservationalContext({
+          intent: kdm.trace.messageInterpretation.intent,
+          sentiment: kdm.trace.messageInterpretation.sentiment,
+          warmth: relationship.warmthScore,
+          trust: relationship.trustScore ?? 50,
+          conflict: relationship.conflictScore ?? 0,
+          hurt: relationship.hurtScore ?? 0,
+          reactionMode: kdm.nextDynamicState.reactionMode ?? null,
+        })
+      : "";
+    // WHAT/WHETHER authority. Flag OFF: the legacy stack is byte-identical.
+    // Flag ON: behaviorContractInstruction, the relationship directives and the
+    // "KDM ... bağlayıcıdır" line are dropped — the canonical block is the only
+    // place a social decision is stated.
     const system = `${buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character)}\n${speechIdentityPrompt(speech)}\n${languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)}\
-${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${selfMemoryInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${selfMemoryInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${canonicalPromptOn ? `${responsePlanInstruction}\n${canonicalObservationalContext}` : `${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.`}\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();

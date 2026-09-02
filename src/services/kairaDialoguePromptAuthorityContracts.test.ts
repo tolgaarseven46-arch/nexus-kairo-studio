@@ -44,21 +44,29 @@ describe("dialogue prompt final ResponsePlan authority", () => {
     expect(instruction).not.toContain("en fazla 80 kelime");
   });
 
-  it("server builds dialogue prompt instructions from the final ResponsePlan values", async () => {
+  it("server keeps legacy dialogue authority on flag OFF and canonical context on flag ON", async () => {
     const source = await readFile("server.ts", "utf8");
-    const expected = `buildDialogueDecisionInstruction(\n        dialogueDecision,\n        responsePlan.allowQuestion,\n        responsePlan.maxSentences,\n        responsePlan.maxWords,\n      )`;
 
-    expect(source).toContain(expected);
+    expect(source).toContain('isCanonicalBehaviorFlagEnabled("CANONICAL_PROMPT_BUILDER")');
+    expect(source).toContain("dialogueDecisionInstruction = canonicalPromptOn");
+    expect(source).toContain("buildCanonicalDialogueMoveContext(");
+    expect(source).toContain("buildDialogueDecisionInstruction(");
+    expect(source).toContain("responsePlan.allowQuestion");
+    expect(source).toContain("responsePlan.maxSentences");
+    expect(source).toContain("responsePlan.maxWords");
     expect(source.indexOf("responsePlan = buildKairaResponsePlan")).toBeLessThan(
-      source.indexOf("dialogueDecisionInstruction = buildDialogueDecisionInstruction"),
+      source.indexOf("dialogueDecisionInstruction = canonicalPromptOn"),
     );
   });
 
-  it("server injects the canonical relationship instruction that carries affective reaction mode into the AI prompt", async () => {
+  it("relationship directive is legacy-only while canonical mode uses observational relationship context", async () => {
     const source = await readFile("server.ts", "utf8");
 
     expect(source).toContain("const relationshipInstruction = behaviorProfile.relationshipInstruction");
     expect(source).toContain("İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}");
-    expect(source).toContain("${relationshipInstruction}");
+    expect(source).toContain("buildCanonicalObservationalContext({");
+    expect(source).toContain(
+      'canonicalPromptOn ? `${responsePlanInstruction}\\n${canonicalObservationalContext}` : `${relationshipInstruction}',
+    );
   });
 });
