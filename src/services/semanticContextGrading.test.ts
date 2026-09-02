@@ -101,3 +101,58 @@ describe("semantic context grading — single word / slang / banter must not sel
     expect(joke.sincerityConfidence).toBeLessThan(pointed.sincerityConfidence);
   });
 });
+
+/**
+ * PR #26 step 3–4 minimal repro set. The same slur stem ("kaşar") across five
+ * contexts must land in five different places. A lexical hit is only a CANDIDATE
+ * signal: it produces neither high severity nor a hard-stop until independent
+ * hostility evidence (pointed address, serious-conflict framing) resolves it.
+ */
+describe("kaşar minimal repro — one stem, five contexts", () => {
+  it("'kaşar ekmek' is food: no disrespect, no attack act, not aimed at Kaira", () => {
+    const i = interpretationFromRegexFloor("kaşar ekmek");
+    expect(i.severity.disrespect).toBeLessThan(0.1);
+    expect(i.target).not.toBe("kaira");
+    expect(i.secondarySocialActs).not.toContain("insult");
+    expect(hardStops("kaşar ekmek")).toBe(false);
+  });
+
+  it("'kaşarlı tost' / 'kaşar peyniri severim' are food: disrespect ~0", () => {
+    expect(interpretationFromRegexFloor("kaşarlı tost").severity.disrespect).toBeLessThan(0.1);
+    expect(interpretationFromRegexFloor("kaşar peyniri severim").severity.disrespect).toBeLessThan(0.1);
+    expect(hardStops("kaşarlı tost")).toBe(false);
+  });
+
+  it("'sen kaşarsın' is a pointed insult: disrespect-dominant, aimed at Kaira, hard-stops", () => {
+    const i = interpretationFromRegexFloor("sen kaşarsın");
+    expect(i.severity.disrespect).toBeGreaterThan(0.7);
+    expect(i.target).toBe("kaira");
+    expect(i.secondarySocialActs).toContain("insult");
+    expect(hardStops("sen kaşarsın")).toBe(true);
+  });
+
+  it("close friend + 'ulan kaşar 😂': banter/insult ambiguity is preserved, no hard-stop", () => {
+    const i = interpretationFromRegexFloor("ulan kaşar 😂");
+    // non-zero (the possibility is visible) but far below the severity gate
+    expect(i.severity.disrespect).toBeGreaterThan(0);
+    expect(i.severity.disrespect).toBeLessThan(DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline.minPresentSeverity);
+    expect(i.jokingConfidence).toBeGreaterThan(0.5);
+    expect(i.uncertainty.overall).toBeGreaterThan(0.6);
+    expect(hardStops("ulan kaşar 😂")).toBe(false);
+  });
+
+  it("'seninle ciddi ciddi kavga edeceğiz kaşar herif': serious-fight framing → real disrespect + hard-stop", () => {
+    const i = interpretationFromRegexFloor("seninle ciddi ciddi kavga edeceğiz kaşar herif");
+    expect(i.severity.disrespect).toBeGreaterThan(0.7);
+    expect(i.target).toBe("kaira");
+    expect(i.jokingConfidence).toBeLessThan(0.2);
+    expect(hardStops("seninle ciddi ciddi kavga edeceğiz kaşar herif")).toBe(true);
+  });
+
+  it("a lone 'kaşar' is a candidate only: ambiguous, wide uncertainty, never a lone hard-stop", () => {
+    const i = interpretationFromRegexFloor("kaşar");
+    expect(i.severity.disrespect).toBeLessThan(DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline.minPresentSeverity);
+    expect(i.uncertainty.overall).toBeGreaterThan(0.6);
+    expect(hardStops("kaşar")).toBe(false);
+  });
+});
