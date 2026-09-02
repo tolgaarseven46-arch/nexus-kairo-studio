@@ -2,24 +2,39 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   run: vi.fn(),
+  health: vi.fn(),
+  config: vi.fn(),
 }));
 
 vi.mock("./kairaProposalRecoveryWorkerRunCoordinator", () => ({
   runKairaProposalRecoveryWorker: mocks.run,
 }));
+vi.mock("./kairaProposalRecoveryWorkerHealthRuntime", () => ({
+  readKairaProposalRecoveryWorkerHealth: mocks.health,
+}));
+vi.mock("./kairaProposalRecoveryWorkerHealthConfig", () => ({
+  resolveKairaProposalRecoveryWorkerHealthConfig: mocks.config,
+}));
 
 import { registerKairaProposalRecoveryWorkerRoute } from "./kairaProposalRecoveryWorkerRoute";
 
+type Handler = (req: any, res: any) => Promise<unknown>;
+
 function routeHarness() {
-  let handler: ((req: any, res: any) => Promise<unknown>) | undefined;
+  let postHandler: Handler | undefined;
+  let getHandler: Handler | undefined;
   const app = {
-    post: vi.fn((path: string, fn: typeof handler) => {
+    post: vi.fn((path: string, fn: Handler) => {
       expect(path).toBe("/internal/workers/kaira/proposal-recovery");
-      handler = fn;
+      postHandler = fn;
+    }),
+    get: vi.fn((path: string, fn: Handler) => {
+      expect(path).toBe("/internal/workers/kaira/proposal-recovery/health");
+      getHandler = fn;
     }),
   } as any;
   registerKairaProposalRecoveryWorkerRoute(app);
-  if (!handler) throw new Error("worker handler not registered");
+  if (!postHandler || !getHandler) throw new Error("worker routes not registered");
   const response = {
     statusCode: 200,
     body: undefined as any,
@@ -32,7 +47,7 @@ function routeHarness() {
       return this;
     }),
   };
-  return { handler, response };
+  return { postHandler, getHandler, response };
 }
 
 function req(headers: Record<string, string>, body: Record<string, unknown> = {}) {
@@ -46,28 +61,29 @@ function req(headers: Record<string, string>, body: Record<string, unknown> = {}
 beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.KAIRA_INTERNAL_WORKER_SECRET;
+  mocks.config.mockReturnValue({ status: "disabled", reason: "health_policy_not_configured" });
 });
 
 describe("Kaira proposal recovery worker route contracts", () => {
   it("fails closed when worker auth is not configured", async () => {
-    const { handler, response } = routeHarness();
-    await handler(req({ authorization: "Bearer anything", "x-kaira-worker-run-id": "run_1" }), response);
+    const { postHandler, response } = routeHarness();
+    await postHandler(req({ authorization: "Bearer anything", "x-kaira-worker-run-id": "run_1" }), response);
     expect(response.statusCode).toBe(503);
     expect(mocks.run).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid bearer before recovery coordination", async () => {
     process.env.KAIRA_INTERNAL_WORKER_SECRET = "secret";
-    const { handler, response } = routeHarness();
-    await handler(req({ authorization: "Bearer wrong", "x-kaira-worker-run-id": "run_1" }), response);
+    const { postHandler, response } = routeHarness();
+    await postHandler(req({ authorization: "Bearer wrong", "x-kaira-worker-run-id": "run_1" }), response);
     expect(response.statusCode).toBe(403);
     expect(mocks.run).not.toHaveBeenCalled();
   });
 
   it("requires a stable logical run id after successful authentication", async () => {
     process.env.KAIRA_INTERNAL_WORKER_SECRET = "secret";
-    const { handler, response } = routeHarness();
-    await handler(req({ authorization: "Bearer secret" }), response);
+    const { postHandler, response } = routeHarness();
+    await postHandler(req({ authorization: "Bearer secret" }), response);
     expect(response.statusCode).toBe(400);
     expect(response.body).toMatchObject({ ok: false, error: "worker_run_id_required" });
     expect(mocks.run).not.toHaveBeenCalled();
@@ -88,8 +104,8 @@ describe("Kaira proposal recovery worker route contracts", () => {
       },
       batch: { discovered: 0, processed: 0, failed: 0, items: [] },
     });
-    const { handler, response } = routeHarness();
-    await handler(req(
+    const { postHandler, response } = routeHarness();
+    await postHandler(req(
       { authorization: "Bearer secret", "x-kaira-worker-run-id": "wake_123" },
       { limit: 999, now: "1900-01-01T00:00:00.000Z" },
     ), response);
@@ -102,5 +118,66 @@ describe("Kaira proposal recovery worker route contracts", () => {
     expect(Number.isFinite(Date.parse(call.now))).toBe(true);
     expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({ ok: true, runId: "wake_123", limit: 100, status: "completed" });
+  });
+
+  it("requires the same internal auth before reading health", async () => {
+    process.env.KAIRA_INTERNAL_WORKER_SECRET = "secret";
+    const { getHandler, response } = routeHarness();
+    await getHandler(req({ authorization: "Bearer wrong" }), response);
+    expect(response.statusCode).toBe(403);
+    expect(mocks.config).not.toHaveBeenCalled();
+    expect(mocks.health).not.toHaveBeenCalled();
+  });
+
+  it("does not read Firestore health data when deployment health policy is not configured", async () => {
+    process.env.KAIRA_INTERNAL_WORKER_SECRET = "secret";
+    const { getHandler, response } = routeHarness();
+    await getHandler(req({ authorization: "Bearer secret" }), response);
+    expect(response.statusCode).toBe(503);
+    expect(response.body).toEqual({ ok: false, error: "health_policy_not_configured" });
+    expect(mocks.health).not.toHaveBeenCalled();
+  });
+
+  it("returns unhealthy as 503 from a read-only health projection", async () => {
+    process.env.KAIRA_INTERNAL_WORKER_SECRET = "secret";
+    const thresholds = {
+      maxSuccessfulRunAgeMinutes: 15,
+      degradedBacklog: 10,
+      unhealthyBacklog: 50,
+      degradedConsecutiveWorkerFailures: 1,
+      unhealthyConsecutiveWorkerFailures: 3,
+      degradedItemFailureRate: 0.2,
+      unhealthyItemFailureRate: 0.5,
+    };
+    mocks.config.mockReturnValue({
+      status: "configured",
+      thresholds,
+      recentRunLimit: 20,
+      backlogSampleLimit: 100,
+    });
+    mocks.health.mockResolvedValue({
+      status: "unhealthy",
+      reasons: ["recovery_backlog_high"],
+      latestRunId: "run_7",
+      latestSuccessfulRunAt: "2026-09-02T00:00:00.000Z",
+      consecutiveWorkerFailures: 0,
+      recentItemFailureRate: 0,
+      selectedBacklogSampleCount: 100,
+      backlogSampleLimit: 100,
+      backlogSampleSaturated: true,
+    });
+    const { getHandler, response } = routeHarness();
+    await getHandler(req({ authorization: "Bearer secret" }), response);
+
+    expect(mocks.health).toHaveBeenCalledWith(expect.objectContaining({
+      thresholds,
+      recentRunLimit: 20,
+      backlogSampleLimit: 100,
+    }));
+    expect(response.statusCode).toBe(503);
+    expect(response.body).toMatchObject({
+      ok: false,
+      health: { status: "unhealthy", reasons: ["recovery_backlog_high"] },
+    });
   });
 });
