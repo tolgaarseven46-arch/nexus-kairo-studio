@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  recover: vi.fn(),
+  run: vi.fn(),
 }));
 
-vi.mock("./kairaActivityProposalRecoveryDiscovery", () => ({
-  recoverSelectedKairaActivityProposals: mocks.recover,
+vi.mock("./kairaProposalRecoveryWorkerRunCoordinator", () => ({
+  runKairaProposalRecoveryWorker: mocks.run,
 }));
 
 import { registerKairaProposalRecoveryWorkerRoute } from "./kairaProposalRecoveryWorkerRoute";
@@ -35,6 +35,14 @@ function routeHarness() {
   return { handler, response };
 }
 
+function req(headers: Record<string, string>, body: Record<string, unknown> = {}) {
+  const normalized = Object.fromEntries(Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]));
+  return {
+    get: (name: string) => normalized[name.toLowerCase()],
+    body,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.KAIRA_INTERNAL_WORKER_SECRET;
@@ -43,34 +51,56 @@ beforeEach(() => {
 describe("Kaira proposal recovery worker route contracts", () => {
   it("fails closed when worker auth is not configured", async () => {
     const { handler, response } = routeHarness();
-    await handler({ get: () => "Bearer anything", body: {} }, response);
+    await handler(req({ authorization: "Bearer anything", "x-kaira-worker-run-id": "run_1" }), response);
     expect(response.statusCode).toBe(503);
-    expect(mocks.recover).not.toHaveBeenCalled();
+    expect(mocks.run).not.toHaveBeenCalled();
   });
 
-  it("rejects an invalid bearer before recovery discovery", async () => {
+  it("rejects an invalid bearer before recovery coordination", async () => {
     process.env.KAIRA_INTERNAL_WORKER_SECRET = "secret";
     const { handler, response } = routeHarness();
-    await handler({ get: () => "Bearer wrong", body: {} }, response);
+    await handler(req({ authorization: "Bearer wrong", "x-kaira-worker-run-id": "run_1" }), response);
     expect(response.statusCode).toBe(403);
-    expect(mocks.recover).not.toHaveBeenCalled();
+    expect(mocks.run).not.toHaveBeenCalled();
   });
 
-  it("uses server time and clamps the requested batch size", async () => {
+  it("requires a stable logical run id after successful authentication", async () => {
     process.env.KAIRA_INTERNAL_WORKER_SECRET = "secret";
-    mocks.recover.mockResolvedValue({ discovered: 0, processed: 0, failed: 0, items: [] });
     const { handler, response } = routeHarness();
-    await handler({
-      get: () => "Bearer secret",
-      body: { limit: 999, now: "1900-01-01T00:00:00.000Z" },
-    }, response);
+    await handler(req({ authorization: "Bearer secret" }), response);
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toMatchObject({ ok: false, error: "worker_run_id_required" });
+    expect(mocks.run).not.toHaveBeenCalled();
+  });
 
-    expect(mocks.recover).toHaveBeenCalledOnce();
-    const call = mocks.recover.mock.calls[0][0];
-    expect(call.batchSize).toBe(100);
+  it("uses server time, stable run id and clamps the requested batch size", async () => {
+    process.env.KAIRA_INTERNAL_WORKER_SECRET = "secret";
+    mocks.run.mockResolvedValue({
+      status: "completed",
+      receipt: {
+        runId: "wake_123",
+        status: "completed",
+        requestedLimit: 100,
+        startedAt: "2026-09-02T00:00:00.000Z",
+        leaseUntil: "2026-09-02T00:10:00.000Z",
+        completedAt: "2026-09-02T00:00:01.000Z",
+        summary: { discovered: 0, processed: 0, failed: 0, items: [] },
+      },
+      batch: { discovered: 0, processed: 0, failed: 0, items: [] },
+    });
+    const { handler, response } = routeHarness();
+    await handler(req(
+      { authorization: "Bearer secret", "x-kaira-worker-run-id": "wake_123" },
+      { limit: 999, now: "1900-01-01T00:00:00.000Z" },
+    ), response);
+
+    expect(mocks.run).toHaveBeenCalledOnce();
+    const call = mocks.run.mock.calls[0][0];
+    expect(call.runId).toBe("wake_123");
+    expect(call.requestedLimit).toBe(100);
     expect(call.now).not.toBe("1900-01-01T00:00:00.000Z");
     expect(Number.isFinite(Date.parse(call.now))).toBe(true);
     expect(response.statusCode).toBe(200);
-    expect(response.body).toMatchObject({ ok: true, limit: 100, discovered: 0 });
+    expect(response.body).toMatchObject({ ok: true, runId: "wake_123", limit: 100, status: "completed" });
   });
 });
