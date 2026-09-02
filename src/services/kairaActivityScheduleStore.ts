@@ -9,7 +9,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { kairaOwnerScope } from "./kairaInstanceContext";
+import { kairaOwnerScope, resolveKairaInstanceContext } from "./kairaInstanceContext";
 import {
   cancelKairaActivitySchedule,
   createKairaActivitySchedule,
@@ -31,6 +31,12 @@ const canonicalKey = (value: string) =>
     .replace(/[^a-z0-9_:-]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 96);
+
+const canonicalOwner = (value: string) =>
+  String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9_@.+:-]+/g, "_")
+    .slice(0, 160);
 
 function scheduleDocumentId(ownerUserId: string, kairaInstanceId: string, activityId: string): string {
   return `${kairaOwnerScope(ownerUserId, kairaInstanceId)}__schedule__${canonicalKey(activityId)}`.slice(0, 480);
@@ -84,6 +90,15 @@ function isDiscoverableScheduledRecord(value: unknown): value is KairaActivitySc
     String(record.activityId || "").trim() &&
     Number.isFinite(Date.parse(String(record.notBefore || ""))),
   );
+}
+
+function isScheduledRecordForScope(
+  value: unknown,
+  ownerUserId: string,
+  kairaInstanceId: string,
+): value is KairaActivityScheduleRecord {
+  if (!isDiscoverableScheduledRecord(value)) return false;
+  return value.ownerUserId === ownerUserId && value.kairaInstanceId === kairaInstanceId;
 }
 
 function discoveredRecords(snapshot: Awaited<ReturnType<typeof getDocs>>): KairaActivityScheduleRecord[] {
@@ -141,8 +156,7 @@ export async function loadKairaActivitySchedule(input: {
 }
 
 /**
- * Query-backed planning read surface. It returns canonical records still marked
- * scheduled, regardless of whether their trigger time is in the future.
+ * Query-backed broad worker/planning surface for all currently scheduled work.
  */
 export async function listScheduledKairaActivitySchedules(input: {
   batchSize?: number;
@@ -154,6 +168,33 @@ export async function listScheduledKairaActivitySchedules(input: {
     limit(batchSize),
   ));
   return discoveredRecords(snapshot);
+}
+
+/**
+ * Instance-scoped planning read surface. This is the schedule snapshot that may
+ * influence one Kaira's interruption/upcoming-work calculation; cross-owner or
+ * cross-instance rows are rejected again after Firestore query materialization.
+ */
+export async function listScheduledKairaActivitySchedulesForInstance(input: {
+  ownerUserId: string;
+  kairaInstanceId: string;
+  batchSize?: number;
+}): Promise<KairaActivityScheduleRecord[]> {
+  const ownerUserId = canonicalOwner(input.ownerUserId);
+  const kairaInstanceId = resolveKairaInstanceContext({ instanceId: input.kairaInstanceId }).instanceId;
+  if (!ownerUserId) throw new Error("Invalid Kaira scheduled activity discovery owner");
+  const batchSize = boundedDiscoveryBatchSize(input.batchSize);
+  const snapshot = await getDocs(query(
+    collection(db, ACTIVITY_SCHEDULE_COLLECTION),
+    where("ownerUserId", "==", ownerUserId),
+    where("kairaInstanceId", "==", kairaInstanceId),
+    where("status", "==", "scheduled"),
+    limit(batchSize),
+  ));
+  return snapshot.docs
+    .map((item) => item.data())
+    .filter((record) => isScheduledRecordForScope(record, ownerUserId, kairaInstanceId))
+    .map((record) => ({ ...record }));
 }
 
 /**
