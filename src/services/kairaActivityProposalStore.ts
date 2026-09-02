@@ -1,4 +1,13 @@
-import { doc, getDoc, runTransaction } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  query,
+  runTransaction,
+  where,
+} from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { kairaOwnerScope } from "./kairaInstanceContext";
 import {
@@ -49,6 +58,26 @@ export async function loadKairaActivityProposal(input: {
   const snapshot = await getDoc(ref);
   if (!snapshot.exists()) return null;
   return snapshot.data() as KairaActivityProposalRecord;
+}
+
+/**
+ * Query-backed recovery projection. Firestore indexes the canonical proposal
+ * status field, so workers inspect only selected work instead of scanning every
+ * proposal document. This remains a read model; proposal status is the authority.
+ */
+export async function listSelectedKairaActivityProposals(input?: {
+  batchSize?: number;
+}): Promise<KairaActivityProposalRecord[]> {
+  const batchSize = Math.max(1, Math.min(100, Math.floor(input?.batchSize || 25)));
+  const selectedQuery = query(
+    collection(db, COLLECTION),
+    where("status", "==", "selected"),
+    limit(batchSize),
+  );
+  const snapshot = await getDocs(selectedQuery);
+  return snapshot.docs
+    .map((entry) => entry.data() as KairaActivityProposalRecord)
+    .filter((record) => record?.schemaVersion === 1 && record.status === "selected");
 }
 
 export async function markKairaActivityProposalMaterializedAtomic(input: {
