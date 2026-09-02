@@ -19,6 +19,7 @@ import {
   createKairaActivityScheduleAtomic,
   listDueKairaActivitySchedules,
   listScheduledKairaActivitySchedules,
+  listScheduledKairaActivitySchedulesForInstance,
 } from "./kairaActivityScheduleStore";
 
 beforeEach(() => vi.clearAllMocks());
@@ -87,6 +88,29 @@ describe("Kaira activity schedule store contracts", () => {
 
     const result = await listScheduledKairaActivitySchedules({ batchSize: 500 });
 
+    expect(firestore.where).toHaveBeenCalledWith("status", "==", "scheduled");
+    expect(firestore.limit).toHaveBeenCalledWith(100);
+    expect(result).toEqual([existing()]);
+  });
+
+  it("scopes planning schedule snapshots to one owner and Kaira instance", async () => {
+    firestore.getDocs.mockResolvedValue({
+      docs: [
+        { data: () => existing() },
+        { data: () => existing({ ownerUserId: "other_owner", activityId: "foreign_owner" }) },
+        { data: () => existing({ kairaInstanceId: "kaira_b", activityId: "foreign_kaira" }) },
+        { data: () => existing({ status: "dispatched", activityId: "already_dispatched" }) },
+      ],
+    });
+
+    const result = await listScheduledKairaActivitySchedulesForInstance({
+      ownerUserId: "owner_1",
+      kairaInstanceId: "kaira_a",
+      batchSize: 500,
+    });
+
+    expect(firestore.where).toHaveBeenCalledWith("ownerUserId", "==", "owner_1");
+    expect(firestore.where).toHaveBeenCalledWith("kairaInstanceId", "==", "kaira_a");
     expect(firestore.where).toHaveBeenCalledWith("status", "==", "scheduled");
     expect(firestore.limit).toHaveBeenCalledWith(100);
     expect(result).toEqual([existing()]);
