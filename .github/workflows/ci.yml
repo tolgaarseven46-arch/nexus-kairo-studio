@@ -25,7 +25,7 @@ jobs:
         run: npm run test:contracts
 
       - name: Autonomous runtime contracts
-        run: npx vitest run src/services/kairaActivityScheduleDispatchDiscoveryContracts.test.ts
+        run: npx vitest run src/services/kairaActivityScheduleDispatchDiscoveryContracts.test.ts src/services/kairaAutonomousLifeWorkerRunCoordinatorContracts.test.ts src/services/kairaAutonomousLifeWorkerRouteContracts.test.ts
 
       - name: Beta runtime regression gate
         run: npm run test:beta
