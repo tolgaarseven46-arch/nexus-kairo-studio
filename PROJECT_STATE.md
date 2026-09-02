@@ -1231,3 +1231,13 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Verify one deployed scheduled wakeup consumes the previously deferred terminal triggers, creates or deliberately declines a proposal under canonical policy, and returns healthy holistic runtime status.
+
+## 125. Autonomous Life production acceptance and runtime maintenance — 2026-09-02
+- PR #19 merged as main commit `34a1adc31416ff3091b4077112c1bddde11cf03c`; Render deploy `dep-dabrk5fqj5pc73dhao6g` became live from that exact commit.
+- Scheduled production wakeup `gha-autonomous-33596788847` completed on the deployed authority wiring, replayed its durable Firestore receipt without drift and returned holistic `healthy` status. This closes the previously deferred source-authority recovery acceptance item.
+- Successful scheduler output now includes the receipt's bounded planning, recovery and schedule summaries, making future production acceptance observable without exposing credentials or unbounded item payloads.
+- GitHub CI and the autonomous scheduler use `actions/checkout@v5`, `actions/setup-node@v5` and Node 24, removing the Node 20 deprecation path observed in the live scheduler run.
+- The earlier timeout/retry question is closed by request fingerprint reuse, distributed Firestore ownership/lease coordination and lost-response E2E replay contracts: one logical turn cannot advance relationship or dynamic state twice across process instances.
+
+### Autonomous Life phase status
+- Production authority wiring, persistent instance ownership, real trigger delivery, repository-owned scheduling, durable replay, holistic health and live recovery acceptance are complete. No known Autonomous Life production-runtime implementation item remains open.

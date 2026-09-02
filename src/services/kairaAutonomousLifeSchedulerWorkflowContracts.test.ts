@@ -11,6 +11,9 @@ describe("Kaira autonomous life production scheduler contracts", () => {
     expect(workflow).toContain("cancel-in-progress: false");
     expect(workflow).toContain("timeout-minutes: 5");
     expect(workflow).toContain("vars.KAIRA_AUTONOMOUS_LIFE_URL != ''");
+    expect(workflow).toContain("actions/checkout@v5");
+    expect(workflow).toContain("actions/setup-node@v5");
+    expect(workflow).toContain("node-version: 24");
   });
 
   it("uses one stable logical run id across workflow reruns", () => {
@@ -41,6 +44,7 @@ describe("Kaira autonomous life production scheduler contracts", () => {
     expect(runner).toContain("failedPlanningItems");
     expect(runner).toContain(".slice(0, 5)");
     expect(runner).toContain(".slice(0, 500)");
+    expect(runner).toContain("const summary = first.body?.receipt?.summary");
     expect(runner).not.toMatch(/console\.error\([^)]*secret/);
   });
 });

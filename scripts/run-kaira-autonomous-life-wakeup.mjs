@@ -100,6 +100,8 @@ if (first.body.status !== "busy" && health.body?.health?.latestRunId !== runId) 
   throw new Error("Autonomous life health does not observe the persisted run receipt");
 }
 
+const summary = first.body?.receipt?.summary;
+
 console.log(JSON.stringify({
   ok: true,
   runId,
@@ -107,4 +109,9 @@ console.log(JSON.stringify({
   deliveryStatus: first.body.deliveryStatus || first.body.status,
   replayVerified: replay !== null,
   health: health.body.health.status,
+  stages: summary ? {
+    planning: summary.planning,
+    recovery: summary.recovery,
+    schedules: summary.schedules,
+  } : undefined,
 }));
