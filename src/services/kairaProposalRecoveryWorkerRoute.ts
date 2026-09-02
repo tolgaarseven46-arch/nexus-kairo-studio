@@ -1,6 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { authorizeKairaInternalWorker } from "./kairaInternalWorkerAuth";
 import { runKairaProposalRecoveryWorker } from "./kairaProposalRecoveryWorkerRunCoordinator";
+import { readKairaProposalRecoveryWorkerHealth } from "./kairaProposalRecoveryWorkerHealthRuntime";
+import { resolveKairaProposalRecoveryWorkerHealthConfig } from "./kairaProposalRecoveryWorkerHealthConfig";
 
 const clampLimit = (value: unknown) => {
   const parsed = Number(value);
@@ -8,15 +10,21 @@ const clampLimit = (value: unknown) => {
   return Math.max(1, Math.min(100, Math.trunc(parsed)));
 };
 
+function authorizeRequest(req: Request, res: Response) {
+  const auth = authorizeKairaInternalWorker({
+    authorizationHeader: req.get("authorization"),
+    configuredSecret: process.env.KAIRA_INTERNAL_WORKER_SECRET,
+  });
+  if (auth.status !== "authorized") {
+    res.status(auth.httpStatus).json({ ok: false, error: auth.reason });
+    return false;
+  }
+  return true;
+}
+
 export function registerKairaProposalRecoveryWorkerRoute(app: Express) {
   app.post("/internal/workers/kaira/proposal-recovery", async (req: Request, res: Response) => {
-    const auth = authorizeKairaInternalWorker({
-      authorizationHeader: req.get("authorization"),
-      configuredSecret: process.env.KAIRA_INTERNAL_WORKER_SECRET,
-    });
-    if (auth.status !== "authorized") {
-      return res.status(auth.httpStatus).json({ ok: false, error: auth.reason });
-    }
+    if (!authorizeRequest(req, res)) return;
 
     const runId = String(req.get("x-kaira-worker-run-id") || "").trim();
     if (!runId) {
@@ -52,6 +60,38 @@ export function registerKairaProposalRecoveryWorkerRoute(app: Express) {
         ok: false,
         runId,
         error: error?.message || "proposal_recovery_worker_failed",
+      });
+    }
+  });
+
+  app.get("/internal/workers/kaira/proposal-recovery/health", async (req: Request, res: Response) => {
+    if (!authorizeRequest(req, res)) return;
+
+    const config = resolveKairaProposalRecoveryWorkerHealthConfig();
+    if (config.status === "disabled") {
+      return res.status(503).json({ ok: false, error: config.reason });
+    }
+    if (config.status === "invalid") {
+      return res.status(500).json({ ok: false, error: config.reason });
+    }
+
+    const now = new Date().toISOString();
+    try {
+      const health = await readKairaProposalRecoveryWorkerHealth({
+        now,
+        thresholds: config.thresholds,
+        recentRunLimit: config.recentRunLimit,
+        backlogSampleLimit: config.backlogSampleLimit,
+      });
+      return res.status(health.status === "unhealthy" ? 503 : 200).json({
+        ok: health.status !== "unhealthy",
+        checkedAt: now,
+        health,
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || "proposal_recovery_health_read_failed",
       });
     }
   });
