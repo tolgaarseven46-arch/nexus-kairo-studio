@@ -1,4 +1,13 @@
-import { doc, getDoc, runTransaction } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  query,
+  runTransaction,
+  where,
+} from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { kairaOwnerScope } from "./kairaInstanceContext";
 import {
@@ -12,6 +21,8 @@ import {
 import type { KairaInstanceContext } from "./kairaInstanceContext";
 
 const ACTIVITY_SCHEDULE_COLLECTION = "kairaActivitySchedules";
+const DEFAULT_DISCOVERY_BATCH_SIZE = 25;
+const MAX_DISCOVERY_BATCH_SIZE = 100;
 
 const canonicalKey = (value: string) =>
   String(value || "")
@@ -47,6 +58,25 @@ function sameScheduleSeed(
     record.activityId === expected.activityId &&
     record.notBefore === expected.notBefore &&
     record.expiresAt === expected.expiresAt
+  );
+}
+
+function boundedDiscoveryBatchSize(value?: number): number {
+  if (value === undefined) return DEFAULT_DISCOVERY_BATCH_SIZE;
+  if (!Number.isFinite(value)) throw new Error("Invalid Kaira activity schedule discovery batch size");
+  return Math.max(1, Math.min(MAX_DISCOVERY_BATCH_SIZE, Math.trunc(value)));
+}
+
+function isDiscoverableScheduledRecord(value: unknown): value is KairaActivityScheduleRecord {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Partial<KairaActivityScheduleRecord>;
+  return Boolean(
+    record.schemaVersion === 1 &&
+    record.status === "scheduled" &&
+    String(record.ownerUserId || "").trim() &&
+    String(record.kairaInstanceId || "").trim() &&
+    String(record.activityId || "").trim() &&
+    Number.isFinite(Date.parse(String(record.notBefore || ""))),
   );
 }
 
@@ -95,6 +125,26 @@ export async function loadKairaActivitySchedule(input: {
   ));
   if (!snapshot.exists()) return null;
   return snapshot.data() as KairaActivityScheduleRecord;
+}
+
+/**
+ * Query-backed worker discovery surface. It only discovers canonical records still
+ * marked `scheduled`; lifecycle/due/permission legality remains owned by the
+ * scheduler/executor coordinator when each item is dispatched.
+ */
+export async function listScheduledKairaActivitySchedules(input: {
+  batchSize?: number;
+} = {}): Promise<KairaActivityScheduleRecord[]> {
+  const batchSize = boundedDiscoveryBatchSize(input.batchSize);
+  const snapshot = await getDocs(query(
+    collection(db, ACTIVITY_SCHEDULE_COLLECTION),
+    where("status", "==", "scheduled"),
+    limit(batchSize),
+  ));
+  return snapshot.docs
+    .map((item) => item.data())
+    .filter(isDiscoverableScheduledRecord)
+    .map((record) => ({ ...record }));
 }
 
 export type KairaActivityScheduleDispatchCommitResult =
