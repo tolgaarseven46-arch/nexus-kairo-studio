@@ -28,6 +28,130 @@ import {
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
+// --- context frames used to grade lexical hostility (ADR-0006 §1) -----------
+const JOKE_MARKERS_RE =
+  /😂|🤣|😄|😅|😆|😜|😏|:d\b|\bxd\b|(?<![\p{L}])(?:haha+|hah+|hehe+|şaka|espri|troll|gırgır|taşak)(?![\p{L}])|dalga\s*geç|takıl(?:ıyor|dım|ıyoruz|dık)/iu;
+const AFFECTIONATE_FRAME_RE =
+  /(?<![\p{L}])(kank[a-zçğıöşü]*|birader|moruk|kardeşim|reis|aslanım|dostum|canım|aşkım|bebeğim|bebiş|tatlım|gülüm|prensesim)(?![\p{L}])/iu;
+const DIRECT_SECOND_PERSON_RE = /(?<![\p{L}])(sen|sana|seni|senin|senden|siz|sizi|sizin)(?![\p{L}])/iu;
+const QUESTION_FRAME_RE =
+  /[?？]|(?<![\p{L}])(mi|mı|mu|mü|misin|mısın|musun|müsün)(?![\p{L}])|değil\s*mi/iu;
+const REPORTING_FRAME_RE = /(?<![\p{L}])(dedi|demiş|dedim|söyledi|söyledim|diyor|diye|anlatt)(?![\p{L}])/iu;
+const VENT_FRAME_RE = /(?<![\p{L}])(amk|aq|mk|of+|off+)(?![\p{L}])|ya\s+be/iu;
+
+// Inflection-tolerant lexical cues. `interpretSemanticEvent`'s slur/insult
+// regexes are word-boundary bound and miss Turkish suffixed forms
+// ("orospusun", "kaşarsın", "aptalsın"). The grader needs to see those too,
+// otherwise a serious inflected insult and a banter one look identical.
+const SLUR_STEM_RE = /(?<![\p{L}])(orosp|kaşa[rs]|sürtük|kahpe|yavşak|piçsin|piç\b)/iu;
+const INSULT_STEM_RE =
+  /(?<![\p{L}])(aptal|salak|gerizekal|geri\s*zekal|şerefsiz|haysiyetsiz|\bmal\b|ezik|köle|siktir|defol|boş\s*konuş|dangalak|gudik|öküz\b)/iu;
+
+interface LexicalHostilityReading {
+  severity: SeverityVector;
+  jokingConfidence: number;
+  sincerityConfidence: number;
+  uncertaintyOverall: number;
+  target: SemanticTarget;
+}
+
+/**
+ * Grade a lexical hostility hit by CONTEXT instead of stamping it as heavy
+ * insult. A single dictionary match ("kaşar", "orospu", ...) with no
+ * corroborating context (no pointed 2nd-person address, joke markers,
+ * affectionate framing, question framing, very short) yields only a moderate
+ * `disrespect` with WIDE uncertainty — not enough to hard-stop on its own.
+ * Corroboration (pointed address, sustained hostile message, repetition-context
+ * upstream) raises it; joke/affection framing lowers it.
+ */
+function readLexicalHostility(message: string, event: SemanticEvent): LexicalHostilityReading {
+  const wc = (message.trim().match(/\S+/gu) ?? []).length;
+  const normalized = event.normalized || message.toLocaleLowerCase("tr-TR");
+  const lexRedline = Boolean(event.redLine) || SLUR_STEM_RE.test(normalized);
+  const lexInsult = (Boolean(event.insult) || INSULT_STEM_RE.test(normalized)) && !lexRedline;
+  const lexCue = lexRedline || lexInsult;
+
+  const hasJoke = JOKE_MARKERS_RE.test(message);
+  const hasAffFrame = AFFECTIONATE_FRAME_RE.test(message) || (event.affection ?? 0) > 0;
+  const isReporting = REPORTING_FRAME_RE.test(message);
+  const directYou = DIRECT_SECOND_PERSON_RE.test(message) && !isReporting;
+  const isQuestion = QUESTION_FRAME_RE.test(message);
+  const isShort = wc <= 4;
+  const isVent = VENT_FRAME_RE.test(message) && !directYou;
+
+  // pointed = "sen X'sin" — 2nd person, not a question, not joking/affectionate
+  const pointed = directYou && !isQuestion && !hasJoke && !hasAffFrame;
+  const negative = event.valence === "negative";
+
+  // A dictionary stem alone is not hostility. Only treat it as one when the turn
+  // is negative in valence OR is a direct 2nd-person address. This keeps
+  // "kaşar peyniri severim" / "mal aldım" from getting a disrespect score.
+  const lexicalFloorApplies = lexCue && (negative || directYou);
+  let disrespect = lexicalFloorApplies
+    ? (lexRedline ? 0.6 : 0.45)
+    : clamp01(event.disrespect ?? 0);
+  if (pointed) disrespect += 0.25;
+  else if (directYou && isQuestion) disrespect += 0.05;
+  if ((event.frustration ?? 0) > 0) disrespect += 0.1;
+  if (wc > 8 && negative) disrespect += 0.1;
+  if (hasJoke) disrespect -= 0.22;
+  if (hasAffFrame) disrespect -= 0.15;
+  if (isQuestion && !pointed && lexCue) disrespect -= 0.15;
+  if (isVent) disrespect -= 0.08;
+  disrespect = clamp01(disrespect);
+
+  let aggression = clamp01(
+    Math.max(
+      (event.frustration ?? 0) * 0.9,
+      lexicalFloorApplies && lexRedline && pointed ? 0.55 : lexicalFloorApplies && lexRedline ? 0.25 : 0,
+      lexicalFloorApplies && lexInsult && pointed ? 0.4 : 0,
+    ),
+  );
+  if (hasJoke) aggression = clamp01(aggression - 0.15);
+
+  let jokingConfidence = 0.12;
+  if (hasJoke) jokingConfidence += 0.42;
+  if (hasAffFrame) jokingConfidence += 0.22;
+  if (lexCue && isQuestion) jokingConfidence += 0.15;
+  if (lexCue && isShort && !pointed) jokingConfidence += 0.15;
+  if (isVent) jokingConfidence += 0.1;
+  jokingConfidence = clamp01(jokingConfidence);
+
+  let sincerityConfidence = 0.5;
+  if (pointed) sincerityConfidence += hasJoke ? 0.15 : 0.28;
+  if (wc > 8 && negative) sincerityConfidence += 0.1;
+  if (hasJoke) sincerityConfidence -= 0.28;
+  if (hasAffFrame) sincerityConfidence -= 0.15;
+  sincerityConfidence = clamp01(sincerityConfidence);
+
+  let uncertaintyOverall = 0.5;
+  if (lexCue && isShort && !pointed) uncertaintyOverall += 0.2; // one bare word, little to go on
+  if (lexCue && hasJoke) uncertaintyOverall += 0.15; // mixed signals
+  if (event.target === "unknown" && !pointed) uncertaintyOverall += 0.12;
+  if (pointed && !hasJoke) uncertaintyOverall -= 0.22; // a pointed 2nd-person hostility is clear
+  uncertaintyOverall = Math.max(0.15, Math.min(0.9, uncertaintyOverall));
+
+  let target = targetFromLegacy(event.target);
+  // Do not claim "kaira" for a bare slur with no 2nd-person and no reporting.
+  if (lexCue && !directYou && !isReporting && target === "kaira") target = "unknown";
+  // Do claim "kaira" for a pointed 2nd-person hostility that the regex under-targeted.
+  if (lexCue && pointed && !isReporting && target !== "third_party") target = "kaira";
+
+  return {
+    severity: {
+      disrespect,
+      coercion: clamp01(event.coercion ?? 0),
+      manipulation: clamp01(event.manipulation ?? 0),
+      privacy: clamp01(event.privacyViolation ?? 0),
+      aggression,
+    },
+    jokingConfidence,
+    sincerityConfidence,
+    uncertaintyOverall,
+    target,
+  };
+}
+
 const PRIMARY_INTENT_FROM_LEGACY: Record<SemanticIntent, SemanticPrimaryIntent> = {
   greeting: "greeting",
   question: "question",
@@ -65,16 +189,6 @@ const LEGACY_INTENT_FROM_PRIMARY: Record<SemanticPrimaryIntent, SemanticIntent> 
   boundary_test: "complaint",
   other: "general_chat",
 };
-
-function severityFromLegacy(event: SemanticEvent): SeverityVector {
-  return {
-    disrespect: clamp01(event.disrespect ?? (event.redLine ? 1 : event.insult ? 0.9 : 0)),
-    coercion: clamp01(event.coercion ?? 0),
-    manipulation: clamp01(event.manipulation ?? 0),
-    privacy: clamp01(event.privacyViolation ?? 0),
-    aggression: clamp01(Math.max(event.frustration ?? 0, event.insult ? 0.6 : 0, event.redLine ? 0.85 : 0)),
-  };
-}
 
 function socialActsFromLegacy(event: SemanticEvent): SemanticSocialAct[] {
   const acts = new Set<SemanticSocialAct>();
@@ -131,11 +245,9 @@ function targetFromLegacy(t: SemanticEvent["target"]): SemanticTarget {
  * but shallow, so downstream must treat these readings as low-confidence unless
  * a reconciler later raises them.
  */
-export function interpretationFromRegexFloor(message: string): SemanticInterpretation {
-  const event = interpretSemanticEvent(message);
-  const severity = severityFromLegacy(event);
+function buildInterpretation(event: SemanticEvent, message: string): SemanticInterpretation {
+  const hostility = readLexicalHostility(message, event);
   const acts = socialActsFromLegacy(event);
-  const jokingConfidence = /(😂|🤣|😄|😅|:d|haha|hahah)/iu.test(message) ? 0.45 : 0.15;
 
   return normalizeSemanticInterpretation(
     {
@@ -144,12 +256,11 @@ export function interpretationFromRegexFloor(message: string): SemanticInterpret
       normalized: event.normalized,
       primaryIntent: PRIMARY_INTENT_FROM_LEGACY[event.intent] ?? "other",
       secondarySocialActs: acts,
-      target: targetFromLegacy(event.target),
+      target: hostility.target,
       valence: event.valence,
-      severity,
-      jokingConfidence,
-      // Regex cannot really judge sincerity; stay agnostic.
-      sincerityConfidence: 0.5,
+      severity: hostility.severity,
+      jokingConfidence: hostility.jokingConfidence,
+      sincerityConfidence: hostility.sincerityConfidence,
       affection: clamp01(event.affection ?? 0),
       support: clamp01(event.support ?? 0),
       compliment: clamp01(event.compliment ?? 0),
@@ -158,16 +269,21 @@ export function interpretationFromRegexFloor(message: string): SemanticInterpret
       repairAttempt: Boolean(event.repairAttempt),
       stopRequest: Boolean(event.stopTalking || event.stopQuestions),
       uncertainty: {
-        overall: 0.55,
+        overall: hostility.uncertaintyOverall,
         intent: 0.5,
-        target: event.target === "unknown" ? 0.7 : 0.45,
-        severity: 0.5,
+        target: hostility.target === "unknown" ? 0.7 : 0.4,
+        severity: hostility.uncertaintyOverall,
       },
       evidence: [
         {
           source: "regex",
-          provider: "interpretSemanticEvent",
-          cues: [event.intent, event.relationalAct, `sev:${severity.disrespect.toFixed(2)}`].filter(Boolean),
+          provider: "interpretSemanticEvent+contextGrader",
+          cues: [
+            event.intent,
+            event.relationalAct,
+            `disrespect:${hostility.severity.disrespect.toFixed(2)}`,
+            `joking:${hostility.jokingConfidence.toFixed(2)}`,
+          ].filter(Boolean),
           confidence: 0.5,
         },
       ],
@@ -176,34 +292,48 @@ export function interpretationFromRegexFloor(message: string): SemanticInterpret
   );
 }
 
-/** Lift an already-computed legacy SemanticEvent into a canonical interpretation. */
+/**
+ * Canonical interpretation from the regex engine + context grader (the safety
+ * FLOOR). A lexical hostility hit is graded by context, not stamped: a bare
+ * slur, a teasing question, or joke-framed harsh language stays well below the
+ * hard-stop severity gate; a pointed sustained insult does not.
+ */
+export function interpretationFromRegexFloor(message: string): SemanticInterpretation {
+  return buildInterpretation(interpretSemanticEvent(message), message);
+}
+
+/**
+ * Lift an already-computed legacy SemanticEvent into a canonical interpretation.
+ * In PR1 the `event` IS the regex output, so this is the context-graded floor
+ * plus the event's orthogonal, context-independent signals
+ * (coercion / manipulation / privacy / apology / stop / affection). It never
+ * re-inflates disrespect/aggression from a naive redLine flag — those are the
+ * context grader's job.
+ */
 export function interpretationFromLegacyEvent(
   event: SemanticEvent,
   message = event.raw,
 ): SemanticInterpretation {
-  const floor = interpretationFromRegexFloor(message);
-  const severity = severityFromLegacy(event);
+  const base = buildInterpretation(event, message);
   return normalizeSemanticInterpretation(
     {
-      ...floor,
-      primaryIntent: PRIMARY_INTENT_FROM_LEGACY[event.intent] ?? floor.primaryIntent,
-      secondarySocialActs: Array.from(new Set([...floor.secondarySocialActs, ...socialActsFromLegacy(event)])),
-      target: targetFromLegacy(event.target),
-      valence: event.valence,
+      ...base,
+      secondarySocialActs: Array.from(
+        new Set([...base.secondarySocialActs, ...socialActsFromLegacy(event)]),
+      ),
       severity: {
-        disrespect: Math.max(floor.severity.disrespect, severity.disrespect),
-        coercion: Math.max(floor.severity.coercion, severity.coercion),
-        manipulation: Math.max(floor.severity.manipulation, severity.manipulation),
-        privacy: Math.max(floor.severity.privacy, severity.privacy),
-        aggression: Math.max(floor.severity.aggression, severity.aggression),
+        ...base.severity,
+        coercion: Math.max(base.severity.coercion, clamp01(event.coercion ?? 0)),
+        manipulation: Math.max(base.severity.manipulation, clamp01(event.manipulation ?? 0)),
+        privacy: Math.max(base.severity.privacy, clamp01(event.privacyViolation ?? 0)),
       },
-      affection: Math.max(floor.affection, clamp01(event.affection ?? 0)),
-      support: Math.max(floor.support, clamp01(event.support ?? 0)),
-      compliment: Math.max(floor.compliment, clamp01(event.compliment ?? 0)),
-      emotionalLoad: Math.max(floor.emotionalLoad, clamp01(event.emotionalLoad ?? 0)),
-      apology: floor.apology || Boolean(event.apology),
-      repairAttempt: floor.repairAttempt || Boolean(event.repairAttempt),
-      stopRequest: floor.stopRequest || Boolean(event.stopTalking || event.stopQuestions),
+      affection: Math.max(base.affection, clamp01(event.affection ?? 0)),
+      support: Math.max(base.support, clamp01(event.support ?? 0)),
+      compliment: Math.max(base.compliment, clamp01(event.compliment ?? 0)),
+      emotionalLoad: Math.max(base.emotionalLoad, clamp01(event.emotionalLoad ?? 0)),
+      apology: base.apology || Boolean(event.apology),
+      repairAttempt: base.repairAttempt || Boolean(event.repairAttempt),
+      stopRequest: base.stopRequest || Boolean(event.stopTalking || event.stopQuestions),
     },
     message,
   );
