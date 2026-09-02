@@ -6,6 +6,7 @@ import {
 import type {
   KairaActivityExecutionCommand,
   KairaActivityExecutionExperienceSubject,
+  KairaActivityExecutionRecord,
   KairaActivityPermissionPolicy,
 } from "./kairaActivityExecution";
 import type { KairaInstanceContext } from "./kairaInstanceContext";
@@ -18,6 +19,7 @@ import {
   type KairaCompletedActivityExperienceResult,
 } from "./kairaActivityExperienceCoordinator";
 import type { KairaActivityOutcomeAppraisal } from "./kairaActivityExperienceReceipt";
+import { enqueueKairaActivityPlanningTriggerAtomic } from "./kairaActivityPlanningTriggerInboxStore";
 
 const activitySessionId = (activityId: string) => `activity:${activityId}`;
 
@@ -75,6 +77,33 @@ export interface KairaActivityExecutionCommandCoordinatorResult {
   execution: KairaActivityExecutionCommandResult;
   worldObservation?: WorldEventObservation;
   completedExperience?: KairaCompletedActivityExperienceResult;
+  planningTriggerInbox?: Awaited<ReturnType<typeof enqueueKairaActivityPlanningTriggerAtomic>>;
+}
+
+function terminalPlanningTrigger(record: KairaActivityExecutionRecord) {
+  if (record.phase !== "completed" && record.phase !== "cancelled" && record.phase !== "failed") return null;
+  const occurredAt = record.phase === "completed" && record.completedAt
+    ? record.completedAt
+    : record.updatedAt;
+  return {
+    triggerId: `execution_terminal:${record.activityId}:${record.phase}`,
+    kind: "execution_terminal" as const,
+    sourceId: `activity:${record.activityId}`,
+    occurredAt,
+    terminalPhase: record.phase,
+  };
+}
+
+async function enqueueTerminalPlanningTrigger(record: KairaActivityExecutionRecord, now: string) {
+  const trigger = terminalPlanningTrigger(record);
+  if (!trigger) return undefined;
+  return enqueueKairaActivityPlanningTriggerAtomic({
+    ownerUserId: record.ownerUserId,
+    kairaInstanceId: record.kairaInstanceId,
+    instanceType: record.instanceType,
+    trigger,
+    now,
+  });
 }
 
 export async function applyKairaActivityExecutionCommand(
@@ -106,10 +135,12 @@ export async function applyKairaActivityExecutionCommand(
       ...(record.experienceSubject ? { experienceSubject: { ...record.experienceSubject } } : {}),
       outcome: { ...input.outcome },
     });
+    const planningTriggerInbox = await enqueueTerminalPlanningTrigger(record, input.now);
     return {
       execution,
       worldObservation: completedExperience.observation,
       completedExperience,
+      ...(planningTriggerInbox ? { planningTriggerInbox } : {}),
     };
   }
 
@@ -132,5 +163,10 @@ export async function applyKairaActivityExecutionCommand(
       ...(record.experienceSubject ? { experienceSubject: { ...record.experienceSubject } } : {}),
     },
   });
-  return { execution, worldObservation };
+  const planningTriggerInbox = await enqueueTerminalPlanningTrigger(record, input.now);
+  return {
+    execution,
+    worldObservation,
+    ...(planningTriggerInbox ? { planningTriggerInbox } : {}),
+  };
 }
