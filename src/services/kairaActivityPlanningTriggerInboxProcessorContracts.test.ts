@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const inbox = vi.hoisted(() => ({ list: vi.fn(), consume: vi.fn() }));
+const inbox = vi.hoisted(() => ({ list: vi.fn(), consume: vi.fn(), defer: vi.fn() }));
 const sources = vi.hoisted(() => ({ read: vi.fn() }));
 const planning = vi.hoisted(() => ({ commit: vi.fn() }));
 
 vi.mock("./kairaActivityPlanningTriggerInboxStore", () => ({
   listPendingKairaActivityPlanningTriggers: inbox.list,
   markKairaActivityPlanningTriggerConsumedAtomic: inbox.consume,
+  markKairaActivityPlanningTriggerDeferredAtomic: inbox.defer,
 }));
 vi.mock("./kairaActivityPlanningSourceSnapshot", () => ({
   readKairaActivityPlanningSourceSnapshot: sources.read,
@@ -46,6 +47,7 @@ const ready = {
 beforeEach(() => {
   vi.clearAllMocks();
   inbox.consume.mockResolvedValue({ status: "consumed" });
+  inbox.defer.mockResolvedValue({ status: "deferred" });
   sources.read.mockResolvedValue(ready);
   planning.commit.mockResolvedValue({ status: "completed_none" });
 });
@@ -58,17 +60,21 @@ describe("Kaira planning trigger inbox processor contracts", () => {
       batchSize: 10,
       occupancyBatchSize: 20,
     });
+    expect(inbox.list).toHaveBeenCalledWith({ now: "2026-09-02T02:05:00.000Z", batchSize: 10 });
     expect(sources.read).toHaveBeenCalledWith({ record: record("trigger_1"), occupancyBatchSize: 20 });
     expect(planning.commit.mock.invocationCallOrder[0]).toBeLessThan(inbox.consume.mock.invocationCallOrder[0]);
     expect(result).toMatchObject({ discovered: 1, completed: 1, busy: 0, deferred: 0, failed: 0 });
   });
 
-  it("leaves unavailable source work pending instead of inventing defaults", async () => {
-    inbox.list.mockResolvedValue([record("trigger_1")]);
+  it("persists unavailable source work as deferred instead of hot-looping it", async () => {
+    const pending = record("trigger_1");
+    inbox.list.mockResolvedValue([pending]);
     sources.read.mockResolvedValue({ status: "unavailable", reason: "dynamic_state_missing" });
-    const result = await processPendingKairaActivityPlanningTriggers({ now: "2026-09-02T02:05:00.000Z" });
+    const now = "2026-09-02T02:05:00.000Z";
+    const result = await processPendingKairaActivityPlanningTriggers({ now });
     expect(planning.commit).not.toHaveBeenCalled();
     expect(inbox.consume).not.toHaveBeenCalled();
+    expect(inbox.defer).toHaveBeenCalledWith({ record: pending, now });
     expect(result.items[0]).toEqual({
       triggerId: "trigger_1",
       status: "deferred",
@@ -76,11 +82,12 @@ describe("Kaira planning trigger inbox processor contracts", () => {
     });
   });
 
-  it("leaves a busy trigger pending for the current owner to finish", async () => {
+  it("leaves a busy trigger available for the current planning owner to finish", async () => {
     inbox.list.mockResolvedValue([record("trigger_1")]);
     planning.commit.mockResolvedValue({ status: "busy" });
     const result = await processPendingKairaActivityPlanningTriggers({ now: "2026-09-02T02:05:00.000Z" });
     expect(inbox.consume).not.toHaveBeenCalled();
+    expect(inbox.defer).not.toHaveBeenCalled();
     expect(result.items[0]).toMatchObject({ status: "busy", outcome: "busy" });
   });
 
