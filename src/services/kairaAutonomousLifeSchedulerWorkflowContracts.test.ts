@@ -32,4 +32,12 @@ describe("Kaira autonomous life production scheduler contracts", () => {
     expect(runner).toContain('"/internal/workers/kaira/autonomous-life/health"');
     expect(runner).toContain("health.body?.health?.latestRunId !== runId");
   });
+
+  it("emits bounded stage diagnostics without exposing credentials", () => {
+    expect(runner).toContain("stages: summary ?");
+    expect(runner).toContain("planning: summary.planning");
+    expect(runner).toContain("recovery: summary.recovery");
+    expect(runner).toContain("schedules: summary.schedules");
+    expect(runner).not.toMatch(/console\.error\([^)]*secret/);
+  });
 });
