@@ -15,6 +15,12 @@ vi.mock("./kairaProposalRecoveryWorkerHealthRuntime", () => ({
 vi.mock("./kairaProposalRecoveryWorkerHealthConfig", () => ({
   resolveKairaProposalRecoveryWorkerHealthConfig: mocks.config,
 }));
+vi.mock("./kairaAutonomousLifeWorkerDurableRunCoordinator", () => ({
+  runKairaAutonomousLifeWorkerDurable: vi.fn(),
+}));
+vi.mock("./kairaAutonomousLifeWorkerHealthRuntime", () => ({
+  readKairaAutonomousLifeWorkerHealth: vi.fn(),
+}));
 
 import { registerKairaProposalRecoveryWorkerRoute } from "./kairaProposalRecoveryWorkerRoute";
 
