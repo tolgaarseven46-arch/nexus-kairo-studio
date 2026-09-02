@@ -5,113 +5,53 @@ const inbox = vi.hoisted(() => ({ enqueue: vi.fn() }));
 
 vi.mock("./kairaActivityDynamicStateStore", () => ({
   saveKairaActivityDynamicStateAtomic: stateStore.save,
+  kairaActivityDynamicStateMagnitude: vi.fn(),
 }));
 vi.mock("./kairaActivityPlanningTriggerInboxStore", () => ({
   enqueueKairaActivityPlanningTriggerAtomic: inbox.enqueue,
 }));
 
-import {
-  kairaActivityDynamicStateMagnitude,
-  observeKairaActivityDynamicState,
-} from "./kairaActivityDynamicStateObservationCoordinator";
+import { observeKairaActivityDynamicState } from "./kairaActivityDynamicStateObservationCoordinator";
 
 const state = (anger: number) => ({
-  calmness: 70,
-  anger,
-  stress: 20,
-  happiness: 70,
-  confidence: 70,
-  surprise: 10,
-  lastStatus: "stable",
+  calmness: 70, anger, stress: 20, happiness: 70, confidence: 70, surprise: 10, lastStatus: "stable",
+});
+const snapshot = (changeMagnitude?: number) => ({
+  schemaVersion: 1 as const,
+  kairaInstanceId: "kaira_a",
+  instanceType: "individual" as const,
+  state: state(45),
+  observedAt: "2026-09-02T02:10:00.000Z",
+  sourceId: "chat:turn_2",
+  ...(changeMagnitude !== undefined ? { changeMagnitude } : {}),
 });
 
 beforeEach(() => vi.clearAllMocks());
 
 describe("Kaira activity dynamic state observation coordinator contracts", () => {
-  it("computes normalized maximum axis movement without deciding materiality", () => {
-    expect(kairaActivityDynamicStateMagnitude(state(10), { ...state(45), stress: 40 })).toBe(0.35);
-  });
-
-  it("does not emit a planning trigger for first, stale or replayed observations", async () => {
+  it("does not emit for first or stale observations", async () => {
     for (const saved of [
-      {
-        status: "saved" as const,
-        snapshot: {
-          schemaVersion: 1 as const,
-          kairaInstanceId: "kaira_a",
-          instanceType: "individual" as const,
-          state: state(20),
-          observedAt: "2026-09-02T02:10:00.000Z",
-          sourceId: "chat:turn_1",
-        },
-      },
-      {
-        status: "stale" as const,
-        snapshot: {
-          schemaVersion: 1 as const,
-          kairaInstanceId: "kaira_a",
-          instanceType: "individual" as const,
-          state: state(20),
-          observedAt: "2026-09-02T02:10:00.000Z",
-          sourceId: "chat:turn_1",
-        },
-      },
-      {
-        status: "replayed" as const,
-        snapshot: {
-          schemaVersion: 1 as const,
-          kairaInstanceId: "kaira_a",
-          instanceType: "individual" as const,
-          state: state(20),
-          observedAt: "2026-09-02T02:10:00.000Z",
-          sourceId: "chat:turn_1",
-        },
-      },
+      { status: "saved" as const, snapshot: snapshot() },
+      { status: "stale" as const, snapshot: snapshot(0.35) },
     ]) {
       vi.clearAllMocks();
       stateStore.save.mockResolvedValue(saved);
       const result = await observeKairaActivityDynamicState({
-        ownerUserId: "owner_1",
-        kairaInstanceId: "kaira_a",
-        instanceType: "individual",
-        state: state(20),
-        observedAt: "2026-09-02T02:10:00.000Z",
-        sourceId: "chat:turn_1",
+        ownerUserId: "owner_1", kairaInstanceId: "kaira_a", instanceType: "individual",
+        state: state(45), observedAt: "2026-09-02T02:10:00.000Z", sourceId: "chat:turn_2",
       });
       expect(result.planningTriggerInbox).toBeNull();
       expect(inbox.enqueue).not.toHaveBeenCalled();
     }
   });
 
-  it("persists state before emitting a durable magnitude trigger", async () => {
-    stateStore.save.mockResolvedValue({
-      status: "saved",
-      previous: {
-        schemaVersion: 1,
-        kairaInstanceId: "kaira_a",
-        instanceType: "individual",
-        state: state(10),
-        observedAt: "2026-09-02T02:00:00.000Z",
-        sourceId: "chat:turn_1",
-      },
-      snapshot: {
-        schemaVersion: 1,
-        kairaInstanceId: "kaira_a",
-        instanceType: "individual",
-        state: state(45),
-        observedAt: "2026-09-02T02:10:00.000Z",
-        sourceId: "chat:turn_2",
-      },
-    });
-    inbox.enqueue.mockResolvedValue({ status: "enqueued", record: { status: "pending" } });
+  it.each(["saved", "replayed"] as const)("emits the persisted magnitude trigger for %s delivery", async (status) => {
+    stateStore.save.mockResolvedValue({ status, snapshot: snapshot(0.35) });
+    inbox.enqueue.mockResolvedValue({ status: status === "saved" ? "enqueued" : "replayed", record: { status: "pending" } });
 
     await observeKairaActivityDynamicState({
-      ownerUserId: "owner_1",
-      kairaInstanceId: "kaira_a",
-      instanceType: "individual",
-      state: state(45),
-      observedAt: "2026-09-02T02:10:00.000Z",
-      sourceId: "chat:turn_2",
+      ownerUserId: "owner_1", kairaInstanceId: "kaira_a", instanceType: "individual",
+      state: state(45), observedAt: "2026-09-02T02:12:00.000Z", sourceId: "chat:turn_2",
     });
 
     expect(stateStore.save.mock.invocationCallOrder[0]).toBeLessThan(inbox.enqueue.mock.invocationCallOrder[0]);
