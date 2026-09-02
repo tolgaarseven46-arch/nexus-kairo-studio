@@ -6,9 +6,15 @@ Claude Code, bu repoda çalışmaya başlamadan önce sırayla oku:
 2. `PROJECT_STATE.md` — canlı checkpoint (son birkaç "state N" bölümü + Next verified development question).
 3. `docs/adr/` — son kararlar (en az son 10 başlık).
 
-Kurallar (tam metin `AI_CONTEXT.md` §5–§6):
+Kurallar (tam metin `AI_CONTEXT.md` §5–§8):
 
 - Yalnızca `claude/*` dallarında çalış. `main`'e doğrudan push yok, self-merge yok.
+- **B/C sınıfı (davranış/mimari/kontrat) değişiklikte `AI_CONTEXT.md` §8 Hata
+  Azaltma Protokolü zorunludur:** kanıt standardı (test yeşil ≠ davranış doğru),
+  minimal repro + çürütücü karşı-örnek, yazılı tek karar kaynağı, güncel
+  dependency/consumer etki haritası, golden long-session regression (CI), ikinci-göz
+  architecture review, tekrar eden bug sınıfında önce root-cause, feature-flag +
+  eski/yeni karşılaştırma, KNT telemetry görünürlüğü, çürütücü test.
 - Her commit'e `Agent: claude` trailer'ı, her PR'a `agent:claude` etiketi ekle.
 - Riskli path'e dokunan PR `architecture-review-required` etiketi alır ve
   `/arch-approve <head-sha>` insan onayı olmadan merge edilemez. Yeni commit

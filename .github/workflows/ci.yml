@@ -71,3 +71,39 @@ jobs:
           else
             echo "No risky paths touched; docs-guard passes."
           fi
+
+  behavior-guard:
+    # AI_CONTEXT.md §8 Hata Azaltma Protokolü — behavior-critical bir path'e dokunan PR
+    # bir test dosyası VE bir golden/long-session regression testi içermeli.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Enforce test + golden regression for behavior changes
+        run: |
+          set -euo pipefail
+          BASE="origin/${{ github.base_ref }}"
+          git fetch -q origin "${{ github.base_ref }}"
+          CHANGED="$(git diff --name-only "$BASE"...HEAD)"
+          echo "Changed files:"; echo "$CHANGED" | sed 's/^/  /'
+
+          if echo "$CHANGED" | bash .github/scripts/match-risky-paths.sh .github/behavior-critical-paths.txt > /tmp/bc.txt; then
+            echo "Behavior-critical paths touched:"; sed 's/^/  /' /tmp/bc.txt
+            FAIL=0
+            if ! echo "$CHANGED" | grep -Eq '^src/.+\.test\.tsx?$'; then
+              echo "::error::AI_CONTEXT.md §8.10 — davranis degisti ama diff'te src/**/*.test.ts yok (fix + curutucu test zorunlu)."
+              FAIL=1
+            fi
+            if ! echo "$CHANGED" | grep -Eq '(Regression|GoldenSession|LongSession)[A-Za-z0-9]*\.test\.tsx?$'; then
+              echo "::error::AI_CONTEXT.md §8.5 — davranis degisti ama golden/long-session regression testi eklenmedi/guncellenmedi (*Regression* / *GoldenSession* / *LongSession*)."
+              FAIL=1
+            fi
+            [ "$FAIL" -eq 0 ] && echo "OK: behavior change carries a test + a golden/long-session regression."
+            exit "$FAIL"
+          else
+            echo "No behavior-critical paths touched; behavior-guard passes."
+          fi
