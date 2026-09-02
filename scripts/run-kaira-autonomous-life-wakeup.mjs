@@ -54,6 +54,15 @@ const first = await invoke();
 if (first.body?.runId !== runId) throw new Error("Autonomous life worker run correlation mismatch");
 if (![200, 202].includes(first.response.status)) {
   const summary = first.body?.receipt?.summary;
+  const failedPlanningItems = Array.isArray(first.body?.planningInbox?.result?.items)
+    ? first.body.planningInbox.result.items
+      .filter((item) => item?.status === "failed")
+      .slice(0, 5)
+      .map((item) => ({
+        triggerId: String(item?.triggerId || "unknown").slice(0, 160),
+        error: String(item?.error || "planning_trigger_processing_failed").slice(0, 500),
+      }))
+    : [];
   console.error(JSON.stringify({
     ok: false,
     runId,
@@ -64,6 +73,7 @@ if (![200, 202].includes(first.response.status)) {
       recovery: summary.recovery,
       schedules: summary.schedules,
     } : undefined,
+    failedPlanningItems,
   }));
   throw new Error(`Autonomous life worker failed: HTTP ${first.response.status} ${first.body?.error || first.body?.status || "unknown"}`);
 }
