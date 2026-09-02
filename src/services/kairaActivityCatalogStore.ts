@@ -4,13 +4,19 @@ import {
   normalizeKairaActivityCatalog,
   type KairaActivityCatalogEntry,
 } from "./kairaActivityCatalogAuthority";
+import {
+  instancePolicy,
+  resolveKairaInstanceContext,
+  type KairaInstanceContext,
+} from "./kairaInstanceContext";
 
 const COLLECTION = "kairaActivityCatalog";
-const ACTIVE_DOCUMENT = "active";
 const MAX_CATALOG_ENTRIES = 100;
 
 export interface KairaActivityCatalogSnapshot {
   schemaVersion: 1;
+  kairaInstanceId: string;
+  instanceType: KairaInstanceContext["instanceType"];
   catalogVersion: string;
   entries: KairaActivityCatalogEntry[];
   publishedAt: string;
@@ -31,10 +37,19 @@ function canonicalPublishedAt(value: string): string {
 }
 
 export function createKairaActivityCatalogSnapshot(input: {
+  kairaInstanceId: string;
+  instanceType: KairaInstanceContext["instanceType"];
   catalogVersion: string;
   entries: KairaActivityCatalogEntry[];
   publishedAt: string;
 }): KairaActivityCatalogSnapshot {
+  const instance = resolveKairaInstanceContext({
+    instanceId: input.kairaInstanceId,
+    instanceType: input.instanceType,
+  });
+  if (!instancePolicy(instance.instanceType).autonomousActivityPlanning) {
+    throw new Error("Kaira instance cannot own activity catalog");
+  }
   const catalogVersion = versionKey(input.catalogVersion);
   if (!catalogVersion) throw new Error("Invalid Kaira activity catalog version");
   if (!Array.isArray(input.entries) || input.entries.length < 1 || input.entries.length > MAX_CATALOG_ENTRIES) {
@@ -42,6 +57,8 @@ export function createKairaActivityCatalogSnapshot(input: {
   }
   return {
     schemaVersion: 1,
+    kairaInstanceId: instance.instanceId,
+    instanceType: instance.instanceType,
     catalogVersion,
     entries: normalizeKairaActivityCatalog(input.entries),
     publishedAt: canonicalPublishedAt(input.publishedAt),
@@ -53,17 +70,30 @@ function normalizeStoredSnapshot(value: unknown): KairaActivityCatalogSnapshot {
   const snapshot = value as Partial<KairaActivityCatalogSnapshot>;
   if (snapshot.schemaVersion !== 1) throw new Error("Unsupported Kaira activity catalog schema");
   return createKairaActivityCatalogSnapshot({
+    kairaInstanceId: String(snapshot.kairaInstanceId || ""),
+    instanceType: snapshot.instanceType as KairaInstanceContext["instanceType"],
     catalogVersion: String(snapshot.catalogVersion || ""),
     entries: Array.isArray(snapshot.entries) ? snapshot.entries as KairaActivityCatalogEntry[] : [],
     publishedAt: String(snapshot.publishedAt || ""),
   });
 }
 
-/** Global stable activity semantics. Instance-specific availability belongs elsewhere. */
-export async function loadActiveKairaActivityCatalog(): Promise<KairaActivityCatalogSnapshot | null> {
-  const snapshot = await getDoc(doc(db, COLLECTION, ACTIVE_DOCUMENT));
+/** Instance-owned stable activity semantics. Runtime availability belongs elsewhere. */
+export async function loadActiveKairaActivityCatalog(input: {
+  kairaInstanceId: string;
+  instanceType: KairaInstanceContext["instanceType"];
+}): Promise<KairaActivityCatalogSnapshot | null> {
+  const instance = resolveKairaInstanceContext({
+    instanceId: input.kairaInstanceId,
+    instanceType: input.instanceType,
+  });
+  if (!instancePolicy(instance.instanceType).autonomousActivityPlanning) return null;
+  const snapshot = await getDoc(doc(db, COLLECTION, instance.instanceId));
   if (!snapshot.exists()) return null;
-  return normalizeStoredSnapshot(snapshot.data());
+  const normalized = normalizeStoredSnapshot(snapshot.data());
+  return normalized.kairaInstanceId === instance.instanceId && normalized.instanceType === instance.instanceType
+    ? normalized
+    : null;
 }
 
 /**
@@ -71,12 +101,14 @@ export async function loadActiveKairaActivityCatalog(): Promise<KairaActivityCat
  * catalog version; exact retries are idempotent.
  */
 export async function publishKairaActivityCatalogAtomic(input: {
+  kairaInstanceId: string;
+  instanceType: KairaInstanceContext["instanceType"];
   catalogVersion: string;
   entries: KairaActivityCatalogEntry[];
   publishedAt: string;
 }): Promise<{ status: "published" | "replayed"; snapshot: KairaActivityCatalogSnapshot }> {
   const next = createKairaActivityCatalogSnapshot(input);
-  const ref = doc(db, COLLECTION, ACTIVE_DOCUMENT);
+  const ref = doc(db, COLLECTION, next.kairaInstanceId);
   return runTransaction(db, async (transaction) => {
     const currentSnapshot = await transaction.get(ref);
     if (currentSnapshot.exists()) {
@@ -93,5 +125,29 @@ export async function publishKairaActivityCatalogAtomic(input: {
     }
     transaction.set(ref, next);
     return { status: "published", snapshot: next } as const;
+  });
+}
+
+/** Creates deterministic bootstrap semantics once and never overwrites an instance-owned catalog. */
+export async function provisionKairaActivityCatalogIfMissingAtomic(input: {
+  kairaInstanceId: string;
+  instanceType: KairaInstanceContext["instanceType"];
+  catalogVersion: string;
+  entries: KairaActivityCatalogEntry[];
+  publishedAt: string;
+}): Promise<{ status: "provisioned" | "existing"; snapshot: KairaActivityCatalogSnapshot }> {
+  const next = createKairaActivityCatalogSnapshot(input);
+  const ref = doc(db, COLLECTION, next.kairaInstanceId);
+  return runTransaction(db, async (transaction) => {
+    const currentSnapshot = await transaction.get(ref);
+    if (currentSnapshot.exists()) {
+      const current = normalizeStoredSnapshot(currentSnapshot.data());
+      if (current.kairaInstanceId !== next.kairaInstanceId || current.instanceType !== next.instanceType) {
+        throw new Error("Kaira activity catalog owner mismatch");
+      }
+      return { status: "existing", snapshot: current } as const;
+    }
+    transaction.set(ref, next);
+    return { status: "provisioned", snapshot: next } as const;
   });
 }

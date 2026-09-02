@@ -76,6 +76,8 @@ describe("Kaira activity provisioning route contracts", () => {
     await posts.get("/internal/kaira/activity-catalog")!(req({
       headers: { authorization: "Bearer secret" },
       body: {
+        kairaInstanceId: "kaira_a",
+        instanceType: "individual",
         catalogVersion: "v1",
         publishedAt: "1900-01-01T00:00:00.000Z",
         entries: [{ catalogId: "theatre" }],
@@ -84,8 +86,26 @@ describe("Kaira activity provisioning route contracts", () => {
     expect(res.statusCode).toBe(200);
     const call = catalog.publish.mock.calls[0][0];
     expect(call.catalogVersion).toBe("v1");
+    expect(call).toMatchObject({ kairaInstanceId: "kaira_a", instanceType: "individual" });
     expect(call.publishedAt).not.toBe("1900-01-01T00:00:00.000Z");
     expect(Number.isFinite(Date.parse(call.publishedAt))).toBe(true);
+  });
+
+  it("loads one explicit instance catalog and validates identity before store access", async () => {
+    catalog.load.mockResolvedValue({ schemaVersion: 1, kairaInstanceId: "kaira_a", instanceType: "individual", catalogVersion: "v1", entries: [] });
+    const { gets, response } = harness();
+    const bad = response();
+    await gets.get("/internal/kaira/activity-catalog")!(req({ headers: { authorization: "Bearer secret" } }), bad);
+    expect(bad.statusCode).toBe(400);
+    expect(catalog.load).not.toHaveBeenCalled();
+
+    const good = response();
+    await gets.get("/internal/kaira/activity-catalog")!(req({
+      headers: { authorization: "Bearer secret" },
+      query: { kairaInstanceId: "kaira_a", instanceType: "individual" },
+    }), good);
+    expect(good.statusCode).toBe(200);
+    expect(catalog.load).toHaveBeenCalledWith({ kairaInstanceId: "kaira_a", instanceType: "individual" });
   });
 
   it("publishes environment with server-owned observation time and trusted authority", async () => {

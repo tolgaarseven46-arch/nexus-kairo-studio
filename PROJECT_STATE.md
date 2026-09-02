@@ -1220,3 +1220,14 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Configure the production host and GitHub with the same `KAIRA_INTERNAL_WORKER_SECRET`, set repository variable `KAIRA_AUTONOMOUS_LIFE_URL` to the real HTTPS deployment origin, manually dispatch one wakeup, and verify the first live receipt/health result before relying on cron.
+
+## 124. Instance-owned planning authorities and real trigger inbox completion — 2026-09-02
+- Activity catalogs are no longer stored under one global `active` document. Every autonomous Kaira instance owns its persistent catalog at `kairaActivityCatalog/{kairaInstanceId}`; trusted read/write routes require explicit instance identity.
+- A deterministic built-in catalog is created only when an inbox owner has no catalog. Existing instance-owned catalogs are never overwritten by bootstrap provisioning.
+- Instance-owned autonomous dynamic state receives a canonical baseline only when no observed chat/KDM state exists. Later real observations remain the sole update authority and continue emitting material affect triggers.
+- The platform environment is created for a missing instance and refreshed only while its canonical entries still equal the built-in platform semantics. Any instance-specific environment diverging from those semantics is preserved unchanged.
+- The planning inbox processor provisions these durable authorities before composing its fail-closed source snapshot. Terminal execution and material affect changes remain the real, durable trigger sources; no synthetic polling trigger or chat-state alias was added.
+- Catalog, environment, occupancy and dynamic state are composed under the same inbox record identity before the retry-safe planning commit, closing the production `catalog_missing` / `environment_missing` / `dynamic_state_missing` readiness path.
+
+### Next verified development question
+- Verify one deployed scheduled wakeup consumes the previously deferred terminal triggers, creates or deliberately declines a proposal under canonical policy, and returns healthy holistic runtime status.

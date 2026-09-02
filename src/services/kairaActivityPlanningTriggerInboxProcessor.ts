@@ -6,6 +6,7 @@ import {
 } from "./kairaActivityPlanningTriggerInboxStore";
 import { readKairaActivityPlanningSourceSnapshot } from "./kairaActivityPlanningSourceSnapshot";
 import { evaluateAndCommitKairaActivityPlanningTrigger } from "./kairaActivityPlanningCommitCoordinator";
+import { provisionKairaActivityPlanningAuthorities } from "./kairaActivityPlanningAuthorityProvisioning";
 
 export interface KairaActivityPlanningInboxItemResult {
   triggerId: string;
@@ -30,6 +31,7 @@ async function processRecord(
   occupancyBatchSize?: number,
 ): Promise<KairaActivityPlanningInboxItemResult> {
   try {
+    await provisionKairaActivityPlanningAuthorities({ record, now });
     const sources = await readKairaActivityPlanningSourceSnapshot({
       record,
       ...(occupancyBatchSize !== undefined ? { occupancyBatchSize } : {}),

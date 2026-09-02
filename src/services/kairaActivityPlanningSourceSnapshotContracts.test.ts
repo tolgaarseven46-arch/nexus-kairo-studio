@@ -40,6 +40,7 @@ describe("Kaira activity planning source snapshot contracts", () => {
   it("assembles only canonical authorities for the trigger owner", async () => {
     const result = await readKairaActivityPlanningSourceSnapshot({ record, occupancyBatchSize: 33 });
     expect(result.status).toBe("ready");
+    expect(catalog.load).toHaveBeenCalledWith({ kairaInstanceId: "kaira_a", instanceType: "individual" });
     expect(environment.load).toHaveBeenCalledWith({ kairaInstanceId: "kaira_a", instanceType: "individual" });
     expect(occupancy.read).toHaveBeenCalledWith({
       ownerUserId: "owner_1",

@@ -13,6 +13,7 @@ import {
   kairaActivityDynamicStateMagnitude,
   loadKairaActivityDynamicState,
   projectKairaActivityDynamicState,
+  provisionKairaActivityDynamicStateIfMissingAtomic,
   saveKairaActivityDynamicStateAtomic,
 } from "./kairaActivityDynamicStateStore";
 
@@ -129,5 +130,25 @@ describe("Kaira activity dynamic state store contracts", () => {
     await expect(saveKairaActivityDynamicStateAtomic({
       kairaInstanceId: "welcome_a", instanceType: "welcome", state: state(), observedAt: "2026-09-02T02:10:00Z", sourceId: "chat:turn_10",
     })).rejects.toThrow("cannot own autonomous dynamic state");
+  });
+
+  it("provisions a baseline only when the instance has no observed state", async () => {
+    const set = vi.fn();
+    firestore.runTransaction.mockImplementationOnce(async (_db: unknown, callback: (tx: any) => unknown) =>
+      callback({ get: vi.fn().mockResolvedValue({ exists: () => false }), set }),
+    );
+    const input = {
+      kairaInstanceId: "kaira_a", instanceType: "individual" as const, state: state(),
+      observedAt: "2026-09-02T02:10:00Z", sourceId: "authority_bootstrap:v1",
+    };
+    const provisioned = await provisionKairaActivityDynamicStateIfMissingAtomic(input);
+    expect(provisioned.status).toBe("provisioned");
+    expect(set).toHaveBeenCalledOnce();
+
+    firestore.runTransaction.mockImplementationOnce(async (_db: unknown, callback: (tx: any) => unknown) =>
+      callback({ get: vi.fn().mockResolvedValue({ exists: () => true, data: () => provisioned.snapshot }), set: vi.fn() }),
+    );
+    await expect(provisionKairaActivityDynamicStateIfMissingAtomic({ ...input, state: state(99) }))
+      .resolves.toEqual({ status: "existing", snapshot: provisioned.snapshot });
   });
 });
