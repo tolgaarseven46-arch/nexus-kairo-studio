@@ -20,7 +20,7 @@ export interface KairaAutonomousLifeWorkerStage<T> {
 }
 
 export interface KairaAutonomousLifeWorkerRunResult {
-  status: "completed" | "partial_failure" | "failed";
+  status: "completed" | "degraded" | "partial_failure" | "failed";
   runId: string;
   processedAt: string;
   planningInbox: KairaAutonomousLifeWorkerStage<KairaActivityPlanningInboxBatchResult>;
@@ -43,6 +43,8 @@ async function runStage<T>(operation: () => Promise<T>): Promise<KairaAutonomous
  * One trusted autonomous-life tick. Planning delivery runs first so newly durable
  * proposals may be recovered in the same tick; all stages remain isolated and
  * retry-safe so one authority failure cannot block already-canonical work.
+ * Deferred source work is surfaced as degraded readiness instead of being hidden
+ * behind an otherwise successful tick.
  */
 export async function runKairaAutonomousLifeWorker(input: {
   runId: string;
@@ -74,11 +76,14 @@ export async function runKairaAutonomousLifeWorker(input: {
   const proposalFailed = proposalRecovery.status === "failed" || proposalRecovery.result?.status === "failed";
   const scheduleFailed = scheduleDispatch.status === "failed" || (scheduleDispatch.result?.failed || 0) > 0;
   const failureCount = [planningFailed, proposalFailed, scheduleFailed].filter(Boolean).length;
+  const hasDeferredPlanning = planningInbox.status === "completed" && (planningInbox.result?.deferred || 0) > 0;
   const status = failureCount === 3
     ? "failed"
     : failureCount > 0
       ? "partial_failure"
-      : "completed";
+      : hasDeferredPlanning
+        ? "degraded"
+        : "completed";
 
   return {
     status,
