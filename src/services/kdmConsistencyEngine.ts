@@ -14,6 +14,8 @@ import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngin
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 import { appraiseRelationshipConditionedEvent } from "./relationshipConditionedAppraisal";
 import { recoverRelationshipConditionedState } from "./relationshipConditionedRecovery";
+import { isCanonicalBehaviorFlagEnabled } from "../config/canonicalBehaviorFlags";
+import { analyzeKdmInteractionCanonical } from "./kdmRelationshipReducerBridge";
 
 export interface KdmAnalysisResult {
   trace: ReasoningTrace;
@@ -56,7 +58,7 @@ function behaviorPolicyPriorityCode(value?: BehaviorPolicyInput["decision"]["pri
   return 20;
 }
 
-function applyIntegratedBehaviorPolicy(
+export function applyIntegratedBehaviorPolicy(
   profile: BehaviorLayerProfile,
   behaviorPolicy?: BehaviorPolicyInput | null,
 ): BehaviorLayerProfile {
@@ -158,7 +160,7 @@ function applyIntegratedBehaviorPolicy(
   };
 }
 
-function semanticIntentToKdm(event: SemanticEvent): string {
+export function semanticIntentToKdm(event: SemanticEvent): string {
   switch (event.intent) {
     case "greeting": return "selamlama";
     case "question": return "soru";
@@ -191,7 +193,7 @@ function hasActionableNegativeEvidence(event: SemanticEvent): boolean {
   );
 }
 
-function semanticSentimentToKdm(event: SemanticEvent): string {
+export function semanticSentimentToKdm(event: SemanticEvent): string {
   if (event.emotionalLoad > 0) return "duygusal_yük";
   if (event.valence === "negative" && hasActionableNegativeEvidence(event)) return "negatif";
   if (event.valence === "positive") return "pozitif";
@@ -204,7 +206,7 @@ function semanticNegativeTarget(event: SemanticEvent): NegativeTarget {
   return "event";
 }
 
-function semanticPattern(event: SemanticEvent): string | null {
+export function semanticPattern(event: SemanticEvent): string | null {
   if (event.redLine) return "agir_hakaret";
   if (event.insult) return "hakaret";
   if (event.coercion > 0) return "zorlama";
@@ -258,6 +260,25 @@ export function analyzeKdmInteraction(
   const semanticEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage);
   const normalizedPersonality = normalizeDroitPersonality(personality);
   const baseBehaviorProfile = computeBehaviorProfile(normalizedPersonality, userMessage);
+
+  // ADR-0006: canonical relationship reducer. Flag OFF (default) -> the legacy
+  // body below runs unchanged. Flag ON -> the reducer is authoritative for
+  // scores / conversationState / reactionMode / affect; behaviorProfile + trace
+  // are then derived from that state through the SAME applyRelationshipContext /
+  // applyIntegratedBehaviorPolicy path.
+  if (isCanonicalBehaviorFlagEnabled("RELATIONSHIP_REDUCER_V2")) {
+    return analyzeKdmInteractionCanonical({
+      state,
+      semanticEvent,
+      normalizedPersonality,
+      baseBehaviorProfile,
+      behaviorPolicy: behaviorPolicy ?? null,
+      applyIntegrated: applyIntegratedBehaviorPolicy,
+      semanticPattern,
+      semanticIntentToKdm,
+      semanticSentimentToKdm,
+    });
+  }
   const intent = semanticIntentToKdm(semanticEvent);
   const sentiment = semanticSentimentToKdm(semanticEvent);
 

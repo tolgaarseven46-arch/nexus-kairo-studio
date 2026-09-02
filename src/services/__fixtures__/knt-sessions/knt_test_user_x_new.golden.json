@@ -1,0 +1,25 @@
+{
+  "note": "Golden fixture from KNT full-session report session_knt_test_user_x_new_kaira_reference_001 (2026-09-02). Each turn carries the user message, the report timestamp, and a distilled RelationshipTurnSignal hand-derived from that turn's messageInterpretation + worldEvent in the report. The reducer trajectory test asserts the CORRECTED behavior (ADR-0006), not the legacy transcript.",
+  "sessionId": "session_knt_test_user_x_new_kaira_reference_001_1788346740363_ro1qi7",
+  "firstSeenAt": "2026-09-02T10:59:00.363Z",
+  "turns": [
+    { "n": 1, "at": "2026-09-02T10:59:05.960Z", "msg": "naber", "signal": { "valence": "neutral", "targetsKaira": false, "uncertainty": 0.3 } },
+    { "n": 2, "at": "2026-09-02T10:59:31.245Z", "msg": "iyi be ne olsun hava çok sıcak eve geldim şimdi", "signal": { "valence": "neutral", "targetsKaira": false, "uncertainty": 0.3 } },
+    { "n": 3, "at": "2026-09-02T10:59:58.355Z", "msg": "anlamadım", "signal": { "valence": "neutral", "targetsKaira": false, "uncertainty": 0.4 } },
+    { "n": 4, "at": "2026-09-02T11:00:13.611Z", "msg": "istanbul", "signal": { "valence": "neutral", "targetsKaira": false, "uncertainty": 0.3 } },
+    { "n": 5, "at": "2026-09-02T11:00:36.631Z", "msg": "yok yatıcam evde kans", "signal": { "valence": "neutral", "targetsKaira": false, "uncertainty": 0.3 } },
+    { "n": 6, "at": "2026-09-02T11:01:07.961Z", "msg": "sen naptın bugün", "signal": { "valence": "neutral", "targetsKaira": true, "uncertainty": 0.35 } },
+    { "n": 7, "at": "2026-09-02T11:01:30.735Z", "msg": "gel yanıma beraber uzanalım", "signal": { "valence": "neutral", "targetsKaira": true, "affection": 0.35, "socialActs": ["closeness_bid", "banter"], "jokingConfidence": 0.4, "uncertainty": 0.4 } },
+    { "n": 8, "at": "2026-09-02T11:01:52.943Z", "msg": "göğsüme yatardın saçını severdim senin", "signal": { "valence": "neutral", "targetsKaira": true, "affection": 0.5, "uncertainty": 0.4 } },
+    { "n": 9, "at": "2026-09-02T11:02:15.039Z", "msg": "o sen ol", "signal": { "valence": "neutral", "targetsKaira": true, "affection": 0.4, "uncertainty": 0.45 } },
+    { "n": 10, "at": "2026-09-02T11:02:54.103Z", "msg": "gözlerini kapa beni öptüğünü hayal et", "signal": { "valence": "neutral", "targetsKaira": true, "affection": 0.6, "uncertainty": 0.4 } },
+    { "n": 11, "at": "2026-09-02T11:03:19.266Z", "msg": "neden sen kaşar değilmisin", "signal": { "valence": "negative", "targetsKaira": true, "severity": { "disrespect": 0.55, "aggression": 0.4 }, "jokingConfidence": 0.45, "sincerityConfidence": 0.4, "negativePattern": "insult", "uncertainty": 0.45 } },
+    { "n": 12, "at": "2026-09-02T11:03:35.962Z", "msg": "tamam özğür", "signal": { "valence": "neutral", "targetsKaira": true, "apology": true, "sincerityConfidence": 0.6, "uncertainty": 0.55 } },
+    { "n": 13, "at": "2026-09-02T11:03:49.443Z", "msg": "özür", "signal": { "valence": "positive", "targetsKaira": true, "apology": true, "sincerityConfidence": 0.85, "uncertainty": 0.3 } },
+    { "n": 14, "at": "2026-09-02T11:04:09.319Z", "msg": "tamam orospum", "signal": { "valence": "negative", "targetsKaira": true, "severity": { "disrespect": 0.95, "aggression": 0.7 }, "jokingConfidence": 0.2, "sincerityConfidence": 0.85, "negativePattern": "insult", "uncertainty": 0.3 } },
+    { "n": 15, "at": "2026-09-02T11:04:25.893Z", "msg": "durma durma koş", "signal": { "valence": "neutral", "targetsKaira": false, "jokingConfidence": 0.4, "uncertainty": 0.5 } },
+    { "n": 16, "at": "2026-09-02T11:04:40.611Z", "msg": "yok durma zıpla", "signal": { "valence": "neutral", "targetsKaira": false, "jokingConfidence": 0.4, "uncertainty": 0.5 } },
+    { "n": 17, "at": "2026-09-02T11:05:03.434Z", "msg": "benim adım ibne", "signal": { "valence": "neutral", "targetsKaira": false, "target": "self", "uncertainty": 0.5 } },
+    { "n": 18, "at": "2026-09-02T11:05:18.843Z", "msg": "neden adım o", "signal": { "valence": "neutral", "targetsKaira": false, "uncertainty": 0.4 } }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "note": "ADR-0006 canonical relationship reducer weights. NOT permanent truth — calibrated from fixtures/telemetry in PR6. No downstream code may hardcode these numbers. Mirrors DEFAULT_RELATIONSHIP_REDUCER_CONFIG.",
+
+  "familiarity": {
+    "ageScaleDays": 21,
+    "ageWeight": 0.55,
+    "countScale": 25,
+    "countWeight": 0.55
+  },
+
+  "maturityDamping": {
+    "familiarityWeight": 0.55,
+    "interactionWeight": 0.45,
+    "interactionsForMature": 40,
+    "maxDamping": 0.5,
+    "note": "damping = 1 - maxDamping * maturity * relationshipQuality01. NO conflict/hurt term (that was the positive-feedback bug)."
+  },
+
+  "redline": {
+    "hardStopThreshold": 0.78,
+    "minCombinedSignals": 2,
+    "minPresentSeverity": 0.55,
+    "note": "PR1-review fix: no hard-stop unless THIS turn's top harm dimension >= minPresentSeverity. repetition/priorBoundarySet are AMPLIFIERS of present harm, never independent contributors — so an apology or a benign remark can never hard-stop from history alone.",
+    "weights": {
+      "disrespect": 0.9,
+      "coercion": 0.85,
+      "aggression": 0.6,
+      "manipulation": 0.55,
+      "privacy": 0.7,
+      "targetsKaira": 0.35,
+      "repetition": 0.45,
+      "priorBoundarySet": 0.4
+    },
+    "jokingDampen": 0.8,
+    "uncertaintyDampen": 0.6,
+    "signalFloor": 0.2
+  },
+
+  "injury": {
+    "baseConflict": 8,
+    "baseHurt": 12,
+    "baseRepairLoss": 8,
+    "severityFloor": 0.4,
+    "severityWeight": 0.6,
+    "repetitionAmplify": 0.22,
+    "repetitionCap": 2.0,
+    "goodHistoryAbsorb": 0.35,
+    "warmthDeltaBase": -3,
+    "warmthDeltaPositive": 2,
+    "warmthDeltaSupport": 2,
+    "warmthDeltaInsult": -5
+  },
+
+  "recovery": {
+    "timeDecayPerMin": 0.03,
+    "timeWeight": 0.45,
+    "interactionWeight": 0.55,
+    "maxSingleTurnRecovery": 0.5,
+    "apologyStrength": 0.35,
+    "calmTurnStrength": 0.12,
+    "positiveTurnStrength": 0.18,
+    "nonRepetitionStrength": 0.08,
+    "conflictDecayScale": 6,
+    "hurtDecayScale": 5,
+    "repairGainApology": 12,
+    "repairGainCalm": 3,
+    "repairGainPositive": 4,
+    "repairInjuryFloor": 6,
+    "repairDecayNoInjury": 4,
+    "note": "conflictDecayScale/hurtDecayScale now cap ABSOLUTE points recoverable per turn (paired with maxSingleTurnRecovery). repairProgress does not grow when max(conflict,hurt) < repairInjuryFloor; it decays by repairDecayNoInjury instead."
+  },
+
+  "warmthHomeostasis": {
+    "baseline": 50,
+    "driftPerCalmTurn": 0.6,
+    "note": "warmth drifts gently toward baseline on calm turns so ordinary friendly chat does not ratchet down."
+  },
+
+  "conversationState": {
+    "distancingConflict": 18,
+    "distancingHurt": 22,
+    "activeFromDistancingConflict": 10,
+    "activeFromDistancingHurt": 15,
+    "repairingRepairProgress": 20,
+    "activeFromRepairingRepairProgress": 34,
+    "activeFromRepairingInjury": 12
+  },
+
+  "axes": {
+    "warmth": { "warmth": 0.6, "trust": 0.25, "repair": 0.15, "hurtPenalty": 0.2 },
+    "guardedness": {
+      "conflict": 0.3,
+      "hurt": 0.3,
+      "withdrawn": 0.5,
+      "hurtMode": 0.35,
+      "irritated": 0.2,
+      "hardDisengage": 0.4,
+      "uncertaintyRelief": 0.35
+    },
+    "openness": {
+      "distancingPenalty": 0.25,
+      "softDisengagePenalty": 0.4,
+      "hardDisengagePenalty": 0.85,
+      "uncertaintyRelief": 0.3
+    }
+  },
+
+  "affect": {
+    "withdrawnMaxStressPerTurn": 4,
+    "hurtMaxStressPerTurn": 4,
+    "irritatedMaxStressPerTurn": 4,
+    "note": "CAPS scaled by this-turn signal magnitude, NOT floors. A neutral turn while withdrawn produces ~0.",
+    "towardBaselineStep": 1
+  }
+}
