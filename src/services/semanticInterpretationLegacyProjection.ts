@@ -34,7 +34,7 @@ const JOKE_MARKERS_RE =
 const AFFECTIONATE_FRAME_RE =
   /(?<![\p{L}])(kank[a-zçğıöşü]*|birader|moruk|kardeşim|reis|aslanım|dostum|canım|aşkım|bebeğim|bebiş|tatlım|gülüm|prensesim)(?![\p{L}])/iu;
 const DIRECT_SECOND_PERSON_RE =
-  /(?<![\p{L}])(sen|sana|seni|senin|senden|seninle|sende|senle|siz|sizi|sizin|size|sizden|sizinle|bana|beni)(?![\p{L}])/iu;
+  /(?<![\p{L}])(sen|sana|seni|senin|senden|seninle|sende|senle|siz|sizi|sizin|size|sizden|sizinle)(?![\p{L}])/iu;
 const QUESTION_FRAME_RE =
   /[?？]|(?<![\p{L}])(mi|mı|mu|mü|misin|mısın|musun|müsün)(?![\p{L}])|değil\s*mi/iu;
 const REPORTING_FRAME_RE = /(?<![\p{L}])(dedi|demiş|dedim|söyledi|söyledim|diyor|diye|anlatt)(?![\p{L}])/iu;
@@ -48,11 +48,14 @@ const FOOD_CONTEXT_RE =
 // Serious-conflict framing: corroborates that a slur is a real attack, not banter.
 const FIGHT_CONTEXT_RE =
   /(?<![\p{L}])(kavga|kavgan|tartış|hesaplaş|haddin|had+in|bağır|çekiş|kapış|restleş|yüzüne\s+söyl|sinir\s+ediyor|gıcık|nefret\s+ediyor|iğreniyor)(?![\p{L}])|herif(?![\p{L}])/iu;
-// A slur/insult stem standing as a trailing vocative in a multi-word turn
+// A slur stem standing as a trailing vocative in a multi-word turn
 // ("... köle", "... kaşar herif", "... orospu") — an address, not a passing
-// mention. A lone one-word slur is excluded (that stays a candidate).
+// mention. Restricted to stems that are essentially never self-applied, and a
+// lone one-word slur is excluded (that stays a candidate). "aptal"/"salak" &c.
+// are deliberately NOT here — "bugün çok aptalım" is self-deprecation, not an
+// attack; those need a pointed 2nd-person or fight frame to count.
 const TRAILING_VOCATIVE_RE =
-  /(?<![\p{L}])(orosp\p{L}*|kaşa[rs]\p{L}*|sürtük|kahpe|yavşak|piç\p{L}*|köle|şerefsiz|haysiyetsiz|aptal\p{L}*|salak\p{L}*|gerizekal\p{L}*|dangalak|öküz|ezik)\s*(herif|adam|kadın|kız|çocuğu|çocuk|moruk)?\s*[.!?…]*\s*$/iu;
+  /(?<![\p{L}])(orosp\p{L}*|kaşa[rs](?!\p{L}*(?:ım|im|um|üm)\b)\p{L}*|sürtük\p{L}*|kahpe\p{L}*|yavşak\p{L}*|piç\p{L}*|köle|şerefsiz|haysiyetsiz)\s*(herif|herifi|adam|adamı|kadın|kız|çocuğu|çocuk|moruk|it)?\s*[.!?…]*\s*$/iu;
 
 // Inflection-tolerant lexical cues. `interpretSemanticEvent`'s slur/insult
 // regexes are word-boundary bound and miss Turkish suffixed forms
