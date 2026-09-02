@@ -130,6 +130,7 @@ describe("Kaira planning trigger inbox store contracts", () => {
       retryAfter: "2026-09-02T02:06:00.000Z",
     });
     expect(set).toHaveBeenCalledOnce();
+    expect(set.mock.calls[0][1]).not.toHaveProperty("consumedAt");
 
     firestore.runTransaction.mockImplementationOnce(async (_db: unknown, callback: (tx: any) => unknown) =>
       callback({ get: vi.fn().mockResolvedValue({ exists: () => true, data: () => deferred }), set: vi.fn() }),
@@ -162,5 +163,7 @@ describe("Kaira planning trigger inbox store contracts", () => {
     expect(consumed.retryAfter).toBeUndefined();
     expect(consumed.deferredAt).toBeUndefined();
     expect(set).toHaveBeenCalledOnce();
+    expect(set.mock.calls[0][1]).not.toHaveProperty("deferredAt");
+    expect(set.mock.calls[0][1]).not.toHaveProperty("retryAfter");
   });
 });
