@@ -31,7 +31,7 @@ jobs:
         run: npm run test:beta
 
       - name: Beta conversation acceptance
-        run: npx vitest run src/services/kairaLongSessionConsistencyRegression.test.ts src/services/kairaQualitativeSpeechDifferentiationRegression.test.ts src/services/kairaControlledSpontaneityIntegrationContracts.test.ts src/services/kairaBetaConversationContinuityRegression.test.ts src/services/kairaTwentyTurnPersistenceRoundtripRegression.test.ts src/services/kairaLanguageMemorySelfDrift.test.ts src/services/kairaResponsePlanFinalAuthorityContracts.test.ts
+        run: node scripts/run-beta-conversation-acceptance.mjs
 
       - name: Tests
         run: npm test -- --run
