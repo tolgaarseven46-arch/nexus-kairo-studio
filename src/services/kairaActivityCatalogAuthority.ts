@@ -52,6 +52,9 @@ function assertCatalogEntry(entry: KairaActivityCatalogEntry) {
   if (!key(entry.catalogId) || !key(entry.activityType) || !finiteUnit(entry.noveltyPotential)) {
     throw new Error("Invalid Kaira activity catalog entry");
   }
+  if (entry.permissionPolicy !== "none" && entry.permissionPolicy !== "owner_approval") {
+    throw new Error("Invalid Kaira activity catalog permission policy");
+  }
   const affinities = Object.values(entry.motivationAffinity || {});
   if (affinities.some((value) => value !== undefined && !finiteUnit(value))) {
     throw new Error("Invalid Kaira activity catalog motivation affinity");
@@ -89,6 +92,38 @@ function assertUniqueIds(values: string[], label: string) {
   }
 }
 
+/** Canonical stable catalog semantics. Runtime availability never belongs here. */
+export function normalizeKairaActivityCatalog(
+  entries: KairaActivityCatalogEntry[],
+): KairaActivityCatalogEntry[] {
+  const normalized = entries.map((entry) => {
+    assertCatalogEntry(entry);
+    return {
+      ...entry,
+      catalogId: key(entry.catalogId),
+      activityType: key(entry.activityType),
+      motivationAffinity: { ...entry.motivationAffinity },
+      preferenceKeys: uniqueKeys(entry.preferenceKeys),
+      repetitionKey: key(entry.repetitionKey),
+      requiredCapabilities: uniqueKeys(entry.requiredCapabilities),
+      ...(entry.experienceSubject
+        ? {
+            experienceSubject: {
+              preferenceKey: key(entry.experienceSubject.preferenceKey),
+              experiencedValue:
+                typeof entry.experienceSubject.experiencedValue === "string"
+                  ? entry.experienceSubject.experiencedValue.trim()
+                  : entry.experienceSubject.experiencedValue,
+            },
+          }
+        : {}),
+      evidenceIds: uniqueKeys(entry.evidenceIds),
+    };
+  });
+  assertUniqueIds(normalized.map((entry) => entry.catalogId), "catalog id");
+  return normalized;
+}
+
 /**
  * Materializes stable catalog semantics together with ephemeral runtime facts.
  * Stable semantics can only come from catalog entries. Availability, context,
@@ -99,16 +134,12 @@ export function materializeKairaActivityDescriptors(input: {
   catalog: KairaActivityCatalogEntry[];
   runtime: KairaActivityCatalogRuntimeContext;
 }): KairaActivityDescriptor[] {
-  const catalog = input.catalog.map((entry) => {
-    assertCatalogEntry(entry);
-    return { ...entry, catalogId: key(entry.catalogId) };
-  });
+  const catalog = normalizeKairaActivityCatalog(input.catalog);
   const assessments = input.runtime.assessments.map((assessment) => {
     assertAssessment(assessment);
     return { ...assessment, catalogId: key(assessment.catalogId) };
   });
 
-  assertUniqueIds(catalog.map((entry) => entry.catalogId), "catalog id");
   assertUniqueIds(assessments.map((assessment) => assessment.catalogId), "runtime assessment id");
 
   const assessmentById = new Map(assessments.map((assessment) => [assessment.catalogId, assessment]));
@@ -121,17 +152,17 @@ export function materializeKairaActivityDescriptors(input: {
     const assessment = assessmentById.get(entry.catalogId);
     if (!assessment) continue;
 
-    const requiredCapabilities = uniqueKeys(entry.requiredCapabilities);
+    const requiredCapabilities = entry.requiredCapabilities || [];
     const capabilitiesSatisfied = requiredCapabilities.every((capability) => capabilities.get(capability) === true);
     const availability =
       capabilitiesSatisfied && assessment.availability === "available" ? "available" : "blocked";
 
     descriptors.push({
       proposalId: entry.catalogId,
-      activityType: key(entry.activityType),
+      activityType: entry.activityType,
       motivationAffinity: { ...entry.motivationAffinity },
-      preferenceKeys: uniqueKeys(entry.preferenceKeys),
-      repetitionKey: key(entry.repetitionKey),
+      preferenceKeys: entry.preferenceKeys || [],
+      repetitionKey: entry.repetitionKey || "",
       noveltyPotential: entry.noveltyPotential,
       contextualFit: assessment.contextualFit,
       interruptionCost: assessment.interruptionCost,
@@ -142,7 +173,7 @@ export function materializeKairaActivityDescriptors(input: {
       ...(assessment.expiresAt ? { expiresAt: assessment.expiresAt } : {}),
       ...(entry.experienceSubject ? { experienceSubject: { ...entry.experienceSubject } } : {}),
       evidenceIds: Array.from(new Set([
-        ...uniqueKeys(entry.evidenceIds),
+        ...(entry.evidenceIds || []),
         ...uniqueKeys(assessment.evidenceIds),
         ...requiredCapabilities.map((capability) => `capability:${capability}`),
       ])),
