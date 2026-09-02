@@ -17,6 +17,7 @@ import {
   applyKairaActivityExecutionCommandAtomic,
   createKairaActivityExecutionAtomic,
   listOpenKairaActivityExecutions,
+  listPendingKairaActivityPermissionExecutions,
   transitionKairaActivityExecutionAtomic,
 } from "./kairaActivityExecutionStore";
 
@@ -104,6 +105,20 @@ describe("Kaira activity execution store contracts", () => {
     expect(firestore.where).toHaveBeenCalledWith("phase", "in", ["planned", "active"]);
     expect(firestore.limit).toHaveBeenCalledWith(100);
     expect(result.map((record) => record.activityId)).toEqual(["theatre_01", "walk_01"]);
+  });
+
+  it("exposes a bounded operational sample of pending owner approvals", async () => {
+    firestore.getDocs.mockResolvedValue({
+      docs: [
+        { data: () => openExecution({ permissionPolicy: "owner_approval", permissionStatus: "pending" }) },
+        { data: () => openExecution({ activityId: "granted", permissionPolicy: "owner_approval", permissionStatus: "granted" }) },
+        { data: () => openExecution({ activityId: "active", phase: "active", permissionPolicy: "owner_approval", permissionStatus: "pending" }) },
+      ],
+    });
+    const result = await listPendingKairaActivityPermissionExecutions({ batchSize: 200 });
+    expect(firestore.where).toHaveBeenCalledWith("permissionStatus", "==", "pending");
+    expect(firestore.limit).toHaveBeenCalledWith(100);
+    expect(result.map((record) => record.activityId)).toEqual(["theatre_01"]);
   });
 
   it("fails closed when a retry reuses the same activity id with different semantics", async () => {

@@ -127,6 +127,7 @@ export interface SaveTestSessionTurnPayload {
     selfMemoryRuntime?: unknown;
     livedMemoryRuntime?: unknown;
     responsePlan?: unknown;
+    activityPermission?: { requestId: string; activityId: string; activityLabel: string; text: string } | null;
   };
 }
 
@@ -149,6 +150,7 @@ export function turnsToTestMessages(turns: TestSessionTurnRecord[]): TestMessage
         sender: 'droit',
         text: turn.assistantReply,
         replyToParticipantName: turn.speaker,
+        activityPermissionRequestId: turn.metadata?.activityPermission?.requestId,
         timestamp: timeStr,
       });
     }
@@ -246,6 +248,7 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
       selfMemoryRuntime: payload.metadata?.selfMemoryRuntime,
       livedMemoryRuntime: payload.metadata?.livedMemoryRuntime,
       responsePlan: payload.metadata?.responsePlan,
+      activityPermission: payload.metadata?.activityPermission,
     },
   };
 

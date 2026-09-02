@@ -53,7 +53,7 @@ export interface DynamicStateDelta { anger?: number; stress?: number; calmness?:
 export interface LastEventReaction { eventTitle: string; reactionText: string; deltas: { label: string; key: string; value: number; }[]; }
 export interface DroitDynamicState { calmness: number; anger: number; stress: number; happiness: number; confidence: number; surprise: number; lastStatus: string; reactionMode?: AffectiveReactionMode; lastEvent?: LastEventReaction; relationship?: RelationshipState; }
 export type DroitExpressionMode = 'NEUTRAL' | 'FOCUSED' | 'ALERT' | 'CALM' | 'ANALYTICAL' | 'FRIENDLY' | 'CONFIDENT';
-export interface TestMessage { id: string; sender: 'user' | 'droit'; text: string; timestamp: string; moodEffect?: string; participantId?: string; participantName?: string; replyToParticipantId?: string; replyToParticipantName?: string; }
+export interface TestMessage { id: string; sender: 'user' | 'droit'; text: string; timestamp: string; moodEffect?: string; participantId?: string; participantName?: string; replyToParticipantId?: string; replyToParticipantName?: string; activityPermissionRequestId?: string; }
 export interface DroitStudioData { id: string; codeName: string; name: string; title: string; personality: DroitPersonalityTraits; dynamicState: DroitDynamicState; expression: DroitExpressionMode; }
 
 export interface TestSessionTurnRecord {
@@ -117,6 +117,7 @@ export interface TestSessionTurnRecord {
     selfMemoryRuntime?: unknown;
     livedMemoryRuntime?: unknown;
     responsePlan?: unknown;
+    activityPermission?: { requestId: string; activityId: string; activityLabel: string; text: string } | null;
   };
 }
 

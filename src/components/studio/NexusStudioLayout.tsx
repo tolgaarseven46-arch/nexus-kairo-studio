@@ -458,6 +458,7 @@ export const NexusStudioLayout: React.FC = () => {
           text: response.reply,
           replyToParticipantId: activeParticipant.id,
           replyToParticipantName: activeParticipant.label,
+          activityPermissionRequestId: response.activityPermission?.requestId,
           timestamp: new Date().toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",

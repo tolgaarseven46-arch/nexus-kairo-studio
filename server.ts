@@ -55,6 +55,12 @@ import { recordKdmMetric } from "./src/services/kdmMetricsService";
 import { loadRecentWorldEventObservations } from "./src/services/worldModelEventStore";
 import { persistWorldEventAndMaybeConsolidateLivedMemory } from "./src/services/kairaLivedMemoryRuntime";
 import { observeKairaActivityDynamicState } from "./src/services/kairaActivityDynamicStateObservationCoordinator";
+import {
+  composeKairaActivityPermissionChatReply,
+  presentKairaActivityPermissionChatPrompt,
+  resolveKairaActivityPermissionChatReply,
+  type KairaActivityPermissionChatPrompt,
+} from "./src/services/kairaActivityPermissionChatRuntime";
 import { buildWorldEventMemoryInstruction, rankWorldEventObservations, shouldRetrieveWorldEvents } from "./src/services/worldEventRetrieval";
 import { enforceWorldModelRecallResponse, findWorldModelResponseIssues } from "./src/services/worldModelResponseGuard";
 import { appraiseRetrievedWorldState, buildWorldStateAppraisalInstruction } from "./src/services/worldStateAppraisal";
@@ -537,6 +543,7 @@ app.post("/api/chat", async (req, res) => {
       kairaInstanceId: incomingKairaInstanceId,
       kairaInstanceType: incomingKairaInstanceType,
       requestId: incomingRequestId,
+      activityPermissionRequestId: incomingActivityPermissionRequestId,
     } = req.body;
     if (!userMessage)
       return res.status(400).json({ error: "userMessage is required" });
@@ -566,6 +573,35 @@ app.post("/api/chat", async (req, res) => {
         ownsIdempotencyClaim = false;
       }
       return res.json(payload);
+    };
+    const activityPermissionResolution = kairaPolicy.autonomousActivityPlanning
+      ? await resolveKairaActivityPermissionChatReply({
+          ownerUserId: userId,
+          kairaInstanceId: kairaInstance.instanceId,
+          sessionId,
+          permissionRequestId:
+            typeof incomingActivityPermissionRequestId === "string"
+              ? incomingActivityPermissionRequestId.trim()
+              : undefined,
+          message: String(userMessage),
+          now: new Date().toISOString(),
+        })
+      : ({ status: "none" } as const);
+    let activityPermissionPrompt: KairaActivityPermissionChatPrompt | null = null;
+    const attachActivityPermission = async (baseReply: string) => {
+      if (!kairaPolicy.autonomousActivityPlanning) return baseReply;
+      activityPermissionPrompt = await presentKairaActivityPermissionChatPrompt({
+        ownerUserId: userId,
+        kairaInstanceId: kairaInstance.instanceId,
+        sessionId,
+        promptTurnId: `permission_prompt_${requestId || `${sessionId}_${cleanHistory.length}`}`,
+        now: new Date().toISOString(),
+      });
+      return composeKairaActivityPermissionChatReply({
+        reply: baseReply,
+        resolution: activityPermissionResolution,
+        prompt: activityPermissionPrompt,
+      });
     };
     const cleanHistory = sanitizeKairoChatHistory(history);
     const retrievedWorldEvents = kairaPolicy.persistentWorldModel && shouldRetrieveWorldEvents(userMessage)
@@ -773,6 +809,7 @@ app.post("/api/chat", async (req, res) => {
           score: Math.max(0, localBaseConsistency.score - (localPlanIssues.length + localEpistemicIssues.length) * 15),
           issues: [...localBaseConsistency.issues, ...localPlanIssues, ...localEpistemicIssues],
         };
+      const userFacingReply = await attachActivityPermission(reply);
       if (kairaPolicy.persistentUserMemory && consistency.accepted) {
         learnLanguageReply(stateUserId, reply);
       }
@@ -792,7 +829,7 @@ app.post("/api/chat", async (req, res) => {
           dynamicState: kdm.nextDynamicState,
           reasoningTrace: kdm.trace,
           lastUserMessage: userMessage,
-          reply,
+          reply: userFacingReply,
           memoryScope: kairaPolicy.persistentUserMemory ? dialogueAnalysis.memoryScope : "session",
           dialogueAnalysis,
         }) : Promise.resolve(),
@@ -807,7 +844,7 @@ app.post("/api/chat", async (req, res) => {
         saveKntTrace({
           userId: stateUserId,
           userMessage,
-          reply,
+          reply: userFacingReply,
           reasoningTrace: kdm.trace,
           dynamicState: kdm.nextDynamicState,
           timings: {
@@ -834,7 +871,7 @@ app.post("/api/chat", async (req, res) => {
           userId: stateUserId,
           userName,
           userMessage,
-          assistantReply: reply,
+          assistantReply: userFacingReply,
           speaker: userName,
           intent: kdm.trace?.messageInterpretation?.intent,
           detectedEmotion: kdm.trace?.messageInterpretation?.sentiment,
@@ -882,6 +919,7 @@ app.post("/api/chat", async (req, res) => {
             livedMemoryRuntime,
             responsePlan,
             timings: { memoryMs, kdmMs, aiMs: 0 },
+            activityPermission: activityPermissionPrompt,
           },
         }).then((t) => {
           savedTurnId = t.turnId;
@@ -919,7 +957,9 @@ app.post("/api/chat", async (req, res) => {
         requestId: requestId || undefined,
         kairaInstanceId: kairaInstance.instanceId,
         kairaInstanceType: kairaInstance.instanceType,
-        reply,
+        reply: userFacingReply,
+        activityPermission: activityPermissionPrompt,
+        activityPermissionResolution: activityPermissionResolution.status,
         providerUsed: "local_language",
         localLanguage: {
           intent: local.intent,
@@ -1159,6 +1199,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
     if (kairaPolicy.persistentUserMemory && consistency.accepted && !providerFailureFallbackUsed) {
       learnLanguageReply(stateUserId, reply);
     }
+    reply = await attachActivityPermission(reply);
     const postStart = now();
     const livedMemoryRuntime = await persistWorldEventAndMaybeConsolidateLivedMemory({
       userId,
@@ -1259,6 +1300,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           livedMemoryRuntime,
           responsePlan,
           timings: { memoryMs, kdmMs, aiMs },
+          activityPermission: activityPermissionPrompt,
         },
       }).then((t) => {
         savedTurnId = t.turnId;
@@ -1297,6 +1339,8 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
       kairaInstanceId: kairaInstance.instanceId,
       kairaInstanceType: kairaInstance.instanceType,
       reply,
+      activityPermission: activityPermissionPrompt,
+      activityPermissionResolution: activityPermissionResolution.status,
       providerUsed: activeAiProviderUsed,
       enforcement: enforced,
       speechIdentity: speech,
