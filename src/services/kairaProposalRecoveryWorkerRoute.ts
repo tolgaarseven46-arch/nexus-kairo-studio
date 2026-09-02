@@ -81,7 +81,7 @@ export function registerKairaProposalRecoveryWorkerRoute(app: Express) {
         requestedLimit: limit,
         now,
       });
-      const ok = result.status === "completed";
+      const ok = result.status === "completed" || result.status === "degraded";
       return res.status(ok ? 200 : 500).json({
         ok,
         limit,
