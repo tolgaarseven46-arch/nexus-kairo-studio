@@ -221,6 +221,31 @@ export async function listOpenKairaActivityExecutions(input: {
     .map((record) => ({ ...record }));
 }
 
+/** Operational read-model for owner-approval work waiting to be surfaced in chat. */
+export async function listPendingKairaActivityPermissionExecutions(input: {
+  batchSize?: number;
+} = {}): Promise<KairaActivityExecutionRecord[]> {
+  const batchSize = boundedOpenExecutionBatchSize(input.batchSize);
+  const snapshot = await getDocs(query(
+    collection(db, ACTIVITY_EXECUTION_COLLECTION),
+    where("permissionStatus", "==", "pending"),
+    limit(batchSize),
+  ));
+  return snapshot.docs
+    .map((item) => item.data() as Partial<KairaActivityExecutionRecord>)
+    .filter((record): record is KairaActivityExecutionRecord => Boolean(
+      record.schemaVersion === 1 &&
+      record.phase === "planned" &&
+      record.permissionPolicy === "owner_approval" &&
+      record.permissionStatus === "pending" &&
+      String(record.ownerUserId || "").trim() &&
+      String(record.kairaInstanceId || "").trim() &&
+      String(record.activityId || "").trim() &&
+      Number.isFinite(Date.parse(String(record.createdAt || ""))),
+    ))
+    .map((record) => ({ ...record }));
+}
+
 export async function transitionKairaActivityExecutionAtomic(input: {
   ownerUserId: string;
   kairaInstanceId: string;

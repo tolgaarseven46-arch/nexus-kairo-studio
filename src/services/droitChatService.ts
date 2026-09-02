@@ -73,6 +73,13 @@ export interface KairoChatResponse {
   epistemicAccess?: unknown;
   responsePlan?: unknown;
   controlledSpontaneity?: unknown;
+  activityPermission?: {
+    requestId: string;
+    activityId: string;
+    activityLabel: string;
+    text: string;
+  } | null;
+  activityPermissionResolution?: "none" | "uncorrelated" | "unmatched" | "execution_rejected" | "applied";
 }
 
 function resolveConversationUserId(explicitUserId?: string) {
@@ -247,7 +254,11 @@ export const droitChatService = {
     );
     const clientPrepMs = Math.round(performance.now() - prepStart);
 
-    const payload = { sessionId: resolvedSessionId, requestId, userId, userName, userMessage, semanticEvent, character: characterInfo, personality, responsePersonality: runtimePersonality, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorPolicy, dynamicState: temperamentAdjustedState ?? dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
+    const activityPermissionRequestId = [...history]
+      .reverse()
+      .find((message) => message.sender === "droit" && message.activityPermissionRequestId)
+      ?.activityPermissionRequestId;
+    const payload = { sessionId: resolvedSessionId, requestId, userId, userName, userMessage, semanticEvent, character: characterInfo, personality, responsePersonality: runtimePersonality, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorPolicy, dynamicState: temperamentAdjustedState ?? dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName })), activityPermissionRequestId, provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     try {
@@ -289,7 +300,7 @@ export const droitChatService = {
         temperamentAdjustedState,
       });
       completeKairaChatRequestIdentity(retryFingerprint);
-      return { reply, profile: authoritativeBehaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId, kairaInstanceId: data.kairaInstanceId || kairaInstance.instanceId, kairaInstanceType: data.kairaInstanceType || kairaInstance.instanceType, languageUnderstanding, worldStateAppraisal: data.kdm?.worldStateAppraisal, worldReasoningPolicy: data.kdm?.worldReasoningPolicy, worldMemoryGuard: data.kdm?.worldMemoryGuard, epistemicAccess: data.kdm?.epistemicAccess, responsePlan: data.kdm?.responsePlan, controlledSpontaneity: data.kdm?.controlledSpontaneity };
+      return { reply, profile: authoritativeBehaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId, kairaInstanceId: data.kairaInstanceId || kairaInstance.instanceId, kairaInstanceType: data.kairaInstanceType || kairaInstance.instanceType, languageUnderstanding, worldStateAppraisal: data.kdm?.worldStateAppraisal, worldReasoningPolicy: data.kdm?.worldReasoningPolicy, worldMemoryGuard: data.kdm?.worldMemoryGuard, epistemicAccess: data.kdm?.epistemicAccess, responsePlan: data.kdm?.responsePlan, controlledSpontaneity: data.kdm?.controlledSpontaneity, activityPermission: data.activityPermission ?? null, activityPermissionResolution: data.activityPermissionResolution };
     } catch (err: any) {
       if (err?.name === "AbortError") throw new Error("Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.");
       throw err;

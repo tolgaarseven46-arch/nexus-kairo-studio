@@ -251,6 +251,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
                 id: `kairo-${turn.turnId || idx}`,
                 sender: 'droit',
                 text: turn.assistantReply,
+                activityPermissionRequestId: turn.metadata?.activityPermission?.requestId,
                 timestamp: timeStr,
               });
             });
@@ -798,6 +799,7 @@ export const TestLabTab: React.FC<TestLabTabProps> = ({
         id: `kairo-${Date.now()}`,
         sender: 'droit',
         text: response.reply,
+        activityPermissionRequestId: response.activityPermission?.requestId,
         timestamp: replyTime,
       };
       setTestMessages((prev) => [...prev, droitMsg]);
