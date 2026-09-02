@@ -89,6 +89,7 @@ import {
   enforceKairaEpistemicResponse,
   findKairaEpistemicResponseIssues,
 } from "./src/services/kairaEpistemicResponsePolicy";
+import { registerKairaProposalRecoveryWorkerRoute } from "./src/services/kairaProposalRecoveryWorkerRoute";
 import type {
   DroitDynamicState,
 } from "./src/types/nexus";
@@ -96,6 +97,7 @@ dotenv.config();
 const app = express(),
   PORT = 3000;
 app.use(express.json());
+registerKairaProposalRecoveryWorkerRoute(app);
 let aiClient: GoogleGenAI | null = null;
 const now = () => performance.now(),
   memoryCache = new Map<
