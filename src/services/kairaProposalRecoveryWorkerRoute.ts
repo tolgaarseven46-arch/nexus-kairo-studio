@@ -3,7 +3,8 @@ import { authorizeKairaInternalWorker } from "./kairaInternalWorkerAuth";
 import { runKairaProposalRecoveryWorker } from "./kairaProposalRecoveryWorkerRunCoordinator";
 import { readKairaProposalRecoveryWorkerHealth } from "./kairaProposalRecoveryWorkerHealthRuntime";
 import { resolveKairaProposalRecoveryWorkerHealthConfig } from "./kairaProposalRecoveryWorkerHealthConfig";
-import { runKairaAutonomousLifeWorker } from "./kairaAutonomousLifeWorkerRunCoordinator";
+import { runKairaAutonomousLifeWorkerDurable } from "./kairaAutonomousLifeWorkerDurableRunCoordinator";
+import { readKairaAutonomousLifeWorkerHealth } from "./kairaAutonomousLifeWorkerHealthRuntime";
 
 const clampLimit = (value: unknown) => {
   const parsed = Number(value);
@@ -76,22 +77,80 @@ export function registerKairaProposalRecoveryWorkerRoute(app: Express) {
     const now = new Date().toISOString();
     const limit = clampLimit(req.body?.limit);
     try {
-      const result = await runKairaAutonomousLifeWorker({
+      const result = await runKairaAutonomousLifeWorkerDurable({
         runId,
         requestedLimit: limit,
         now,
       });
-      const ok = result.status === "completed" || result.status === "degraded";
+      if (result.status === "busy") {
+        return res.status(202).json({ ok: true, runId, status: "busy", limit, receipt: result.receipt });
+      }
+      if (result.status === "replayed") {
+        const status = result.receipt.summary?.outcome || "failed";
+        const ok = status === "completed" || status === "degraded";
+        return res.status(ok ? 200 : 500).json({
+          ok,
+          runId,
+          status,
+          deliveryStatus: "replayed",
+          limit,
+          receipt: result.receipt,
+        });
+      }
+      if (result.status === "failed") {
+        return res.status(500).json({
+          ok: false,
+          runId,
+          status: "failed",
+          limit,
+          error: result.error,
+          receipt: result.receipt,
+        });
+      }
+      const ok = result.worker.status === "completed" || result.worker.status === "degraded";
       return res.status(ok ? 200 : 500).json({
         ok,
         limit,
-        ...result,
+        deliveryStatus: "executed",
+        receipt: result.receipt,
+        ...result.worker,
       });
     } catch (error: any) {
       return res.status(500).json({
         ok: false,
         runId,
         error: error?.message || "autonomous_life_worker_failed",
+      });
+    }
+  });
+
+  app.get("/internal/workers/kaira/autonomous-life/health", async (req: Request, res: Response) => {
+    if (!authorizeRequest(req, res)) return;
+
+    const config = resolveKairaProposalRecoveryWorkerHealthConfig();
+    if (config.status === "disabled") {
+      return res.status(503).json({ ok: false, error: config.reason });
+    }
+    if (config.status === "invalid") {
+      return res.status(500).json({ ok: false, error: config.reason });
+    }
+
+    const now = new Date().toISOString();
+    try {
+      const health = await readKairaAutonomousLifeWorkerHealth({
+        now,
+        maxTerminalRunAgeMinutes: config.thresholds.maxSuccessfulRunAgeMinutes,
+        recentRunLimit: config.recentRunLimit,
+      });
+      return res.status(health.status === "unhealthy" ? 503 : 200).json({
+        ok: health.status !== "unhealthy",
+        checkedAt: now,
+        health,
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || "autonomous_life_health_read_failed",
       });
     }
   });

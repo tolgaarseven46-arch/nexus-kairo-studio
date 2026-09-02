@@ -1190,3 +1190,21 @@ Yeni sohbet açıldığında:
 ### Next verified development question
 - Audit timeout/retry idempotency. droitChatService aborts the client request at 35 seconds, but a server request can continue processing/persisting after the client disconnects. A retry must not apply the same logical user turn twice or advance relationship/state twice.
 
+## 121. Autonomous Life production authority wiring — 2026-09-02
+- Due schedule query/discovery, trusted autonomous-life worker tick and instance-scoped execution/schedule occupancy read-model are active.
+- Instance-owned autonomous dynamic-state snapshots are persisted and assembled into canonical planning source snapshots; chat/KDM state changes feed this authority through retry-safe observation coordination.
+- Activity catalog authority is persistent, instance-owned and provisioned only through authenticated trusted routes. Empty/malformed active catalogs fail closed.
+- Terminal execution and material affect changes emit durable, retry-safe planning-trigger inbox records. The planning worker assembles catalog, environment, occupancy and dynamic-state sources before committing a proposal.
+- Missing source facts are persisted as deferred trigger work with bounded backoff; deferred work cannot hot-loop or starve unrelated planning items. Autonomous ticks surface this condition as `degraded` readiness.
+- Proposal recovery and due schedule dispatch remain stage-isolated so one failed authority does not block other canonical work.
+
+## 122. Durable autonomous-life tick identity and holistic health — 2026-09-02
+- The complete autonomous-life wakeup now has its own Firestore-backed run receipt and lease authority (`kairaAutonomousLifeWorkerRuns`). A stable `x-kaira-worker-run-id` can own the whole tick only once.
+- Concurrent retries while the lease is live return `busy` without re-running planning, recovery or schedule dispatch. Terminal retries replay the persisted outcome without applying stages twice; expired leases can be reclaimed safely over independently idempotent stages.
+- Terminal receipts persist compact stage summaries rather than unbounded runtime payloads: planning completed/busy/deferred/failed counts, proposal recovery counts and schedule dispatch counts.
+- `/internal/workers/kaira/autonomous-life` is wired to the durable coordinator. It returns HTTP 202 for a live duplicate, replays persisted completed/degraded outcomes, and preserves retryable failure status for partial/failed ticks.
+- `/internal/workers/kaira/autonomous-life/health` is an authenticated read-only holistic health projection over durable tick history. It distinguishes healthy, degraded, unhealthy and unknown; detects deferred readiness, partial/failed outcomes, expired leases and stale wakeups.
+- Permanent autonomous runtime CI now explicitly gates the whole-tick store, durable coordinator, holistic health policy and route contracts.
+
+### Next verified development question
+- Production wakeup ownership is still external to this repository. Verify the deployed scheduler/cron invokes `/internal/workers/kaira/autonomous-life` with a stable unique run id and `KAIRA_INTERNAL_WORKER_SECRET`, then perform a real Firestore smoke test covering receipt creation, replay, degraded health and recovery to healthy.
