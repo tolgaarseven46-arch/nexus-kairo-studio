@@ -75,7 +75,9 @@ const key = (value: unknown) =>
 const finiteUnit = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 
-function normalizeTrigger(trigger: KairaActivityPlanningTrigger): KairaActivityPlanningTrigger {
+export function normalizeKairaActivityPlanningTrigger(
+  trigger: KairaActivityPlanningTrigger,
+): KairaActivityPlanningTrigger {
   const triggerId = key(trigger.triggerId);
   const sourceId = key(trigger.sourceId);
   const occurredAtMs = Date.parse(trigger.occurredAt);
@@ -110,7 +112,7 @@ export function evaluateKairaActivityPlanningTrigger(
     instanceId: input.kairaInstanceId,
     instanceType: input.instanceType,
   });
-  const trigger = normalizeTrigger(input.trigger);
+  const trigger = normalizeKairaActivityPlanningTrigger(input.trigger);
   const evidenceIds = [
     `planning_trigger:${trigger.kind}`,
     `trigger:${trigger.triggerId}`,
