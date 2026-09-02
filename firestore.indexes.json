@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "kairaActivitySchedules",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "notBefore", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
