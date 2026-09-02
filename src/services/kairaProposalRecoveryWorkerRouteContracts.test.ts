@@ -21,20 +21,20 @@ import { registerKairaProposalRecoveryWorkerRoute } from "./kairaProposalRecover
 type Handler = (req: any, res: any) => Promise<unknown>;
 
 function routeHarness() {
-  let postHandler: Handler | undefined;
-  let getHandler: Handler | undefined;
+  const postHandlers = new Map<string, Handler>();
+  const getHandlers = new Map<string, Handler>();
   const app = {
     post: vi.fn((path: string, fn: Handler) => {
-      expect(path).toBe("/internal/workers/kaira/proposal-recovery");
-      postHandler = fn;
+      postHandlers.set(path, fn);
     }),
     get: vi.fn((path: string, fn: Handler) => {
-      expect(path).toBe("/internal/workers/kaira/proposal-recovery/health");
-      getHandler = fn;
+      getHandlers.set(path, fn);
     }),
   } as any;
   registerKairaProposalRecoveryWorkerRoute(app);
-  if (!postHandler || !getHandler) throw new Error("worker routes not registered");
+  const postHandler = postHandlers.get("/internal/workers/kaira/proposal-recovery");
+  const getHandler = getHandlers.get("/internal/workers/kaira/proposal-recovery/health");
+  if (!postHandler || !getHandler) throw new Error("proposal recovery worker routes not registered");
   const response = {
     statusCode: 200,
     body: undefined as any,
