@@ -1,0 +1,6 @@
+# CI Linux runner'ında CRLF, bash script'lerini ve YAML'ı bozar.
+# Bu dosyalar her platformda LF olarak checkout edilir.
+*.sh          text eol=lf
+*.yml         text eol=lf
+*.yaml        text eol=lf
+.gitattributes text eol=lf

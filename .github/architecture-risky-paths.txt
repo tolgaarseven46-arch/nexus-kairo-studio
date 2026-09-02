@@ -1,0 +1,34 @@
+# Riskli path listesi — architecture-review.yml classifier'ının ve ci.yml docs-guard'ının girdisi.
+# Bu path'lerden birine dokunan PR `architecture-review-required` etiketi alır
+# ve `architecture-review` status check'i insan `/arch-approve <head-sha>` verene
+# kadar `pending` kalır. Ayrıca docs-guard, PROJECT_STATE.md veya docs/adr/**
+# güncellemesi ister.
+#
+# Desen kuralları (basit, minimatch değil):
+#   dir/**      -> "dir/" ile başlayan her değişen dosya
+#   *.uzanti    -> bu uzantıyla biten her değişen dosya
+#   tam/yol.ext -> birebir eşleşme
+# Satır başı `#` yorum, boş satır yok sayılır.
+# Bu dosyanın kendisi de risklidir (CODEOWNERS korumalı).
+
+server.ts
+firestore.rules
+firestore.indexes.json
+firebase-applet-config.json
+firebase-blueprint.json
+package.json
+package-lock.json
+bun.lock
+vite.config.ts
+tsconfig.json
+
+src/services/**
+src/types/**
+src/lib/**
+
+.github/**
+docs/adr/**
+
+AI_CONTEXT.md
+CLAUDE.md
+AGENTS.md
