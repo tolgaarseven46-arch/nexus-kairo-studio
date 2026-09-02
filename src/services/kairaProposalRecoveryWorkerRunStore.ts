@@ -1,4 +1,4 @@
-import { doc, runTransaction } from "firebase/firestore";
+import { collection, doc, getDocs, limit, orderBy, query, runTransaction } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 const COLLECTION = "kairaProposalRecoveryWorkerRuns";
@@ -62,6 +62,16 @@ function normalizedLimit(value: number): number {
 
 function refFor(runId: string) {
   return doc(db, COLLECTION, normalizeRunId(runId));
+}
+
+export async function listRecentKairaProposalRecoveryWorkerRuns(input?: {
+  limit?: number;
+}): Promise<KairaProposalRecoveryWorkerRunReceipt[]> {
+  const requested = Math.max(1, Math.min(100, Math.trunc(input?.limit || 20)));
+  const snapshot = await getDocs(
+    query(collection(db, COLLECTION), orderBy("startedAt", "desc"), limit(requested)),
+  );
+  return snapshot.docs.map((item) => item.data() as KairaProposalRecoveryWorkerRunReceipt);
 }
 
 export async function claimKairaProposalRecoveryWorkerRun(input: {
