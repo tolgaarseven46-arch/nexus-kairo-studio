@@ -38,6 +38,9 @@ describe("Kaira autonomous life production scheduler contracts", () => {
     expect(runner).toContain("planning: summary.planning");
     expect(runner).toContain("recovery: summary.recovery");
     expect(runner).toContain("schedules: summary.schedules");
+    expect(runner).toContain("failedPlanningItems");
+    expect(runner).toContain(".slice(0, 5)");
+    expect(runner).toContain(".slice(0, 500)");
     expect(runner).not.toMatch(/console\.error\([^)]*secret/);
   });
 });
