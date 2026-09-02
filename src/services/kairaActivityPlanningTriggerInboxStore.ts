@@ -242,13 +242,13 @@ export async function markKairaActivityPlanningTriggerDeferredAtomic(input: {
     if (!sameDelivery(current, expected)) throw new Error("Kaira planning trigger inbox idempotency conflict");
     if (current.status === "consumed") return current;
     const attemptCount = Math.max(0, current.attemptCount || 0) + 1;
+    const { consumedAt: _consumedAt, ...withoutConsumption } = current;
     const deferred: KairaActivityPlanningTriggerInboxRecord = {
-      ...current,
+      ...withoutConsumption,
       status: "deferred",
       deferredAt,
       retryAfter: retryAfter(deferredAt, attemptCount - 1),
       attemptCount,
-      consumedAt: undefined,
     };
     transaction.set(ref, deferred);
     return deferred;
@@ -268,12 +268,11 @@ export async function markKairaActivityPlanningTriggerConsumedAtomic(input: {
     const current = normalizeRecord(snapshot.data());
     if (!sameDelivery(current, expected)) throw new Error("Kaira planning trigger inbox idempotency conflict");
     if (current.status === "consumed") return current;
+    const { deferredAt: _deferredAt, retryAfter: _retryAfter, ...withoutDeferral } = current;
     const consumed: KairaActivityPlanningTriggerInboxRecord = {
-      ...current,
+      ...withoutDeferral,
       status: "consumed",
       consumedAt,
-      deferredAt: undefined,
-      retryAfter: undefined,
     };
     transaction.set(ref, consumed);
     return consumed;
