@@ -8,6 +8,14 @@ import {
 } from "./kairaInstanceContext";
 
 const COLLECTION = "kairaActivityDynamicState";
+const AFFECT_AXES: Array<keyof Pick<DroitDynamicState, "calmness" | "anger" | "stress" | "happiness" | "confidence" | "surprise">> = [
+  "calmness",
+  "anger",
+  "stress",
+  "happiness",
+  "confidence",
+  "surprise",
+];
 
 export interface KairaActivityDynamicStateSnapshot {
   schemaVersion: 1;
@@ -16,10 +24,12 @@ export interface KairaActivityDynamicStateSnapshot {
   state: DroitDynamicState;
   observedAt: string;
   sourceId: string;
+  /** Persisted delta from the immediately previous canonical self-state. Undefined for the first observation. */
+  changeMagnitude?: number;
 }
 
 export type KairaActivityDynamicStateSaveResult =
-  | { status: "saved"; snapshot: KairaActivityDynamicStateSnapshot; previous?: KairaActivityDynamicStateSnapshot }
+  | { status: "saved"; snapshot: KairaActivityDynamicStateSnapshot }
   | { status: "replayed" | "stale"; snapshot: KairaActivityDynamicStateSnapshot };
 
 const sourceKey = (value: unknown) =>
@@ -59,6 +69,13 @@ export function projectKairaActivityDynamicState(state: DroitDynamicState): Droi
   };
 }
 
+export function kairaActivityDynamicStateMagnitude(
+  previous: DroitDynamicState,
+  current: DroitDynamicState,
+): number {
+  return Math.max(...AFFECT_AXES.map((axis) => Math.abs(current[axis] - previous[axis]) / 100));
+}
+
 function normalizeSnapshot(value: unknown): KairaActivityDynamicStateSnapshot {
   if (!value || typeof value !== "object") throw new Error("Invalid persisted Kaira activity dynamic state");
   const snapshot = value as Partial<KairaActivityDynamicStateSnapshot>;
@@ -79,6 +96,12 @@ function normalizeSnapshot(value: unknown): KairaActivityDynamicStateSnapshot {
   }
   const sourceId = sourceKey(snapshot.sourceId);
   if (!sourceId) throw new Error("Invalid persisted Kaira activity dynamic state");
+  if (
+    snapshot.changeMagnitude !== undefined &&
+    (typeof snapshot.changeMagnitude !== "number" || !Number.isFinite(snapshot.changeMagnitude) || snapshot.changeMagnitude < 0 || snapshot.changeMagnitude > 1)
+  ) {
+    throw new Error("Invalid persisted Kaira activity dynamic state magnitude");
+  }
   return {
     schemaVersion: 1,
     kairaInstanceId: instance.instanceId,
@@ -86,6 +109,7 @@ function normalizeSnapshot(value: unknown): KairaActivityDynamicStateSnapshot {
     state: projectKairaActivityDynamicState(snapshot.state),
     observedAt: canonicalTime(String(snapshot.observedAt || "")),
     sourceId,
+    ...(snapshot.changeMagnitude !== undefined ? { changeMagnitude: snapshot.changeMagnitude } : {}),
   };
 }
 
@@ -114,32 +138,44 @@ export async function saveKairaActivityDynamicStateAtomic(input: {
   }
   const sourceId = sourceKey(input.sourceId);
   if (!sourceId) throw new Error("Invalid Kaira activity dynamic state source");
-  const next: KairaActivityDynamicStateSnapshot = {
-    schemaVersion: 1,
-    kairaInstanceId: instance.instanceId,
-    instanceType: instance.instanceType,
-    state: projectKairaActivityDynamicState(input.state),
-    observedAt: canonicalTime(input.observedAt),
-    sourceId,
-  };
+  const state = projectKairaActivityDynamicState(input.state);
+  const observedAt = canonicalTime(input.observedAt);
   const ref = doc(db, COLLECTION, instance.instanceId);
   return runTransaction(db, async (transaction) => {
     const currentSnapshot = await transaction.get(ref);
     if (currentSnapshot.exists()) {
       const current = normalizeSnapshot(currentSnapshot.data());
-      const currentMs = Date.parse(current.observedAt);
-      const nextMs = Date.parse(next.observedAt);
-      if (currentMs > nextMs) return { status: "stale", snapshot: current } as const;
-      if (currentMs === nextMs) {
-        if (current.sourceId !== next.sourceId || JSON.stringify(current.state) !== JSON.stringify(next.state)) {
-          throw new Error("Kaira activity dynamic state timestamp conflict");
+      if (current.sourceId === sourceId) {
+        if (JSON.stringify(current.state) !== JSON.stringify(state)) {
+          throw new Error("Kaira activity dynamic state source conflict");
         }
         return { status: "replayed", snapshot: current } as const;
       }
+      const currentMs = Date.parse(current.observedAt);
+      const nextMs = Date.parse(observedAt);
+      if (currentMs > nextMs) return { status: "stale", snapshot: current } as const;
+      if (currentMs === nextMs) throw new Error("Kaira activity dynamic state timestamp conflict");
+      const next: KairaActivityDynamicStateSnapshot = {
+        schemaVersion: 1,
+        kairaInstanceId: instance.instanceId,
+        instanceType: instance.instanceType,
+        state,
+        observedAt,
+        sourceId,
+        changeMagnitude: kairaActivityDynamicStateMagnitude(current.state, state),
+      };
       transaction.set(ref, next);
-      return { status: "saved", snapshot: next, previous: current } as const;
+      return { status: "saved", snapshot: next } as const;
     }
-    transaction.set(ref, next);
-    return { status: "saved", snapshot: next } as const;
+    const first: KairaActivityDynamicStateSnapshot = {
+      schemaVersion: 1,
+      kairaInstanceId: instance.instanceId,
+      instanceType: instance.instanceType,
+      state,
+      observedAt,
+      sourceId,
+    };
+    transaction.set(ref, first);
+    return { status: "saved", snapshot: first } as const;
   });
 }
