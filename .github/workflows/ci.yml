@@ -25,7 +25,7 @@ jobs:
         run: npm run test:contracts
 
       - name: Autonomous runtime contracts
-        run: npx vitest run src/services/kairaActivityScheduleDispatchDiscoveryContracts.test.ts src/services/kairaAutonomousLifeWorkerRunCoordinatorContracts.test.ts src/services/kairaAutonomousLifeWorkerRouteContracts.test.ts src/services/kairaActivityOccupancyReadModelContracts.test.ts src/services/kairaActivityExecutionStoreContracts.test.ts src/services/kairaActivityScheduleStoreContracts.test.ts src/services/kairaActivityCatalogStoreContracts.test.ts
+        run: npx vitest run src/services/kairaActivityScheduleDispatchDiscoveryContracts.test.ts src/services/kairaAutonomousLifeWorkerRunCoordinatorContracts.test.ts src/services/kairaAutonomousLifeWorkerRouteContracts.test.ts src/services/kairaActivityOccupancyReadModelContracts.test.ts src/services/kairaActivityExecutionStoreContracts.test.ts src/services/kairaActivityExecutionCoordinatorContracts.test.ts src/services/kairaActivityScheduleStoreContracts.test.ts src/services/kairaActivityCatalogStoreContracts.test.ts src/services/kairaActivityPlanningTriggerInboxStoreContracts.test.ts src/services/kairaActivityDynamicStateStoreContracts.test.ts src/services/kairaActivityDynamicStateObservationCoordinatorContracts.test.ts src/services/kairaActivityPlanningSourceSnapshotContracts.test.ts src/services/kairaActivityPlanningTriggerInboxProcessorContracts.test.ts
 
       - name: Beta runtime regression gate
         run: npm run test:beta
