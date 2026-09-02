@@ -30,6 +30,9 @@ jobs:
       - name: Beta runtime regression gate
         run: npm run test:beta
 
+      - name: Beta conversation acceptance
+        run: node scripts/run-beta-conversation-acceptance.mjs
+
       - name: Tests
         run: npm test -- --run
 

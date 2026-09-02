@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "tests": [
+    "src/services/kairaBetaConversationAcceptanceScenario.test.ts",
+    "src/services/kairaTwentyTurnPersistenceRoundtripRegression.test.ts"
+  ]
+}
