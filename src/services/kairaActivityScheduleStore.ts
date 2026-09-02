@@ -67,6 +67,12 @@ function boundedDiscoveryBatchSize(value?: number): number {
   return Math.max(1, Math.min(MAX_DISCOVERY_BATCH_SIZE, Math.trunc(value)));
 }
 
+function canonicalDiscoveryTime(value: string): string {
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) throw new Error("Invalid Kaira activity schedule discovery time");
+  return new Date(parsed).toISOString();
+}
+
 function isDiscoverableScheduledRecord(value: unknown): value is KairaActivityScheduleRecord {
   if (!value || typeof value !== "object") return false;
   const record = value as Partial<KairaActivityScheduleRecord>;
@@ -78,6 +84,13 @@ function isDiscoverableScheduledRecord(value: unknown): value is KairaActivitySc
     String(record.activityId || "").trim() &&
     Number.isFinite(Date.parse(String(record.notBefore || ""))),
   );
+}
+
+function discoveredRecords(snapshot: Awaited<ReturnType<typeof getDocs>>): KairaActivityScheduleRecord[] {
+  return snapshot.docs
+    .map((item) => item.data())
+    .filter(isDiscoverableScheduledRecord)
+    .map((record) => ({ ...record }));
 }
 
 export type KairaActivityScheduleCreateResult =
@@ -128,9 +141,8 @@ export async function loadKairaActivitySchedule(input: {
 }
 
 /**
- * Query-backed worker discovery surface. It only discovers canonical records still
- * marked `scheduled`; lifecycle/due/permission legality remains owned by the
- * scheduler/executor coordinator when each item is dispatched.
+ * Query-backed planning read surface. It returns canonical records still marked
+ * scheduled, regardless of whether their trigger time is in the future.
  */
 export async function listScheduledKairaActivitySchedules(input: {
   batchSize?: number;
@@ -141,10 +153,27 @@ export async function listScheduledKairaActivitySchedules(input: {
     where("status", "==", "scheduled"),
     limit(batchSize),
   ));
-  return snapshot.docs
-    .map((item) => item.data())
-    .filter(isDiscoverableScheduledRecord)
-    .map((record) => ({ ...record }));
+  return discoveredRecords(snapshot);
+}
+
+/**
+ * Query-backed worker discovery surface. The range predicate prevents future
+ * schedules from occupying the worker batch ahead of work that is actually due.
+ * Lifecycle/permission legality remains scheduler/executor-owned at dispatch time.
+ */
+export async function listDueKairaActivitySchedules(input: {
+  now: string;
+  batchSize?: number;
+}): Promise<KairaActivityScheduleRecord[]> {
+  const now = canonicalDiscoveryTime(input.now);
+  const batchSize = boundedDiscoveryBatchSize(input.batchSize);
+  const snapshot = await getDocs(query(
+    collection(db, ACTIVITY_SCHEDULE_COLLECTION),
+    where("status", "==", "scheduled"),
+    where("notBefore", "<=", now),
+    limit(batchSize),
+  ));
+  return discoveredRecords(snapshot);
 }
 
 export type KairaActivityScheduleDispatchCommitResult =
