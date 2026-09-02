@@ -25,6 +25,14 @@
         { "fieldPath": "kairaInstanceId", "order": "ASCENDING" },
         { "fieldPath": "phase", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "kairaActivityPlanningTriggerInbox",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "retryAfter", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
