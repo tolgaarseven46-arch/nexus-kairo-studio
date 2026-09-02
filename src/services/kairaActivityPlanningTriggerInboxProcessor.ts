@@ -1,6 +1,7 @@
 import {
   listPendingKairaActivityPlanningTriggers,
   markKairaActivityPlanningTriggerConsumedAtomic,
+  markKairaActivityPlanningTriggerDeferredAtomic,
   type KairaActivityPlanningTriggerInboxRecord,
 } from "./kairaActivityPlanningTriggerInboxStore";
 import { readKairaActivityPlanningSourceSnapshot } from "./kairaActivityPlanningSourceSnapshot";
@@ -34,6 +35,7 @@ async function processRecord(
       ...(occupancyBatchSize !== undefined ? { occupancyBatchSize } : {}),
     });
     if (sources.status === "unavailable") {
+      await markKairaActivityPlanningTriggerDeferredAtomic({ record, now });
       return {
         triggerId: record.trigger.triggerId,
         status: "deferred",
@@ -71,8 +73,9 @@ async function processRecord(
 }
 
 /**
- * Query-backed worker stage. Items are isolated: one malformed/unavailable Kaira
- * cannot block unrelated autonomous planning work in the same tick.
+ * Query-backed worker stage. Deferred work is given a persisted retry window so
+ * missing source facts cannot occupy every bounded batch and starve unrelated
+ * Kaira planning work. Items remain isolated and retry-safe.
  */
 export async function processPendingKairaActivityPlanningTriggers(input: {
   now: string;
@@ -80,6 +83,7 @@ export async function processPendingKairaActivityPlanningTriggers(input: {
   occupancyBatchSize?: number;
 }): Promise<KairaActivityPlanningInboxBatchResult> {
   const records = await listPendingKairaActivityPlanningTriggers({
+    now: input.now,
     ...(input.batchSize !== undefined ? { batchSize: input.batchSize } : {}),
   });
   const items: KairaActivityPlanningInboxItemResult[] = [];
