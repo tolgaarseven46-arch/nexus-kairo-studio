@@ -1009,14 +1009,10 @@ app.post("/api/chat", async (req, res) => {
     const relationshipInstruction = behaviorProfile.relationshipInstruction
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
-    // WHAT/WHETHER authority section. Flag OFF: the legacy stack
-    // (dialogueDecisionInstruction gates + relationshipInstruction directives +
-    // behaviorContractInstruction + the "KDM ... bağlayıcıdır" line + the plan
-    // instruction) — byte-identical to before. Flag ON: the single canonical
-    // behavior block is the only decision surface; everything else here is
-    // demoted to observational context so no decision is stated twice.
-    const behaviorAuthoritySection = canonicalPromptOn
-      ? `${dialogueDecisionInstruction}\n${responsePlanInstruction}\n${buildCanonicalObservationalContext({
+    // Flag ON: KDM scores/intent become observational-only context (no gate
+    // verbs); the single canonical behavior block is the sole decision surface.
+    const canonicalObservationalContext = canonicalPromptOn
+      ? buildCanonicalObservationalContext({
           intent: kdm.trace.messageInterpretation.intent,
           sentiment: kdm.trace.messageInterpretation.sentiment,
           warmth: relationship.warmthScore,
@@ -1024,10 +1020,14 @@ app.post("/api/chat", async (req, res) => {
           conflict: relationship.conflictScore ?? 0,
           hurt: relationship.hurtScore ?? 0,
           reactionMode: kdm.nextDynamicState.reactionMode ?? null,
-        })}`
-      : `${dialogueDecisionInstruction}\n${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.`;
+        })
+      : "";
+    // WHAT/WHETHER authority. Flag OFF: the legacy stack is byte-identical.
+    // Flag ON: behaviorContractInstruction, the relationship directives and the
+    // "KDM ... bağlayıcıdır" line are dropped — the canonical block is the only
+    // place a social decision is stated.
     const system = `${buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character)}\n${speechIdentityPrompt(speech)}\n${languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)}\
-${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${selfMemoryInstruction}\n${dialogueInstruction}\n${behaviorAuthoritySection}\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${selfMemoryInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${canonicalPromptOn ? `${responsePlanInstruction}\n${canonicalObservationalContext}` : `${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.`}\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
