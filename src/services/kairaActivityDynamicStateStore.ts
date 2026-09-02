@@ -18,6 +18,10 @@ export interface KairaActivityDynamicStateSnapshot {
   sourceId: string;
 }
 
+export type KairaActivityDynamicStateSaveResult =
+  | { status: "saved"; snapshot: KairaActivityDynamicStateSnapshot; previous?: KairaActivityDynamicStateSnapshot }
+  | { status: "replayed" | "stale"; snapshot: KairaActivityDynamicStateSnapshot };
+
 const sourceKey = (value: unknown) =>
   String(value || "")
     .trim()
@@ -100,7 +104,7 @@ export async function saveKairaActivityDynamicStateAtomic(input: {
   state: DroitDynamicState;
   observedAt: string;
   sourceId: string;
-}): Promise<{ status: "saved" | "replayed" | "stale"; snapshot: KairaActivityDynamicStateSnapshot }> {
+}): Promise<KairaActivityDynamicStateSaveResult> {
   const instance = resolveKairaInstanceContext({
     instanceId: input.kairaInstanceId,
     instanceType: input.instanceType,
@@ -132,6 +136,8 @@ export async function saveKairaActivityDynamicStateAtomic(input: {
         }
         return { status: "replayed", snapshot: current } as const;
       }
+      transaction.set(ref, next);
+      return { status: "saved", snapshot: next, previous: current } as const;
     }
     transaction.set(ref, next);
     return { status: "saved", snapshot: next } as const;
