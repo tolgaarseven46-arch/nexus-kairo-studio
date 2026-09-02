@@ -1,0 +1,26 @@
+name: one-time-kaira-recovery-worker-route
+on:
+  push:
+    paths:
+      - ".github/workflows/one-time-kaira-recovery-worker-route.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/patch-kaira-recovery-worker-route.mjs
+      - name: Commit worker route wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts
+          git diff --cached --quiet && exit 1
+          git commit -m "feat(kaira): register authenticated recovery worker route"
+          git push
