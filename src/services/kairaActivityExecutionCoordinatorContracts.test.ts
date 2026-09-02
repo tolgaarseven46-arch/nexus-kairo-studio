@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const store = vi.hoisted(() => ({ create: vi.fn(), command: vi.fn() }));
 const world = vi.hoisted(() => ({ save: vi.fn() }));
 const experience = vi.hoisted(() => ({ complete: vi.fn() }));
+const inbox = vi.hoisted(() => ({ enqueue: vi.fn() }));
 
 vi.mock("./kairaActivityExecutionStore", () => ({
   createKairaActivityExecutionAtomic: store.create,
@@ -13,6 +14,9 @@ vi.mock("./worldModelEventStore", () => ({
 }));
 vi.mock("./kairaActivityExperienceCoordinator", () => ({
   recordCompletedKairaActivityExperience: experience.complete,
+}));
+vi.mock("./kairaActivityPlanningTriggerInboxStore", () => ({
+  enqueueKairaActivityPlanningTriggerAtomic: inbox.enqueue,
 }));
 
 import {
@@ -51,6 +55,7 @@ const observation = (status: string) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  inbox.enqueue.mockResolvedValue({ status: "enqueued", record: { status: "pending" } });
 });
 
 describe("Kaira activity execution coordinator contracts", () => {
@@ -81,10 +86,11 @@ describe("Kaira activity execution coordinator contracts", () => {
         experienceSubject: execution.experienceSubject,
       }),
     }));
+    expect(inbox.enqueue).not.toHaveBeenCalled();
     expect(result.executionStatus).toBe("created");
   });
 
-  it("does not project rejected execution commands into world history", async () => {
+  it("does not project rejected execution commands into world history or planning inbox", async () => {
     store.command.mockResolvedValue({
       status: "rejected",
       record: record(),
@@ -100,9 +106,10 @@ describe("Kaira activity execution coordinator contracts", () => {
     expect(result.execution.status).toBe("rejected");
     expect(world.save).not.toHaveBeenCalled();
     expect(experience.complete).not.toHaveBeenCalled();
+    expect(inbox.enqueue).not.toHaveBeenCalled();
   });
 
-  it("keeps permission decisions in process state rather than inventing activity lifecycle history", async () => {
+  it("keeps permission decisions in process state rather than inventing lifecycle or planning work", async () => {
     store.command.mockResolvedValue({
       status: "applied",
       record: record({ permissionStatus: "granted" }),
@@ -119,17 +126,40 @@ describe("Kaira activity execution coordinator contracts", () => {
       now: "2026-09-02T00:01:00.000Z",
     });
     expect(world.save).not.toHaveBeenCalled();
+    expect(inbox.enqueue).not.toHaveBeenCalled();
   });
 
-  it("projects active/cancelled/failed lifecycle only after canonical process transition", async () => {
-    for (const [command, phase, status] of [
-      [{ type: "start", authority: "kaira_activity_executor" } as const, "active", "active"],
-      [{ type: "cancel", authority: "kaira_activity_executor" } as const, "cancelled", "cancelled"],
-      [{ type: "fail", authority: "kaira_activity_executor" } as const, "failed", "failed"],
+  it("projects active lifecycle without emitting a terminal planning trigger", async () => {
+    store.command.mockResolvedValue({
+      status: "applied",
+      record: record({ phase: "active", updatedAt: "2026-09-02T00:02:00.000Z" }),
+    });
+    world.save.mockResolvedValue(observation("active"));
+    await applyKairaActivityExecutionCommand({
+      ownerUserId: "owner_1",
+      kairaInstanceId: "kaira_a",
+      activityId: "theatre_01",
+      command: { type: "start", authority: "kaira_activity_executor" },
+      now: "2026-09-02T00:02:00.000Z",
+    });
+    expect(world.save).toHaveBeenCalledWith(expect.objectContaining({
+      activity: expect.objectContaining({ status: "active" }),
+    }));
+    expect(inbox.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("emits cancelled/failed planning triggers only after world lifecycle persistence", async () => {
+    for (const [command, phase] of [
+      [{ type: "cancel", authority: "kaira_activity_executor" } as const, "cancelled"],
+      [{ type: "fail", authority: "kaira_activity_executor" } as const, "failed"],
     ] as const) {
       vi.clearAllMocks();
-      store.command.mockResolvedValue({ status: "applied", record: record({ phase }) });
-      world.save.mockResolvedValue(observation(status));
+      inbox.enqueue.mockResolvedValue({ status: "enqueued", record: { status: "pending" } });
+      store.command.mockResolvedValue({
+        status: "applied",
+        record: record({ phase, updatedAt: "2026-09-02T00:02:00.000Z" }),
+      });
+      world.save.mockResolvedValue(observation(phase));
       await applyKairaActivityExecutionCommand({
         ownerUserId: "owner_1",
         kairaInstanceId: "kaira_a",
@@ -137,15 +167,28 @@ describe("Kaira activity execution coordinator contracts", () => {
         command,
         now: "2026-09-02T00:02:00.000Z",
       });
-      expect(store.command.mock.invocationCallOrder[0]).toBeLessThan(world.save.mock.invocationCallOrder[0]);
-      expect(world.save).toHaveBeenCalledWith(expect.objectContaining({
-        activity: expect.objectContaining({ status }),
+      expect(world.save.mock.invocationCallOrder[0]).toBeLessThan(inbox.enqueue.mock.invocationCallOrder[0]);
+      expect(inbox.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+        ownerUserId: "owner_1",
+        kairaInstanceId: "kaira_a",
+        instanceType: "individual",
+        trigger: expect.objectContaining({
+          triggerId: `execution_terminal:theatre_01:${phase}`,
+          kind: "execution_terminal",
+          sourceId: "activity:theatre_01",
+          occurredAt: "2026-09-02T00:02:00.000Z",
+          terminalPhase: phase,
+        }),
       }));
     }
   });
 
-  it("routes completed activity with outcome through the existing completed-experience authority", async () => {
-    const completedRecord = record({ phase: "completed", completedAt: "2026-09-02T00:20:00.000Z" });
+  it("routes completed activity with outcome through experience authority before planning trigger", async () => {
+    const completedRecord = record({
+      phase: "completed",
+      updatedAt: "2026-09-02T00:20:00.000Z",
+      completedAt: "2026-09-02T00:20:00.000Z",
+    });
     store.command.mockResolvedValue({ status: "applied", record: completedRecord });
     const completed = {
       observation: observation("completed"),
@@ -164,17 +207,22 @@ describe("Kaira activity execution coordinator contracts", () => {
     });
 
     expect(store.command.mock.invocationCallOrder[0]).toBeLessThan(experience.complete.mock.invocationCallOrder[0]);
-    expect(experience.complete).toHaveBeenCalledWith(expect.objectContaining({
-      authority: "kaira_activity_executor",
-      userId: "owner_1",
-      activityId: "theatre_01",
-      experienceSubject: completedRecord.experienceSubject,
+    expect(experience.complete.mock.invocationCallOrder[0]).toBeLessThan(inbox.enqueue.mock.invocationCallOrder[0]);
+    expect(inbox.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+      trigger: expect.objectContaining({ terminalPhase: "completed", occurredAt: completedRecord.completedAt }),
     }));
     expect(result.completedExperience).toBe(completed);
   });
 
-  it("records completion truth even when no outcome appraisal is available yet", async () => {
-    store.command.mockResolvedValue({ status: "applied", record: record({ phase: "completed" }) });
+  it("records completion truth before terminal planning when no outcome appraisal is available yet", async () => {
+    store.command.mockResolvedValue({
+      status: "applied",
+      record: record({
+        phase: "completed",
+        updatedAt: "2026-09-02T00:20:00.000Z",
+        completedAt: "2026-09-02T00:20:00.000Z",
+      }),
+    });
     world.save.mockResolvedValue(observation("completed"));
     const result = await applyKairaActivityExecutionCommand({
       ownerUserId: "owner_1",
@@ -183,21 +231,24 @@ describe("Kaira activity execution coordinator contracts", () => {
       command: { type: "complete", authority: "kaira_activity_executor" },
       now: "2026-09-02T00:20:00.000Z",
     });
-    expect(world.save).toHaveBeenCalledWith(expect.objectContaining({
-      activity: expect.objectContaining({ status: "completed" }),
-    }));
+    expect(world.save.mock.invocationCallOrder[0]).toBeLessThan(inbox.enqueue.mock.invocationCallOrder[0]);
     expect(experience.complete).not.toHaveBeenCalled();
     expect(result.worldObservation).toEqual(observation("completed"));
   });
 
-  it("allows exact completion replay to retry downstream experience consolidation without reopening state", async () => {
-    const completedRecord = record({ phase: "completed" });
+  it("allows exact completion replay to retry downstream experience and trigger delivery", async () => {
+    const completedRecord = record({
+      phase: "completed",
+      updatedAt: "2026-09-02T00:20:00.000Z",
+      completedAt: "2026-09-02T00:20:00.000Z",
+    });
     store.command.mockResolvedValue({ status: "replayed", record: completedRecord });
     experience.complete.mockResolvedValue({
       observation: observation("completed"),
       receipt: { sourceWorldObservationId: "obs_completed" },
       consolidation: { status: "duplicate" },
     });
+    inbox.enqueue.mockResolvedValue({ status: "replayed", record: { status: "pending" } });
     const result = await applyKairaActivityExecutionCommand({
       ownerUserId: "owner_1",
       kairaInstanceId: "kaira_a",
@@ -208,5 +259,6 @@ describe("Kaira activity execution coordinator contracts", () => {
     });
     expect(result.execution.status).toBe("replayed");
     expect(experience.complete).toHaveBeenCalledTimes(1);
+    expect(inbox.enqueue).toHaveBeenCalledTimes(1);
   });
 });
