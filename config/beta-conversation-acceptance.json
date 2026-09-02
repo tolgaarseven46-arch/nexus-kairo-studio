@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "tests": [
+    "src/services/kairaLongSessionConsistencyRegression.test.ts",
+    "src/services/kairaQualitativeSpeechDifferentiationRegression.test.ts",
+    "src/services/kairaControlledSpontaneityIntegrationContracts.test.ts",
+    "src/services/kairaBetaConversationContinuityRegression.test.ts",
+    "src/services/kairaTwentyTurnPersistenceRoundtripRegression.test.ts",
+    "src/services/kairaLanguageMemorySelfDrift.test.ts"
+  ]
+}
