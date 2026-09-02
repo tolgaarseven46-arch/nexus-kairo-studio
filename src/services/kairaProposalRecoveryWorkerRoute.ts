@@ -3,6 +3,7 @@ import { authorizeKairaInternalWorker } from "./kairaInternalWorkerAuth";
 import { runKairaProposalRecoveryWorker } from "./kairaProposalRecoveryWorkerRunCoordinator";
 import { readKairaProposalRecoveryWorkerHealth } from "./kairaProposalRecoveryWorkerHealthRuntime";
 import { resolveKairaProposalRecoveryWorkerHealthConfig } from "./kairaProposalRecoveryWorkerHealthConfig";
+import { runKairaAutonomousLifeWorker } from "./kairaAutonomousLifeWorkerRunCoordinator";
 
 const clampLimit = (value: unknown) => {
   const parsed = Number(value);
@@ -60,6 +61,37 @@ export function registerKairaProposalRecoveryWorkerRoute(app: Express) {
         ok: false,
         runId,
         error: error?.message || "proposal_recovery_worker_failed",
+      });
+    }
+  });
+
+  app.post("/internal/workers/kaira/autonomous-life", async (req: Request, res: Response) => {
+    if (!authorizeRequest(req, res)) return;
+
+    const runId = String(req.get("x-kaira-worker-run-id") || "").trim();
+    if (!runId) {
+      return res.status(400).json({ ok: false, error: "worker_run_id_required" });
+    }
+
+    const now = new Date().toISOString();
+    const limit = clampLimit(req.body?.limit);
+    try {
+      const result = await runKairaAutonomousLifeWorker({
+        runId,
+        requestedLimit: limit,
+        now,
+      });
+      const ok = result.status === "completed";
+      return res.status(ok ? 200 : 500).json({
+        ok,
+        limit,
+        ...result,
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        ok: false,
+        runId,
+        error: error?.message || "autonomous_life_worker_failed",
       });
     }
   });
