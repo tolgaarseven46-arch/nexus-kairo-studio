@@ -1,4 +1,8 @@
 import {
+  processPendingKairaActivityPlanningTriggers,
+  type KairaActivityPlanningInboxBatchResult,
+} from "./kairaActivityPlanningTriggerInboxProcessor";
+import {
   runKairaProposalRecoveryWorker,
   type KairaProposalRecoveryWorkerRunResult,
 } from "./kairaProposalRecoveryWorkerRunCoordinator";
@@ -19,6 +23,7 @@ export interface KairaAutonomousLifeWorkerRunResult {
   status: "completed" | "partial_failure" | "failed";
   runId: string;
   processedAt: string;
+  planningInbox: KairaAutonomousLifeWorkerStage<KairaActivityPlanningInboxBatchResult>;
   proposalRecovery: KairaAutonomousLifeWorkerStage<KairaProposalRecoveryWorkerRunResult>;
   scheduleDispatch: KairaAutonomousLifeWorkerStage<KairaActivityScheduleDispatchDiscoveryResult>;
 }
@@ -35,10 +40,9 @@ async function runStage<T>(operation: () => Promise<T>): Promise<KairaAutonomous
 }
 
 /**
- * One trusted autonomous-life tick. Stages are deliberately isolated: proposal
- * recovery failure must not prevent already-canonical due schedules from running,
- * and a scheduler discovery failure must not roll back proposal recovery.
- * Each underlying authority remains idempotent/retry-safe.
+ * One trusted autonomous-life tick. Planning delivery runs first so newly durable
+ * proposals may be recovered in the same tick; all stages remain isolated and
+ * retry-safe so one authority failure cannot block already-canonical work.
  */
 export async function runKairaAutonomousLifeWorker(input: {
   runId: string;
@@ -51,6 +55,11 @@ export async function runKairaAutonomousLifeWorker(input: {
   if (!Number.isFinite(nowMs)) throw new Error("Invalid Kaira autonomous life worker time");
   const now = new Date(nowMs).toISOString();
 
+  const planningInbox = await runStage(() => processPendingKairaActivityPlanningTriggers({
+    now,
+    batchSize: input.requestedLimit,
+    occupancyBatchSize: input.requestedLimit,
+  }));
   const proposalRecovery = await runStage(() => runKairaProposalRecoveryWorker({
     runId: `${runId}:proposal-recovery`,
     requestedLimit: input.requestedLimit,
@@ -61,11 +70,13 @@ export async function runKairaAutonomousLifeWorker(input: {
     batchSize: input.requestedLimit,
   }));
 
+  const planningFailed = planningInbox.status === "failed" || (planningInbox.result?.failed || 0) > 0;
   const proposalFailed = proposalRecovery.status === "failed" || proposalRecovery.result?.status === "failed";
-  const scheduleFailed = scheduleDispatch.status === "failed";
-  const status = proposalFailed && scheduleFailed
+  const scheduleFailed = scheduleDispatch.status === "failed" || (scheduleDispatch.result?.failed || 0) > 0;
+  const failureCount = [planningFailed, proposalFailed, scheduleFailed].filter(Boolean).length;
+  const status = failureCount === 3
     ? "failed"
-    : proposalFailed || scheduleFailed
+    : failureCount > 0
       ? "partial_failure"
       : "completed";
 
@@ -73,6 +84,7 @@ export async function runKairaAutonomousLifeWorker(input: {
     status,
     runId,
     processedAt: now,
+    planningInbox,
     proposalRecovery,
     scheduleDispatch,
   };
