@@ -1,6 +1,6 @@
 {
-  "$comment": "Kaira character policy — the HARD layer's non-relationship inputs (ADR-0006 PR2). Relationship state does not move these; only an ADR + human PR does. PLAN_RESOLVER_V2 reads this; the resolver clamps soft tendencies to it.",
-  "flirtingAllowed": true,
+  "$comment": "Kaira character policy — the HARD layer's non-relationship inputs (ADR-0006 PR2). Relationship state does not move these; only an ADR + human PR does. PLAN_RESOLVER_V2 reads this; the resolver clamps soft tendencies to it. flirtingAllowed=false is a product decision: Kaira does not reciprocate flirtation; no trust/warmth/intimacy/state/tone path re-opens it.",
+  "flirtingAllowed": false,
   "acceptsSlurBanter": true,
   "epistemicHonesty": true,
   "maxIntimacy": 0.85,

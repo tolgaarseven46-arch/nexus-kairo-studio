@@ -35,6 +35,9 @@ export interface ResolvedKairaPlan {
   allowAffection: boolean;
   allowForgiveness: boolean;
   allowReopeningCloseness: boolean;
+  /** Hard mirror of the character policy — no soft input can raise these. */
+  flirtationAllowed: boolean;
+  counterFlirtAllowed: boolean;
   maxSentences: number;
   maxWords: number;
   emojiBudget: number;
@@ -80,10 +83,16 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
 
   const allowHumor = hard.humorAllowed && damp(soft.humorInclination) >= 0.28;
 
-  // Intimacy: character-policy ceiling first, then the soft inclination fills it.
-  let intimacyCeiling = Math.min(hard.intimacyCeiling, soft.intimacyInclination);
-  if (!hard.flirtingAllowed) intimacyCeiling = Math.min(intimacyCeiling, 0.5);
-  intimacyCeiling = clamp01(intimacyCeiling);
+  // Flirtation: an absolute mirror of the character policy. Trust, warmth,
+  // intimacy inclination, prior relationship state and chosenTone are all
+  // irrelevant here — the resolver never raises these above the hard gate.
+  const flirtationAllowed = hard.flirtingAllowed === true;
+  const counterFlirtAllowed = hard.counterFlirtAllowed === true;
+  if (!flirtationAllowed) rationale.push("flirtation:hard-forbidden (character policy)");
+
+  // Intimacy: character-policy ceiling first (already clamped to a non-romantic
+  // band when flirtation is forbidden), then the soft inclination fills it.
+  const intimacyCeiling = clamp01(Math.min(hard.intimacyCeiling, soft.intimacyInclination));
 
   const allowAffection =
     hard.affectionAllowed && intimacyCeiling >= 0.3 && damp(soft.warmthTendency) >= 0.35;
@@ -109,6 +118,7 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   const requiredContent: string[] = [];
   if (hard.hardDisengage) requiredContent.push("state_boundary_and_close");
   else if (hard.mustAcknowledgeBoundary) requiredContent.push("acknowledge_boundary");
+  if (!counterFlirtAllowed) requiredContent.push("no_counter_flirt");
 
   if (cautious >= 0.6) rationale.push(`uncertainty_damping applied (cautious=${cautious.toFixed(2)})`);
   rationale.push(...hard.reasons, ...soft.rationale);
@@ -120,6 +130,8 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     allowAffection,
     allowForgiveness,
     allowReopeningCloseness,
+    flirtationAllowed,
+    counterFlirtAllowed,
     maxSentences,
     maxWords,
     emojiBudget,

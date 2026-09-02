@@ -16,7 +16,10 @@ import type { DialogueDecisionPlan } from "./kairoDialogueDecisionEngine";
 import type { HardConstraintSet, KairaCharacterPolicy } from "../types/kairaBehaviorPlan";
 
 export const DEFAULT_KAIRA_CHARACTER_POLICY: KairaCharacterPolicy = {
-  flirtingAllowed: true,
+  // Product decision: Kaira does not reciprocate flirtation as a rule. This is a
+  // HARD boundary — no soft tendency, trust, warmth, intimacy inclination,
+  // prior relationship state or chosenTone may re-open it.
+  flirtingAllowed: false,
   acceptsSlurBanter: true,
   epistemicHonesty: true,
   maxIntimacy: 0.85,
@@ -27,6 +30,14 @@ export const DEFAULT_KAIRA_CHARACTER_POLICY: KairaCharacterPolicy = {
     "repeated_boundary_violation",
   ],
 };
+
+/**
+ * Intimacy ceiling when `flirtingAllowed` is false. Held below the resolver's
+ * `allowAffection` threshold (0.3) so romantic-physical endearments ("öp",
+ * "aşkım", "sevgilim") are gated too — plain warmth ("iyi ki varsın") is not in
+ * that gate and stays available. No soft inclination can raise this.
+ */
+export const NON_ROMANTIC_INTIMACY_CEILING = 0.25;
 
 const BOUNDARY_REASON_RE =
   /(disengage|boundary|red[_-]?line|ihlal|sınır|user_stop|stop)/i;
@@ -71,14 +82,26 @@ export function deriveHardConstraints(
   // Emoji ceiling: only an open stance permits any; soft layer may still zero it.
   const emojiBudget = !hardDisengage && contract.stance === "open" ? 1 : 0;
 
+  // Flirtation is gated ONLY by character policy. If the policy forbids it there
+  // is no path — soft tendency, trust, warmth, intimacy inclination, prior state
+  // or chosenTone — that can set it true.
+  const flirtingAllowed = policy.flirtingAllowed === true && !hardDisengage;
+  const intimacyCeiling = hardDisengage
+    ? 0
+    : flirtingAllowed
+      ? Math.max(0, Math.min(1, policy.maxIntimacy))
+      : NON_ROMANTIC_INTIMACY_CEILING;
+  if (!policy.flirtingAllowed) reasons.push("flirtation_forbidden_by_character_policy");
+
   return {
     hardDisengage,
     hardDisengageReason,
     mustAcknowledgeBoundary,
-    flirtingAllowed: policy.flirtingAllowed && !hardDisengage,
+    flirtingAllowed,
+    counterFlirtAllowed: flirtingAllowed,
     acceptsSlurBanter: policy.acceptsSlurBanter,
     epistemicHonesty: policy.epistemicHonesty,
-    intimacyCeiling: hardDisengage ? 0 : Math.max(0, Math.min(1, policy.maxIntimacy)),
+    intimacyCeiling,
     questionAllowed,
     humorAllowed,
     affectionAllowed,

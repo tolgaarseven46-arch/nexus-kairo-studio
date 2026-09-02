@@ -21,7 +21,7 @@ import type { BehaviorContract } from "./behaviorContract";
 import type { DialogueDecisionPlan } from "./kairoDialogueDecisionEngine";
 import type { KairoSpeechIdentity } from "./kairoSpeechIdentity";
 import { buildKairaResponsePlan } from "./kairaResponsePlan";
-import { deriveHardConstraints } from "./kairaHardConstraints";
+import { deriveHardConstraints, NON_ROMANTIC_INTIMACY_CEILING } from "./kairaHardConstraints";
 import { deriveSoftTendencies } from "./kairaSoftTendencies";
 import { resolveKairaResponsePlan } from "./kairaPlanResolver";
 import * as flags from "../config/canonicalBehaviorFlags";
@@ -168,15 +168,30 @@ describe("PlanResolver — intimacy governed by policy + soft inclination", () =
     });
     const soft = deriveSoftTendencies(c, speech({ relationshipLevel: "close", warmthLevel: 1 }), dialogue());
     const resolved = resolveKairaResponsePlan({ hard, soft, dialogue: dialogue(), speech: speech(), contract: c });
-    expect(resolved.intimacyCeiling).toBeLessThanOrEqual(0.5);
+    expect(resolved.intimacyCeiling).toBeLessThanOrEqual(NON_ROMANTIC_INTIMACY_CEILING);
+    expect(resolved.flirtationAllowed).toBe(false);
+    expect(resolved.counterFlirtAllowed).toBe(false);
   });
 
-  it("with flirting allowed, a close warm relationship raises the ceiling", () => {
+  it("with an explicit flirtingAllowed policy, a close warm relationship raises the ceiling", () => {
     const c = contract({ stance: "open", affection: "allowed" });
-    const hard = deriveHardConstraints(c, dialogue());
+    const hard = deriveHardConstraints(c, dialogue(), {
+      flirtingAllowed: true,
+      acceptsSlurBanter: true,
+      epistemicHonesty: true,
+      maxIntimacy: 0.9,
+      hardDisengageReasons: [],
+    });
     const soft = deriveSoftTendencies(c, speech({ relationshipLevel: "close", warmthLevel: 0.9 }), dialogue());
     const resolved = resolveKairaResponsePlan({ hard, soft, dialogue: dialogue(), speech: speech(), contract: c });
     expect(resolved.intimacyCeiling).toBeGreaterThan(0.5);
+  });
+
+  it("the SHIPPED default policy forbids flirtation", () => {
+    const hard = deriveHardConstraints(contract({ stance: "open" }), dialogue());
+    expect(hard.flirtingAllowed).toBe(false);
+    expect(hard.counterFlirtAllowed).toBe(false);
+    expect(hard.intimacyCeiling).toBeLessThanOrEqual(NON_ROMANTIC_INTIMACY_CEILING);
   });
 });
 

@@ -37,6 +37,11 @@ export interface HardConstraintSet {
   mustAcknowledgeBoundary: boolean;
   /** Character-policy gates (not relationship-conditioned). */
   flirtingAllowed: boolean;
+  /**
+   * Whether Kaira may flirt BACK. Follows `flirtingAllowed` exactly — an absolute
+   * mirror of the character policy. Nothing graded can raise it.
+   */
+  counterFlirtAllowed: boolean;
   acceptsSlurBanter: boolean;
   epistemicHonesty: boolean;
   intimacyCeiling: number;
