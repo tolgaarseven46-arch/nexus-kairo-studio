@@ -7,6 +7,24 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "notBefore", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "kairaActivitySchedules",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerUserId", "order": "ASCENDING" },
+        { "fieldPath": "kairaInstanceId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "kairaActivityExecutions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerUserId", "order": "ASCENDING" },
+        { "fieldPath": "kairaInstanceId", "order": "ASCENDING" },
+        { "fieldPath": "phase", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
