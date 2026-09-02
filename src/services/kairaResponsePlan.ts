@@ -1,6 +1,11 @@
 import type { BehaviorContract } from "./behaviorContract";
 import type { DialogueDecisionPlan } from "./kairoDialogueDecisionEngine";
 import type { KairoSpeechIdentity } from "./kairoSpeechIdentity";
+import type { KairaPlanProjections, KairaPlanUncertainty } from "../types/kairaBehaviorPlan";
+import { isCanonicalBehaviorFlagEnabled } from "../config/canonicalBehaviorFlags";
+import { deriveHardConstraints } from "./kairaHardConstraints";
+import { deriveSoftTendencies } from "./kairaSoftTendencies";
+import { resolveKairaResponsePlan } from "./kairaPlanResolver";
 
 export interface KairaResponsePlan {
   move: DialogueDecisionPlan["move"];
@@ -17,6 +22,21 @@ export interface KairaResponsePlan {
   maxWords: number;
   emojiBudget: number;
   reasons: string[];
+  /**
+   * Canonical resolver output (PLAN_RESOLVER_V2). Absent on the legacy path.
+   * When present, the boolean gates above are the resolver's; the fields below
+   * are the resolved snapshot's orthogonal axes + obligations. `projections` is
+   * NON-AUTHORITATIVE — style hints only, never re-decided from.
+   */
+  resolver?: "legacy" | "canonical";
+  opennessAxis?: number;
+  warmthAxis?: number;
+  guardedness?: number;
+  intimacyCeiling?: number;
+  requiredContent?: string[];
+  hardReasons?: string[];
+  uncertainty?: KairaPlanUncertainty;
+  projections?: KairaPlanProjections;
 }
 
 const countEmoji = (text: string) =>
@@ -94,7 +114,7 @@ export function buildKairaResponsePlan(
       ? 1
       : 0;
 
-  return {
+  const legacyPlan: KairaResponsePlan = {
     move: dialogue.move,
     stance: contract.stance,
     register: speech.register,
@@ -113,6 +133,39 @@ export function buildKairaResponsePlan(
       dialogue.reason,
       `speech=${speech.register}/${speech.relationshipLevel}`,
     ],
+  };
+
+  // Flag OFF -> byte-identical legacy plan.
+  if (!isCanonicalBehaviorFlagEnabled("PLAN_RESOLVER_V2")) return legacyPlan;
+
+  // Flag ON -> HardConstraintSet ∩ SoftTendencyProfile -> resolved snapshot.
+  // The resolver's gates replace the legacy ones; legacy field names stay
+  // populated so every existing consumer keeps working.
+  const hard = deriveHardConstraints(contract, dialogue);
+  const soft = deriveSoftTendencies(contract, speech, dialogue);
+  const resolved = resolveKairaResponsePlan({ hard, soft, dialogue, speech, contract });
+
+  return {
+    ...legacyPlan,
+    continueConversation: resolved.continueConversation,
+    allowQuestion: resolved.allowQuestion,
+    allowHumor: resolved.allowHumor,
+    allowAffection: resolved.allowAffection,
+    allowForgiveness: resolved.allowForgiveness,
+    allowReopeningCloseness: resolved.allowReopeningCloseness,
+    maxSentences: resolved.maxSentences,
+    maxWords: resolved.maxWords,
+    emojiBudget: resolved.emojiBudget,
+    reasons: [...legacyPlan.reasons, ...resolved.resolverRationale.map((r) => `resolver:${r}`)],
+    resolver: "canonical",
+    opennessAxis: resolved.opennessAxis,
+    warmthAxis: resolved.warmthAxis,
+    guardedness: resolved.guardedness,
+    intimacyCeiling: resolved.intimacyCeiling,
+    requiredContent: resolved.requiredContent,
+    hardReasons: resolved.hardReasons,
+    uncertainty: resolved.uncertainty,
+    projections: resolved.projections,
   };
 }
 
