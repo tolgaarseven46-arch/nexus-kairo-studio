@@ -54,6 +54,7 @@ import {
 import { recordKdmMetric } from "./src/services/kdmMetricsService";
 import { loadRecentWorldEventObservations } from "./src/services/worldModelEventStore";
 import { persistWorldEventAndMaybeConsolidateLivedMemory } from "./src/services/kairaLivedMemoryRuntime";
+import { observeKairaActivityDynamicState } from "./src/services/kairaActivityDynamicStateObservationCoordinator";
 import { buildWorldEventMemoryInstruction, rankWorldEventObservations, shouldRetrieveWorldEvents } from "./src/services/worldEventRetrieval";
 import { enforceWorldModelRecallResponse, findWorldModelResponseIssues } from "./src/services/worldModelResponseGuard";
 import { appraiseRetrievedWorldState, buildWorldStateAppraisalInstruction } from "./src/services/worldStateAppraisal";
@@ -884,6 +885,23 @@ app.post("/api/chat", async (req, res) => {
           savedTurnId = t.turnId;
         }),
       ]);
+      const autonomousStateSourceId = requestId
+        ? `chat_request:${requestId}`
+        : savedTurnId
+          ? `chat_turn:${savedTurnId}`
+          : "";
+      if (kairaPolicy.autonomousActivityPlanning && autonomousStateSourceId) {
+        await Promise.allSettled([
+          observeKairaActivityDynamicState({
+            ownerUserId: String(userId),
+            kairaInstanceId: kairaInstance.instanceId,
+            instanceType: kairaInstance.instanceType,
+            state: kdm.nextDynamicState,
+            observedAt: new Date().toISOString(),
+            sourceId: autonomousStateSourceId,
+          }),
+        ]);
+      }
       memoryCache.delete(memoryCacheKey(userId, kairaInstance.instanceId));
       const postProcessMs = Math.round(now() - postStart),
         timings = {
@@ -1244,6 +1262,23 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         savedTurnId = t.turnId;
       }),
     ]);
+    const autonomousStateSourceId = requestId
+      ? `chat_request:${requestId}`
+      : savedTurnId
+        ? `chat_turn:${savedTurnId}`
+        : "";
+    if (kairaPolicy.autonomousActivityPlanning && autonomousStateSourceId) {
+      await Promise.allSettled([
+        observeKairaActivityDynamicState({
+          ownerUserId: String(userId),
+          kairaInstanceId: kairaInstance.instanceId,
+          instanceType: kairaInstance.instanceType,
+          state: kdm.nextDynamicState,
+          observedAt: new Date().toISOString(),
+          sourceId: autonomousStateSourceId,
+        }),
+      ]);
+    }
     memoryCache.delete(memoryCacheKey(userId, kairaInstance.instanceId));
     const postProcessMs = Math.round(now() - postStart),
       timings = {
