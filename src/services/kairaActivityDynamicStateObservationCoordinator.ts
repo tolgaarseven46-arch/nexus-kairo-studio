@@ -1,26 +1,13 @@
 import type { DroitDynamicState } from "../types/nexus";
 import type { KairaInstanceContext } from "./kairaInstanceContext";
 import {
+  kairaActivityDynamicStateMagnitude,
   saveKairaActivityDynamicStateAtomic,
   type KairaActivityDynamicStateSnapshot,
 } from "./kairaActivityDynamicStateStore";
 import { enqueueKairaActivityPlanningTriggerAtomic } from "./kairaActivityPlanningTriggerInboxStore";
 
-const AXES: Array<keyof Pick<DroitDynamicState, "calmness" | "anger" | "stress" | "happiness" | "confidence" | "surprise">> = [
-  "calmness",
-  "anger",
-  "stress",
-  "happiness",
-  "confidence",
-  "surprise",
-];
-
-export function kairaActivityDynamicStateMagnitude(
-  previous: DroitDynamicState,
-  current: DroitDynamicState,
-): number {
-  return Math.max(...AXES.map((axis) => Math.abs(current[axis] - previous[axis]) / 100));
-}
+export { kairaActivityDynamicStateMagnitude };
 
 function dynamicStateTriggerId(snapshot: KairaActivityDynamicStateSnapshot): string {
   return `dynamic_state:${snapshot.sourceId}`;
@@ -28,7 +15,8 @@ function dynamicStateTriggerId(snapshot: KairaActivityDynamicStateSnapshot): str
 
 /**
  * Persists Kaira-wide affect first, then durably emits a planning observation.
- * Materiality remains owned by kairaActivityPlanningTrigger policy.
+ * The persisted magnitude makes the delivery retry-safe if a process dies between
+ * the state write and inbox enqueue. Materiality remains trigger-policy owned.
  */
 export async function observeKairaActivityDynamicState(input: {
   ownerUserId: string;
@@ -45,10 +33,9 @@ export async function observeKairaActivityDynamicState(input: {
     observedAt: input.observedAt,
     sourceId: input.sourceId,
   });
-  if (saved.status !== "saved" || !saved.previous) {
+  if (saved.status === "stale" || saved.snapshot.changeMagnitude === undefined) {
     return { state: saved, planningTriggerInbox: null };
   }
-  const magnitude = kairaActivityDynamicStateMagnitude(saved.previous.state, saved.snapshot.state);
   const planningTriggerInbox = await enqueueKairaActivityPlanningTriggerAtomic({
     ownerUserId: input.ownerUserId,
     kairaInstanceId: saved.snapshot.kairaInstanceId,
@@ -58,9 +45,9 @@ export async function observeKairaActivityDynamicState(input: {
       kind: "dynamic_state_change",
       sourceId: saved.snapshot.sourceId,
       occurredAt: saved.snapshot.observedAt,
-      magnitude,
+      magnitude: saved.snapshot.changeMagnitude,
     },
-    now: input.observedAt,
+    now: saved.snapshot.observedAt,
   });
   return { state: saved, planningTriggerInbox };
 }
