@@ -37,7 +37,7 @@ export function createKairaActivityCatalogSnapshot(input: {
 }): KairaActivityCatalogSnapshot {
   const catalogVersion = versionKey(input.catalogVersion);
   if (!catalogVersion) throw new Error("Invalid Kaira activity catalog version");
-  if (!Array.isArray(input.entries) || input.entries.length > MAX_CATALOG_ENTRIES) {
+  if (!Array.isArray(input.entries) || input.entries.length < 1 || input.entries.length > MAX_CATALOG_ENTRIES) {
     throw new Error("Invalid Kaira activity catalog size");
   }
   return {
