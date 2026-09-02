@@ -53,6 +53,18 @@ const invoke = () => request("/internal/workers/kaira/autonomous-life", {
 const first = await invoke();
 if (first.body?.runId !== runId) throw new Error("Autonomous life worker run correlation mismatch");
 if (![200, 202].includes(first.response.status)) {
+  const summary = first.body?.receipt?.summary;
+  console.error(JSON.stringify({
+    ok: false,
+    runId,
+    httpStatus: first.response.status,
+    outcome: first.body?.error || first.body?.status || "unknown",
+    stages: summary ? {
+      planning: summary.planning,
+      recovery: summary.recovery,
+      schedules: summary.schedules,
+    } : undefined,
+  }));
   throw new Error(`Autonomous life worker failed: HTTP ${first.response.status} ${first.body?.error || first.body?.status || "unknown"}`);
 }
 if (!["completed", "degraded", "busy"].includes(first.body?.status)) {
