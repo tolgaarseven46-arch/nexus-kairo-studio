@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24
 
@@ -38,3 +38,33 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+  docs-guard:
+    # Riskli path'e dokunan PR, PROJECT_STATE.md veya docs/adr/** güncellemesi içermeli.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Enforce state/ADR update for risky changes
+        run: |
+          set -euo pipefail
+          BASE="origin/${{ github.base_ref }}"
+          git fetch -q origin "${{ github.base_ref }}"
+          CHANGED="$(git diff --name-only "$BASE"...HEAD)"
+          echo "Changed files:"; echo "$CHANGED" | sed 's/^/  /'
+
+          if echo "$CHANGED" | bash .github/scripts/match-risky-paths.sh > /tmp/risky.txt; then
+            echo "Risky paths touched:"; sed 's/^/  /' /tmp/risky.txt
+            if echo "$CHANGED" | grep -Eq '^(PROJECT_STATE\.md|docs/adr/.+\.md)$'; then
+              echo "OK: PROJECT_STATE.md or docs/adr/** updated alongside risky change."
+            else
+              echo "::error::Risky path degisti ama PROJECT_STATE.md veya docs/adr/** guncellenmedi."
+              exit 1
+            fi
+          else
+            echo "No risky paths touched; docs-guard passes."
+          fi

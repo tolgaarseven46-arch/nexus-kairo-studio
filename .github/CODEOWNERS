@@ -1,0 +1,25 @@
+# Kod sahipliği — bu path'lere dokunan PR insan onayı ister.
+# Ajanlar (Claude/Codex) bu dosyaları PR ile önerebilir ama onaylayamaz.
+# GitHub handle'ını gerçek hesap/ekip ile değiştir/genişlet.
+
+# Statik bağlam ve protokol
+/AI_CONTEXT.md            @tolgaarseven46-arch
+/CLAUDE.md                @tolgaarseven46-arch
+/AGENTS.md                @tolgaarseven46-arch
+
+# Kalıcı kararlar
+/docs/adr/                @tolgaarseven46-arch
+
+# Governance altyapısı
+/.github/                 @tolgaarseven46-arch
+/.github/workflows/       @tolgaarseven46-arch
+/.github/architecture-risky-paths.txt   @tolgaarseven46-arch
+/.github/scripts/         @tolgaarseven46-arch
+
+# Riskli çekirdek
+/server.ts                @tolgaarseven46-arch
+/firestore.rules          @tolgaarseven46-arch
+/firestore.indexes.json   @tolgaarseven46-arch
+/package.json             @tolgaarseven46-arch
+/package-lock.json        @tolgaarseven46-arch
+/bun.lock                 @tolgaarseven46-arch

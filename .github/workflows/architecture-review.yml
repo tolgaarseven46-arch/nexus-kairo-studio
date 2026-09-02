@@ -1,0 +1,171 @@
+name: Architecture Review
+
+# Üç zorunlu mekanizma:
+#  1) Riskli path classifier -> `architecture-review-required` etiketi
+#  2) Sonuç PR head commit SHA'ya bağlı (status yalnız o SHA için success yazılır)
+#  3) Yeni commit (synchronize) eski review'ı otomatik geçersiz kılar
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  statuses: write
+
+concurrency:
+  group: arch-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  classify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Match risky paths
+        id: match
+        run: |
+          set -euo pipefail
+          git fetch -q origin "${{ github.base_ref }}"
+          CHANGED="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)"
+          echo "Changed files:"; echo "$CHANGED" | sed 's/^/  /'
+          if echo "$CHANGED" | bash .github/scripts/match-risky-paths.sh > /tmp/risky.txt; then
+            echo "risky=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "risky=false" >> "$GITHUB_OUTPUT"
+          fi
+          {
+            echo "list<<RISKY_EOF"
+            cat /tmp/risky.txt 2>/dev/null || true
+            echo "RISKY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Apply label + SHA-bound status + sticky comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          RISKY: ${{ steps.match.outputs.risky }}
+          RISKY_LIST: ${{ steps.match.outputs.list }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_ACTION: ${{ github.event.action }}
+        with:
+          script: |
+            const risky = process.env.RISKY === 'true';
+            const list = (process.env.RISKY_LIST || '').trim();
+            const sha = process.env.HEAD_SHA;
+            const short = sha.slice(0, 7);
+            const isNewCommit = process.env.EVENT_ACTION === 'synchronize';
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const LABEL = 'architecture-review-required';
+            const CONTEXT = 'architecture-review';
+            const MARKER = '<!-- architecture-review-bot -->';
+
+            // (1) etiket
+            const current = (await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number }))
+              .data.map(l => l.name);
+            if (risky && !current.includes(LABEL)) {
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [LABEL] });
+            } else if (!risky && current.includes(LABEL)) {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number, name: LABEL }).catch(() => {});
+            }
+
+            // (2)(3) commit status — yalnız bu head SHA'ya yazılır.
+            // Yeni commit geldiğinde yeni SHA'da success yoktur; ayrıca burada
+            // açıkça pending'e çekilir.
+            if (risky) {
+              await github.rest.repos.createCommitStatus({
+                owner, repo, sha, context: CONTEXT, state: 'pending',
+                description: isNewCommit
+                  ? `New commit ${short}: previous review invalidated; needs /arch-approve`
+                  : `Architecture review required for ${short}`,
+              });
+            } else {
+              await github.rest.repos.createCommitStatus({
+                owner, repo, sha, context: CONTEXT, state: 'success',
+                description: `No risky paths in ${short}`,
+              });
+            }
+
+            // sticky comment
+            let body;
+            if (!risky) {
+              body = `${MARKER}\n✅ **Architecture review gerekmiyor** — \`${short}\` itibarıyla riskli path değişmedi.`;
+            } else {
+              const invalidated = isNewCommit
+                ? `\n\n⚠️ **Yeni commit (\`${short}\`) algılandı. Önceki architecture review geçersiz.**`
+                : '';
+              body =
+                `${MARKER}\n🔒 **Architecture review gerekli** — head \`${short}\`.${invalidated}\n\n` +
+                `Riskli değişiklikler:\n\`\`\`\n${list || '(bkz. diff)'}\n\`\`\`\n\n` +
+                `Merge engelli. Bir CODEOWNERS üyesi şu yorumu yazmalı:\n` +
+                `\`/arch-approve ${sha}\`\n\n` +
+                `Yeni commit push edilirse bu onay otomatik geçersiz olur.`;
+            }
+            const comments = (await github.rest.issues.listComments({ owner, repo, issue_number, per_page: 100 })).data;
+            const existing = comments.find(c => c.body && c.body.includes(MARKER) && !c.body.includes(`${MARKER}-reply`));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+  approve:
+    if: >
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '/arch-approve')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify approver + bind approval to current head SHA
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.issue.number;
+            const comment = context.payload.comment;
+            const assoc = comment.author_association;
+            const ALLOWED = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+            const CONTEXT = 'architecture-review';
+            const MARKER = '<!-- architecture-review-bot -->-reply';
+            const reply = (msg) =>
+              github.rest.issues.createComment({ owner, repo, issue_number, body: `${MARKER}\n${msg}` });
+
+            if (!ALLOWED.includes(assoc)) {
+              await reply(`@${comment.user.login} — \`/arch-approve\` yetkisi yok (association: \`${assoc}\`).`);
+              return;
+            }
+            const m = comment.body.trim().match(/^\/arch-approve\s+([0-9a-fA-F]{7,40})\s*$/);
+            if (!m) {
+              await reply('Kullanım: `/arch-approve <head-commit-sha>` (7–40 hex karakter).');
+              return;
+            }
+            const approved = m[1].toLowerCase();
+            const pr = (await github.rest.pulls.get({ owner, repo, pull_number: issue_number })).data;
+            const head = pr.head.sha.toLowerCase();
+
+            if (!head.startsWith(approved)) {
+              await reply(
+                `❌ SHA uyuşmuyor.\n` +
+                `- Onaylanan: \`${approved}\`\n` +
+                `- Güncel head: \`${head.slice(0, 7)}\`\n\n` +
+                `Güncel head SHA ile tekrar deneyin: \`/arch-approve ${head}\``
+              );
+              return;
+            }
+            await github.rest.repos.createCommitStatus({
+              owner, repo, sha: pr.head.sha, context: CONTEXT, state: 'success',
+              description: `Approved by @${comment.user.login} for ${head.slice(0, 7)}`,
+            });
+            await reply(
+              `✅ Architecture review **onaylandı** — head \`${head.slice(0, 7)}\` (@${comment.user.login}).\n` +
+              `Yeni commit push edilirse bu onay otomatik geçersiz olur.`
+            );
