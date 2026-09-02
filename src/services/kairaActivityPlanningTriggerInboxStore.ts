@@ -21,6 +21,7 @@ import {
 const COLLECTION = "kairaActivityPlanningTriggerInbox";
 const DEFAULT_BATCH_SIZE = 25;
 const MAX_BATCH_SIZE = 100;
+const MAX_DEFER_MINUTES = 60;
 
 export interface KairaActivityPlanningTriggerInboxRecord {
   schemaVersion: 1;
@@ -28,8 +29,11 @@ export interface KairaActivityPlanningTriggerInboxRecord {
   kairaInstanceId: string;
   instanceType: KairaInstanceContext["instanceType"];
   trigger: KairaActivityPlanningTrigger;
-  status: "pending" | "consumed";
+  status: "pending" | "deferred" | "consumed";
   enqueuedAt: string;
+  deferredAt?: string;
+  retryAfter?: string;
+  attemptCount?: number;
   consumedAt?: string;
 }
 
@@ -85,7 +89,11 @@ function normalizeRecord(value: unknown): KairaActivityPlanningTriggerInboxRecor
     instanceId: record.kairaInstanceId,
     instanceType: record.instanceType,
   });
-  if (!ownerUserId || !record.trigger || (record.status !== "pending" && record.status !== "consumed")) {
+  if (
+    !ownerUserId ||
+    !record.trigger ||
+    (record.status !== "pending" && record.status !== "deferred" && record.status !== "consumed")
+  ) {
     throw new Error("Invalid persisted Kaira planning trigger inbox record");
   }
   if (!instancePolicy(instance.instanceType).autonomousActivityPlanning) {
@@ -99,11 +107,26 @@ function normalizeRecord(value: unknown): KairaActivityPlanningTriggerInboxRecor
     trigger: normalizeKairaActivityPlanningTrigger(record.trigger),
     status: record.status,
     enqueuedAt: canonicalTime(String(record.enqueuedAt || ""), "enqueue time"),
+    ...(record.deferredAt
+      ? { deferredAt: canonicalTime(String(record.deferredAt), "defer time") }
+      : {}),
+    ...(record.retryAfter
+      ? { retryAfter: canonicalTime(String(record.retryAfter), "retry time") }
+      : {}),
+    ...(Number.isInteger(record.attemptCount) && Number(record.attemptCount) >= 0
+      ? { attemptCount: Number(record.attemptCount) }
+      : {}),
     ...(record.consumedAt
       ? { consumedAt: canonicalTime(String(record.consumedAt), "consume time") }
       : {}),
   };
   if (normalized.status === "consumed" && !normalized.consumedAt) {
+    throw new Error("Invalid persisted Kaira planning trigger inbox record");
+  }
+  if (
+    normalized.status === "deferred" &&
+    (!normalized.deferredAt || !normalized.retryAfter || !normalized.attemptCount || normalized.attemptCount < 1)
+  ) {
     throw new Error("Invalid persisted Kaira planning trigger inbox record");
   }
   return normalized;
@@ -119,6 +142,13 @@ function sameDelivery(
     left.instanceType === right.instanceType &&
     JSON.stringify(left.trigger) === JSON.stringify(right.trigger)
   );
+}
+
+function retryAfter(now: string, previousAttempts: number): string {
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(nowMs)) throw new Error("Invalid Kaira planning trigger inbox defer time");
+  const minutes = Math.min(MAX_DEFER_MINUTES, Math.max(1, 2 ** Math.min(previousAttempts, 6)));
+  return new Date(nowMs + minutes * 60_000).toISOString();
 }
 
 export async function enqueueKairaActivityPlanningTriggerAtomic(input: {
@@ -146,6 +176,7 @@ export async function enqueueKairaActivityPlanningTriggerAtomic(input: {
     trigger,
     status: "pending",
     enqueuedAt: canonicalTime(input.now, "enqueue time"),
+    attemptCount: 0,
   };
   const ref = doc(db, COLLECTION, documentId(instance.instanceId, trigger.triggerId));
   return runTransaction(db, async (transaction) => {
@@ -160,24 +191,68 @@ export async function enqueueKairaActivityPlanningTriggerAtomic(input: {
   });
 }
 
-export async function listPendingKairaActivityPlanningTriggers(input: {
-  batchSize?: number;
-} = {}): Promise<KairaActivityPlanningTriggerInboxRecord[]> {
+async function readStatusBatch(status: "pending" | "deferred", batchSize: number, now?: string) {
+  const constraints = [where("status", "==", status)];
+  if (status === "deferred") {
+    if (!now) return [];
+    constraints.push(where("retryAfter", "<=", canonicalTime(now, "retry discovery time")));
+  }
   const snapshot = await getDocs(query(
     collection(db, COLLECTION),
-    where("status", "==", "pending"),
-    limit(boundedBatchSize(input.batchSize)),
+    ...constraints,
+    limit(batchSize),
   ));
   const records: KairaActivityPlanningTriggerInboxRecord[] = [];
   for (const item of snapshot.docs) {
     try {
       const record = normalizeRecord(item.data());
-      if (record.status === "pending") records.push(record);
+      if (record.status === status) records.push(record);
     } catch {
       // Malformed persisted rows are never treated as executable planning work.
     }
   }
   return records;
+}
+
+export async function listPendingKairaActivityPlanningTriggers(input: {
+  batchSize?: number;
+  now?: string;
+} = {}): Promise<KairaActivityPlanningTriggerInboxRecord[]> {
+  const batchSize = boundedBatchSize(input.batchSize);
+  const pending = await readStatusBatch("pending", batchSize);
+  const deferred = input.now
+    ? await readStatusBatch("deferred", batchSize, input.now)
+    : [];
+  return [...deferred, ...pending]
+    .sort((left, right) => Date.parse(left.enqueuedAt) - Date.parse(right.enqueuedAt))
+    .slice(0, batchSize);
+}
+
+export async function markKairaActivityPlanningTriggerDeferredAtomic(input: {
+  record: KairaActivityPlanningTriggerInboxRecord;
+  now: string;
+}): Promise<KairaActivityPlanningTriggerInboxRecord> {
+  const expected = normalizeRecord(input.record);
+  const ref = doc(db, COLLECTION, documentId(expected.kairaInstanceId, expected.trigger.triggerId));
+  const deferredAt = canonicalTime(input.now, "defer time");
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists()) throw new Error("Kaira planning trigger inbox record not found");
+    const current = normalizeRecord(snapshot.data());
+    if (!sameDelivery(current, expected)) throw new Error("Kaira planning trigger inbox idempotency conflict");
+    if (current.status === "consumed") return current;
+    const attemptCount = Math.max(0, current.attemptCount || 0) + 1;
+    const deferred: KairaActivityPlanningTriggerInboxRecord = {
+      ...current,
+      status: "deferred",
+      deferredAt,
+      retryAfter: retryAfter(deferredAt, attemptCount - 1),
+      attemptCount,
+      consumedAt: undefined,
+    };
+    transaction.set(ref, deferred);
+    return deferred;
+  });
 }
 
 export async function markKairaActivityPlanningTriggerConsumedAtomic(input: {
@@ -197,6 +272,8 @@ export async function markKairaActivityPlanningTriggerConsumedAtomic(input: {
       ...current,
       status: "consumed",
       consumedAt,
+      deferredAt: undefined,
+      retryAfter: undefined,
     };
     transaction.set(ref, consumed);
     return consumed;
