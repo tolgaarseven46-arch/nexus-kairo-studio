@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 describe("Kaira autobiographical runtime integration contracts", () => {
   const server = readFileSync("server.ts", "utf8");
+  const unifiedPass = readFileSync("src/services/kairaResponseConstraintPass.ts", "utf8");
 
   it("consumes only the canonical semantic self-memory facet", () => {
     expect(server).toContain('from "./src/services/kairaAutobiographicalRecallRuntime"');
@@ -22,19 +23,21 @@ describe("Kaira autobiographical runtime integration contracts", () => {
     expect(dialogueIndex).toBeGreaterThan(selfMemoryIndex);
   });
 
-  it("guards generated and post-enforcement fallback replies against unsupported autobiography", () => {
-    expect(server).toContain(
-      "const selfMemoryGuard = enforceKairaAutobiographicalResponse(reply, selfMemoryRuntime);",
-    );
-    expect(server).toContain(
-      "const candidateSelfMemoryGuard = enforceKairaAutobiographicalResponse(candidateWorldGuard.reply, selfMemoryRuntime);",
-    );
-    expect(server).toContain(
-      "const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateSelfMemoryGuard.reply, epistemicAccess);",
-    );
-    expect(server).toMatch(
-      /worldMemoryGuard\.changed\s*\|\|\s*selfMemoryGuard\.changed\s*\|\|\s*epistemicGuard\.changed/,
-    );
+  it("guards generated and fallback replies against unsupported autobiography on both rollout paths", () => {
+    expect(server).toContain('isCanonicalBehaviorFlagEnabled("UNIFIED_GUARD_PASS")');
+    expect(server).toContain("autobiographicalGuard: KairaAutobiographicalResponseGuardResult").or.toBeDefined;
+    expect(server).toContain("canonicalConstraint?.autobiographicalGuard ?? enforceKairaAutobiographicalResponse(reply, selfMemoryRuntime)");
+    expect(server).toContain("fallbackFactory: () =>");
+
+    const worldIndex = unifiedPass.indexOf("enforceWorldModelRecallResponse(");
+    const selfMemoryIndex = unifiedPass.indexOf("enforceKairaAutobiographicalResponse(");
+    const epistemicIndex = unifiedPass.indexOf("enforceKairaEpistemicResponse(");
+    const planIndex = unifiedPass.indexOf("enforceKairoResponse(");
+    expect(worldIndex).toBeGreaterThan(-1);
+    expect(selfMemoryIndex).toBeGreaterThan(worldIndex);
+    expect(epistemicIndex).toBeGreaterThan(selfMemoryIndex);
+    expect(planIndex).toBeGreaterThan(epistemicIndex);
+    expect(unifiedPass).toContain("const candidate = runOrderedPass(preferredFallback, input)");
   });
 
   it("exposes the typed recall decision in session metadata and API KDM output", () => {
@@ -45,7 +48,7 @@ describe("Kaira autobiographical runtime integration contracts", () => {
   });
 
   it("does not create a second downstream self-memory parser", () => {
-    const consumerRegion = server.slice(server.indexOf('app.post("/api/chat"'));
+    const consumerRegion = server.slice(server.indexOf('app.post("/api/chat"')));
     expect(consumerRegion).not.toMatch(/selfMemory.*RegExp|SELF_MEMORY_RE|selfMemory.*\.test\(userMessage/i);
   });
 });
