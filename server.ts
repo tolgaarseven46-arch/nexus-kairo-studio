@@ -2,7 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
+import { analyzeKdmInteractionCanonicalTurn } from "./src/services/kdmConsistencyEngine";
 import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
 import { claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";
 import { normalizeDroitPersonality } from "./src/services/droitPersonalityNormalizer";
@@ -725,10 +725,11 @@ app.post("/api/chat", async (req, res) => {
       responsePersonality = normalizeDroitPersonality(incomingResponsePersonality ?? basePersonality),
       behaviorPolicy = normalizeBehaviorPolicyInput(incomingBehaviorPolicy),
       kdmStart = now(),
-      kdm = analyzeKdmInteraction(
+      kdm = analyzeKdmInteractionCanonicalTurn(
         userMessage,
         basePersonality,
         effective,
+        canonicalSemantic.interpretation,
         canonicalSemantic.event,
         behaviorPolicy,
       ),
