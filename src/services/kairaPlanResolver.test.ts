@@ -5,8 +5,8 @@ import type { KairoSpeechIdentity } from "./kairoSpeechIdentity";
 import { buildKairaResponsePlan } from "./kairaResponsePlan";
 
 const contract = (o: Partial<BehaviorContract> = {}): BehaviorContract => ({ conversationState:"active", continueConversation:true, playfulness:"allowed", affection:"allowed", questions:"allowed", forgivenessGranted:false, repairStatus:"none", reopeningCloseness:"allowed", stance:"open", maxResponseLength:"medium", reasons:[], ...o });
-const dialogue = (o: Partial<DialogueDecisionPlan> = {}): DialogueDecisionPlan => ({ move:"continue_conversation", allowFollowUpQuestion:true, allowSpeculation:false, maxSentences:2, maxWords:32, hasSupportedTargetClaim:false, reason:"test", ...o });
-const speech = (o: Partial<KairoSpeechIdentity> = {}): KairoSpeechIdentity => ({ register:"casual", relationshipLevel:"familiar", sentenceLength:"short", slangLevel:.4, humorLevel:.6, emojiLevel:1, warmthLevel:.6, directness:.5, informalityLevel:.6, humorMode:"dry", rhythm:{} as KairoSpeechIdentity["rhythm"], emotionalDisplayLevel:.5, instructions:[], ...o });
+const dialogue = (o: Partial<DialogueDecisionPlan> = {}): DialogueDecisionPlan => ({ move:"natural_reaction", allowFollowUpQuestion:true, allowSpeculation:false, maxSentences:2, maxWords:32, hasSupportedTargetClaim:false, reason:"test", ...o });
+const speech = (o: Partial<KairoSpeechIdentity> = {}): KairoSpeechIdentity => ({ register:"casual", relationshipLevel:"familiar", sentenceLength:"short", slangLevel:.4, humorLevel:.6, emojiLevel:1, warmthLevel:.6, directness:.5, informalityLevel:.6, humorMode:"irony", rhythm:{} as KairoSpeechIdentity["rhythm"], emotionalDisplayLevel:.5, instructions:[], ...o });
 
 describe("PlanResolver canonical-only authority", () => {
   it("always emits the canonical resolver and orthogonal axes", () => { const plan = buildKairaResponsePlan(contract(), dialogue(), speech()); expect(plan.resolver).toBe("canonical"); expect(plan.opennessAxis).toBeGreaterThan(0); expect(typeof plan.guardedness).toBe("number"); });
