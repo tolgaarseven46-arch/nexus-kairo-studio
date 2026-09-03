@@ -124,7 +124,7 @@ export const DEFAULT_RELATIONSHIP_REDUCER_CONFIG: RelationshipReducerConfig = {
     maxDamping: 0.5,
   },
   redline: {
-    hardStopThreshold: 0.78,
+    hardStopThreshold: 1.35,
     minCombinedSignals: 2,
     minPresentSeverity: 0.55,
     weights: {
@@ -219,18 +219,15 @@ function deepMerge<T>(base: T, override: DeepPartial<T> | undefined): T {
   const out: Record<string, unknown> = { ...(base as Record<string, unknown>) };
   for (const [key, value] of Object.entries(override)) {
     const current = out[key];
-    if (isObject(current) && isObject(value)) {
-      out[key] = deepMerge(current, value as DeepPartial<unknown>);
-    } else if (value !== undefined) {
-      out[key] = value;
-    }
+    out[key] = isObject(current) && isObject(value)
+      ? deepMerge(current as object, value as object)
+      : value;
   }
   return out as T;
 }
 
-/** Merge a (possibly partial / JSON-loaded) override onto the committed defaults. */
-export function resolveRelationshipReducerConfig(
-  override?: DeepPartial<RelationshipReducerConfig>,
+export function loadRelationshipReducerConfig(
+  raw?: DeepPartial<RelationshipReducerConfig> | null,
 ): RelationshipReducerConfig {
-  return deepMerge(DEFAULT_RELATIONSHIP_REDUCER_CONFIG, override);
+  return deepMerge(DEFAULT_RELATIONSHIP_REDUCER_CONFIG, raw ?? undefined);
 }

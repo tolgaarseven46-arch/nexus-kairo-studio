@@ -14,13 +14,15 @@ const unifiedPass = fs.readFileSync(path.resolve(process.cwd(), "src/services/ka
 describe("canonical KairaResponsePlan runtime integration", () => {
   it("builds one response plan from contract, dialogue and HOW-only speech", () => {
     expect(server).toContain("buildKairaResponsePlan(behaviorContract, dialogueDecision, speech)");
-    expect(server).toContain("kairaResponsePlanInstruction(responsePlan)");
+    expect(server).toContain("buildCanonicalBehaviorBlock(responsePlan)");
+    expect(server).not.toContain("kairaResponsePlanInstruction(responsePlan)");
   });
 
-  it("feeds the same plan to local and AI verbalizers", () => {
+  it("feeds the same plan to local and canonical AI verbalizers", () => {
     expect(local).toContain("responsePlan?: KairaResponsePlan");
     expect(server).toMatch(/dialogueDecision\.move,\s*responsePlan,\s*languageUnderstanding\.event,\s*kairaPolicy\.persistentUserMemory,\s*discourseState,\s*\)/u);
-    expect(server).toContain("${responsePlanInstruction}\\nKDM:");
+    expect(server).toContain("${responsePlanInstruction}\\n${canonicalObservationalContext}");
+    expect(server).not.toContain("${responsePlanInstruction}\\nKDM:");
   });
 
   it("validates legacy repair/fallback and canonical final-delivery outputs", () => {

@@ -215,7 +215,13 @@ export function evaluateRedline(
     ["manipulation", w.manipulation * s.manipulation],
     ["privacy", w.privacy * s.privacy],
   ];
-  const contributors = harmContributors.filter(([, v]) => v >= floor).length + (signal.targetsKaira ? 1 : 0);
+  // Targeting raises the score, but it is context rather than a second harm
+  // dimension. Low lexical aggression commonly co-occurs with an insult and is
+  // also correlated evidence, so it only becomes an independent contributor
+  // when its raw present-turn severity clears the hard-stop severity gate.
+  const contributors = harmContributors.filter(([name, v]) =>
+    v >= floor && (name !== "aggression" || s.aggression >= rl.minPresentSeverity)
+  ).length;
   const base = harmContributors.reduce((acc, [, v]) => acc + v, 0) + (signal.targetsKaira ? w.targetsKaira : 0);
 
   const repetitionFactor = clamp01(num(prev.scores.repeatedNegativeCount, 0) / 2);
@@ -290,7 +296,11 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     signal.severity.manipulation >= 0.15 ||
     signal.severity.privacy >= 0.15 ||
     signal.severity.aggression >= 0.2;
-  const rawNegative = signal.valence === "negative" && negativeEvidence;
+  // Canonical severity is the harm authority. A directly Kaira-targeted turn
+  // with real present harm stays negative even if the coarse valence projection
+  // is neutral; ambiguous/third-party harm still does not mutate the dyad.
+  const targetedHarm = signal.targetsKaira && presentSeverityOf(signal.severity) >= 0.15;
+  const rawNegative = negativeEvidence && (signal.valence === "negative" || targetedHarm);
   const targetsKaira = rawNegative && signal.targetsKaira;
   const kind: "positive" | "negative" | "neutral" =
     rawNegative && !targetsKaira ? "neutral" : rawNegative ? "negative" : signal.valence === "positive" ? "positive" : "neutral";

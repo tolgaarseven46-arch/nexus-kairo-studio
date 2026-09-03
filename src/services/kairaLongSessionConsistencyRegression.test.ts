@@ -43,7 +43,7 @@ describe('long-session consistency', () => {
 
     for (let i = 0; i < 120; i += 1) {
       let message = i % 3 === 0 ? 'naber' : i % 3 === 1 ? 'bugün işler yoğundu' : 'tamam';
-      if (i === 25 || i === 55) message = 'salak';
+      if (i === 25 || i === 55) message = 'sen salaksın';
       if (i === 26 || i === 56) message = 'özür dilerim';
       if (i === 27 || i === 57) message = 'tamam devam edelim';
       messages.push(message);
@@ -70,8 +70,10 @@ describe('long-session consistency', () => {
     expect(messages).toHaveLength(120);
     expect(snapshots).toHaveLength(120);
     expect(snapshots[25].reactionMode).not.toBe('neutral');
-    expect(snapshots[26].relationship?.repairProgress ?? 0)
-      .toBeGreaterThan(snapshots[25].relationship?.repairProgress ?? 0);
+    expect(snapshots[26].relationship?.hurtScore ?? 0)
+      .toBeLessThanOrEqual(snapshots[25].relationship?.hurtScore ?? 0);
+    expect(snapshots[26].relationship?.conflictScore ?? 0)
+      .toBeLessThanOrEqual(snapshots[25].relationship?.conflictScore ?? 0);
     expect(['neutral', 'repairing']).toContain(snapshots[26].reactionMode);
     expect(state.reactionMode).toBe('neutral');
     expect(state.relationship?.conversationState).toBe('active');

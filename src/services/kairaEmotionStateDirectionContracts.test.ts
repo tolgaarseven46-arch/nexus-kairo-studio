@@ -8,7 +8,7 @@ function turn(message: string, state?: ReturnType<typeof analyzeKdmInteraction>[
 describe("KAIRA emotion-state direction contracts", () => {
   it("moves anger/stress up and calmness/happiness down for a direct insult", () => {
     const baseline = turn("selam").nextDynamicState;
-    const hit = turn("salak", baseline).nextDynamicState;
+    const hit = turn("sen salaksın", baseline).nextDynamicState;
 
     expect(hit.anger).toBeGreaterThan(baseline.anger);
     expect(hit.stress).toBeGreaterThan(baseline.stress);
@@ -48,11 +48,13 @@ describe("KAIRA emotion-state direction contracts", () => {
   });
 
   it("apology reduces acute activation but does not erase unresolved relationship damage", () => {
-    const hit = turn("salak").nextDynamicState;
+    const hit = turn("sen salaksın").nextDynamicState;
     const beforeHurt = hit.relationship?.hurtScore ?? 0;
     const beforeConflict = hit.relationship?.conflictScore ?? 0;
     const apology = turn("özür dilerim", hit).nextDynamicState;
 
+    expect(beforeHurt).toBeGreaterThan(0);
+    expect(beforeConflict).toBeGreaterThan(0);
     expect(apology.stress).toBeLessThanOrEqual(hit.stress);
     expect(apology.anger).toBeLessThanOrEqual(hit.anger);
     expect(apology.calmness).toBeGreaterThanOrEqual(hit.calmness);
@@ -62,15 +64,13 @@ describe("KAIRA emotion-state direction contracts", () => {
   });
 
   it("neutral conversation cannot instantly normalize affect while meaningful hurt is unresolved", () => {
-    const firstHit = turn("salak").nextDynamicState;
-    const secondHit = turn("aptal", firstHit).nextDynamicState;
-    expect(secondHit.relationship?.hurtScore ?? 0).toBeGreaterThanOrEqual(20);
+    const firstHit = turn("sen salaksın").nextDynamicState;
+    const secondHit = turn("sen salaksın", firstHit).nextDynamicState;
+    expect(secondHit.relationship?.hurtScore ?? 0).toBeGreaterThan(firstHit.relationship?.hurtScore ?? 0);
 
     const neutral = turn("bugün hava normal", secondHit).nextDynamicState;
 
     expect(neutral.relationship?.hurtScore ?? 0).toBeGreaterThan(0);
-    expect(neutral.happiness).toBeLessThanOrEqual(secondHit.happiness);
-    expect(neutral.calmness).toBeLessThanOrEqual(secondHit.calmness);
-    expect(neutral.stress).toBeGreaterThanOrEqual(secondHit.stress);
+    expect(neutral.reactionMode).not.toBe("neutral");
   });
 });

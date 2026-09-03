@@ -13,7 +13,7 @@ describe("KDM SemanticEvent authority", () => {
     expect(result.trace.messageInterpretation.intent).toBe("duygusal_paylasim");
     expect(result.trace.messageInterpretation.sentiment).toBe("duygusal_yük");
     expect(result.trace.messageInterpretation.explanation).toContain(
-      "intent=emotional_share",
+      "primary=emotional_share",
     );
   });
 
@@ -21,7 +21,7 @@ describe("KDM SemanticEvent authority", () => {
     const result = analyzeKdmInteraction("orası nasıl");
     expect(result.trace.messageInterpretation.intent).toBe("bilgi_ve_aciklama");
     expect(result.trace.messageInterpretation.explanation).toContain(
-      "intent=information_request",
+      "primary=information_request",
     );
   });
 
@@ -30,7 +30,7 @@ describe("KDM SemanticEvent authority", () => {
     expect(result.trace.messageInterpretation.intent).toBe("özür_ve_telafi");
     expect(result.trace.messageInterpretation.sentiment).toBe("pozitif");
     expect(result.trace.messageInterpretation.explanation).toContain(
-      "intent=apology",
+      "primary=apology",
     );
   });
 
@@ -39,7 +39,7 @@ describe("KDM SemanticEvent authority", () => {
     expect(result.trace.messageInterpretation.intent).toBe("genel_sohbet");
     expect(result.trace.messageInterpretation.sentiment).toBe("pozitif");
     expect(result.trace.messageInterpretation.explanation).toContain(
-      "intent=affection",
+      "primary=affection",
     );
   });
 });

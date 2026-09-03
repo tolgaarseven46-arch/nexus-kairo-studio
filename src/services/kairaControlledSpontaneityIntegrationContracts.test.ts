@@ -14,14 +14,15 @@ describe('controlled spontaneity server integration', () => {
     expect(server).toContain('history: cleanHistory');
   });
 
-  it('composes the lower-authority spontaneity instruction into the existing response-plan prompt instruction', async () => {
+  it('composes the lower-authority spontaneity instruction after the canonical behavior block', async () => {
     const server = await readFile('server.ts', 'utf8');
-    const responseInstructionIndex = server.indexOf('kairaResponsePlanInstruction(responsePlan)');
+    const responseInstructionIndex = server.indexOf('buildCanonicalBehaviorBlock(responsePlan)');
     const spontaneityInstructionIndex = server.indexOf('kairaControlledSpontaneityInstruction(spontaneityDecision, responsePlan)');
 
     expect(responseInstructionIndex).toBeGreaterThanOrEqual(0);
     expect(spontaneityInstructionIndex).toBeGreaterThan(responseInstructionIndex);
     expect(server).toContain('responsePlanInstruction = [');
+    expect(server).not.toContain('kairaResponsePlanInstruction(responsePlan)');
   });
 
   it('persists the full decision in AI KNT metadata', async () => {

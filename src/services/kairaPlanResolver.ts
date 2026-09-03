@@ -1,12 +1,11 @@
 /**
- * PlanResolver (ADR-0006, PR2).
+ * PlanResolver (ADR-0006, PR2/PR5).
  *
  * Resolves HardConstraintSet + SoftTendencyProfile (+ per-turn uncertainty) into
  * a single behavior snapshot. This is NOT a state machine: it is a pure function
  * of the two layers for THIS turn. Hard constraints CLAMP; soft tendencies FILL
- * the room left inside them. `chosenTone` / `register` / `stance` are emitted
- * only as `projections` — non-authoritative style hints. The realizer may not
- * re-derive a behavior decision from them.
+ * the room left inside them. `chosenTone` / `register` / speech-style signals are
+ * projections only and must never create or revoke WHAT/WHETHER permissions.
  */
 
 import type { BehaviorContract } from "./behaviorContract";
@@ -35,13 +34,11 @@ export interface ResolvedKairaPlan {
   allowAffection: boolean;
   allowForgiveness: boolean;
   allowReopeningCloseness: boolean;
-  /** Hard mirror of the character policy — no soft input can raise these. */
   flirtationAllowed: boolean;
   counterFlirtAllowed: boolean;
   maxSentences: number;
   maxWords: number;
   emojiBudget: number;
-  /** Orthogonal axes carried through for telemetry — live even under disengage. */
   opennessAxis: number;
   warmthAxis: number;
   guardedness: number;
@@ -72,7 +69,6 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     semantic: clamp01(input.uncertainty?.semantic ?? 0.4),
     relational: clamp01(input.uncertainty?.relational ?? 0.35),
   };
-  // High uncertainty pulls graded drives toward caution without flipping a gate.
   const cautious = Math.max(uncertainty.semantic, uncertainty.relational);
   const damp = (n: number) => clamp01(n * (1 - 0.35 * cautious));
 
@@ -81,17 +77,15 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   const allowQuestion =
     hard.questionAllowed && dialogue.allowFollowUpQuestion && damp(soft.questionDrive) >= 0.3;
 
-  const allowHumor = hard.humorAllowed && damp(soft.humorInclination) >= 0.28;
+  // `allowHumor` is a permission. SpeechIdentity.humorLevel is HOW and may
+  // influence whether the realizer actually uses humor, but must not revoke an
+  // otherwise allowed behavior permission.
+  const allowHumor = hard.humorAllowed;
 
-  // Flirtation: an absolute mirror of the character policy. Trust, warmth,
-  // intimacy inclination, prior relationship state and chosenTone are all
-  // irrelevant here — the resolver never raises these above the hard gate.
   const flirtationAllowed = hard.flirtingAllowed === true;
   const counterFlirtAllowed = hard.counterFlirtAllowed === true;
   if (!flirtationAllowed) rationale.push("flirtation:hard-forbidden (character policy)");
 
-  // Intimacy: character-policy ceiling first (already clamped to a non-romantic
-  // band when flirtation is forbidden), then the soft inclination fills it.
   const intimacyCeiling = clamp01(Math.min(hard.intimacyCeiling, soft.intimacyInclination));
 
   const allowAffection =
@@ -104,13 +98,14 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     soft.opennessTendency >= 0.35 &&
     soft.guardedness <= 0.7;
 
-  // Length: hard ceiling is absolute; low verbosity tendency may shrink it.
   const maxSentences =
     soft.verbosityTendency < 0.35 ? Math.max(1, Math.min(hard.maxSentences, 1)) : hard.maxSentences;
-  const maxWords = Math.max(
-    1,
-    Math.min(hard.maxWords, Math.round(hard.maxWords * (0.6 + 0.4 * soft.verbosityTendency))),
-  );
+  const maxWords = hard.hardDisengage
+    ? Math.max(4, hard.maxWords)
+    : Math.max(
+        1,
+        Math.min(hard.maxWords, Math.round(hard.maxWords * (0.6 + 0.4 * soft.verbosityTendency))),
+      );
 
   const emojiBudget =
     hard.emojiBudget > 0 && soft.warmthTendency >= 0.4 && !hard.mustAcknowledgeBoundary ? 1 : 0;
@@ -135,7 +130,6 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     maxSentences,
     maxWords,
     emojiBudget,
-    // axes stay populated even when hardDisengage vetoes the gates above (K2)
     opennessAxis: soft.opennessTendency,
     warmthAxis: soft.warmthTendency,
     guardedness: soft.guardedness,

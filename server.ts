@@ -10,7 +10,6 @@ import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguag
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
 import { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";
 import { buildKairaResponsePlan, findKairaResponsePlanIssues, kairaResponsePlanInstruction } from "./src/services/kairaResponsePlan";
-import { isCanonicalBehaviorFlagEnabled } from "./src/config/canonicalBehaviorFlags";
 import {
   buildCanonicalBehaviorBlock,
   buildCanonicalObservationalContext,
@@ -741,30 +740,19 @@ app.post("/api/chat", async (req, res) => {
         behaviorPolicy?.expressionStyle,
       ),
       responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech),
-      canonicalPromptOn = isCanonicalBehaviorFlagEnabled("CANONICAL_PROMPT_BUILDER"),
-      unifiedGuardOn = isCanonicalBehaviorFlagEnabled("UNIFIED_GUARD_PASS"),
       spontaneityDecision = decideKairaControlledSpontaneity({
         responsePlan,
         dynamicState: kdm.nextDynamicState,
         history: cleanHistory,
       }),
       responsePlanInstruction = [
-        canonicalPromptOn
-          ? buildCanonicalBehaviorBlock(responsePlan)
-          : kairaResponsePlanInstruction(responsePlan),
+        buildCanonicalBehaviorBlock(responsePlan),
         kairaControlledSpontaneityInstruction(spontaneityDecision, responsePlan),
       ].join("\n"),
-      dialogueDecisionInstruction = canonicalPromptOn
-        ? buildCanonicalDialogueMoveContext(
+      dialogueDecisionInstruction = buildCanonicalDialogueMoveContext(
             dialogueDecision.move,
             dialogueDecision.target,
             dialogueDecision.reason,
-          )
-        : buildDialogueDecisionInstruction(
-            dialogueDecision,
-            responsePlan.allowQuestion,
-            responsePlan.maxSentences,
-            responsePlan.maxWords,
           ),
       enforcementRules = {
         continueConversation: responsePlan.continueConversation,
@@ -816,8 +804,7 @@ app.post("/api/chat", async (req, res) => {
       );
     kdm.trace.whoSent.userName = userName;
     if (!selfMemoryInstruction && local.handled && local.reply) {
-      const canonicalConstraint = unifiedGuardOn
-        ? runKairaResponseConstraintPass({
+      const canonicalConstraint = runKairaResponseConstraintPass({
             reply: local.reply,
             trace: kdm.trace,
             plan: responsePlan,
@@ -825,8 +812,7 @@ app.post("/api/chat", async (req, res) => {
             worldContext: worldReasoningContext,
             selfMemoryRuntime,
             epistemicContext: epistemicAccess,
-          })
-        : null,
+          }),
         worldMemoryGuard = canonicalConstraint?.worldGuard ?? enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext),
         epistemicGuard = canonicalConstraint?.epistemicGuard ?? enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess),
         baseEnforced = canonicalConstraint?.planEnforcement ?? enforceKairoResponse(epistemicGuard.reply, kdm.trace, enforcementRules),
@@ -1060,8 +1046,7 @@ app.post("/api/chat", async (req, res) => {
       : "";
     // Flag ON: KDM scores/intent become observational-only context (no gate
     // verbs); the single canonical behavior block is the sole decision surface.
-    const canonicalObservationalContext = canonicalPromptOn
-      ? buildCanonicalObservationalContext({
+    const canonicalObservationalContext = buildCanonicalObservationalContext({
           intent: kdm.trace.messageInterpretation.intent,
           sentiment: kdm.trace.messageInterpretation.sentiment,
           warmth: relationship.warmthScore,
@@ -1069,15 +1054,14 @@ app.post("/api/chat", async (req, res) => {
           conflict: relationship.conflictScore ?? 0,
           hurt: relationship.hurtScore ?? 0,
           reactionMode: kdm.nextDynamicState.reactionMode ?? null,
-        })
-      : "";
+        });
     // WHAT/WHETHER authority. Flag OFF: the legacy stack is byte-identical.
     // Flag ON: behaviorContractInstruction, the relationship directives and the
     // "KDM ... bağlayıcıdır" line are dropped — the canonical block is the only
     // place a social decision is stated.
     const discourseInstruction = buildDiscourseObservationalInstruction(discourseState);
     const system = `${buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character)}\n${speechIdentityPrompt(speech)}\n${languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)}\
-${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${selfMemoryInstruction}\n${dialogueInstruction}\n${discourseInstruction}\n${dialogueDecisionInstruction}\n${canonicalPromptOn ? `${responsePlanInstruction}\n${canonicalObservationalContext}` : `${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.`}\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${selfMemoryInstruction}\n${dialogueInstruction}\n${discourseInstruction}\n${dialogueDecisionInstruction}\n${`${responsePlanInstruction}\n${canonicalObservationalContext}`}\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();
@@ -1200,8 +1184,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         }
       }
     }
-    const canonicalConstraint = unifiedGuardOn
-      ? runKairaResponseConstraintPass({
+    const canonicalConstraint = runKairaResponseConstraintPass({
           reply,
           trace: kdm.trace,
           plan: responsePlan,
@@ -1218,8 +1201,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
               dialogueAnalysis,
               responsePlan.allowQuestion,
             ),
-        })
-      : null;
+        });
     const worldMemoryGuard = canonicalConstraint?.worldGuard ?? enforceWorldModelRecallResponse(reply, retrievedWorldEvents, worldReasoningContext);
     if (!canonicalConstraint && worldMemoryGuard.changed) {
       reply = worldMemoryGuard.reply;

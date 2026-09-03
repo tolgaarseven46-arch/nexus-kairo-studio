@@ -30,9 +30,6 @@ jobs:
       - name: Beta runtime regression gate
         run: npm run test:beta
 
-      - name: Canonical path (ADR-0006 flags ON)
-        run: npm run test:canonical
-
       - name: Beta conversation acceptance
         run: node scripts/run-beta-conversation-acceptance.mjs
 
@@ -68,7 +65,7 @@ jobs:
             if echo "$CHANGED" | grep -Eq '^(PROJECT_STATE\.md|docs/adr/.+\.md)$'; then
               echo "OK: PROJECT_STATE.md or docs/adr/** updated alongside risky change."
             else
-              echo "::error::Risky path degisti ama PROJECT_STATE.md veya docs/adr/** guncellenmedi."
+              echo "::error::Riskli path degisti ama PROJECT_STATE.md veya docs/adr/** guncellenmedi."
               exit 1
             fi
           else
@@ -102,7 +99,7 @@ jobs:
               FAIL=1
             fi
             if ! echo "$CHANGED" | grep -Eq '(Regression|GoldenSession|LongSession)[A-Za-z0-9]*\.test\.tsx?$'; then
-              echo "::error::AI_CONTEXT.md §8.5 — davranis degisti ama golden/long-session regression testi eklenmedi/guncellenmedi (*Regression* / *GoldenSession* / *LongSession*)."
+              echo "::error::AI_CONTEXT.md §8.5 — davranis degisti ama golden/long-session regression testi eklenmedi/guncellendi (*Regression* / *GoldenSession* / *LongSession*)."
               FAIL=1
             fi
             [ "$FAIL" -eq 0 ] && echo "OK: behavior change carries a test + a golden/long-session regression."

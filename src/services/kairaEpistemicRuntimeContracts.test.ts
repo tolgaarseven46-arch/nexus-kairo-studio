@@ -23,55 +23,35 @@ describe("Kaira epistemic runtime contracts", () => {
     expect(result.event.knowledgeQuery ?? null).toBeNull();
   });
 
-  it("wires instance-owned knowledge through the epistemic gate before final social enforcement", () => {
+  it("wires instance-owned knowledge through the canonical epistemic guard before final social enforcement", () => {
     const server = serverSource();
     expect(server).toContain('loadKairaKnowledgeProfileResult(kairaInstance.instanceId)');
     expect(server).toContain('evaluateKairaKnowledge(');
     expect(server).toContain('buildKairaEpistemicInstruction(epistemicAccess)');
     expect(server).toMatch(/epistemicAccess\s*,\s*selfMemoryRuntime\s*,\s*(?:livedMemoryRuntime\s*,\s*)?behaviorContract/);
+    expect(server).not.toContain('isCanonicalBehaviorFlagEnabled("UNIFIED_GUARD_PASS")');
+    expect(server).toContain('runKairaResponseConstraintPass({');
+    expect(server).toContain('epistemicContext: epistemicAccess');
 
-    if (server.includes('runKairaResponseConstraintPass')) {
-      expect(server).toContain('isCanonicalBehaviorFlagEnabled("UNIFIED_GUARD_PASS")');
-      expect(server).toContain('epistemicContext: epistemicAccess');
-      const pass = unifiedPassSource();
-      const world = pass.indexOf('enforceWorldModelRecallResponse(');
-      const selfMemory = pass.indexOf('enforceKairaAutobiographicalResponse(');
-      const epistemic = pass.indexOf('enforceKairaEpistemicResponse(');
-      const social = pass.indexOf('enforceKairoResponse(');
-      expect(world).toBeGreaterThan(-1);
-      expect(world).toBeLessThan(selfMemory);
-      expect(selfMemory).toBeLessThan(epistemic);
-      expect(epistemic).toBeLessThan(social);
-    } else {
-      expect(server).toContain('enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess)');
-      expect(server.indexOf('const selfMemoryGuard = enforceKairaAutobiographicalResponse(reply, selfMemoryRuntime)')).toBeLessThan(server.indexOf('const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess)'));
-      expect(server.indexOf('const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess)')).toBeLessThan(server.indexOf('const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules)'));
-    }
+    const pass = unifiedPassSource();
+    const world = pass.indexOf('enforceWorldModelRecallResponse(');
+    const selfMemory = pass.indexOf('enforceKairaAutobiographicalResponse(');
+    const epistemic = pass.indexOf('enforceKairaEpistemicResponse(');
+    const social = pass.indexOf('enforceKairoResponse(');
+    expect(world).toBeGreaterThan(-1);
+    expect(world).toBeLessThan(selfMemory);
+    expect(selfMemory).toBeLessThan(epistemic);
+    expect(epistemic).toBeLessThan(social);
   });
 
   it("keeps every post-plan fallback behind the same truth and social final authority", () => {
     const server = serverSource();
-    if (server.includes('runKairaResponseConstraintPass')) {
-      expect(server).toContain('fallbackFactory: () =>');
-      const pass = unifiedPassSource();
-      expect(pass).toContain('const candidate = runOrderedPass(preferredFallback, input)');
-      expect(pass).toContain('runOrderedPass("tamam", input)');
-      expect(pass).toContain('findKairaResponsePlanIssues(delivered, input.plan)');
-      expect(pass).toContain('findKairaEpistemicResponseIssues(delivered, input.epistemicContext)');
-    } else {
-      const candidateWorld = server.indexOf("const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents, worldReasoningContext)");
-      const candidateSelfMemory = server.indexOf("const candidateSelfMemoryGuard = enforceKairaAutobiographicalResponse(candidateWorldGuard.reply, selfMemoryRuntime)");
-      const candidateEpistemic = server.indexOf("const candidateEpistemicGuard = enforceKairaEpistemicResponse(candidateSelfMemoryGuard.reply, epistemicAccess)");
-      const candidateSocial = server.indexOf("const candidateBaseEnforced = enforceKairoResponse(candidateEpistemicGuard.reply, kdm.trace, enforcementRules)");
-      const candidateContract = server.indexOf("const candidateContractEnforced = enforceBehaviorContract(candidateBaseEnforced.reply, kdm.trace, behaviorContract)");
-      const finalEpistemic = server.indexOf("const finalEpistemicIssues = findKairaEpistemicResponseIssues(reply, epistemicAccess)");
-      expect(candidateWorld).toBeGreaterThan(-1);
-      expect(candidateWorld).toBeLessThan(candidateSelfMemory);
-      expect(candidateSelfMemory).toBeLessThan(candidateEpistemic);
-      expect(candidateEpistemic).toBeLessThan(candidateSocial);
-      expect(candidateSocial).toBeLessThan(candidateContract);
-      expect(candidateContract).toBeLessThan(finalEpistemic);
-    }
+    expect(server).toContain('fallbackFactory: () =>');
+    const pass = unifiedPassSource();
+    expect(pass).toContain('const candidate = runOrderedPass(preferredFallback, input)');
+    expect(pass).toContain('runOrderedPass("tamam", input)');
+    expect(pass).toContain('findKairaResponsePlanIssues(delivered, input.plan)');
+    expect(pass).toContain('findKairaEpistemicResponseIssues(delivered, input.epistemicContext)');
   });
 
   it("fails closed when the instance knowledge profile cannot be read", () => {

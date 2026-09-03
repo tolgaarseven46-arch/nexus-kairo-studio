@@ -2,15 +2,12 @@
  * ADR-0006 §1 — the lexical/regex floor must not stamp a message as heavy
  * insult from a single dictionary hit. A slur/insult word is graded BY CONTEXT
  * (target, joking/sincerity confidence, question framing, affectionate framing,
- * length, repetition) and only a genuinely pointed, sincere, sustained hostility
+ * length, repetition) and only genuinely strong or amplified combined hostility
  * reaches the reducer's hard-stop gate.
  *
- * This proves the five classes are distinguished:
- *   - close friend + harsh joke        -> no hard-stop
- *   - post-apology calming             -> no hard-stop
- *   - same word as serious insult      -> hard-stop
- *   - same word as banter              -> no hard-stop
- *   - repeated real boundary violation -> hard-stop, amplified
+ * PR5 calibration: an ordinary explicitly targeted insult remains visible as
+ * disrespect and flows through relationship-sensitive reaction handling; it is
+ * not by itself a hard-stop. Strong combined or repeated boundary violations are.
  */
 
 import { describe, expect, it } from "vitest";
@@ -69,10 +66,9 @@ describe("semantic context grading — single word / slang / banter must not sel
     expect(hardStops("tamam özür, haklısın", 3, true)).toBe(false);
   });
 
-  it("same word as a POINTED serious insult DOES hard-stop", () => {
-    expect(hardStops("sen tam bir orospusun iğrençsin")).toBe(true);
-    expect(hardStops("sen kaşarsın")).toBe(true);
-    expect(hardStops("sen aptalsın ya")).toBe(true);
+  it("ordinary pointed insults remain relationship-sensitive instead of instantly hard-stopping", () => {
+    expect(hardStops("sen kaşarsın")).toBe(false);
+    expect(hardStops("sen aptalsın ya")).toBe(false);
   });
 
   it("a slur reported as third-party speech does not hard-stop the Kaira relationship", () => {
@@ -82,7 +78,7 @@ describe("semantic context grading — single word / slang / banter must not sel
   it("repeated real boundary violation hard-stops and the score is amplified vs the first time", () => {
     const first = evaluateRedline(signalOf("sen tam bir orospusun iğrençsin"), prev(0, false), DEFAULT_RELATIONSHIP_REDUCER_CONFIG);
     const repeat = evaluateRedline(signalOf("sen tam bir orospusun iğrençsin"), prev(2, true), DEFAULT_RELATIONSHIP_REDUCER_CONFIG);
-    expect(first.disengage).toBe(true);
+    expect(first.disengage).toBe(false);
     expect(repeat.disengage).toBe(true);
     expect(repeat.score).toBeGreaterThan(first.score);
   });
@@ -104,9 +100,9 @@ describe("semantic context grading — single word / slang / banter must not sel
 
 /**
  * PR #26 step 3–4 minimal repro set. The same slur stem ("kaşar") across five
- * contexts must land in five different places. A lexical hit is only a CANDIDATE
- * signal: it produces neither high severity nor a hard-stop until independent
- * hostility evidence (pointed address, serious-conflict framing) resolves it.
+ * contexts must remain semantically distinguishable. A lexical hit is only a
+ * candidate signal; PR5 additionally separates ordinary targeted disrespect
+ * from the stronger/amplified combined-harm hard-stop class.
  */
 describe("kaşar minimal repro — one stem, five contexts", () => {
   it("'kaşar ekmek' is food: no disrespect, no attack act, not aimed at Kaira", () => {
@@ -123,17 +119,16 @@ describe("kaşar minimal repro — one stem, five contexts", () => {
     expect(hardStops("kaşarlı tost")).toBe(false);
   });
 
-  it("'sen kaşarsın' is a pointed insult: disrespect-dominant, aimed at Kaira, hard-stops", () => {
+  it("'sen kaşarsın' is a pointed insult: disrespect-dominant and aimed at Kaira, but not an automatic hard-stop", () => {
     const i = interpretationFromRegexFloor("sen kaşarsın");
     expect(i.severity.disrespect).toBeGreaterThan(0.7);
     expect(i.target).toBe("kaira");
     expect(i.secondarySocialActs).toContain("insult");
-    expect(hardStops("sen kaşarsın")).toBe(true);
+    expect(hardStops("sen kaşarsın")).toBe(false);
   });
 
   it("close friend + 'ulan kaşar 😂': banter/insult ambiguity is preserved, no hard-stop", () => {
     const i = interpretationFromRegexFloor("ulan kaşar 😂");
-    // non-zero (the possibility is visible) but far below the severity gate
     expect(i.severity.disrespect).toBeGreaterThan(0);
     expect(i.severity.disrespect).toBeLessThan(DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline.minPresentSeverity);
     expect(i.jokingConfidence).toBeGreaterThan(0.5);
@@ -141,7 +136,7 @@ describe("kaşar minimal repro — one stem, five contexts", () => {
     expect(hardStops("ulan kaşar 😂")).toBe(false);
   });
 
-  it("'seninle ciddi ciddi kavga edeceğiz kaşar herif': serious-fight framing → real disrespect + hard-stop", () => {
+  it("'seninle ciddi ciddi kavga edeceğiz kaşar herif': serious-fight framing remains a strong combined boundary violation", () => {
     const i = interpretationFromRegexFloor("seninle ciddi ciddi kavga edeceğiz kaşar herif");
     expect(i.severity.disrespect).toBeGreaterThan(0.7);
     expect(i.target).toBe("kaira");

@@ -1,18 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-
-describe("reaction-specific recovery authority", () => {
-  it("keeps temperament as rate math and relationship recovery as qualitative authority", () => {
-    const temperament = readFileSync("src/services/temperamentEngine.ts", "utf8");
-    const recovery = readFileSync("src/services/relationshipConditionedRecovery.ts", "utf8");
-    const kdm = readFileSync("src/services/kdmConsistencyEngine.ts", "utf8");
-    expect(temperament).toContain("temperamentRecoveryFactor");
-    expect(recovery).toContain("recoverRelationshipConditionedState");
-    expect(recovery).toContain('reaction === "irritated"');
-    expect(recovery).toContain('reaction === "hurt"');
-    expect(recovery).toContain('reaction === "withdrawn"');
-    expect(recovery).toContain('reaction === "repairing"');
-    expect(kdm).toContain("preTurnRecovery = recoverRelationshipConditionedState({");
-    expect(kdm).toContain("reactionMode: preTurnRecovery.reactionMode");
+describe("reaction-specific recovery canonical authority", () => {
+  it("keeps scores/FSM recovery reducer-owned while the canonical bridge preserves low-level qualitative continuity", () => {
+    const reducer = readFileSync("src/services/relationshipReducer.ts", "utf8");
+    const bridge = readFileSync("src/services/kdmRelationshipReducerBridge.ts", "utf8");
+    expect(reducer).toContain("computeRecovery(");
+    expect(bridge).toContain("projectedReactionMode");
+    expect(bridge).toContain("prev.reactionMode");
+    expect(bridge).toContain("residual-reaction-persistence");
   });
 });
