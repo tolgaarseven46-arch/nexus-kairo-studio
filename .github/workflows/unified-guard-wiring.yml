@@ -1,0 +1,48 @@
+name: Unified Guard Wiring
+
+on:
+  push:
+    branches:
+      - chatgpt/unified-guard-pass-v1
+    paths:
+      - scripts/apply-unified-guard-server-wiring.mjs
+      - .github/workflows/unified-guard-wiring.yml
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: chatgpt/unified-guard-pass-v1
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: Apply server wiring
+        run: |
+          if grep -q 'import { runKairaResponseConstraintPass }' server.ts; then
+            echo 'Server already wired.'
+          else
+            node scripts/apply-unified-guard-server-wiring.mjs
+          fi
+      - name: Targeted canonical guard tests
+        run: npx vitest run src/services/kairaResponseConstraintPass.test.ts src/services/worldModelResponseGuardContracts.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts src/services/kairaAutobiographicalResponseGuardContracts.test.ts
+      - name: TypeScript check
+        run: npm run lint
+      - name: Commit wiring
+        run: |
+          if git diff --quiet -- server.ts; then
+            echo 'No server wiring changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add server.ts
+          git commit -m 'feat(kaira): wire unified guard into chat runtime'
+          git push origin HEAD:chatgpt/unified-guard-pass-v1
