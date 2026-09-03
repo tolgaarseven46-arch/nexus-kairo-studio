@@ -206,7 +206,7 @@ const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
 
 /**
  * ADR-0006 PR5: RelationshipReducer is now the only relationship/state authority.
- * The rollout flag and legacy decision body were removed after the promotion gate.
+ * The temporary rollout switch and legacy decision body were removed after promotion.
  * Rollback is repository-level `git revert`.
  */
 export function analyzeKdmInteraction(
