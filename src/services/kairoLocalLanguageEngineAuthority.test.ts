@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { tryLocalKairoReply } from "./kairoLocalLanguageEngine";
 import { interpretSemanticEvent } from "./semanticEventEngine";
 import { deriveDiscourseState } from "./discourseStateReducer";
+import type { ConversationTurn } from "./kairoConversationGrounding";
 import type { DroitDynamicState, ReasoningTrace } from "../types/nexus";
 
 const state = {
@@ -27,9 +28,15 @@ const state = {
 const trace = { decision: { chosenTone: "casual" } } as ReasoningTrace;
 const personality = { humor: 60 } as never;
 
+function ingestionHistory(history: Array<{ sender: string; text: string }>): ConversationTurn[] {
+  return history.map((turn) => turn.sender === "user"
+    ? { ...turn, sender: "user", semanticEvent: interpretSemanticEvent(turn.text) } as ConversationTurn
+    : { ...turn, sender: "droit" } as ConversationTurn);
+}
+
 function run(message: string, move: string | undefined, opts: { history?: Array<{ sender: string; text: string }>; plan?: unknown } = {}) {
   const event = interpretSemanticEvent(message);
-  const discourse = deriveDiscourseState(opts.history ?? [], { message, event });
+  const discourse = deriveDiscourseState(ingestionHistory(opts.history ?? []), { message, event });
   return tryLocalKairoReply(
     message,
     personality,
