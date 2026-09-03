@@ -403,7 +403,11 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     // repairProgress is progress toward repairing ACTUAL damage. With no injury
     // to repair it must not accumulate; it decays toward 0 so a long friendly
     // chat never arrives at a fake "mid-repair" state (PR1-review fix).
-    const injuryToRepair = Math.max(conflictBefore, hurtBefore) >= config.recovery.repairInjuryFloor;
+    // A persisted hard disengage reason is itself repairable relational damage:
+    // good-history damping can keep numeric conflict/hurt below the score floor,
+    // but that must never make the FSM permanently impossible to repair.
+    const hardBoundaryToRepair = prev.conversationState === "disengaged" && Boolean(prev.disengageReason);
+    const injuryToRepair = hardBoundaryToRepair || Math.max(conflictBefore, hurtBefore) >= config.recovery.repairInjuryFloor;
     const explicitRepairAct = Boolean(signal.apology || signal.repairAttempt);
     if (!injuryToRepair) {
       repairProgress = Math.max(0, repairProgress - config.recovery.repairDecayNoInjury);
