@@ -15,6 +15,7 @@ import { resolveMessageEntities } from "./entityResolutionEngine";
 import { groundSemanticEventForAppraisal } from "./languageUnderstandingService";
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 import { analyzeKdmInteractionCanonical } from "./kdmRelationshipReducerBridge";
+import { isKdmSalientEmotionalLoad } from "./emotionalLoadPolicy";
 
 export interface KdmAnalysisResult {
   trace: ReasoningTrace;
@@ -164,7 +165,7 @@ function hasActionableNegativeEvidence(event: SemanticEvent): boolean {
 }
 
 export function semanticSentimentToKdm(event: SemanticEvent): string {
-  if (event.emotionalLoad > 0) return "duygusal_yük";
+  if (isKdmSalientEmotionalLoad(event.emotionalLoad)) return "duygusal_yük";
   if (event.valence === "negative" && hasActionableNegativeEvidence(event)) return "negatif";
   if (event.valence === "positive") return "pozitif";
   return "nötr";
