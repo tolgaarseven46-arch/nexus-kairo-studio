@@ -3,6 +3,11 @@ import fs from "node:fs";
 const path = "src/services/kairoDialogueDecisionEngine.ts";
 let source = fs.readFileSync(path, "utf8");
 
+if (source.includes("function applyRepetitionPolicy(")) {
+  console.log("repetition policy guard already applied");
+  process.exit(0);
+}
+
 function replaceOnce(from, to, label) {
   if (!source.includes(from)) throw new Error(`missing marker: ${label}`);
   source = source.replace(from, to);
