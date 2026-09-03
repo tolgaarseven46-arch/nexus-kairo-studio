@@ -11,6 +11,8 @@ import {
 import { normalizeDroitPersonality } from "./droitPersonalityNormalizer";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";
+import { resolveMessageEntities } from "./entityResolutionEngine";
+import { groundSemanticEventForAppraisal } from "./languageUnderstandingService";
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 import { analyzeKdmInteractionCanonical } from "./kdmRelationshipReducerBridge";
 
@@ -68,19 +70,13 @@ export function applyIntegratedBehaviorPolicy(
   let humorLevel = humorAllowed ? profile.humorLevel : 0;
   let curiosity = profile.curiosity;
 
-  if (!humorAllowed) {
-    directives.push("Bu tur mizah kullanma; şaka, ironi ve alay ekleme.");
-  }
+  if (!humorAllowed) directives.push("Bu tur mizah kullanma; şaka, ironi ve alay ekleme.");
   if (!askQuestion) {
     curiosity = Math.min(curiosity, 0.2);
     directives.push("Cevabı soru ile bitirme; yeni soru sorma.");
   }
-  if (acknowledgeComplaint) {
-    directives.push("Varsa rahatsızlığı veya itirazı kısa biçimde kabul et; konuyu atlama.");
-  }
-  if (!repairAllowed) {
-    directives.push("Özür veya barışma sinyali gelse bile ilişkiyi anında normale döndürme.");
-  }
+  if (acknowledgeComplaint) directives.push("Varsa rahatsızlığı veya itirazı kısa biçimde kabul et; konuyu atlama.");
+  if (!repairAllowed) directives.push("Özür veya barışma sinyali gelse bile ilişkiyi anında normale döndürme.");
 
   if (!continueConversation || stance >= 90) {
     tone = "firm";
@@ -184,11 +180,6 @@ const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
   lastStatus: "Sakin ve kontrollü",
 };
 
-/**
- * Authoritative runtime entrypoint (C1b).
- * Both values originate from the same ingestion-time SemanticInterpretation@2;
- * `semanticEvent` is only its deterministic compatibility projection.
- */
 export function analyzeKdmInteractionCanonicalTurn(
   userMessage: string,
   personality: Partial<DroitPersonalityTraits> | null | undefined,
@@ -214,10 +205,9 @@ export function analyzeKdmInteractionCanonicalTurn(
 }
 
 /**
- * Legacy/test ingress helper.
- * Production server code must not call this function: it exists only for older
- * reducer unit/regression tests that intentionally exercise deterministic regex
- * ingestion without the HTTP language-understanding gateway.
+ * Legacy/test ingress helper. It intentionally performs a complete deterministic
+ * ingestion step (regex v2 + entity/world grounding) before entering the same
+ * canonical reducer bridge. Production server code must never call it.
  */
 export function analyzeKdmInteraction(
   userMessage: string,
@@ -226,14 +216,19 @@ export function analyzeKdmInteraction(
   canonicalSemanticEvent?: SemanticEvent | null,
   behaviorPolicy?: BehaviorPolicyInput | null,
 ): KdmAnalysisResult {
-  const semanticEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage);
   const semanticInterpretation = interpretationFromRegexFloor(userMessage);
+  const projectedEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage);
+  const groundedEvent = groundSemanticEventForAppraisal(
+    userMessage,
+    projectedEvent,
+    resolveMessageEntities(userMessage),
+  ).event;
   return analyzeKdmInteractionCanonicalTurn(
     userMessage,
     personality,
     currentDynamicState,
     semanticInterpretation,
-    semanticEvent,
+    groundedEvent,
     behaviorPolicy,
   );
 }
