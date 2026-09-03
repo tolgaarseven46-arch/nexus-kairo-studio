@@ -17,6 +17,7 @@ import {
   type SemanticIntent,
 } from "./semanticEventEngine";
 import { normalizeSemanticInterpretation } from "./semanticInterpretationSchema";
+import { calibrateProjectedEmotionalLoad } from "./emotionalLoadPolicy";
 import {
   SEMANTIC_INTERPRETATION_SCHEMA_VERSION,
   type SemanticInterpretation,
@@ -513,6 +514,6 @@ export function projectLegacySemanticEvent(
     affection: Math.max(floor.affection, interp.affection),
     support: Math.max(floor.support, interp.support),
     compliment: Math.max(floor.compliment, interp.compliment),
-    emotionalLoad: Math.max(floor.emotionalLoad, interp.emotionalLoad),
+    emotionalLoad: calibrateProjectedEmotionalLoad(interp, floor.emotionalLoad),
   };
 }
