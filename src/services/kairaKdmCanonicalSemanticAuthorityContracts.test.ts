@@ -19,7 +19,7 @@ describe("KDM canonical SemanticInterpretation@2 authority", () => {
     expect(kdm).toContain("semanticEvent,");
     expect(kdm).toContain("return analyzeKdmInteractionCanonical({");
     expect(bridge).toContain("semanticInterpretation: SemanticInterpretation");
-    expect(bridge).toContain("buildTurnSignal(semanticInterpretation, negativePattern)");
+    expect(bridge).toContain("buildTurnSignal(semanticInterpretation, semanticEvent, negativePattern)");
     expect(bridge).not.toContain("interpretationFromLegacyEvent");
   });
 
@@ -28,8 +28,18 @@ describe("KDM canonical SemanticInterpretation@2 authority", () => {
     expect(bridge).not.toContain("interpretSemanticEvent(");
     expect(bridge).not.toContain("interpretationFromRegexFloor");
     expect(bridge).not.toMatch(/\.test\(semantic(?:Event|Interpretation)\.raw\)/u);
-    expect(bridge).toContain("userStop: interp.stopRequest");
+    expect(bridge).toContain('const thirdParty = event.relationshipScope === "third_party"');
+    expect(bridge).toContain("userStop: thirdParty ? false : interp.stopRequest");
     expect(bridge).toContain("semanticNegativePattern(semanticInterpretation)");
+  });
+
+  it("uses upstream grounded relationship scope without creating a third semantic authority", () => {
+    const bridge = source("src/services/kdmRelationshipReducerBridge.ts");
+    expect(bridge).toContain("relationshipScope?: SemanticRelationshipScope");
+    expect(bridge).toContain('negativePattern: thirdParty ? null : negativePattern');
+    expect(bridge).toContain('apology: thirdParty ? false : interp.apology');
+    expect(bridge).not.toContain("resolveMessageEntities(");
+    expect(bridge).not.toContain("buildCanonicalWorldEvent(");
   });
 
   it("keeps the old raw-text helper outside the production server authority", () => {
