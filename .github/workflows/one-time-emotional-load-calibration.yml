@@ -1,0 +1,30 @@
+name: One-time emotional load calibration
+
+on:
+  push:
+    branches: [chatgpt/emotional-load-policy-calibration]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: chatgpt/emotional-load-policy-calibration
+          fetch-depth: 0
+      - name: Apply migration
+        run: node scripts/apply-emotional-load-calibration.mjs
+      - name: Commit migration result
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/semanticInterpretationLegacyProjection.ts src/services/kdmConsistencyEngine.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "refactor(kaira): calibrate emotional load policy"
+          git push origin HEAD:chatgpt/emotional-load-policy-calibration
