@@ -1,0 +1,36 @@
+# ADR-0010 — Runtime behavior proof strategy
+
+Status: proposed in PR #31
+
+## Context
+
+A green unit/contract suite did not prevent the post-PR30 live KNT conversation from exposing repeated social moves, lost previous-turn dependency, punctuation-sensitive output guards, and an autonomous activity permission prompt entering the delivered chat reply outside the intended response-plan authority.
+
+The failure was methodological as much as local: tests proved individual functions and selected literal examples, but did not prove the delivered runtime behavior across semantic interpretation, discourse state, response-plan conformance, side-channel composition, and multi-turn history.
+
+## Decision
+
+Behavior changes must be validated with multiple independent evidence classes rather than one example-specific regression.
+
+Required evidence for behavior-critical changes:
+
+1. Focused contract test for the local invariant.
+2. Metamorphic/paraphrase tests that preserve meaning while changing surface text.
+3. Sequence/long-session tests that fold real alternating user/Kaira turns.
+4. Final-output conformance tests on the actually delivered text, including text appended by side channels.
+5. Canonical/legacy rollout tests with explicit flag ON/OFF states; library defaults are not silently changed to make a test pass.
+6. Red-team counterexamples for likely bypasses such as omitted punctuation, slang, profanity, reordered wording, and repeated social acts expressed with different text.
+
+A passing test is evidence only for the invariant it directly observes. CI green is necessary but is not by itself proof of natural conversation quality.
+
+## Runtime safety decisions in PR #31
+
+- Previous-turn dependency is inferred from the pending conversational role plus canonical semantics, not from one exact phrase.
+- Question blocking checks common punctuation-free Turkish question acts in addition to `?`.
+- Autonomous activity permission prompts are fail-closed for ordinary chat unless explicitly enabled; an appended permission prompt is treated as part of the delivered response contract.
+- Kaira self-repeat detection is evaluated by social act, not exact reply string.
+- ADR-0006 behavior flags retain explicit opt-in/rollback semantics; canonical promotion must be proven at the runtime/deployment boundary rather than implemented as a hidden library default.
+
+## Consequences
+
+Behavior fixes will generally add more than one test and may intentionally keep a PR in draft while counterexamples are still being found. This increases short-term test work but reduces false confidence from narrow green suites.
