@@ -3,28 +3,41 @@ import { readFileSync } from "node:fs";
 
 const source = (path: string) => readFileSync(path, "utf8");
 
-describe("KDM canonical SemanticEvent authority", () => {
-  it("receives the server canonical event for the live KDM turn", () => {
+describe("KDM canonical SemanticInterpretation@2 authority", () => {
+  it("receives the ingestion-time interpretation and its deterministic event projection", () => {
     const server = source("server.ts");
-    expect(server).toMatch(/analyzeKdmInteraction\(\s*userMessage,\s*basePersonality,\s*effective,\s*canonicalSemantic\.event,\s*behaviorPolicy,\s*\)/u);
+    expect(server).toContain('import { analyzeKdmInteractionCanonicalTurn } from "./src/services/kdmConsistencyEngine"');
+    expect(server).toMatch(/analyzeKdmInteractionCanonicalTurn\(\s*userMessage,\s*basePersonality,\s*effective,\s*canonicalSemantic\.interpretation,\s*canonicalSemantic\.event,\s*behaviorPolicy,\s*\)/u);
+    expect(server).not.toMatch(/\banalyzeKdmInteraction\(/u);
   });
 
-  it("uses the supplied canonical event and delegates semantic projections to the single canonical bridge", () => {
+  it("feeds SemanticInterpretation@2 directly into the canonical relationship bridge", () => {
     const kdm = source("src/services/kdmConsistencyEngine.ts");
-    expect(kdm).toContain("const semanticEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage)");
-    expect(kdm).toContain("return analyzeKdmInteractionCanonical({");
+    const bridge = source("src/services/kdmRelationshipReducerBridge.ts");
+    expect(kdm).toContain("export function analyzeKdmInteractionCanonicalTurn(");
+    expect(kdm).toContain("semanticInterpretation,");
     expect(kdm).toContain("semanticEvent,");
-    expect(kdm).toContain("semanticIntentToKdm,");
-    expect(kdm).toContain("semanticSentimentToKdm,");
-    expect(kdm).not.toContain("RELATIONSHIP_REDUCER_V2");
+    expect(kdm).toContain("return analyzeKdmInteractionCanonical({");
+    expect(bridge).toContain("semanticInterpretation: SemanticInterpretation");
+    expect(bridge).toContain("buildTurnSignal(semanticInterpretation, negativePattern)");
+    expect(bridge).not.toContain("interpretationFromLegacyEvent");
   });
 
-  it("does not carry an independent raw-message intent or sentiment parser", () => {
+  it("never reparses raw text inside the authoritative relationship bridge", () => {
+    const bridge = source("src/services/kdmRelationshipReducerBridge.ts");
+    expect(bridge).not.toContain("interpretSemanticEvent(");
+    expect(bridge).not.toContain("interpretationFromRegexFloor");
+    expect(bridge).not.toMatch(/\.test\(semantic(?:Event|Interpretation)\.raw\)/u);
+    expect(bridge).toContain("userStop: interp.stopRequest");
+    expect(bridge).toContain("semanticNegativePattern(semanticInterpretation)");
+  });
+
+  it("keeps the old raw-text helper outside the production server authority", () => {
     const kdm = source("src/services/kdmConsistencyEngine.ts");
-    expect(kdm).not.toContain("function classifyIntent(");
-    expect(kdm).not.toContain("function classifySentiment(");
-    expect(kdm).not.toContain("normalizeKairoLanguageInput");
-    expect(kdm).not.toContain("hasLocalLowMoodExpression");
-    expect(kdm).not.toContain("isConfusionOrChallenge");
+    const server = source("server.ts");
+    expect(kdm).toContain("Legacy/test ingress helper");
+    expect(kdm).toContain("interpretationFromRegexFloor(userMessage)");
+    expect(server).not.toContain("interpretationFromRegexFloor");
+    expect(server).not.toMatch(/\banalyzeKdmInteraction\(/u);
   });
 });
