@@ -2,29 +2,36 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 describe('final accepted language-memory integration', () => {
-  it('learns AI output only after final AI consistency acceptance', async () => {
+  it('learns AI output only after the final unified/legacy consistency decision', async () => {
     const server = await readFile('server.ts', 'utf8');
-    const consistencyIndex = server.indexOf('const consistency = {', server.indexOf('const aiMs ='));
+    const aiRegionStart = server.indexOf('const finalPlanIssues = postEnforcementPlanIssues');
+    const consistencyIndex = server.indexOf('const consistency = canonicalConstraint', aiRegionStart);
     const learningIndex = server.indexOf('learnLanguageReply(stateUserId, reply)', consistencyIndex);
 
     expect(server).toContain('learnLanguageReply,');
-    expect(consistencyIndex).toBeGreaterThanOrEqual(0);
+    expect(aiRegionStart).toBeGreaterThanOrEqual(0);
+    expect(consistencyIndex).toBeGreaterThan(aiRegionStart);
     expect(learningIndex).toBeGreaterThan(consistencyIndex);
-    expect(server.slice(consistencyIndex, learningIndex)).toContain('consistency.accepted');
+    expect(server.slice(consistencyIndex, learningIndex)).toContain('accepted:');
+    expect(server.slice(learningIndex - 160, learningIndex)).toContain('consistency.accepted');
+    expect(server.slice(learningIndex - 160, learningIndex)).toContain('!providerFailureFallbackUsed');
   });
 
-  it('learns local output only after local final consistency acceptance', async () => {
+  it('learns local output only after the local unified/legacy consistency decision and delivery checks', async () => {
     const server = await readFile('server.ts', 'utf8');
-    const localConsistencyIndex = server.indexOf('localBaseConsistency = validateKairoResponse');
-    const localLearningIndex = server.indexOf('learnLanguageReply(stateUserId, reply)', localConsistencyIndex);
-    const localPersistenceIndex = server.indexOf('const postStart = now()', localConsistencyIndex);
+    const localBaseConsistencyIndex = server.indexOf('localBaseConsistency = canonicalConstraint?.consistency ?? validateKairoResponse');
+    const localConsistencyIndex = server.indexOf('consistency = canonicalConstraint', localBaseConsistencyIndex);
+    const localDeliveryIndex = server.indexOf('const localDeliveryIssues = [', localConsistencyIndex);
+    const localLearningIndex = server.indexOf('learnLanguageReply(stateUserId, reply)', localDeliveryIndex);
+    const localPersistenceIndex = server.indexOf('const postStart = now()', localLearningIndex);
 
-    expect(localConsistencyIndex).toBeGreaterThanOrEqual(0);
-    expect(localLearningIndex).toBeGreaterThan(localConsistencyIndex);
+    expect(localBaseConsistencyIndex).toBeGreaterThanOrEqual(0);
+    expect(localConsistencyIndex).toBeGreaterThan(localBaseConsistencyIndex);
+    expect(localDeliveryIndex).toBeGreaterThan(localConsistencyIndex);
+    expect(localLearningIndex).toBeGreaterThan(localDeliveryIndex);
     expect(localPersistenceIndex).toBeGreaterThan(localLearningIndex);
-    expect(server.slice(localConsistencyIndex, localLearningIndex)).toContain('consistency = {');
-    expect(server.slice(localLearningIndex - 120, localLearningIndex)).toContain('kairaPolicy.persistentUserMemory && consistency.accepted');
-    expect(server.slice(localLearningIndex, localPersistenceIndex + 24)).toContain('const postStart = now();');
+    expect(server.slice(localDeliveryIndex, localLearningIndex)).toContain('localDeliveryIssues.length === 0');
+    expect(server.slice(localLearningIndex - 160, localLearningIndex)).toContain('kairaPolicy.persistentUserMemory && consistency.accepted');
   });
 
   it('keeps the local verbalizer free of pre-delivery learning side effects', async () => {
