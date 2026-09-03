@@ -47,7 +47,7 @@ describe("Kaira autobiographical runtime integration contracts", () => {
   });
 
   it("does not create a second downstream self-memory parser", () => {
-    const consumerRegion = server.slice(server.indexOf('app.post("/api/chat"')));
+    const consumerRegion = server.slice(server.indexOf('app.post("/api/chat"'));
     expect(consumerRegion).not.toMatch(/selfMemory.*RegExp|SELF_MEMORY_RE|selfMemory.*\.test\(userMessage/i);
   });
 });
