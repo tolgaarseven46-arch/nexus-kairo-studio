@@ -9,6 +9,7 @@ const chat = fs.readFileSync(path.resolve(process.cwd(), "src/services/droitChat
 const nexus = fs.readFileSync(path.resolve(process.cwd(), "src/types/nexus.ts"), "utf8");
 const layout = fs.readFileSync(path.resolve(process.cwd(), "src/components/studio/NexusStudioLayout.tsx"), "utf8");
 const mindMap = fs.readFileSync(path.resolve(process.cwd(), "src/components/studio/tabs/MindMapTab.tsx"), "utf8");
+const unifiedPass = fs.readFileSync(path.resolve(process.cwd(), "src/services/kairaResponseConstraintPass.ts"), "utf8");
 
 describe("canonical KairaResponsePlan runtime integration", () => {
   it("builds one response plan from contract, dialogue and HOW-only speech", () => {
@@ -22,15 +23,18 @@ describe("canonical KairaResponsePlan runtime integration", () => {
     expect(server).toContain("${responsePlanInstruction}\\nKDM:");
   });
 
-  it("validates initial, repair, fallback, local and final post-enforcement outputs", () => {
-    expect(server.match(/findKairaResponsePlanIssues\(/g)?.length).toBeGreaterThanOrEqual(5);
+  it("validates legacy repair/fallback and canonical final-delivery outputs", () => {
     expect(server).toContain("findKairaResponsePlanIssues(repairedReply, responsePlan)");
     expect(server).toContain("findKairaResponsePlanIssues(fallback, responsePlan)");
-    expect(server).toContain("localPlanIssues = findKairaResponsePlanIssues(reply, responsePlan)");
-    expect(server).toContain("postEnforcementPlanIssues = findKairaResponsePlanIssues(reply, responsePlan)");
+    expect(server).toContain("localPlanIssues = canonicalConstraint?.issues ?? findKairaResponsePlanIssues(reply, responsePlan)");
+    expect(server).toContain("postEnforcementPlanIssues = canonicalConstraint?.issues ?? findKairaResponsePlanIssues(reply, responsePlan)");
     expect(server).toContain("findKairaResponsePlanIssues(candidateReply, responsePlan)");
     expect(server).toContain("response_plan_delivery_fallback");
-    expect(server).toContain("finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues])]");
+    expect(server).toContain("const finalIssues = canonicalConstraint");
+    expect(server).toContain("...canonicalExternalIssues, ...finalPlanIssues");
+    expect(server).toContain("...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues");
+    expect(unifiedPass).toContain("findKairaResponsePlanIssues(delivered, input.plan)");
+    expect(unifiedPass).toContain("const candidate = runOrderedPass(preferredFallback, input)");
   });
 
   it("persists response-plan observability in both local and AI paths", () => {

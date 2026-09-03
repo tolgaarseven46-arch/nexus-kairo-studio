@@ -4,11 +4,9 @@ import { defineConfig } from "vitest/config";
  * Explicit CANONICAL test run (ADR-0006 foundation repair).
  *
  * The default `vitest run` keeps every canonical flag OFF, so the whole legacy
- * suite is exercised on the legacy engine unchanged. THIS config turns the three
- * wired canonical flags ON and runs the curated set of tests that must pass on
- * the canonical path — the relationship reducer, the plan resolver, the
- * canonical prompt builder, the discourse-state foundation and the first real
- * 8-turn conversation regression.
+ * suite is exercised on the legacy engine unchanged. THIS config turns the wired
+ * canonical flags ON and runs the curated set of tests that must pass on the
+ * canonical path.
  *
  * Answer to "which engine are we testing?": `npm run test:canonical` = canonical.
  */
@@ -19,6 +17,7 @@ export default defineConfig({
       RELATIONSHIP_REDUCER_V2: "1",
       PLAN_RESOLVER_V2: "1",
       CANONICAL_PROMPT_BUILDER: "1",
+      UNIFIED_GUARD_PASS: "1",
     },
     include: [
       // canonical core
@@ -29,6 +28,9 @@ export default defineConfig({
       "src/services/kairaFlirtationBoundaryRegression.test.ts",
       "src/services/kairaCanonicalPromptBuilder.test.ts",
       "src/services/kairaCanonicalPromptAuthorityRegression.test.ts",
+      "src/services/kairaResponseConstraintPass.test.ts",
+      "src/services/kairaUnifiedGuardWiringContracts.test.ts",
+      "src/services/kairaUnifiedGuardFinalDeliveryRegression.test.ts",
       "src/services/semanticContextGrading.test.ts",
       "src/services/kdmRelationshipReducerBridge.test.ts",
       // foundation repair

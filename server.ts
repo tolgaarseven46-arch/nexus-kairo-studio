@@ -100,6 +100,7 @@ import {
 import { buildKairaRuntimeIdentityInstruction } from "./src/services/kairaRuntimeIdentity";
 import { resolveKairaAutobiographicalRecallRuntime } from "./src/services/kairaAutobiographicalRecallRuntime";
 import { enforceKairaAutobiographicalResponse } from "./src/services/kairaAutobiographicalResponseGuard";
+import { runKairaResponseConstraintPass } from "./src/services/kairaResponseConstraintPass";
 import { loadKairaKnowledgeProfileResult } from "./src/services/kairaKnowledgeProfileStore";
 import { evaluateKairaKnowledge, unavailableKairaKnowledgeDecision } from "./src/services/kairaEpistemicGate";
 import {
@@ -741,6 +742,7 @@ app.post("/api/chat", async (req, res) => {
       ),
       responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech),
       canonicalPromptOn = isCanonicalBehaviorFlagEnabled("CANONICAL_PROMPT_BUILDER"),
+      unifiedGuardOn = isCanonicalBehaviorFlagEnabled("UNIFIED_GUARD_PASS"),
       spontaneityDecision = decideKairaControlledSpontaneity({
         responsePlan,
         dynamicState: kdm.nextDynamicState,
@@ -814,30 +816,51 @@ app.post("/api/chat", async (req, res) => {
       );
     kdm.trace.whoSent.userName = userName;
     if (!selfMemoryInstruction && local.handled && local.reply) {
-      const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext),
-        epistemicGuard = enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess),
-        baseEnforced = enforceKairoResponse(epistemicGuard.reply, kdm.trace, enforcementRules),
-        contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract),
-        enforced = {
-          reply: contractEnforced.reply,
-          changed: worldMemoryGuard.changed || epistemicGuard.changed || baseEnforced.changed || contractEnforced.changed,
-          reasons: [
-            ...baseEnforced.reasons,
-            ...contractEnforced.reasons,
-            ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),
-            ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),
-          ],
-        },
-        reply = enforced.reply,
-        localPlanIssues = findKairaResponsePlanIssues(reply, responsePlan),
-        localEpistemicIssues = findKairaEpistemicResponseIssues(reply, epistemicAccess),
-        localBaseConsistency = validateKairoResponse(reply, kdm.trace),
-        consistency = {
-          ...localBaseConsistency,
-          accepted: localBaseConsistency.accepted && localPlanIssues.length === 0 && localEpistemicIssues.length === 0,
-          score: Math.max(0, localBaseConsistency.score - (localPlanIssues.length + localEpistemicIssues.length) * 15),
-          issues: [...localBaseConsistency.issues, ...localPlanIssues, ...localEpistemicIssues],
-        };
+      const canonicalConstraint = unifiedGuardOn
+        ? runKairaResponseConstraintPass({
+            reply: local.reply,
+            trace: kdm.trace,
+            plan: responsePlan,
+            worldItems: retrievedWorldEvents,
+            worldContext: worldReasoningContext,
+            selfMemoryRuntime,
+            epistemicContext: epistemicAccess,
+          })
+        : null,
+        worldMemoryGuard = canonicalConstraint?.worldGuard ?? enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext),
+        epistemicGuard = canonicalConstraint?.epistemicGuard ?? enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess),
+        baseEnforced = canonicalConstraint?.planEnforcement ?? enforceKairoResponse(epistemicGuard.reply, kdm.trace, enforcementRules),
+        contractEnforced = canonicalConstraint
+          ? { reply: canonicalConstraint.reply, changed: false, reasons: [] as string[] }
+          : enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract),
+        enforced = canonicalConstraint
+          ? {
+              reply: canonicalConstraint.reply,
+              changed: canonicalConstraint.changed,
+              reasons: canonicalConstraint.reasons,
+            }
+          : {
+              reply: contractEnforced.reply,
+              changed: worldMemoryGuard.changed || epistemicGuard.changed || baseEnforced.changed || contractEnforced.changed,
+              reasons: [
+                ...baseEnforced.reasons,
+                ...contractEnforced.reasons,
+                ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),
+                ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),
+              ],
+            },
+        reply = canonicalConstraint?.reply ?? enforced.reply,
+        localPlanIssues = canonicalConstraint?.issues ?? findKairaResponsePlanIssues(reply, responsePlan),
+        localEpistemicIssues = canonicalConstraint ? [] : findKairaEpistemicResponseIssues(reply, epistemicAccess),
+        localBaseConsistency = canonicalConstraint?.consistency ?? validateKairoResponse(reply, kdm.trace),
+        consistency = canonicalConstraint
+          ? canonicalConstraint.consistency
+          : {
+              ...localBaseConsistency,
+              accepted: localBaseConsistency.accepted && localPlanIssues.length === 0 && localEpistemicIssues.length === 0,
+              score: Math.max(0, localBaseConsistency.score - (localPlanIssues.length + localEpistemicIssues.length) * 15),
+              issues: [...localBaseConsistency.issues, ...localPlanIssues, ...localEpistemicIssues],
+            };
       // The local renderer must not escape the main delivery boundary. If the
       // rendered reply fails any plan / dialogue / grounding / rhythm check,
       // abandon the fast path and let the full LLM pipeline produce the turn.
@@ -1177,8 +1200,28 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         }
       }
     }
-    const worldMemoryGuard = enforceWorldModelRecallResponse(reply, retrievedWorldEvents, worldReasoningContext);
-    if (worldMemoryGuard.changed) {
+    const canonicalConstraint = unifiedGuardOn
+      ? runKairaResponseConstraintPass({
+          reply,
+          trace: kdm.trace,
+          plan: responsePlan,
+          worldItems: retrievedWorldEvents,
+          worldContext: worldReasoningContext,
+          selfMemoryRuntime,
+          epistemicContext: epistemicAccess,
+          fallbackFactory: () =>
+            buildGroundedDialogueFallback(
+              dialogueDecision,
+              cleanHistory,
+              userMessage,
+              userName,
+              dialogueAnalysis,
+              responsePlan.allowQuestion,
+            ),
+        })
+      : null;
+    const worldMemoryGuard = canonicalConstraint?.worldGuard ?? enforceWorldModelRecallResponse(reply, retrievedWorldEvents, worldReasoningContext);
+    if (!canonicalConstraint && worldMemoryGuard.changed) {
       reply = worldMemoryGuard.reply;
       groundingIssues = [
         ...findKairoGroundingIssues(reply, cleanHistory, userMessage),
@@ -1186,29 +1229,37 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         ...findDialogueDecisionIssues(reply, dialogueDecision, dialogueOutputStyle),
         ...findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move, speech.relationshipLevel),
         ...findKairaResponsePlanIssues(reply, responsePlan),
-      ...findKairoAffectiveResponseIssues(reply, kdm.trace),
-      ...findWorldModelResponseIssues(reply, retrievedWorldEvents, worldReasoningContext).map((issue) => issue.message),
+        ...findKairoAffectiveResponseIssues(reply, kdm.trace),
+        ...findWorldModelResponseIssues(reply, retrievedWorldEvents, worldReasoningContext).map((issue) => issue.message),
       ];
     }
-    const selfMemoryGuard = enforceKairaAutobiographicalResponse(reply, selfMemoryRuntime);
-    reply = selfMemoryGuard.reply;
-    const epistemicGuard = enforceKairaEpistemicResponse(reply, epistemicAccess);
-    reply = epistemicGuard.reply;
-    const baseEnforced = enforceKairoResponse(reply, kdm.trace, enforcementRules);
-    const contractEnforced = enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract);
-    const enforced = {
-      reply: contractEnforced.reply,
-      changed: worldMemoryGuard.changed || selfMemoryGuard.changed || epistemicGuard.changed || baseEnforced.changed || contractEnforced.changed,
-      reasons: [
-        ...baseEnforced.reasons,
-        ...contractEnforced.reasons,
-        ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),
-        ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),
-      ],
-    };
-    reply = enforced.reply;
-    let postEnforcementPlanIssues = findKairaResponsePlanIssues(reply, responsePlan);
-    if (postEnforcementPlanIssues.length) {
+    const selfMemoryGuard = canonicalConstraint?.autobiographicalGuard ?? enforceKairaAutobiographicalResponse(reply, selfMemoryRuntime);
+    reply = canonicalConstraint?.reply ?? selfMemoryGuard.reply;
+    const epistemicGuard = canonicalConstraint?.epistemicGuard ?? enforceKairaEpistemicResponse(reply, epistemicAccess);
+    reply = canonicalConstraint?.reply ?? epistemicGuard.reply;
+    const baseEnforced = canonicalConstraint?.planEnforcement ?? enforceKairoResponse(reply, kdm.trace, enforcementRules);
+    const contractEnforced = canonicalConstraint
+      ? { reply: canonicalConstraint.reply, changed: false, reasons: [] as string[] }
+      : enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract);
+    const enforced = canonicalConstraint
+      ? {
+          reply: canonicalConstraint.reply,
+          changed: canonicalConstraint.changed,
+          reasons: canonicalConstraint.reasons,
+        }
+      : {
+          reply: contractEnforced.reply,
+          changed: worldMemoryGuard.changed || selfMemoryGuard.changed || epistemicGuard.changed || baseEnforced.changed || contractEnforced.changed,
+          reasons: [
+            ...baseEnforced.reasons,
+            ...contractEnforced.reasons,
+            ...(worldMemoryGuard.reason ? [worldMemoryGuard.reason] : []),
+            ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),
+          ],
+        };
+    reply = canonicalConstraint?.reply ?? enforced.reply;
+    let postEnforcementPlanIssues = canonicalConstraint?.issues ?? findKairaResponsePlanIssues(reply, responsePlan);
+    if (!canonicalConstraint && postEnforcementPlanIssues.length) {
       const planSafeFallback = buildGroundedDialogueFallback(
         dialogueDecision, cleanHistory, userMessage, userName, dialogueAnalysis, responsePlan.allowQuestion,
       );
@@ -1244,17 +1295,35 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
       }
     }
     const aiMs = Math.round(now() - aiStart);
-    const baseConsistency = validateKairoResponse(reply, kdm.trace);
+    const canonicalExternalIssues = canonicalConstraint
+      ? [
+          ...findKairoGroundingIssues(reply, cleanHistory, userMessage),
+          ...findDialogueAttributionIssues(reply, cleanHistory, userMessage, userName, dialogueAnalysis),
+          ...findDialogueDecisionIssues(reply, dialogueDecision, dialogueOutputStyle),
+          ...findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move, speech.relationshipLevel),
+        ]
+      : [];
+    const baseConsistency = canonicalConstraint?.consistency ?? validateKairoResponse(reply, kdm.trace);
     const finalPlanIssues = postEnforcementPlanIssues;
-    const finalEpistemicIssues = findKairaEpistemicResponseIssues(reply, epistemicAccess);
-    const finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues])];
-    const consistency = {
-      ...baseConsistency,
-      accepted: baseConsistency.accepted && finalIssues.length === 0,
-      score: Math.max(0, baseConsistency.score - finalIssues.length * 15),
-      issues: [...baseConsistency.issues, ...finalIssues],
-      warnings: enforced.reasons,
-    };
+    const finalEpistemicIssues = canonicalConstraint ? [] : findKairaEpistemicResponseIssues(reply, epistemicAccess);
+    const finalIssues = canonicalConstraint
+      ? [...new Set([...canonicalExternalIssues, ...finalPlanIssues])]
+      : [...new Set([...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues])];
+    const consistency = canonicalConstraint
+      ? {
+          ...canonicalConstraint.consistency,
+          accepted: canonicalConstraint.consistency.accepted && finalIssues.length === 0,
+          score: Math.max(0, canonicalConstraint.consistency.score - finalIssues.length * 15),
+          issues: [...new Set([...canonicalConstraint.consistency.issues, ...finalIssues])],
+          warnings: enforced.reasons,
+        }
+      : {
+          ...baseConsistency,
+          accepted: baseConsistency.accepted && finalIssues.length === 0,
+          score: Math.max(0, baseConsistency.score - finalIssues.length * 15),
+          issues: [...baseConsistency.issues, ...finalIssues],
+          warnings: enforced.reasons,
+        };
     if (kairaPolicy.persistentUserMemory && consistency.accepted && !providerFailureFallbackUsed) {
       learnLanguageReply(stateUserId, reply);
     }
