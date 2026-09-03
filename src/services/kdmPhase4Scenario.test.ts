@@ -19,6 +19,8 @@ function backdateDisengagement(state: DroitDynamicState, minutes = 31): DroitDyn
   };
 }
 
+const hardBoundaryMessage = "seninle ciddi ciddi kavga edeceğiz kaşar herif";
+
 describe("KDM Phase 4 end-to-end relationship scenarios", () => {
   it("keeps normal conversation active and open", () => {
     const result = turn("selam kaira naber");
@@ -57,8 +59,8 @@ describe("KDM Phase 4 end-to-end relationship scenarios", () => {
     expect(contract.reopeningCloseness).toBe("forbidden");
   });
 
-  it("turns a red-line insult into a persistent disengaged hard stop", () => {
-    const hit = turn("orospu");
+  it("turns a strong combined boundary violation into a persistent disengaged hard stop", () => {
+    const hit = turn(hardBoundaryMessage);
     const neutral = turn("neyse bugün hava güzel", hit.nextDynamicState);
     const contract = buildBehaviorContract(neutral.nextDynamicState, neutral.trace);
 
@@ -71,7 +73,7 @@ describe("KDM Phase 4 end-to-end relationship scenarios", () => {
   });
 
   it("requires time and repeated repair before reactivation", () => {
-    const hardStop = turn("orospu");
+    const hardStop = turn(hardBoundaryMessage);
     const state = backdateDisengagement(hardStop.nextDynamicState, 31);
 
     const repair1 = turn("özür dilerim", state);
