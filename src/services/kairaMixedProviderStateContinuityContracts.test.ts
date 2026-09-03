@@ -4,17 +4,18 @@ import { describe, expect, it } from 'vitest';
 const server = readFileSync('server.ts', 'utf8');
 const count = (needle: string) => server.split(needle).length - 1;
 const localBranchMarker = 'if (!selfMemoryInstruction && local.handled && local.reply)';
+const kdmMarker = 'kdm = analyzeKdmInteractionCanonicalTurn(';
 
 describe('mixed local / AI provider state continuity contracts', () => {
   it('computes canonical KDM state once before the local-vs-AI response branch', () => {
-    const kdm = server.indexOf('kdm = analyzeKdmInteraction(');
+    const kdm = server.indexOf(kdmMarker);
     const local = server.indexOf('local = tryLocalKairoReply(');
     const branch = server.indexOf(localBranchMarker);
 
     expect(kdm).toBeGreaterThan(-1);
     expect(local).toBeGreaterThan(kdm);
     expect(branch).toBeGreaterThan(local);
-    expect(count('kdm = analyzeKdmInteraction(')).toBe(1);
+    expect(count(kdmMarker)).toBe(1);
   });
 
   it('persists the same canonical nextDynamicState on both local and AI branches', () => {
@@ -61,7 +62,7 @@ describe('mixed local / AI provider state continuity contracts', () => {
   });
 
   it('keeps provider identity as observability metadata rather than a state-transition input', () => {
-    const kdmCallStart = server.indexOf('kdm = analyzeKdmInteraction(');
+    const kdmCallStart = server.indexOf(kdmMarker);
     const kdmCallEnd = server.indexOf('),\n      behaviorContract =', kdmCallStart);
     const kdmCall = server.slice(kdmCallStart, kdmCallEnd);
 
