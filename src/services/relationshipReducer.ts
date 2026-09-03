@@ -204,12 +204,10 @@ export function evaluateRedline(
   const w = rl.weights;
   const floor = rl.signalFloor;
 
-  // Severity gate: no present harm -> no hard-stop, history irrelevant.
   if (presentSeverity < rl.minPresentSeverity) {
     return { disengage: false, score: 0, contributors: 0, presentSeverity, reason: null };
   }
 
-  // Harm base: only real-harm dimensions (+ target). Context is NOT here.
   const harmContributors: Array<[string, number]> = [
     ["disrespect", w.disrespect * s.disrespect],
     ["coercion", w.coercion * s.coercion],
@@ -217,16 +215,11 @@ export function evaluateRedline(
     ["manipulation", w.manipulation * s.manipulation],
     ["privacy", w.privacy * s.privacy],
   ];
-  const contributors =
-    harmContributors.filter(([, v]) => v >= floor).length + (signal.targetsKaira ? 1 : 0);
-  const base =
-    harmContributors.reduce((acc, [, v]) => acc + v, 0) + (signal.targetsKaira ? w.targetsKaira : 0);
+  const contributors = harmContributors.filter(([, v]) => v >= floor).length + (signal.targetsKaira ? 1 : 0);
+  const base = harmContributors.reduce((acc, [, v]) => acc + v, 0) + (signal.targetsKaira ? w.targetsKaira : 0);
 
-  // Context AMPLIFIES present harm; it can raise the score but only because harm
-  // is already present (base > 0). It cannot manufacture a hard-stop.
   const repetitionFactor = clamp01(num(prev.scores.repeatedNegativeCount, 0) / 2);
-  const amp =
-    1 + w.repetition * repetitionFactor + (prev.boundarySetByKaira ? w.priorBoundarySet : 0);
+  const amp = 1 + w.repetition * repetitionFactor + (prev.boundarySetByKaira ? w.priorBoundarySet : 0);
 
   let score = base * amp;
   score *= 1 - rl.jokingDampen * signal.jokingConfidence * (1 - signal.sincerityConfidence);
@@ -237,20 +230,9 @@ export function evaluateRedline(
     contributors >= rl.minCombinedSignals &&
     score >= rl.hardStopThreshold;
 
-  return {
-    disengage,
-    score,
-    contributors,
-    presentSeverity,
-    reason: disengage ? "combined_boundary_violation" : null,
-  };
+  return { disengage, score, contributors, presentSeverity, reason: disengage ? "combined_boundary_violation" : null };
 }
 
-/**
- * Recovery strength for this turn: elapsed-time component + interaction-based
- * component (apology / calm turn / positive turn / non-repetition), blended and
- * capped so neither alone is a full reset.
- */
 export function computeRecovery(
   signal: RelationshipTurnSignal,
   timing: RelationshipReducerTiming,
@@ -258,36 +240,21 @@ export function computeRecovery(
 ): { time: number; interaction: number; strength: number; rationale: string[] } {
   const r = config.recovery;
   const time = clamp01(1 - Math.exp(-Math.max(0, timing.elapsedMinutesSincePrev) * r.timeDecayPerMin));
-
   const calmTurn = signal.valence !== "negative" && severityLoad(signal.severity) < 0.15;
   const positiveTurn = signal.valence === "positive" || signal.support > 0.3 || signal.compliment > 0.3;
   const nonRepetition = !signal.negativePattern;
 
   let interaction = 0;
   const rationale: string[] = [];
-  if (signal.apology) {
-    interaction += r.apologyStrength;
-    rationale.push("apology");
-  }
-  if (calmTurn) {
-    interaction += r.calmTurnStrength;
-    rationale.push("calm-turn");
-  }
-  if (positiveTurn) {
-    interaction += r.positiveTurnStrength;
-    rationale.push("positive-turn");
-  }
-  if (nonRepetition) {
-    interaction += r.nonRepetitionStrength;
-    rationale.push("no-repeat");
-  }
+  if (signal.apology) { interaction += r.apologyStrength; rationale.push("apology"); }
+  if (calmTurn) { interaction += r.calmTurnStrength; rationale.push("calm-turn"); }
+  if (positiveTurn) { interaction += r.positiveTurnStrength; rationale.push("positive-turn"); }
+  if (nonRepetition) { interaction += r.nonRepetitionStrength; rationale.push("no-repeat"); }
   interaction = clamp01(interaction);
 
   let strength = clamp01(r.timeWeight * time + r.interactionWeight * interaction);
-  // neither time alone nor interaction alone fully resets
   strength = Math.min(strength, r.maxSingleTurnRecovery);
   if (time > 0) rationale.push(`elapsed:${round1(timing.elapsedMinutesSincePrev)}m`);
-
   return { time, interaction, strength, rationale };
 }
 
@@ -298,9 +265,6 @@ function towardBaseline(value: number, baseline: number, step: number): number {
   return value > baseline ? -Math.min(step, value - baseline) : Math.min(step, baseline - value);
 }
 
-/**
- * The reducer. Pure: same input → same output. No Date.now(), no env, no I/O.
- */
 export function reduceRelationshipTurn(input: RelationshipReducerInput): RelationshipReducerResult {
   const config = input.config ?? DEFAULT_RELATIONSHIP_REDUCER_CONFIG;
   const { prev, signal, timing } = input;
@@ -308,7 +272,6 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
 
   const interactionCountBefore = Math.max(0, num(prev.interactionCount, num(prev.scores.positiveEvents, 0) + num(prev.scores.negativeEvents, 0)));
   const interactionCount = interactionCountBefore + 1;
-
   const familiarity = computeFamiliarity(prev.firstSeenAt, timing.nowIso, interactionCount, config);
 
   const warmthBefore = clamp100(num(prev.scores.warmth, 50));
@@ -320,7 +283,6 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   const negativeEvents = Math.max(0, num(prev.scores.negativeEvents, 0));
   const priorRepeated = Math.max(0, num(prev.scores.repeatedNegativeCount, 0));
 
-  // ---- kind ---------------------------------------------------------------
   const sevLoad = severityLoad(signal.severity);
   const negativeEvidence =
     signal.severity.disrespect >= 0.15 ||
@@ -336,7 +298,6 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   const samePattern = Boolean(signal.negativePattern && signal.negativePattern === prev.lastNegativePattern);
   const repeatedNegativeCount = kind === "negative" ? (samePattern ? priorRepeated + 1 : 1) : priorRepeated;
 
-  // ---- hard-stop decision (K1: hard vs soft) ----------------------------
   const redline = evaluateRedline(
     { ...signal, negativePattern: signal.negativePattern ?? prev.lastNegativePattern },
     { ...prev, scores: { ...prev.scores, repeatedNegativeCount } },
@@ -344,27 +305,19 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   );
   rationale.push(`redline:${redline.score.toFixed(2)}/${redline.contributors}${redline.disengage ? "*" : ""}`);
 
-  // ---- recovery (time + interaction) -----------------------------------
-  const recovery = computeRecovery(
-    { ...signal, negativePattern: signal.negativePattern ?? null },
-    timing,
-    config,
-  );
+  const recovery = computeRecovery({ ...signal, negativePattern: signal.negativePattern ?? null }, timing, config);
   rationale.push(`recovery:${recovery.strength.toFixed(2)} [${recovery.rationale.join("+")}]`);
 
-  // ---- maturity damping (NO conflict/hurt term) -----------------------
   const relationshipQuality01 = clamp01(
     (warmthBefore * 0.35 + trustBefore * 0.4 + (100 - conflictBefore) * 0.15 + (100 - hurtBefore) * 0.1) / 100,
   );
   const maturity = clamp01(
     config.maturityDamping.familiarityWeight * familiarity +
-      config.maturityDamping.interactionWeight *
-        Math.min(1, interactionCount / Math.max(1, config.maturityDamping.interactionsForMature)),
+      config.maturityDamping.interactionWeight * Math.min(1, interactionCount / Math.max(1, config.maturityDamping.interactionsForMature)),
   );
   const damping = 1 - config.maturityDamping.maxDamping * maturity * relationshipQuality01;
   rationale.push(`damping:${damping.toFixed(2)}`);
 
-  // ---- injury (derived asymmetry) ------------------------------------
   const inj = config.injury;
   const repAmp = Math.min(inj.repetitionCap, 1 + Math.max(0, repeatedNegativeCount - 1) * inj.repetitionAmplify);
   const severityScale = inj.severityFloor + inj.severityWeight * (kind === "negative" ? Math.max(sevLoad, signal.severity.disrespect) : 0);
@@ -379,9 +332,6 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   let lastConflictAt = prev.lastConflictAt;
   let lastNegativePattern = prev.lastNegativePattern;
 
-  // Points of conflict/hurt that recover this turn. `*DecayScale` is now an
-  // effective knob: it caps the ABSOLUTE points recoverable per turn, so a big
-  // backlog cannot vanish in one calm turn (paired with maxSingleTurnRecovery).
   const recoveredConflictDrop = recovery.strength * Math.min(conflictBefore, config.recovery.conflictDecayScale);
   const recoveredHurtDrop = recovery.strength * Math.min(hurtBefore, config.recovery.hurtDecayScale);
 
@@ -389,24 +339,20 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     conflict = clamp100(conflict + inj.baseConflict * injuryScale);
     hurt = clamp100(hurt + inj.baseHurt * injuryScale);
     repairProgress = clamp100(repairProgress - inj.baseRepairLoss * injuryScale);
-    warmth = clamp100(
-      warmth + (signal.severity.disrespect >= 0.7 ? inj.warmthDeltaInsult : inj.warmthDeltaBase) * damping * repAmp,
-    );
+    warmth = clamp100(warmth + (signal.severity.disrespect >= 0.7 ? inj.warmthDeltaInsult : inj.warmthDeltaBase) * damping * repAmp);
     trust = clamp100(trust - 4 * injuryScale);
     lastConflictAt = timing.nowIso;
     lastNegativePattern = signal.negativePattern ?? lastNegativePattern;
   } else {
-    // recovery applies on non-injury turns
     conflict = clamp100(conflict - recoveredConflictDrop);
     hurt = clamp100(hurt - recoveredHurtDrop);
 
-    // repairProgress is progress toward repairing ACTUAL damage. With no injury
-    // to repair it must not accumulate; it decays toward 0 so a long friendly
-    // chat never arrives at a fake "mid-repair" state (PR1-review fix).
-    // A persisted hard disengage reason is itself repairable relational damage:
-    // good-history damping can keep numeric conflict/hurt below the score floor,
-    // but that must never make the FSM permanently impossible to repair.
-    const hardBoundaryToRepair = prev.conversationState === "disengaged" && Boolean(prev.disengageReason);
+    // Hard-boundary repair context survives both disengaged and repairing states.
+    // Otherwise strong prior-history damping can leave numeric scores below the
+    // repair floor and make either FSM transition permanently unreachable.
+    const hardBoundaryToRepair =
+      (prev.conversationState === "disengaged" || prev.conversationState === "repairing") &&
+      Boolean(prev.disengageReason);
     const injuryToRepair = hardBoundaryToRepair || Math.max(conflictBefore, hurtBefore) >= config.recovery.repairInjuryFloor;
     const explicitRepairAct = Boolean(signal.apology || signal.repairAttempt);
     if (!injuryToRepair) {
@@ -416,9 +362,6 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
       repairProgress = clamp100(repairProgress + config.recovery.repairGainApology * (0.6 + signal.sincerityConfidence * 0.4));
       trust = clamp100(trust + 1.5);
     } else if (prev.conversationState === "disengaged") {
-      // While disengaged, only an explicit repair act (apology / repair attempt)
-      // advances repairProgress. A calm plea, neutral chat or flirting is NOT
-      // repair — it must not chip away at a boundary the user has not addressed.
       repairProgress = clamp100(repairProgress);
     } else if (kind === "positive") {
       repairProgress = clamp100(repairProgress + config.recovery.repairGainPositive);
@@ -427,12 +370,9 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
       repairProgress = clamp100(repairProgress + config.recovery.repairGainCalm);
     }
 
-    // warmth: positive bump, or gentle homeostatic drift back toward baseline
     if (kind === "positive" || signal.support > 0.3 || signal.compliment > 0.3) {
       warmth = clamp100(
-        warmth +
-          inj.warmthDeltaPositive +
-          (signal.support > 0.3 || signal.compliment > 0.3 ? inj.warmthDeltaSupport : 0),
+        warmth + inj.warmthDeltaPositive + (signal.support > 0.3 || signal.compliment > 0.3 ? inj.warmthDeltaSupport : 0),
       );
     } else {
       const wh = config.warmthHomeostasis;
@@ -444,7 +384,6 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   const negativeEventsAfter = negativeEvents + (kind === "negative" ? 1 : 0);
   const injury = Math.max(conflict, hurt);
 
-  // ---- conversationState FSM (small, pure) ---------------------------
   const cs = config.conversationState;
   let conversationState: ConversationRelationshipState = prev.conversationState;
   let disengagedAt = prev.disengagedAt;
@@ -459,9 +398,10 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     repairAttempts = 0;
     repairProgress = 0;
   } else if (prev.conversationState === "disengaged") {
-    // interaction-based repair CAN move out within a session (no wall-clock gate)
     if (repairSignal) repairAttempts += 1;
-    const enough = (repairSignal && repairAttempts >= 1 && repairProgress >= cs.repairingRepairProgress) || repairProgress >= cs.repairingRepairProgress + 10;
+    const enough =
+      (repairSignal && repairAttempts >= 1 && repairProgress >= cs.repairingRepairProgress) ||
+      repairProgress >= cs.repairingRepairProgress + 10;
     conversationState = enough ? "repairing" : "disengaged";
   } else if (prev.conversationState === "repairing") {
     if (kind === "negative") {
@@ -487,7 +427,6 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     repairAttempts = 0;
   }
 
-  // ---- reactionMode -------------------------------------------------
   let reactionMode: AffectiveReactionMode = "neutral";
   if (redline.disengage || conversationState === "disengaged") {
     reactionMode = "withdrawn";
@@ -508,7 +447,6 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     reactionMode = "hurt";
   }
 
-  // ---- affect delta: CAPS scaled by this-turn signal, NOT floors -----
   const af = config.affect;
   const step = af.towardBaselineStep;
   const affectDelta: RelationshipAffect = {
@@ -519,12 +457,11 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   };
   const turnMagnitude = kind === "negative" ? Math.max(sevLoad, signal.severity.disrespect) : 0;
   if ((reactionMode === "withdrawn" || reactionMode === "hurt" || reactionMode === "irritated") && turnMagnitude > 0) {
-    const cap =
-      reactionMode === "withdrawn"
-        ? af.withdrawnMaxStressPerTurn
-        : reactionMode === "hurt"
-          ? af.hurtMaxStressPerTurn
-          : af.irritatedMaxStressPerTurn;
+    const cap = reactionMode === "withdrawn"
+      ? af.withdrawnMaxStressPerTurn
+      : reactionMode === "hurt"
+        ? af.hurtMaxStressPerTurn
+        : af.irritatedMaxStressPerTurn;
     const scaled = cap * turnMagnitude;
     affectDelta.stress = Math.round(scaled);
     affectDelta.happiness = -Math.round(scaled * 0.75);
@@ -536,7 +473,6 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     affectDelta.calmness = 1;
   }
 
-  // ---- projection axes (K2: orthogonal; state is one input) --------
   const ax = config.axes;
   const uncertaintyReliefG = ax.guardedness.uncertaintyRelief * signal.uncertainty * (redline.disengage ? 0 : 1);
   let guardedness = clamp01(
@@ -554,17 +490,11 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
       (hurt / 100) * ax.warmth.hurtPenalty,
   );
 
-  // openness: hard-stop crushes it; a SOFT disengaged/distancing only dents it,
-  // and interpretation uncertainty softens the dent further.
   const uncertaintyReliefO = ax.openness.uncertaintyRelief * signal.uncertainty * (redline.disengage ? 0 : 1);
   let openness = 1 - guardedness * 0.6;
-  if (redline.disengage) {
-    openness -= ax.openness.hardDisengagePenalty;
-  } else if (conversationState === "disengaged") {
-    openness -= ax.openness.softDisengagePenalty * (1 - uncertaintyReliefO);
-  } else if (conversationState === "distancing") {
-    openness -= ax.openness.distancingPenalty * (1 - uncertaintyReliefO);
-  }
+  if (redline.disengage) openness -= ax.openness.hardDisengagePenalty;
+  else if (conversationState === "disengaged") openness -= ax.openness.softDisengagePenalty * (1 - uncertaintyReliefO);
+  else if (conversationState === "distancing") openness -= ax.openness.distancingPenalty * (1 - uncertaintyReliefO);
   openness = clamp01(openness);
 
   const scores: RelationshipScores = {
