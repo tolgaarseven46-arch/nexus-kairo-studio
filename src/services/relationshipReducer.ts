@@ -296,7 +296,11 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     signal.severity.manipulation >= 0.15 ||
     signal.severity.privacy >= 0.15 ||
     signal.severity.aggression >= 0.2;
-  const rawNegative = signal.valence === "negative" && negativeEvidence;
+  // Canonical severity is the harm authority. A directly Kaira-targeted turn
+  // with real present harm stays negative even if the coarse valence projection
+  // is neutral; ambiguous/third-party harm still does not mutate the dyad.
+  const targetedHarm = signal.targetsKaira && presentSeverityOf(signal.severity) >= 0.15;
+  const rawNegative = negativeEvidence && (signal.valence === "negative" || targetedHarm);
   const targetsKaira = rawNegative && signal.targetsKaira;
   const kind: "positive" | "negative" | "neutral" =
     rawNegative && !targetsKaira ? "neutral" : rawNegative ? "negative" : signal.valence === "positive" ? "positive" : "neutral";
