@@ -59,7 +59,17 @@ describe('language-memory policy read boundary', () => {
     const server = await readFile('server.ts', 'utf8');
     expect(server).toContain('languageStyleMemorySignal(stateUserId, kairaPolicy.persistentUserMemory)');
     expect(server).toContain('languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)');
-    expect(server).toContain('languageUnderstanding.event,\n        kairaPolicy.persistentUserMemory,\n      )');
+
+    const localCallStart = server.indexOf('tryLocalKairoReply(');
+    const localCallEnd = server.indexOf('),\n      kdmMs', localCallStart);
+    const localCall = server.slice(localCallStart, localCallEnd);
+
+    expect(localCallStart).toBeGreaterThanOrEqual(0);
+    expect(localCall).toContain('languageUnderstanding.event');
+    expect(localCall).toContain('kairaPolicy.persistentUserMemory');
+    expect(localCall.indexOf('kairaPolicy.persistentUserMemory')).toBeGreaterThan(
+      localCall.indexOf('languageUnderstanding.event'),
+    );
   });
 
   it('keeps the local verbalizer gate explicit and defaults it on for direct callers', async () => {
