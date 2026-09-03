@@ -34,31 +34,7 @@ jobs:
         run: node scripts/run-beta-conversation-acceptance.mjs
 
       - name: Tests
-        id: full_tests
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          npm test -- --run 2>&1 | tee /tmp/full-tests.log
-
-      - name: Upload one-shot source and full test log
-        if: steps.full_tests.outcome == 'failure'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: full-tests-debug
-          path: |
-            /tmp/full-tests.log
-            src/services
-            src/config
-            src/types
-            config
-            server.ts
-            package.json
-            .github/workflows/ci.yml
-          retention-days: 1
-
-      - name: Fail on full test regression
-        if: steps.full_tests.outcome == 'failure'
-        run: exit 1
+        run: npm test -- --run
 
       - name: TypeScript check
         run: npm run lint
