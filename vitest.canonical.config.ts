@@ -30,6 +30,7 @@ export default defineConfig({
       "src/services/kairaCanonicalPromptAuthorityRegression.test.ts",
       "src/services/kairaResponseConstraintPass.test.ts",
       "src/services/kairaUnifiedGuardWiringContracts.test.ts",
+      "src/services/kairaUnifiedGuardFinalDeliveryRegression.test.ts",
       "src/services/semanticContextGrading.test.ts",
       "src/services/kdmRelationshipReducerBridge.test.ts",
       // foundation repair
