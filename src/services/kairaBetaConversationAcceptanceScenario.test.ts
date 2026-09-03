@@ -41,8 +41,9 @@ describe('beta conversation acceptance scenario', () => {
       allowSpeculation: false,
     });
 
-    // SemanticInterpretation@2 requires explicit target evidence for this injury.
-    const hurt = analyzeKdmInteraction('sen salaksın', NEUTRAL_DROIT_PERSONALITY, closeRelationship);
+    // Hard-boundary acceptance requires multiple independent present-harm dimensions;
+    // a single targeted insult is intentionally only a relationship injury.
+    const hurt = analyzeKdmInteraction('sen salaksın, dediğimi yap, zorundasın', NEUTRAL_DROIT_PERSONALITY, closeRelationship);
     expect(hurt.nextDynamicState.reactionMode).toBe('withdrawn');
     expect(hurt.nextDynamicState.relationship?.conversationState).toBe('disengaged');
     const hurtSpeech = computeKairoSpeechIdentity(
