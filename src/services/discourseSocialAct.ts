@@ -14,8 +14,17 @@ import type { DiscourseSocialAct } from "../types/discourseState";
 const ALREADY_ANSWERED_RE =
   /\b(dedim\s*ya|söyledim\s*ya|zaten\s+(?:dedim|söyledim|s[öo]yl[üu]yorum)|dedim\s+sana|geçen\s+de\s+dedim)\b/iu;
 
+// Contextual friction is intentionally phrased as composable discourse cues,
+// not a list of whole magic sentences. These cues only say "this likely refers
+// back to an earlier answer"; they do not decide sentiment or relationship.
+const PRIOR_ANSWER_FRICTION_RE =
+  /\b(?:az\s+önce|daha\s+demin|demin|zaten|kaç\s+kere)\b.{0,48}\b(?:dedim|söyledim|s[öo]yledim|cevap\s+verdim|söyleyeyim|s[öo]yleyeyim)\b|\b(?:dedim|söyledim|s[öo]yledim|cevap\s+verdim)\b.{0,32}\b(?:az\s+önce|daha\s+demin|demin|zaten|sana)\b|\bkaç\s+kere\b/iu;
+
 const SHORT_STATE_ANSWER_RE =
   /^(?:iyi(?:yim)?|eh(?:\s*işte)?|idare(?:\s*eder)?|fena\s*değil|k[öo]t[üu](?:y[üu]m)?|takıl[ıi]yorum|bo[şs]tay[ıi]m|normal|ayn[ıi])(?:\s+(?:valla|ya|işte|kanka|be))?[.!?…]*$/iu;
+
+const STATE_ANSWER_PREFIX_RE =
+  /^(?:iyi(?:yim|dir)?|k[öo]t[üu](?:y[üu]m)?|fena\s+değil|eh\b|idare\b|normal\b|ayn[ıi]\b|moral(?:im)?\b|mod(?:um)?\b)/iu;
 
 /** Classify a user message from the shared semantic event. */
 export function classifyUserSocialAct(
@@ -82,6 +91,16 @@ export function classifyUserSocialAct(
 /** True when the user message signals "I already answered that". */
 export function userSignalsAlreadyAnswered(message: string): boolean {
   return ALREADY_ANSWERED_RE.test(message);
+}
+
+/** Broader compositional cue for an answer that explicitly refers back in frustration. */
+export function userSignalsAnswerFriction(message: string): boolean {
+  return PRIOR_ANSWER_FRICTION_RE.test(message);
+}
+
+/** Context-only shape check: can this message begin as an answer to a state question? */
+export function userSignalsStateAnswer(message: string): boolean {
+  return STATE_ANSWER_PREFIX_RE.test(message.trim().toLocaleLowerCase("tr-TR"));
 }
 
 const KAIRA_GREETING_RE = /^\s*(?:selam+|merhaba+|hey+|he?yy?|s(?:a|.a\.))\b/iu;
