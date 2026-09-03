@@ -127,14 +127,16 @@ describe("Kaira activity permission chat runtime contracts", () => {
     expect(mocks.openDialogue).not.toHaveBeenCalled();
   });
 
-  it("keeps the permission acknowledgement and next prompt explicit in the user-facing reply", () => {
+  it("keeps permission acknowledgement and next prompt out of the planner-owned reply", () => {
+    const plannerReply = "Bugün biraz meraklı hissediyorum.";
+    const promptText = "Park için izin verir misin?";
     const reply = composeKairaActivityPermissionChatReply({
-      reply: "Bugün biraz meraklı hissediyorum.",
+      reply: plannerReply,
       resolution: { status: "applied", result: { status: "applied", decision: { intent: "deny" } } as any },
-      prompt: { requestId: "r2", activityId: "park", activityLabel: "park", text: "Park için izin verir misin?" },
+      prompt: { requestId: "r2", activityId: "park", activityLabel: "park", text: promptText },
     });
-    expect(reply).toContain("yapmayacağım");
-    expect(reply).toContain("Bugün biraz meraklı hissediyorum.");
-    expect(reply).toContain("Park için izin verir misin?");
+    expect(reply).toBe(plannerReply);
+    expect(reply).not.toContain("yapmayacağım");
+    expect(reply).not.toContain(promptText);
   });
 });
