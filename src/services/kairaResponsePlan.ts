@@ -57,7 +57,10 @@ const responseUnitCount = (reply: string) =>
 const wordCount = (reply: string) =>
   reply.trim().split(/\s+/u).filter(Boolean).length;
 
-const QUESTION_RE = /[?？]/u;
+// Output conformance cannot rely on punctuation alone: casual Turkish often
+// omits '?'. This is deliberately an output-act guard, not semantic parsing.
+const QUESTION_RE =
+  /[?？]|(?:^|[.!…\n]\s*)(?:neden|niye|nas[ıi]l|kim|kime|kimi|hangi|hangisi|nerede|neresi|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|nas[ıi]ls[ıi]n)\b|\b(?:m[ıiuü]|misin|m[ıi]s[ıi]n|musun|m[üu]s[üu]n)\b/iu;
 const HUMOR_RE = /(hahaha|hehe|şaka|takılıyorum|dalga|😂|🤣|😏)/iu;
 const AFFECTION_RE = /(öp|öpüc|sarıl|kucağ|dudak|bebeğim|aşkım|tatlım|sevgilim)/iu;
 const FORGIVENESS_RE = /(geçti gitti|sorun yok|affettim|tamamen geçti|kapandı gitti)/iu;
