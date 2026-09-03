@@ -25,7 +25,7 @@ describe("base personality vs per-turn response overlay ownership", () => {
     expect(server).toContain("responsePersonality = normalizeDroitPersonality(incomingResponsePersonality ?? basePersonality)");
     expect(server).not.toContain("personality as DroitPersonalityTraits");
     expect(server).not.toContain("incomingResponsePersonality || personality");
-    const kdmCall = between(server, "kdm = analyzeKdmInteraction(", "),\n      behaviorContract");
+    const kdmCall = between(server, "kdm = analyzeKdmInteractionCanonicalTurn(", "),\n      behaviorContract");
     expect(kdmCall).toContain("basePersonality");
     expect(kdmCall).not.toContain("responsePersonality");
   });
@@ -38,7 +38,7 @@ describe("base personality vs per-turn response overlay ownership", () => {
   });
 
   it("keeps explicit behavior policy as the only per-turn decision input entering KDM", () => {
-    const kdmCall = between(server, "kdm = analyzeKdmInteraction(", "),\n      behaviorContract");
+    const kdmCall = between(server, "kdm = analyzeKdmInteractionCanonicalTurn(", "),\n      behaviorContract");
     expect(kdmCall).toContain("behaviorPolicy");
   });
 });
