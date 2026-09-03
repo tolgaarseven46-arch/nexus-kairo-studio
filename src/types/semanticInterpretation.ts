@@ -1,18 +1,3 @@
-/**
- * Canonical compositional semantic interpretation (ADR-0006, schema v2).
- *
- * Replaces the single-label `SemanticEvent` as the language-understanding output.
- * Key properties:
- *  - multi-label: one message can be banter + insult + affection at once
- *  - normalized severity is a VECTOR, not a scalar
- *  - joking / sincerity are explicit confidences
- *  - uncertainty is a first-class field and is never discarded
- *  - evidence records where each reading came from (llm / regex / reconciled)
- *
- * This type is UNWIRED in PR1 (no runtime consumes it authoritatively yet).
- * A legacy projection keeps the old `SemanticEvent` consumers working.
- */
-
 export const SEMANTIC_INTERPRETATION_SCHEMA_VERSION = "semantic-interpretation@2" as const;
 
 export type SemanticPrimaryIntent =
@@ -52,15 +37,74 @@ export type SemanticSocialAct =
   | "privacy_violation";
 
 export type SemanticTarget = "kaira" | "third_party" | "self" | "event" | "unknown";
-
 export type SemanticValence = "positive" | "negative" | "neutral";
-
 export type InterpretationEvidenceSource = "llm" | "regex" | "reconciled";
 
+export type SemanticSocialRoutine =
+  | "none"
+  | "greeting"
+  | "how_are_you"
+  | "what_doing"
+  | "thanks"
+  | "agreement"
+  | "goodbye"
+  | "good_night"
+  | "emotional_opening";
+
+export type SemanticDiscourseAct =
+  | "none"
+  | "correction"
+  | "topic_shift"
+  | "recall_request"
+  | "confusion_or_challenge";
+
+export type SemanticRepairSignal =
+  | "none"
+  | "clarification_request"
+  | "relevance_challenge";
+
+export type SemanticRelationalAct =
+  | "none"
+  | "reassurance_seek"
+  | "repair_probe"
+  | "reconciliation_attempt"
+  | "challenge"
+  | "mockery"
+  | "closeness_bid";
+
+export interface SemanticKnowledgeQuery {
+  surface: string;
+  conceptId?: string;
+  confidence: number;
+}
+
+export interface SemanticSelfMemoryQuery {
+  surface: string;
+  scope: "self_fact" | "autobiographical_memory" | "any";
+  factKey?: string;
+  retrievalMode: "targeted" | "broad";
+  confidence: number;
+}
+
 /**
- * Each component is 0..1. They are orthogonal threat dimensions; downstream must
- * read the component it needs rather than a collapsed maximum.
+ * Canonical discourse-facing facets that are still utterance semantics.
+ * These are produced once at ingestion. DiscourseState may consume them, but it
+ * must never recreate them from raw text.
  */
+export interface SemanticDiscourseFacets {
+  socialRoutine: SemanticSocialRoutine;
+  discourseAct: SemanticDiscourseAct;
+  repairSignal: SemanticRepairSignal;
+  adviceRequested: boolean;
+  knowledgeQuery: SemanticKnowledgeQuery | null;
+  selfMemoryQuery: SemanticSelfMemoryQuery | null;
+  relationalAct: SemanticRelationalAct;
+  relationalIntensity: number;
+  stopQuestions: boolean;
+  stopTalking: boolean;
+}
+
+/** Each component is 0..1 and orthogonal. */
 export interface SeverityVector {
   disrespect: number;
   coercion: number;
@@ -70,23 +114,26 @@ export interface SeverityVector {
 }
 
 export interface InterpretationUncertainty {
-  /** Aggregate 0..1. 0 = fully confident, 1 = essentially a guess. */
   overall: number;
   intent: number;
   target: number;
   severity: number;
-  /** Optional human-readable alternative readings the resolver may want to hedge on. */
   ambiguousReadings?: string[];
 }
 
 export interface InterpretationEvidence {
   source: InterpretationEvidenceSource;
   provider?: string;
-  /** Matched cues / phrases / model rationale fragments. */
   cues: string[];
   confidence: number;
 }
 
+/**
+ * Canonical immutable per-turn semantic truth (ADR-0006).
+ *
+ * `SemanticEvent` is only a deterministic compatibility projection of this
+ * object. No downstream consumer may use raw text to enrich or reinterpret it.
+ */
 export interface SemanticInterpretation {
   schemaVersion: typeof SEMANTIC_INTERPRETATION_SCHEMA_VERSION;
   raw: string;
@@ -108,8 +155,10 @@ export interface SemanticInterpretation {
 
   apology: boolean;
   repairAttempt: boolean;
+  /** Dyadic full-conversation stop only; must equal discourseFacets.stopTalking. */
   stopRequest: boolean;
 
+  discourseFacets: SemanticDiscourseFacets;
   uncertainty: InterpretationUncertainty;
   evidence: InterpretationEvidence[];
 }
@@ -122,7 +171,6 @@ export const EMPTY_SEVERITY_VECTOR: Readonly<SeverityVector> = Object.freeze({
   aggression: 0,
 });
 
-/** L2-ish aggregate used by the reducer for graded (not gated) effects. */
 export function severityLoad(v: SeverityVector): number {
   const sq =
     v.disrespect * v.disrespect +

@@ -361,7 +361,7 @@ describe("KDM response consistency gate", () => {
 
     expect(result.trace.messageInterpretation.intent).toBe("hakaret_ve_saldiri");
     expect(result.trace.messageInterpretation.sentiment).toBe("negatif");
-    expect(result.nextDynamicState.relationship?.lastNegativePattern).toBe("hakaret");
+    expect(result.nextDynamicState.relationship?.lastNegativePattern).toBe("zorlama");
     expect(result.nextDynamicState.relationship?.warmth).toBeLessThan(50);
     expect(result.nextDynamicState.relationship?.trust).toBeLessThan(50);
   });

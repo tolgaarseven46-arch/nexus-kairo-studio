@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { createLlmSemanticUnderstandingProvider } from "./llmSemanticUnderstandingProvider";
 import { understandTurkishMessage } from "./languageUnderstandingService";
+import { SEMANTIC_INTERPRETATION_SCHEMA_VERSION } from "../types/semanticInterpretation";
 
 const serverSource = () => readFileSync("server.ts", "utf8");
 const unifiedPassSource = () => readFileSync("src/services/kairaResponseConstraintPass.ts", "utf8");
@@ -10,11 +11,41 @@ describe("Kaira epistemic runtime contracts", () => {
   it("lets the canonical semantic provider identify a knowledge query without answering it", async () => {
     const semanticProvider = createLlmSemanticUnderstandingProvider({
       generate: async () => JSON.stringify({
-        raw: "opera nedir", normalized: "opera nedir", intent: "information_request", socialRoutine: "none", discourseAct: "none", repairSignal: "none", adviceRequested: false,
-        knowledgeQuery: { surface: "opera", confidence: 0.96 }, valence: "neutral", target: "unknown", relationalAct: "none", relationalIntensity: 0, severity: 0, insult: false, redLine: false, disrespect: 0, coercion: 0, manipulation: 0, privacyViolation: 0, apology: false, repairAttempt: false, stopQuestions: false, stopTalking: false, frustration: 0, emotionalLoad: 0, affection: 0, support: 0, compliment: 0,
+        schemaVersion: SEMANTIC_INTERPRETATION_SCHEMA_VERSION,
+        raw: "opera nedir",
+        normalized: "opera nedir",
+        primaryIntent: "information_request",
+        secondarySocialActs: [],
+        target: "unknown",
+        valence: "neutral",
+        severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 },
+        jokingConfidence: 0,
+        sincerityConfidence: 0.9,
+        affection: 0,
+        support: 0,
+        compliment: 0,
+        emotionalLoad: 0,
+        apology: false,
+        repairAttempt: false,
+        stopRequest: false,
+        discourseFacets: {
+          socialRoutine: "none",
+          discourseAct: "none",
+          repairSignal: "none",
+          adviceRequested: false,
+          knowledgeQuery: { surface: "opera", confidence: 0.96 },
+          selfMemoryQuery: null,
+          relationalAct: "none",
+          relationalIntensity: 0,
+          stopQuestions: false,
+          stopTalking: false,
+        },
+        uncertainty: { overall: 0.08, intent: 0.05, target: 0.15, severity: 0.05 },
+        evidence: [{ source: "llm", cues: ["opera nedir"], confidence: 0.96 }],
       }),
     });
     const result = await understandTurkishMessage("opera nedir", { semanticProvider });
+    expect(result.interpretation.discourseFacets.knowledgeQuery).toEqual({ surface: "opera", confidence: 0.96 });
     expect(result.event.knowledgeQuery).toEqual({ surface: "opera", confidence: 0.96 });
   });
 

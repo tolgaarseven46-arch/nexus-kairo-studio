@@ -1,7 +1,11 @@
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
 
 export interface TestSessionLayerAudit {
+  /** Canonical immutable semantic truth for the turn. */
+  semanticInterpretation?: SemanticInterpretation;
+  /** Compatibility projection may still be recorded for debugging, never as authority. */
   semanticEvent?: unknown;
   semanticSource?: string;
   languageUnderstanding?: {

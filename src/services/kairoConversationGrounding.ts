@@ -1,3 +1,4 @@
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
 export interface ConversationTurn {
   sender?: string;
   text?: string;
@@ -5,6 +6,8 @@ export interface ConversationTurn {
   participantName?: string;
   replyToParticipantId?: string;
   replyToParticipantName?: string;
+  semanticInterpretation?: SemanticInterpretation;
+  semanticSource?: string;
 }
 
 export function sanitizeKairoChatHistory<T extends ConversationTurn>(

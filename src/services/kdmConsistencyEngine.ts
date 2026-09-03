@@ -3,12 +3,16 @@ import {
   DroitPersonalityTraits,
   ReasoningTrace,
 } from "../types/nexus";
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import {
   computeBehaviorProfile,
   BehaviorLayerProfile,
 } from "./droitBehaviorEngine";
 import { normalizeDroitPersonality } from "./droitPersonalityNormalizer";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
+import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";
+import { resolveMessageEntities } from "./entityResolutionEngine";
+import { groundSemanticEventForAppraisal } from "./languageUnderstandingService";
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 import { analyzeKdmInteractionCanonical } from "./kdmRelationshipReducerBridge";
 
@@ -66,19 +70,13 @@ export function applyIntegratedBehaviorPolicy(
   let humorLevel = humorAllowed ? profile.humorLevel : 0;
   let curiosity = profile.curiosity;
 
-  if (!humorAllowed) {
-    directives.push("Bu tur mizah kullanma; şaka, ironi ve alay ekleme.");
-  }
+  if (!humorAllowed) directives.push("Bu tur mizah kullanma; şaka, ironi ve alay ekleme.");
   if (!askQuestion) {
     curiosity = Math.min(curiosity, 0.2);
     directives.push("Cevabı soru ile bitirme; yeni soru sorma.");
   }
-  if (acknowledgeComplaint) {
-    directives.push("Varsa rahatsızlığı veya itirazı kısa biçimde kabul et; konuyu atlama.");
-  }
-  if (!repairAllowed) {
-    directives.push("Özür veya barışma sinyali gelse bile ilişkiyi anında normale döndürme.");
-  }
+  if (acknowledgeComplaint) directives.push("Varsa rahatsızlığı veya itirazı kısa biçimde kabul et; konuyu atlama.");
+  if (!repairAllowed) directives.push("Özür veya barışma sinyali gelse bile ilişkiyi anında normale döndürme.");
 
   if (!continueConversation || stance >= 90) {
     tone = "firm";
@@ -99,19 +97,11 @@ export function applyIntegratedBehaviorPolicy(
     tone = "warm";
   }
 
-  if (responseLength <= 30) {
-    directives.push("Cevabı kısa tut; tercihen tek kısa cümle, gerekirse iki cümle.");
-  } else if (responseLength >= 70) {
-    directives.push("Konu gerektiriyorsa biraz daha açıklayıcı ol; yine sosyal sohbet ritmini koru.");
-  }
-
+  if (responseLength <= 30) directives.push("Cevabı kısa tut; tercihen tek kısa cümle, gerekirse iki cümle.");
+  else if (responseLength >= 70) directives.push("Konu gerektiriyorsa biraz daha açıklayıcı ol; yine sosyal sohbet ritmini koru.");
   if (directness >= 70) directives.push("Dolandırmadan, doğrudan ve net konuş.");
-
-  if (priority >= 80) {
-    relationshipParts.push("Üst öncelik değer/sınır katmanında; eğlence, yakınlaşma ve tercih katmanları bunu bastıramaz.");
-  } else if (priority >= 60) {
-    relationshipParts.push("Üst öncelik mevcut ilişki durumunda; önce ilişki mesafesini koru.");
-  }
+  if (priority >= 80) relationshipParts.push("Üst öncelik değer/sınır katmanında; eğlence, yakınlaşma ve tercih katmanları bunu bastıramaz.");
+  else if (priority >= 60) relationshipParts.push("Üst öncelik mevcut ilişki durumunda; önce ilişki mesafesini koru.");
 
   return {
     ...profile,
@@ -152,15 +142,12 @@ export function semanticIntentToKdm(event: SemanticEvent): string {
     case "banter": return "şakalaşma";
     case "insult": return "hakaret_ve_saldiri";
     case "rejection": return "reddetme_ve_mesafe";
-    case "apology": return "özür_ve_telafi";
+    case "apology":
     case "repair": return "özür_ve_telafi";
     case "complaint": return "anlamama_ve_itiraz";
     case "command": return "eylem_talebi";
     case "support": return "duygusal_destek";
-    case "compliment": return "genel_sohbet";
-    case "general_chat":
-    default:
-      return "genel_sohbet";
+    default: return "genel_sohbet";
   }
 }
 
@@ -183,18 +170,6 @@ export function semanticSentimentToKdm(event: SemanticEvent): string {
   return "nötr";
 }
 
-export function semanticPattern(event: SemanticEvent): string | null {
-  const normalized = event.normalized || event.raw.toLocaleLowerCase("tr-TR");
-  if (event.redLine || /(?<![\p{L}])(orosp\p{L}*|kaşa[rs]\p{L}*|sürtük\p{L}*|kahpe\p{L}*|yavşak\p{L}*|şerefsiz\p{L}*|haysiyetsiz\p{L}*)(?![\p{L}])/iu.test(normalized)) return "agir_hakaret";
-  if (event.insult || /(?<![\p{L}])(aptal\p{L}*|salak\p{L}*|gerizekal\p{L}*|geri\s*zekal\p{L}*|mal|ezik\p{L}*|dangalak\p{L}*|öküz\p{L}*)(?![\p{L}])/iu.test(normalized)) return "hakaret";
-  if (event.coercion > 0) return "zorlama";
-  if (event.manipulation > 0) return "manipulasyon";
-  if (event.privacyViolation > 0) return "mahremiyet_ihlali";
-  if (event.intent === "rejection") return "kovma_ve_reddetme";
-  if (event.frustration > 0) return "agresif_dil";
-  return null;
-}
-
 const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
   calmness: 70,
   anger: 10,
@@ -205,10 +180,34 @@ const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
   lastStatus: "Sakin ve kontrollü",
 };
 
+export function analyzeKdmInteractionCanonicalTurn(
+  userMessage: string,
+  personality: Partial<DroitPersonalityTraits> | null | undefined,
+  currentDynamicState: DroitDynamicState | null | undefined,
+  semanticInterpretation: SemanticInterpretation,
+  semanticEvent: SemanticEvent,
+  behaviorPolicy?: BehaviorPolicyInput | null,
+): KdmAnalysisResult {
+  const state: DroitDynamicState = { ...DEFAULT_DYNAMIC_STATE, ...(currentDynamicState || {}) };
+  const normalizedPersonality = normalizeDroitPersonality(personality);
+  const baseBehaviorProfile = computeBehaviorProfile(normalizedPersonality, userMessage);
+  return analyzeKdmInteractionCanonical({
+    state,
+    semanticInterpretation,
+    semanticEvent,
+    normalizedPersonality,
+    baseBehaviorProfile,
+    behaviorPolicy: behaviorPolicy ?? null,
+    applyIntegrated: applyIntegratedBehaviorPolicy,
+    semanticIntentToKdm,
+    semanticSentimentToKdm,
+  });
+}
+
 /**
- * ADR-0006 PR5: RelationshipReducer is now the only relationship/state authority.
- * The temporary rollout switch and legacy decision body were removed after promotion.
- * Rollback is repository-level `git revert`.
+ * Legacy/test ingress helper. It intentionally performs a complete deterministic
+ * ingestion step (regex v2 + entity/world grounding) before entering the same
+ * canonical reducer bridge. Production server code must never call it.
  */
 export function analyzeKdmInteraction(
   userMessage: string,
@@ -217,23 +216,19 @@ export function analyzeKdmInteraction(
   canonicalSemanticEvent?: SemanticEvent | null,
   behaviorPolicy?: BehaviorPolicyInput | null,
 ): KdmAnalysisResult {
-  const state: DroitDynamicState = {
-    ...DEFAULT_DYNAMIC_STATE,
-    ...(currentDynamicState || {}),
-  };
-  const semanticEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage);
-  const normalizedPersonality = normalizeDroitPersonality(personality);
-  const baseBehaviorProfile = computeBehaviorProfile(normalizedPersonality, userMessage);
-
-  return analyzeKdmInteractionCanonical({
-    state,
-    semanticEvent,
-    normalizedPersonality,
-    baseBehaviorProfile,
-    behaviorPolicy: behaviorPolicy ?? null,
-    applyIntegrated: applyIntegratedBehaviorPolicy,
-    semanticPattern,
-    semanticIntentToKdm,
-    semanticSentimentToKdm,
-  });
+  const semanticInterpretation = interpretationFromRegexFloor(userMessage);
+  const projectedEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage);
+  const groundedEvent = groundSemanticEventForAppraisal(
+    userMessage,
+    projectedEvent,
+    resolveMessageEntities(userMessage),
+  ).event;
+  return analyzeKdmInteractionCanonicalTurn(
+    userMessage,
+    personality,
+    currentDynamicState,
+    semanticInterpretation,
+    groundedEvent,
+    behaviorPolicy,
+  );
 }

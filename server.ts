@@ -2,7 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import { analyzeKdmInteraction } from "./src/services/kdmConsistencyEngine";
+import { analyzeKdmInteractionCanonicalTurn } from "./src/services/kdmConsistencyEngine";
 import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
 import { claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";
 import { normalizeDroitPersonality } from "./src/services/droitPersonalityNormalizer";
@@ -548,7 +548,7 @@ app.post("/api/chat", async (req, res) => {
       dynamicState = defaultDynamicState,
       provider = "openrouter",
       suppressRecentMemory = false,
-      semanticEvent: incomingSemanticEvent,
+      semanticInterpretation: incomingSemanticInterpretation,
       behaviorPolicy: incomingBehaviorPolicy,
       sessionId: incomingSessionId,
       kairaInstanceId: incomingKairaInstanceId,
@@ -630,7 +630,7 @@ app.post("/api/chat", async (req, res) => {
     const worldReasoningPolicyInstruction = buildWorldReasoningPolicyInstruction(worldReasoningPolicy);
     const languageUnderstanding = await resolveServerLanguageUnderstanding({
       message: userMessage,
-      incomingSemanticEvent,
+      incomingSemanticInterpretation,
       context: {
         userName,
         characterName: character.name || "KAIRO",
@@ -646,6 +646,7 @@ app.post("/api/chat", async (req, res) => {
       generateText,
     });
     const canonicalSemantic = {
+      interpretation: languageUnderstanding.interpretation,
       event: languageUnderstanding.event,
       source: languageUnderstanding.semanticSource,
     };
@@ -724,10 +725,11 @@ app.post("/api/chat", async (req, res) => {
       responsePersonality = normalizeDroitPersonality(incomingResponsePersonality ?? basePersonality),
       behaviorPolicy = normalizeBehaviorPolicyInput(incomingBehaviorPolicy),
       kdmStart = now(),
-      kdm = analyzeKdmInteraction(
+      kdm = analyzeKdmInteractionCanonicalTurn(
         userMessage,
         basePersonality,
         effective,
+        canonicalSemantic.interpretation,
         canonicalSemantic.event,
         behaviorPolicy,
       ),
@@ -953,6 +955,9 @@ app.post("/api/chat", async (req, res) => {
             warnings: enforced.reasons,
           },
           metadata: {
+            semanticInterpretation: canonicalSemantic.interpretation,
+        semanticEvent: canonicalSemantic.event,
+            semanticSource: canonicalSemantic.source,
             providerUsed: "local_language",
             languageStyleMemory,
             controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" },
@@ -1395,6 +1400,9 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           warnings: enforced.reasons,
         },
         metadata: {
+          semanticInterpretation: canonicalSemantic.interpretation,
+        semanticEvent: canonicalSemantic.event,
+          semanticSource: canonicalSemantic.source,
           providerUsed: activeAiProviderUsed,
           languageStyleMemory,
           controlledSpontaneity: spontaneityDecision,
