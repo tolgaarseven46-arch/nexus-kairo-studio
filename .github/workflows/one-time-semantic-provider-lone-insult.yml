@@ -1,0 +1,30 @@
+name: One-time semantic provider lone-insult patch
+
+on:
+  push:
+    branches: [chatgpt/semantic-provider-quality-matrix]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: chatgpt/semantic-provider-quality-matrix
+          fetch-depth: 0
+      - name: Apply patch
+        run: node scripts/patch-semantic-provider-lone-insult.mjs
+      - name: Commit patch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/llmSemanticUnderstandingProvider.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(kaira): keep lone insult lexical-only"
+          git push origin HEAD:chatgpt/semantic-provider-quality-matrix
