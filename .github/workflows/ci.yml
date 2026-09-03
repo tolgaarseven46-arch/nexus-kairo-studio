@@ -21,18 +21,44 @@ jobs:
       - name: Install dependencies
         run: npm install --ignore-scripts
 
+      - name: isolate response-plan
+        continue-on-error: true
+        run: npx vitest run src/services/kairaResponsePlan.test.ts
+      - name: isolate response-plan integration
+        continue-on-error: true
+        run: npx vitest run src/services/kairaResponsePlanIntegrationContracts.test.ts
+      - name: isolate response-plan authority
+        continue-on-error: true
+        run: npx vitest run src/services/kairaResponsePlanFinalAuthorityContracts.test.ts
+      - name: isolate speech authority
+        continue-on-error: true
+        run: npx vitest run src/services/kairaSpeechIdentityAuthorityContracts.test.ts
+      - name: isolate semantic consumer
+        continue-on-error: true
+        run: npx vitest run src/services/kairaSemanticConsumerAuthorityContracts.test.ts
+      - name: isolate KDM semantic authority
+        continue-on-error: true
+        run: npx vitest run src/services/kairaKdmCanonicalSemanticAuthorityContracts.test.ts
+      - name: isolate current-turn dialogue authority
+        continue-on-error: true
+        run: npx vitest run src/services/kairaCurrentTurnDialogueAuthorityContracts.test.ts
+      - name: isolate behavior-profile authority
+        continue-on-error: true
+        run: npx vitest run src/services/kairaBehaviorProfileAuthorityContracts.test.ts
+      - name: isolate temperament authority
+        continue-on-error: true
+        run: npx vitest run src/services/kairaTemperamentBeforeKdmContracts.test.ts
+      - name: isolate behavior-policy boundary
+        continue-on-error: true
+        run: npx vitest run src/services/kairaBehaviorPolicyBoundaryContracts.test.ts
+      - name: isolate base-personality ownership
+        continue-on-error: true
+        run: npx vitest run src/services/kairaBasePersonalityOwnershipContracts.test.ts
+      - name: isolate legacy runtime removal
+        continue-on-error: true
+        run: npx vitest run src/services/kairaLegacyRuntimeFlagRemovalContracts.test.ts
       - name: Architecture contracts
-        shell: bash
-        run: |
-          set +e
-          npm run test:contracts 2>&1 | tee /tmp/architecture-contracts.log
-          status=${PIPESTATUS[0]}
-          {
-            echo '```text'
-            tail -n 200 /tmp/architecture-contracts.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit "$status"
+        run: npm run test:contracts
 
       - name: Autonomous runtime contracts
         run: npx vitest run src/services/kairaActivityScheduleDispatchDiscoveryContracts.test.ts src/services/kairaAutonomousLifeWorkerRunCoordinatorContracts.test.ts src/services/kairaAutonomousLifeWorkerRunStoreContracts.test.ts src/services/kairaAutonomousLifeWorkerDurableRunCoordinatorContracts.test.ts src/services/kairaAutonomousLifeWorkerHealthContracts.test.ts src/services/kairaAutonomousLifeWorkerHealthConfigContracts.test.ts src/services/kairaAutonomousLifeWorkerRouteContracts.test.ts src/services/kairaAutonomousLifeSchedulerWorkflowContracts.test.ts src/services/kairaActivityOccupancyReadModelContracts.test.ts src/services/kairaActivityExecutionStoreContracts.test.ts src/services/kairaActivityExecutionCoordinatorContracts.test.ts src/services/kairaActivityScheduleStoreContracts.test.ts src/services/kairaActivityCatalogStoreContracts.test.ts src/services/kairaActivityPlanningTriggerInboxStoreContracts.test.ts src/services/kairaActivityDynamicStateStoreContracts.test.ts src/services/kairaActivityDynamicStateObservationCoordinatorContracts.test.ts src/services/kairaActivityPlanningSourceSnapshotContracts.test.ts src/services/kairaActivityPlanningTriggerInboxProcessorContracts.test.ts src/services/kairaAutonomousStateChatWiringContracts.test.ts
@@ -53,7 +79,6 @@ jobs:
         run: npm run build
 
   docs-guard:
-    # Riskli path'e dokunan PR, PROJECT_STATE.md veya docs/adr/** güncellemesi içermeli.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -61,7 +86,6 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
-
       - name: Enforce state/ADR update for risky changes
         run: |
           set -euo pipefail
@@ -69,7 +93,6 @@ jobs:
           git fetch -q origin "${{ github.base_ref }}"
           CHANGED="$(git diff --name-only "$BASE"...HEAD)"
           echo "Changed files:"; echo "$CHANGED" | sed 's/^/  /'
-
           if echo "$CHANGED" | bash .github/scripts/match-risky-paths.sh > /tmp/risky.txt; then
             echo "Risky paths touched:"; sed 's/^/  /' /tmp/risky.txt
             if echo "$CHANGED" | grep -Eq '^(PROJECT_STATE\.md|docs/adr/.+\.md)$'; then
@@ -83,8 +106,6 @@ jobs:
           fi
 
   behavior-guard:
-    # AI_CONTEXT.md §8 Hata Azaltma Protokolü — behavior-critical bir path'e dokunan PR
-    # bir test dosyası VE bir golden/long-session regression testi içermeli.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -92,7 +113,6 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
-
       - name: Enforce test + golden regression for behavior changes
         run: |
           set -euo pipefail
@@ -100,7 +120,6 @@ jobs:
           git fetch -q origin "${{ github.base_ref }}"
           CHANGED="$(git diff --name-only "$BASE"...HEAD)"
           echo "Changed files:"; echo "$CHANGED" | sed 's/^/  /'
-
           if echo "$CHANGED" | bash .github/scripts/match-risky-paths.sh .github/behavior-critical-paths.txt > /tmp/bc.txt; then
             echo "Behavior-critical paths touched:"; sed 's/^/  /' /tmp/bc.txt
             FAIL=0
