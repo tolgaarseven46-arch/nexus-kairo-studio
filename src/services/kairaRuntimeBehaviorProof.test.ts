@@ -47,10 +47,12 @@ describe("Kaira cross-layer runtime behavior proofs", () => {
     envBefore.clear();
   });
 
-  it("uses the validated canonical relationship/plan/prompt path by default, while preserving explicit rollback", () => {
+  it("proves canonical promotion and rollback are explicit rather than silently changing library defaults", () => {
     for (const flag of CANONICAL_FLAGS) {
       envBefore.set(flag, process.env[flag]);
       delete process.env[flag];
+      expect(isCanonicalBehaviorFlagEnabled(flag)).toBe(false);
+      process.env[flag] = "on";
       expect(isCanonicalBehaviorFlagEnabled(flag)).toBe(true);
       process.env[flag] = "off";
       expect(isCanonicalBehaviorFlagEnabled(flag)).toBe(false);
