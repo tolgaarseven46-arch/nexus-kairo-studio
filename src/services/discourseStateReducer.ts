@@ -12,6 +12,8 @@ import {
   classifyUserSocialAct,
   kairaActIsQuestion,
   userSignalsAlreadyAnswered,
+  userSignalsAnswerFriction,
+  userSignalsStateAnswer,
 } from "./discourseSocialAct";
 import {
   EMPTY_DISCOURSE_STATE,
@@ -90,9 +92,7 @@ function answersPendingQuestion(
   if (!text) return false;
   if (act === "answer" || act === "agreement_ack" || act === "correction") return true;
 
-  if (pending.kind === "how_are_you") {
-    return /^(?:iyi(?:yim|dir)?|k[öo]t[üu](?:y[üu]m)?|fena\s+değil|eh\b|idare\b|normal\b|ayn[ıi]\b|moral(?:im)?\b|mod(?:um)?\b)/iu.test(text);
-  }
+  if (pending.kind === "how_are_you") return userSignalsStateAnswer(message);
   if (pending.kind === "what_doing") {
     return /^(?:tak[ıi]l|çalış|çal[ıi][şs]|otur|evde|işte|okulda|dışarı|boş|hiçbir|bi\s+şey|bir\s+şey)/iu.test(text);
   }
@@ -131,18 +131,26 @@ export function reduceDiscourseState(
       act === "greeting" || act === "farewell" || act === "thanks";
     const contextualAnswer =
       kairaPending !== null && answersPendingQuestion(kairaPending, turn.message, act);
+    const answerFriction =
+      userSignalsAlreadyAnswered(turn.message) || userSignalsAnswerFriction(turn.message);
     const explicitDependency =
-      userSignalsAlreadyAnswered(turn.message) ||
+      answerFriction ||
       act === "correction" ||
       act === "complaint";
+    const responseEvidence = contextualAnswer || (!isOwnRoutine && explicitDependency);
+    // A canonical semantic label such as complaint/general_chat must not erase a
+    // stronger turn-taking fact: a state-shaped answer to Kaira's still-pending
+    // question remains dependent on that question. Only treat it as a new topic
+    // when there is no contextual/explicit response evidence.
+    const unambiguousNewTopic = startsNewTopic(turn.event) && !responseEvidence;
     const respondsToKaira =
       prev.lastKairaAct !== null &&
-      !startsNewTopic(turn.event) &&
-      (contextualAnswer || (!isOwnRoutine && explicitDependency));
+      !unambiguousNewTopic &&
+      responseEvidence;
 
     if (respondsToKaira) {
       const friction =
-        userSignalsAlreadyAnswered(turn.message) ||
+        answerFriction ||
         act === "complaint" ||
         turn.event.discourseAct === "correction" ||
         turn.event.frustration >= 0.25;
@@ -151,7 +159,7 @@ export function reduceDiscourseState(
         responseKind:
           act === "correction"
             ? "correction"
-            : act === "complaint" && !userSignalsAlreadyAnswered(turn.message)
+            : act === "complaint" && !answerFriction
               ? "clarification"
               : friction
                 ? "answer_with_friction"
@@ -266,7 +274,7 @@ export function buildDiscourseObservationalInstruction(state: DiscourseState): s
         d.on === "kaira_question" ? "sorusuna" : "sözüne"
       } verilmiş bir ${
         d.responseKind === "answer_with_friction"
-          ? "cevap + hafif sitem (kullanıcı 'zaten söyledim' diyor)"
+          ? "cevap + hafif sitem (kullanıcı daha önce cevap verdiğini belirtiyor)"
           : d.responseKind === "correction"
             ? "düzeltme"
             : d.responseKind === "clarification"
