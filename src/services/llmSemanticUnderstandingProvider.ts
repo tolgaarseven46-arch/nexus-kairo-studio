@@ -3,7 +3,7 @@ import type {
   SemanticUnderstandingProvider,
   TurkishMorphologyResult,
 } from "./languageUnderstandingService";
-import { normalizeSemanticInterpretation } from "./semanticInterpretationSchema";
+import { isSemanticInterpretation, normalizeSemanticInterpretation } from "./semanticInterpretationSchema";
 import { SEMANTIC_INTERPRETATION_SCHEMA_VERSION, type SemanticInterpretation } from "../types/semanticInterpretation";
 
 export type SemanticTextGenerator = (input: { system: string; prompt: string; temperature: number }) => Promise<string>;
@@ -139,9 +139,11 @@ export function createLlmSemanticUnderstandingProvider(options: LlmSemanticProvi
       const prompt = `MESAJ:\n${message}\n\nMORFOLOJİ:\n${compactMorphology(morphology)}\n\nSON BAĞLAM:\n${compactContext(context)}\n\nKullanıcı adı: ${context?.userName ?? "bilinmiyor"}\nKarakter adı: ${context?.characterName ?? "Kaira"}`;
       const raw = await options.generate({ system: SYSTEM, prompt, temperature: 0.05 });
       const parsed = extractJson(raw) as Record<string, unknown>;
+      // Only evidence identity is authoritative at the boundary. The model may not rewrite raw text.
       parsed.raw = message;
-      parsed.schemaVersion = SEMANTIC_INTERPRETATION_SCHEMA_VERSION;
-      if (typeof parsed.normalized !== "string") parsed.normalized = message.toLocaleLowerCase("tr-TR").trim();
+      if (parsed.schemaVersion !== SEMANTIC_INTERPRETATION_SCHEMA_VERSION || !isSemanticInterpretation(parsed)) {
+        throw new Error("LLM semantic parser incomplete/invalid SemanticInterpretation@2 returned.");
+      }
       const normalized = normalizeSemanticInterpretation(parsed, message);
       normalized.evidence = normalized.evidence.length
         ? normalized.evidence.map((e) => ({ ...e, source: "llm", provider: e.provider ?? options.name ?? "llm_semantic_parser_v2" }))
