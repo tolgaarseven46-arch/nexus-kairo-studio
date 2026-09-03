@@ -43,7 +43,7 @@ describe('long-session consistency', () => {
 
     for (let i = 0; i < 120; i += 1) {
       let message = i % 3 === 0 ? 'naber' : i % 3 === 1 ? 'bugün işler yoğundu' : 'tamam';
-      if (i === 25 || i === 55) message = 'salak';
+      if (i === 25 || i === 55) message = 'sen salaksın';
       if (i === 26 || i === 56) message = 'özür dilerim';
       if (i === 27 || i === 57) message = 'tamam devam edelim';
       messages.push(message);
