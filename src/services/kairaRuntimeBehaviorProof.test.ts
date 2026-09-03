@@ -90,7 +90,16 @@ describe("Kaira cross-layer runtime behavior proofs", () => {
     );
   });
 
-  it("treats activity permission text as part of the delivered reply contract, not an invisible side channel", () => {
+  it.each([
+    "Mert bana nasılsın diye sordu",
+    "Mert bana iyi misin diye sordu",
+  ])("does not over-block reported question content: %s", (reply) => {
+    expect(findKairaResponsePlanIssues(reply, focusedPlan())).not.toContain(
+      "response_plan_question_blocked",
+    );
+  });
+
+  it("characterizes the activity permission side-channel as delivered text that can violate a no-question plan", () => {
     const prompt = buildKairaActivityPermissionChatPrompt({
       requestId: "req-1",
       activityId: "archive_exploration",
