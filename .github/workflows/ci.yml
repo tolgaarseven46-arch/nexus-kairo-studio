@@ -7,8 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
-  pull-requests: write
+  contents: write
 
 jobs:
   validate:
@@ -16,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -30,19 +31,19 @@ jobs:
         continue-on-error: true
         run: npm run test:contracts -- --fileParallelism=false > /tmp/architecture-contracts.log 2>&1
 
-      - name: Publish architecture failure diagnostics
-        if: steps.architecture_contracts.outcome == 'failure' && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Persist architecture failure diagnostics once
+        if: steps.architecture_contracts.outcome == 'failure' && github.event_name == 'pull_request' && hashFiles('architecture-contracts-debug.txt') == ''
         run: |
-          {
-            echo '<!-- architecture-contract-debug -->'
-            echo '```text'
-            tail -n 180 /tmp/architecture-contracts.log
-            echo '```'
-          } > /tmp/architecture-comment.md
-          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/architecture-comment.md
-          exit 1
+          tail -n 240 /tmp/architecture-contracts.log > architecture-contracts-debug.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add architecture-contracts-debug.txt
+          git commit -m 'ci(debug): capture architecture contract failure'
+          git push origin HEAD:${{ github.head_ref }}
+
+      - name: Fail on architecture contract failure
+        if: steps.architecture_contracts.outcome == 'failure'
+        run: exit 1
 
       - name: Autonomous runtime contracts
         run: npx vitest run src/services/kairaActivityScheduleDispatchDiscoveryContracts.test.ts src/services/kairaAutonomousLifeWorkerRunCoordinatorContracts.test.ts src/services/kairaAutonomousLifeWorkerRunStoreContracts.test.ts src/services/kairaAutonomousLifeWorkerDurableRunCoordinatorContracts.test.ts src/services/kairaAutonomousLifeWorkerHealthContracts.test.ts src/services/kairaAutonomousLifeWorkerHealthConfigContracts.test.ts src/services/kairaAutonomousLifeWorkerRouteContracts.test.ts src/services/kairaAutonomousLifeSchedulerWorkflowContracts.test.ts src/services/kairaActivityOccupancyReadModelContracts.test.ts src/services/kairaActivityExecutionStoreContracts.test.ts src/services/kairaActivityExecutionCoordinatorContracts.test.ts src/services/kairaActivityScheduleStoreContracts.test.ts src/services/kairaActivityCatalogStoreContracts.test.ts src/services/kairaActivityPlanningTriggerInboxStoreContracts.test.ts src/services/kairaActivityDynamicStateStoreContracts.test.ts src/services/kairaActivityDynamicStateObservationCoordinatorContracts.test.ts src/services/kairaActivityPlanningSourceSnapshotContracts.test.ts src/services/kairaActivityPlanningTriggerInboxProcessorContracts.test.ts src/services/kairaAutonomousStateChatWiringContracts.test.ts
