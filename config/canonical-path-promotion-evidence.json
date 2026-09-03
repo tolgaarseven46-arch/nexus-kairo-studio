@@ -5,7 +5,8 @@
     "src/services/kairaFoundationFirstConversationRegression.test.ts",
     "src/services/kairaRuntimeBehaviorProof.test.ts",
     "src/services/kairaRuntimeBehaviorLongSessionRegression.test.ts",
-    "src/services/kairaTwentyTurnPersistenceRoundtripRegression.test.ts"
+    "src/services/kairaTwentyTurnPersistenceRoundtripRegression.test.ts",
+    "src/services/kairaCanonicalHardBoundaryRepairRegression.test.ts"
   ],
   "rollbackTests": [
     "src/services/kairaBetaConversationAcceptanceScenario.test.ts",
