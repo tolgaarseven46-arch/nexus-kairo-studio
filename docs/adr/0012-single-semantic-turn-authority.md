@@ -1,6 +1,6 @@
 # ADR-0012: Conversation turn semantic truth is immutable and single-source
 
-- **Durum:** Proposed
+- **Durum:** Accepted
 - **Tarih:** 2026-09-03
 - **Karar veren:** Tolga / ChatGPT, Claude red-team evidence review
 - **İlgili PR:** #35
@@ -13,44 +13,56 @@ Aynı sekiz user turn için ingestion-time LLM semantic okuması ile historical 
 
 Sonuç: sekiz turun yedisinde (%87.5) materyal semantic fark bulundu. Current-turn ve historical-turn için iki farklı parser kullanılması aynı conversation içinde farklı semantic gerçekler üreten bir authority hatasıdır.
 
-C1a'nın ilk uygulamasında ingestion snapshot boru hattı doğru kurulmuş olsa da canonical payload yanlışlıkla legacy `SemanticEvent` olarak seçildi. Sonraki repo-forensic inceleme Accepted ADR-0006 ile bu seçimin çeliştiğini gösterdi: ADR-0006 canonical compositional şemayı `SemanticInterpretation@2` (`primaryIntent`, `secondarySocialActs[]`, target, severity vector, joking/sincerity confidence, uncertainty, evidence) olarak kabul etmişti; buna karşın gerçek LLM producer hâlâ `SemanticEvent` üretiyor ve KDM `interpretationFromLegacyEvent` ile eksik v2 alanlarını raw text üzerinde yeniden türetiyordu.
+İlk C1a uygulamasında ingestion snapshot boru hattı doğru kurulmuş olsa da canonical payload geçici olarak `SemanticEvent` seçilmişti. Repo-forensic inceleme ADR-0006 ile bunun çeliştiğini gösterdi: kabul edilmiş canonical compositional şema `SemanticInterpretation@2` idi; buna karşın gerçek LLM producer `SemanticEvent` üretiyor ve KDM `interpretationFromLegacyEvent` ile eksik v2 alanlarını raw text üzerinde yeniden türetiyordu.
 
-Bu nedenle bulgu yalnız historical dual-authority değil, **tamamlanmamış canonical semantic migration** olarak genişletildi. C1b ve classification→policy C2 hâlâ ayrı problemlerdir ve bu ADR kapsamında çözülmez.
+Bu nedenle C1 iki bağımsız fakat aynı authority ailesindeki adım olarak tamamlandı:
+
+- **C1a:** ingestion-time canonical v2 snapshot'ın live/history/persistence/hydration boyunca tek semantic truth olarak taşınması; historical raw-text reparse'ın kaldırılması.
+- **C1b:** KDM/RelationshipReducer authoritative hattının `SemanticInterpretation@2`'yi doğrudan tüketmesi; `interpretationFromLegacyEvent` ve raw-text enrichment'ın authoritative relationship yolundan kaldırılması.
+
+Classification→policy coupling (C2) ayrı bir yapısal problemdir ve bu ADR/PR kapsamında çözülmez.
 
 ## Karar
 
-Bir user turn'ün canonical semantic truth'u **`SemanticInterpretation@2`**'dir. Bu obje ingestion anında tam olarak bir kez üretilir, turn ile immutable snapshot olarak taşınır/persist edilir ve bütün historical replay yalnız bu snapshot'ı tüketir.
+Bir user turn'ün canonical semantic truth'u **`SemanticInterpretation@2`**'dir. Bu obje ingestion anında tam olarak bir kez üretilir, immutable turn snapshot'ı olarak taşınır/persist edilir ve bütün downstream/historical tüketiciler aynı objeyi veya ondan deterministik türetilen projection'ları kullanır.
 
-`SemanticEvent` canonical authority değildir. Yalnız `SemanticInterpretation@2`'den deterministik olarak türetilen compatibility/appraisal projection'dır. Projection raw text'i inceleyemez, parser/regex çağıramaz ve semantic okuma genişletemez.
+`SemanticEvent` canonical authority değildir. Yalnız `SemanticInterpretation@2`'den deterministik olarak türetilen compatibility/appraisal projection'dır. Projection raw text'i inceleyemez, parser/regex çağıramaz ve semantic okumayı genişletemez.
 
-Ek kurallar:
+### Authority kuralları
 
-1. **Gerçek producer:** normal language-understanding yolu LLM semantic provider → `SemanticInterpretation@2` üretir. Provider eksik/invalid v2 döndürürse eksik alanlar defaultlarla "canonical" yapılmaz; çağrı başarısız kabul edilir ve açık fallback yoluna geçilir.
-2. **Fallback:** regex yalnız parser/provider failure anında `fallback_regex` source'u ile aynı `SemanticInterpretation@2` şemasını üreten ingestion-time producer olabilir. Historical veya downstream reparse rolü yoktur.
-3. **Discourse facet ownership:** `socialRoutine`, `discourseAct`, `repairSignal`, `knowledgeQuery`, `selfMemoryQuery`, relational facet'ler ve stop/advice sinyalleri canonical v2 objenin `discourseFacets` alanında yaşar. Projection'ın özel bilgisi değildir.
-4. **Historical authority:** `deriveDiscourseState` historical user text için regex/LLM çağrısı yapamaz; yalnız persisted `SemanticInterpretation@2` snapshot'ını deterministik `SemanticEvent` projection'a çevirip mevcut discourse reducer'a verir.
-5. **Transport/persistence:** Live Studio history, client→server history payload, server result, layer audit, test-session persistence ve hydration aynı turn'e ait canonical `semanticInterpretation` snapshot'ını korur.
-6. **Fail-closed:** Eski/persist edilmemiş historical turn'de canonical v2 snapshot yoksa discourse semantic replay fail-closed olur; runtime sessizce yeni semantic truth üretmez. Gerekirse ayrı ve açık batch migration yapılır.
-7. **Policy ayrımı:** `complaint/confusion` gibi content etiketlerinin `repair_or_rephrase` gibi dialogue policy kararlarına nasıl modüle edildiği C2'dir; bu değişiklik classification→policy coupling'i çözmeye çalışmaz.
-8. **Migration-negative proof:** Bir ADR/migration "X, Y'nin yerini aldı" dediğinde yalnız yeni yolun varlığı değil, eski authority yolunun artık normal runtime'da kabul edilmediği de negatif contract/lint testiyle doğrulanır.
+1. **Gerçek producer:** normal language-understanding yolu LLM semantic provider → `SemanticInterpretation@2` üretir. Eksik/invalid v2 output canonical kabul edilmez; provider failure sayılır ve explicit fallback'e geçilir.
+2. **Fallback:** regex yalnız ingestion-time `fallback_regex` producer olarak aynı v2 şemayı üretebilir. Historical veya downstream reparse rolü yoktur.
+3. **Discourse facet ownership:** `socialRoutine`, `discourseAct`, `repairSignal`, `knowledgeQuery`, `selfMemoryQuery`, relational facet'ler, `stopQuestions`, `stopTalking` ve advice sinyalleri v2 `discourseFacets` altında yaşar.
+4. **Historical authority:** historical user turn'ler yalnız persisted `SemanticInterpretation@2` snapshot'ını tüketir. Snapshot yoksa semantic replay fail-closed olur; runtime raw text'i yeniden yorumlamaz.
+5. **Transport/persistence:** live Studio history, client→server payload, server result, layer audit, test-session persistence ve hydration aynı `semanticInterpretation` snapshot'ını korur.
+6. **KDM authority:** production server yalnız `analyzeKdmInteractionCanonicalTurn(...)` kullanır ve aynı ingestion sonucunun `canonicalSemantic.interpretation` + deterministik grounded `canonicalSemantic.event` projection'ını verir.
+7. **RelationshipReducer input:** severity vector, joking/sincerity confidence, uncertainty, target, repair/apology/support vb. semantic sinyaller doğrudan v2'den gelir. Bridge raw text parse etmez ve `interpretationFromLegacyEvent` kullanmaz.
+8. **Entity/world grounding:** `relationshipScope` language-understanding boundary'de entity/world grounding'den deterministik üretilir. KDM bunu yalnız tüketir; yeniden entity çözümlemez. Third-party scope dyadic Kaira-user damage/reward/repair sinyallerini relationship reducer'a taşımaz.
+9. **Stop ayrımı:** canonical `stopRequest` yalnız full-conversation stop anlamına gelir ve `discourseFacets.stopTalking` ile birebir aynıdır. `stopQuestions` ayrı bir discourse facet'tir ve tek başına relationship FSM'i disengage yapamaz.
+10. **Migration-negative proof:** bir migration "X, Y'nin yerini aldı" dediğinde eski authority yolunun normal runtime'da yokluğu negatif contract ile zorunlu doğrulanır.
+11. **Policy ayrımı:** `complaint/confusion` gibi content etiketlerinin `repair_or_rephrase` gibi policy kararlarına nasıl modüle edildiği C2'dir; C1 bunu çözmüş sayılmaz.
 
 ## Sonuçlar
 
-- Olumlu: current turn ve history aynı immutable compositional semantic truth'u kullanır; Ablation-0 parser divergence yapısal olarak kapanır.
-- Olumlu: RelationshipReducer'ın ihtiyaç duyduğu severity vector / joking / sincerity / uncertainty artık gizli downstream regex reconstruction'a bağlı olmadan gerçek producer kontratının parçasıdır.
-- Olumlu: `SemanticEvent` yaşamaya devam eder fakat authority değil deterministik compatibility projection rolüne düşer; üçüncü semantic representation eklenmez.
-- Olumlu: Gelecekte historical raw-text reparse veya eski incoming `SemanticEvent` authority'si geri eklenirse negatif authority contract kırılır.
-- Olumsuz / takas: C1a öncesi persisted turn'lerde v2 snapshot yoktur; bunlar runtime'da yeniden yorumlanmaz.
-- Olumsuz / takas: LLM parser prompt/schema artık daha zengindir; severity/joking/sincerity/uncertainty alanlarının operasyonel semantiği promptta açık çıpalarla korunmalı ve telemetry/fixtures ile kalibre edilmelidir.
-- Kapsam dışı: repair-policy coupling (C2), repetition, emotionalLoad policy/threshold kalibrasyonu.
+- Current turn ve history aynı immutable compositional semantic truth'u kullanır; Ablation-0'daki parser-divergence sınıfı yapısal olarak kapanır.
+- RelationshipReducer'ın ihtiyaç duyduğu severity/joking/sincerity/uncertainty alanları gizli downstream regex reconstruction yerine gerçek producer kontratının parçasıdır.
+- `SemanticEvent` yaşamaya devam eder fakat authority değil deterministik compatibility/appraisal projection rolündedir; üçüncü semantic representation eklenmez.
+- Third-party entity/world grounding korunur fakat semantic authority yaratmaz.
+- `stopQuestions` ile full stop artık canonical v2'de ayrı anlamlardır.
+- C1 öncesi persisted turn'lerde v2 snapshot yoksa runtime onları sessizce yeniden yorumlamaz; gerekiyorsa ayrı batch migration gerekir.
+- Kapsam dışı: C2 classification→policy coupling, repetition guard ve emotionalLoad policy/threshold kalibrasyonu.
 
 ## Etkilenen seam'ler
 
 - `src/types/semanticInterpretation.ts`
 - `src/services/llmSemanticUnderstandingProvider.ts`
-- `src/services/languageUnderstandingService.ts`
+- `src/services/semanticInterpretationSchema.ts`
 - `src/services/semanticInterpretationProjection.ts`
+- `src/services/semanticInterpretationLegacyProjection.ts` (yalnız explicit regex fallback/test ingress rolü)
+- `src/services/languageUnderstandingService.ts`
 - `src/services/serverLanguageUnderstanding.ts`
+- `src/services/kdmConsistencyEngine.ts`
+- `src/services/kdmRelationshipReducerBridge.ts`
 - `server.ts`
 - `TestMessage` / `ConversationTurn`
 - `droitChatService` history payload
@@ -60,16 +72,20 @@ Ek kurallar:
 
 ## Doğrulama
 
-- Pre-change ablation: 7/8 (%87.5) material semantic divergence.
-- İlk C1a Event-snapshot altyapısı bağımsız olarak full CI + TS + production build geçti; boru hattının kendisi doğrulandı fakat canonical type sonradan ADR-0006 ile uyumlu hale getirildi.
-- V2 producer/snapshot focused migration validation: 10 dosyada 66/66 test geçti.
-- Aynı focused migration'da TypeScript `--noEmit` geçti.
-- Negatif authority contract doğruluyor:
-  - normal language gateway `incomingSemanticEvent` kabul etmiyor;
-  - v2→Event projection parser/regex import veya çağrısı içermiyor;
-  - projection raw wording değişince semantic sınıfı yeniden çıkarmıyor.
-- PR-wide CI, Architecture Review ve production build merge öncesi ayrıca zorunludur.
+- Pre-change ablation: **7/8 (%87.5)** material current-LLM vs historical-regex semantic divergence.
+- C1a ilk snapshot boru hattı bağımsız full CI + TypeScript + production build geçti; sonrasında canonical payload ADR-0006 ile uyumlu v2'ye yükseltildi.
+- V2 producer/snapshot focused migration: **66/66 test + TypeScript** geçti.
+- C1a exact v2 head: PR-wide **CI + Architecture Review success**.
+- C1b authoritative KDM migration sırasında full suite gerçek third-party relationship-scope regresyonunu yakaladı; fix upstream grounded `relationshipScope` tüketimine taşındı ve ilgili property/state contracts tekrar yeşil oldu.
+- C1b ayrıca `stopQuestions` ile full stop'un v2 `stopRequest` alanında yanlış birleştirildiğini ortaya çıkardı; producer/schema sözleşmesi `stopRequest === stopTalking` olarak sıkılaştırıldı.
+- C1b exact validation head `5e90c3e...`: Architecture contracts, autonomous runtime, beta gate, beta conversation acceptance, full test suite, TypeScript ve production build **success**; Architecture Review **success**.
+- Negatif authority contracts şunları kilitler:
+  - normal gateway eski incoming `SemanticEvent` authority'sini kabul etmez;
+  - v2→Event projection parser/regex/raw-text reinterpretation yapmaz;
+  - production server legacy KDM helper'ını çağırmaz;
+  - authoritative relationship bridge `interpretationFromLegacyEvent` veya raw-text parser kullanmaz;
+  - question-stop/full-stop semantic ayrımı yeniden birleşemez.
 
 ## Notlar
 
-C1b'ye geçiş ön koşulu: düzeltilmiş v2 snapshot tipi + gerçek v2 LLM producer aynı PR head'inde PR-wide CI ile doğrulanmış olmalıdır. C2 bundan sonra ayrı değişiklik olarak ele alınır.
+C1 bu ADR ile tamamlanmıştır. Sonraki yapısal çalışma **C2: classification/content semantic → dialogue policy coupling** olmalıdır ve ayrı PR/branch'te yürütülmelidir; C1 ile aynı causal change olarak karıştırılmamalıdır.
