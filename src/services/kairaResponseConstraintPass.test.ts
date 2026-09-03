@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ReasoningTrace } from "../types/nexus";
 import type { KairaResponsePlan } from "./kairaResponsePlan";
 import { validateKairoResponse } from "./kairoResponseConsistency";
+import { findKairaResponsePlanIssues } from "./kairaResponsePlan";
 import { runKairaResponseConstraintPass } from "./kairaResponseConstraintPass";
 
 const trace = (overrides: Partial<ReasoningTrace> = {}) => ({
@@ -137,19 +138,22 @@ describe("Kaira unified response constraint pass", () => {
   });
 
   it("never trusts a supplied fallback; the fallback is passed through the same ordered constraints", () => {
+    const responsePlan = plan({ counterFlirtAllowed: false, emojiBudget: 0 });
+    const unsafeFallback = "iyi misin bugün";
     const result = runKairaResponseConstraintPass({
       reply: "😘",
       trace: trace(),
-      plan: plan({ counterFlirtAllowed: false, emojiBudget: 0 }),
+      plan: responsePlan,
       worldItems: neutralWorld.items,
       worldContext: neutralWorld.context,
       selfMemoryRuntime: noSelfMemory,
       epistemicContext: null,
-      fallbackFactory: () => "iyi misin bugün",
+      fallbackFactory: () => unsafeFallback,
     });
 
-    expect(result.reply).toBe("tamam");
+    expect(result.reply).not.toBe(unsafeFallback);
     expect(result.fallbackUsed).toBe(true);
+    expect(findKairaResponsePlanIssues(result.reply, responsePlan)).toEqual([]);
     expect(result.issues).toEqual([]);
     expect(result.consistency.accepted).toBe(true);
   });
