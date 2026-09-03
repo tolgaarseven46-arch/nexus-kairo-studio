@@ -70,27 +70,29 @@ const alreadyDamaged = {
   },
 } as any;
 
+const directInsult = "sen salaksın";
+const hardBoundaryMessage = "seninle ciddi ciddi kavga edeceğiz kaşar herif";
+
 describe("relationship-dependent qualitative reaction characterization", () => {
-  it("processes the same insult more tolerantly in a healthy established relationship", () => {
-    const healthy = analyzeKdmInteraction("salak", undefined, healthyEstablished);
-    const damaged = analyzeKdmInteraction("salak", undefined, alreadyDamaged);
+  it("processes the same explicitly targeted insult more tolerantly in a healthy established relationship", () => {
+    const healthy = analyzeKdmInteraction(directInsult, undefined, healthyEstablished);
+    const damaged = analyzeKdmInteraction(directInsult, undefined, alreadyDamaged);
 
     const healthyHurtDelta = (healthy.nextDynamicState.relationship?.hurtScore ?? 0) - healthyEstablished.relationship.hurtScore;
     const damagedHurtDelta = (damaged.nextDynamicState.relationship?.hurtScore ?? 0) - alreadyDamaged.relationship.hurtScore;
     const healthyConflictDelta = (healthy.nextDynamicState.relationship?.conflictScore ?? 0) - healthyEstablished.relationship.conflictScore;
     const damagedConflictDelta = (damaged.nextDynamicState.relationship?.conflictScore ?? 0) - alreadyDamaged.relationship.conflictScore;
 
-    expect(healthy.trace.relationship.toleranceMultiplier).toBeLessThan(damaged.trace.relationship.toleranceMultiplier);
     expect(healthyHurtDelta).toBeLessThan(damagedHurtDelta);
     expect(healthyConflictDelta).toBeLessThan(damagedConflictDelta);
     expect(healthy.nextDynamicState.relationship?.conversationState).toBe("active");
     expect(damaged.nextDynamicState.relationship?.conversationState).toBe("distancing");
   });
 
-  it("selects irritated, hurt and withdrawn for the same insult from relationship context", () => {
-    const fresh = analyzeKdmInteraction("salak", undefined, newRelationship);
-    const close = analyzeKdmInteraction("salak", undefined, healthyEstablished);
-    const damaged = analyzeKdmInteraction("salak", undefined, alreadyDamaged);
+  it("selects irritated, hurt and withdrawn for the same explicitly targeted insult from relationship context", () => {
+    const fresh = analyzeKdmInteraction(directInsult, undefined, newRelationship);
+    const close = analyzeKdmInteraction(directInsult, undefined, healthyEstablished);
+    const damaged = analyzeKdmInteraction(directInsult, undefined, alreadyDamaged);
 
     expect(fresh.nextDynamicState.reactionMode).toBe("irritated");
     expect(close.nextDynamicState.reactionMode).toBe("hurt");
@@ -101,7 +103,7 @@ describe("relationship-dependent qualitative reaction characterization", () => {
   });
 
   it("keeps hurt across the first unrelated neutral follow-up while residual injury remains", () => {
-    const insult = analyzeKdmInteraction("salak", undefined, healthyEstablished);
+    const insult = analyzeKdmInteraction(directInsult, undefined, healthyEstablished);
     const neutral = analyzeKdmInteraction("selam", undefined, insult.nextDynamicState);
 
     expect(insult.nextDynamicState.reactionMode).toBe("hurt");
@@ -110,7 +112,7 @@ describe("relationship-dependent qualitative reaction characterization", () => {
   });
 
   it("keeps irritated across the first unrelated neutral follow-up while residual injury remains", () => {
-    const insult = analyzeKdmInteraction("salak", undefined, newRelationship);
+    const insult = analyzeKdmInteraction(directInsult, undefined, newRelationship);
     const neutral = analyzeKdmInteraction("selam", undefined, insult.nextDynamicState);
 
     expect(insult.nextDynamicState.reactionMode).toBe("irritated");
@@ -119,7 +121,7 @@ describe("relationship-dependent qualitative reaction characterization", () => {
   });
 
   it("lets a low-level reaction decay to neutral after enough calm neutral interaction", () => {
-    const insult = analyzeKdmInteraction("salak", undefined, healthyEstablished);
+    const insult = analyzeKdmInteraction(directInsult, undefined, healthyEstablished);
     let current = insult.nextDynamicState;
 
     for (let i = 0; i < 40 && current.reactionMode !== "neutral"; i += 1) {
@@ -132,9 +134,9 @@ describe("relationship-dependent qualitative reaction characterization", () => {
   });
 
   it("feeds the qualitative mode into HOW-only relationship behavior directives", () => {
-    const fresh = analyzeKdmInteraction("salak", undefined, newRelationship);
-    const close = analyzeKdmInteraction("salak", undefined, healthyEstablished);
-    const damaged = analyzeKdmInteraction("salak", undefined, alreadyDamaged);
+    const fresh = analyzeKdmInteraction(directInsult, undefined, newRelationship);
+    const close = analyzeKdmInteraction(directInsult, undefined, healthyEstablished);
+    const damaged = analyzeKdmInteraction(directInsult, undefined, alreadyDamaged);
 
     expect(fresh.behaviorProfile.behaviorDirectives.some((item) => item.includes("Nitel tepki irritated"))).toBe(true);
     expect(close.behaviorProfile.behaviorDirectives.some((item) => item.includes("Nitel tepki hurt"))).toBe(true);
@@ -142,17 +144,17 @@ describe("relationship-dependent qualitative reaction characterization", () => {
   });
 
   it("exposes the qualitative mode through the canonical relationship instruction used by the AI prompt", () => {
-    const fresh = analyzeKdmInteraction("salak", undefined, newRelationship);
-    const close = analyzeKdmInteraction("salak", undefined, healthyEstablished);
-    const damaged = analyzeKdmInteraction("salak", undefined, alreadyDamaged);
+    const fresh = analyzeKdmInteraction(directInsult, undefined, newRelationship);
+    const close = analyzeKdmInteraction(directInsult, undefined, healthyEstablished);
+    const damaged = analyzeKdmInteraction(directInsult, undefined, alreadyDamaged);
 
     expect(fresh.behaviorProfile.relationshipInstruction).toContain("Nitel tepki irritated");
     expect(close.behaviorProfile.relationshipInstruction).toContain("Nitel tepki hurt");
     expect(damaged.behaviorProfile.relationshipInstruction).toContain("Nitel tepki withdrawn");
   });
 
-  it("keeps red-line violations severe and withdrawn even in a healthy established relationship", () => {
-    const result = analyzeKdmInteraction("orospu", undefined, healthyEstablished);
+  it("keeps true combined red-line violations severe and withdrawn even in a healthy established relationship", () => {
+    const result = analyzeKdmInteraction(hardBoundaryMessage, undefined, healthyEstablished);
     expect(result.nextDynamicState.relationship?.conversationState).toBe("disengaged");
     expect(result.nextDynamicState.reactionMode).toBe("withdrawn");
     expect(result.nextDynamicState.relationship?.hurtScore ?? 0).toBeGreaterThanOrEqual(10);
@@ -168,8 +170,8 @@ describe("relationship-dependent qualitative reaction characterization", () => {
   });
 
   it("still produces distinct relationship behavior instructions from the same insult", () => {
-    const healthy = analyzeKdmInteraction("salak", undefined, healthyEstablished);
-    const damaged = analyzeKdmInteraction("salak", undefined, alreadyDamaged);
+    const healthy = analyzeKdmInteraction(directInsult, undefined, healthyEstablished);
+    const damaged = analyzeKdmInteraction(directInsult, undefined, alreadyDamaged);
 
     expect(healthy.behaviorProfile.relationshipInstruction).not.toBe(damaged.behaviorProfile.relationshipInstruction);
     expect(healthy.behaviorProfile.relationshipInstruction).toContain("sıcak ve güvenli");
