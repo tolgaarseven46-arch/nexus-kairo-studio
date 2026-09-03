@@ -22,7 +22,17 @@ jobs:
         run: npm install --ignore-scripts
 
       - name: Architecture contracts
-        run: npm run test:contracts
+        shell: bash
+        run: |
+          set +e
+          npm run test:contracts 2>&1 | tee /tmp/architecture-contracts.log
+          status=${PIPESTATUS[0]}
+          {
+            echo '```text'
+            tail -n 200 /tmp/architecture-contracts.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
       - name: Autonomous runtime contracts
         run: npx vitest run src/services/kairaActivityScheduleDispatchDiscoveryContracts.test.ts src/services/kairaAutonomousLifeWorkerRunCoordinatorContracts.test.ts src/services/kairaAutonomousLifeWorkerRunStoreContracts.test.ts src/services/kairaAutonomousLifeWorkerDurableRunCoordinatorContracts.test.ts src/services/kairaAutonomousLifeWorkerHealthContracts.test.ts src/services/kairaAutonomousLifeWorkerHealthConfigContracts.test.ts src/services/kairaAutonomousLifeWorkerRouteContracts.test.ts src/services/kairaAutonomousLifeSchedulerWorkflowContracts.test.ts src/services/kairaActivityOccupancyReadModelContracts.test.ts src/services/kairaActivityExecutionStoreContracts.test.ts src/services/kairaActivityExecutionCoordinatorContracts.test.ts src/services/kairaActivityScheduleStoreContracts.test.ts src/services/kairaActivityCatalogStoreContracts.test.ts src/services/kairaActivityPlanningTriggerInboxStoreContracts.test.ts src/services/kairaActivityDynamicStateStoreContracts.test.ts src/services/kairaActivityDynamicStateObservationCoordinatorContracts.test.ts src/services/kairaActivityPlanningSourceSnapshotContracts.test.ts src/services/kairaActivityPlanningTriggerInboxProcessorContracts.test.ts src/services/kairaAutonomousStateChatWiringContracts.test.ts
