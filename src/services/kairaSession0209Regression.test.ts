@@ -5,67 +5,12 @@ import { tryLocalKairoReply } from "./kairoLocalLanguageEngine";
 import type { SemanticEvent } from "./semanticEventEngine";
 import { canonicalizeSemanticEvent } from "./semanticEventCanonicalizer";
 
-const state = () => ({
-  calmness: 76, anger: 20, stress: 16, happiness: 66, confidence: 86, surprise: 14,
-  lastStatus: "Sakin ve kontrollü",
-  relationship: {
-    firstSeenAt: "2026-09-01T02:04:55.191Z",
-    lastInteractionAt: "2026-09-01T02:04:55.191Z",
-    interactionCount: 3, familiarityDays: 0, warmth: 52, trust: 54, positiveEvents: 2,
-    negativeEvents: 0, conflictScore: 0, hurtScore: 0, repairProgress: 8,
-    repeatedNegativeCount: 0, conversationState: "active", repairAttempts: 0,
-  },
-}) as any;
+const state = () => ({ calmness:76,anger:20,stress:16,happiness:66,confidence:86,surprise:14,lastStatus:"Sakin ve kontrollü",relationship:{firstSeenAt:"2026-09-01T02:04:55.191Z",lastInteractionAt:"2026-09-01T02:04:55.191Z",interactionCount:3,familiarityDays:0,warmth:52,trust:54,positiveEvents:2,negativeEvents:0,conflictScore:0,hurtScore:0,repairProgress:8,repeatedNegativeCount:0,conversationState:"active",repairAttempts:0}}) as any;
+const event=(overrides:Partial<SemanticEvent>={}):SemanticEvent=>({raw:"test",normalized:"test",intent:"general_chat",socialRoutine:"none",discourseAct:"none",adviceRequested:false,valence:"neutral",target:"unknown",relationalAct:"none",relationalIntensity:0,severity:0,insult:false,redLine:false,disrespect:0,coercion:0,manipulation:0,privacyViolation:0,apology:false,repairAttempt:false,stopQuestions:false,stopTalking:false,frustration:0,emotionalLoad:0,affection:0,support:0,compliment:0,...overrides});
 
-const event = (overrides: Partial<SemanticEvent> = {}): SemanticEvent => ({
-  raw: "test", normalized: "test", intent: "general_chat", socialRoutine: "none",
-  discourseAct: "none", adviceRequested: false, valence: "neutral", target: "unknown",
-  relationalAct: "none", relationalIntensity: 0, severity: 0, insult: false, redLine: false,
-  disrespect: 0, coercion: 0, manipulation: 0, privacyViolation: 0, apology: false,
-  repairAttempt: false, stopQuestions: false, stopTalking: false, frustration: 0,
-  emotionalLoad: 0, affection: 0, support: 0, compliment: 0, ...overrides,
-});
-
-describe("session 0209 regressions", () => {
-  it("does not convert a zero-severity confusion challenge into relationship damage", () => {
-    const canonical = event({ raw: "ne alaka", normalized: "ne alaka", valence: "negative", target: "kaira", discourseAct: "confusion_or_challenge", frustration: 0.35, emotionalLoad: 0.2, severity: 0 });
-    const result = analyzeKdmInteraction("ne alaka", undefined, state(), canonical);
-    const rel = result.nextDynamicState.relationship!;
-    expect(result.trace.messageInterpretation.sentiment).toBe("duygusal_yük");
-    expect(rel.warmth).toBeGreaterThanOrEqual(49);
-    expect(rel.trust).toBe(54);
-    expect(rel.negativeEvents).toBe(0);
-    expect(rel.conflictScore).toBe(0);
-    expect(rel.hurtScore).toBe(0);
-    expect(rel.repeatedNegativeCount).toBe(0);
-    expect(result.nextDynamicState.reactionMode).toBe("neutral");
-  });
-
-  it("does not create injury for a benign Kaira-targeted provider false negative", () => {
-    const canonical = event({ raw: "bana bi kıyak geçsen :)", normalized: "bana bi kıyak geçsen :)", intent: "banter", valence: "negative", target: "kaira", severity: 0 });
-    const result = analyzeKdmInteraction("bana bi kıyak geçsen :)", undefined, state(), canonical);
-    expect(result.trace.messageInterpretation.sentiment).toBe("nötr");
-    expect(result.nextDynamicState.relationship?.warmth ?? 0).toBeGreaterThanOrEqual(49);
-    expect(result.nextDynamicState.relationship?.negativeEvents).toBe(0);
-    expect(result.nextDynamicState.relationship?.conflictScore).toBe(0);
-    expect(result.nextDynamicState.relationship?.hurtScore).toBe(0);
-  });
-
-  it.each(["naber", "nasılsın kank", "ne yapıyorsun"])("allows one reciprocal social question for: %s", (message) => {
-    const coarseProviderEvent = event({ raw: message, normalized: message, intent: "greeting", socialRoutine: "greeting", target: "kaira" });
-    const canonicalEvent = canonicalizeSemanticEvent(message, coarseProviderEvent);
-    const plan = planDialogueResponse([], message, "Mert", canonicalEvent);
-    expect(canonicalEvent.socialRoutine).toMatch(/^(how_are_you|what_doing)$/);
-    expect(plan).toMatchObject({ move: "natural_reaction", allowFollowUpQuestion: true });
-  });
-
-  it("renders the how-are-you routine from the CANONICAL event", () => {
-    const coarseProviderEvent = event({ raw: "naber", normalized: "naber", intent: "greeting", socialRoutine: "greeting", target: "kaira" });
-    const canonicalEvent = canonicalizeSemanticEvent("naber", coarseProviderEvent);
-    expect(canonicalEvent.socialRoutine).toBe("how_are_you");
-    const local = tryLocalKairoReply("naber", { humor: 50 } as any, state(), { decision: { chosenTone: "playful" } } as any, "session-0209-regression", "natural_reaction", { continueConversation: true, allowQuestion: true, allowHumor: true, relationshipLevel: "new" } as any, canonicalEvent, false);
-    expect(local.handled).toBe(true);
-    expect(local.intent).toBe("how_are_you");
-    expect(local.reply).toMatch(/sen|senden/u);
-  });
+describe("session 0209 regressions",()=>{
+ it("does not convert a zero-severity confusion challenge into relationship damage",()=>{const before=state();const canonical=event({raw:"ne alaka",normalized:"ne alaka",valence:"negative",target:"kaira",discourseAct:"confusion_or_challenge",frustration:0.35,emotionalLoad:0.2,severity:0});const result=analyzeKdmInteraction("ne alaka",undefined,before,canonical);const rel=result.nextDynamicState.relationship!;expect(result.trace.messageInterpretation.sentiment).toBe("duygusal_yük");expect(rel.warmth).toBeGreaterThanOrEqual(49);expect(rel.trust??0).toBeGreaterThanOrEqual((before.relationship.trust??0)-2);expect(rel.negativeEvents).toBe(0);expect(rel.conflictScore).toBe(0);expect(rel.hurtScore).toBe(0);expect(rel.repeatedNegativeCount).toBe(0);expect(result.nextDynamicState.reactionMode).toBe("neutral");});
+ it("does not create injury for a benign Kaira-targeted provider false negative",()=>{const canonical=event({raw:"bana bi kıyak geçsen :)",normalized:"bana bi kıyak geçsen :)",intent:"banter",valence:"negative",target:"kaira",severity:0});const result=analyzeKdmInteraction("bana bi kıyak geçsen :)",undefined,state(),canonical);expect(result.trace.messageInterpretation.sentiment).toBe("nötr");expect(result.nextDynamicState.relationship?.warmth??0).toBeGreaterThanOrEqual(49);expect(result.nextDynamicState.relationship?.negativeEvents).toBe(0);expect(result.nextDynamicState.relationship?.conflictScore).toBe(0);expect(result.nextDynamicState.relationship?.hurtScore).toBe(0);});
+ it.each(["naber","nasılsın kank","ne yapıyorsun"])("allows one reciprocal social question for: %s",message=>{const coarseProviderEvent=event({raw:message,normalized:message,intent:"greeting",socialRoutine:"greeting",target:"kaira"});const canonicalEvent=canonicalizeSemanticEvent(message,coarseProviderEvent);const plan=planDialogueResponse([],message,"Mert",canonicalEvent);expect(canonicalEvent.socialRoutine).toMatch(/^(how_are_you|what_doing)$/);expect(plan).toMatchObject({move:"natural_reaction",allowFollowUpQuestion:true});});
+ it("renders the how-are-you routine from the CANONICAL event",()=>{const coarseProviderEvent=event({raw:"naber",normalized:"naber",intent:"greeting",socialRoutine:"greeting",target:"kaira"});const canonicalEvent=canonicalizeSemanticEvent("naber",coarseProviderEvent);expect(canonicalEvent.socialRoutine).toBe("how_are_you");const local=tryLocalKairoReply("naber",{humor:50} as any,state(),{decision:{chosenTone:"playful"}} as any,"session-0209-regression","natural_reaction",{continueConversation:true,allowQuestion:true,allowHumor:true,relationshipLevel:"new"} as any,canonicalEvent,false);expect(local.handled).toBe(true);expect(local.intent).toBe("how_are_you");expect(local.reply).toMatch(/sen|senden/u);});
 });
