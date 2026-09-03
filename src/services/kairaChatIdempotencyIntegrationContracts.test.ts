@@ -8,7 +8,7 @@ describe('chat idempotency server integration contracts', () => {
   it('claims request identity before language understanding and KDM work', () => {
     const claimIndex = serverSource.indexOf('claimCoordinatedKairaChatRequest<any>(idempotencyKey)');
     const languageIndex = serverSource.indexOf('const languageUnderstanding = await resolveServerLanguageUnderstanding', claimIndex);
-    const kdmIndex = serverSource.indexOf('analyzeKdmInteraction(', claimIndex);
+    const kdmIndex = serverSource.indexOf('analyzeKdmInteractionCanonicalTurn(', claimIndex);
 
     expect(claimIndex).toBeGreaterThan(-1);
     expect(languageIndex).toBeGreaterThan(claimIndex);
