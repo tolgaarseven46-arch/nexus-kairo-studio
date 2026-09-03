@@ -21,18 +21,8 @@ jobs:
       - name: Install dependencies
         run: npm install --ignore-scripts
 
-      - name: contracts half A
-        continue-on-error: true
-        run: |
-          FILES=$(node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const a=p.scripts['test:contracts'].split(' ').filter(x=>x.endsWith('.test.ts'));console.log(a.slice(0,Math.ceil(a.length/2)).join(' '))")
-          npx vitest run $FILES
-      - name: contracts half B
-        continue-on-error: true
-        run: |
-          FILES=$(node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const a=p.scripts['test:contracts'].split(' ').filter(x=>x.endsWith('.test.ts'));console.log(a.slice(Math.ceil(a.length/2)).join(' '))")
-          npx vitest run $FILES
       - name: Architecture contracts
-        run: npm run test:contracts
+        run: npm run test:contracts -- --fileParallelism=false
 
       - name: Autonomous runtime contracts
         run: npx vitest run src/services/kairaActivityScheduleDispatchDiscoveryContracts.test.ts src/services/kairaAutonomousLifeWorkerRunCoordinatorContracts.test.ts src/services/kairaAutonomousLifeWorkerRunStoreContracts.test.ts src/services/kairaAutonomousLifeWorkerDurableRunCoordinatorContracts.test.ts src/services/kairaAutonomousLifeWorkerHealthContracts.test.ts src/services/kairaAutonomousLifeWorkerHealthConfigContracts.test.ts src/services/kairaAutonomousLifeWorkerRouteContracts.test.ts src/services/kairaAutonomousLifeSchedulerWorkflowContracts.test.ts src/services/kairaActivityOccupancyReadModelContracts.test.ts src/services/kairaActivityExecutionStoreContracts.test.ts src/services/kairaActivityExecutionCoordinatorContracts.test.ts src/services/kairaActivityScheduleStoreContracts.test.ts src/services/kairaActivityCatalogStoreContracts.test.ts src/services/kairaActivityPlanningTriggerInboxStoreContracts.test.ts src/services/kairaActivityDynamicStateStoreContracts.test.ts src/services/kairaActivityDynamicStateObservationCoordinatorContracts.test.ts src/services/kairaActivityPlanningSourceSnapshotContracts.test.ts src/services/kairaActivityPlanningTriggerInboxProcessorContracts.test.ts src/services/kairaAutonomousStateChatWiringContracts.test.ts
@@ -53,6 +43,7 @@ jobs:
         run: npm run build
 
   docs-guard:
+    # Riskli path'e dokunan PR, PROJECT_STATE.md veya docs/adr/** güncellemesi içermeli.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -60,6 +51,7 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
+
       - name: Enforce state/ADR update for risky changes
         run: |
           set -euo pipefail
@@ -67,6 +59,7 @@ jobs:
           git fetch -q origin "${{ github.base_ref }}"
           CHANGED="$(git diff --name-only "$BASE"...HEAD)"
           echo "Changed files:"; echo "$CHANGED" | sed 's/^/  /'
+
           if echo "$CHANGED" | bash .github/scripts/match-risky-paths.sh > /tmp/risky.txt; then
             echo "Risky paths touched:"; sed 's/^/  /' /tmp/risky.txt
             if echo "$CHANGED" | grep -Eq '^(PROJECT_STATE\.md|docs/adr/.+\.md)$'; then
@@ -80,6 +73,8 @@ jobs:
           fi
 
   behavior-guard:
+    # AI_CONTEXT.md §8 Hata Azaltma Protokolü — behavior-critical bir path'e dokunan PR
+    # bir test dosyası VE bir golden/long-session regression testi içermeli.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -87,6 +82,7 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
+
       - name: Enforce test + golden regression for behavior changes
         run: |
           set -euo pipefail
@@ -94,6 +90,7 @@ jobs:
           git fetch -q origin "${{ github.base_ref }}"
           CHANGED="$(git diff --name-only "$BASE"...HEAD)"
           echo "Changed files:"; echo "$CHANGED" | sed 's/^/  /'
+
           if echo "$CHANGED" | bash .github/scripts/match-risky-paths.sh .github/behavior-critical-paths.txt > /tmp/bc.txt; then
             echo "Behavior-critical paths touched:"; sed 's/^/  /' /tmp/bc.txt
             FAIL=0
