@@ -1,0 +1,108 @@
+name: C1 V2 Authority Migration
+on:
+  push:
+    branches: [chatgpt/c1-single-semantic-authority]
+    paths: [.github/workflows/c1-v2-authority-migration.yml]
+permissions:
+  contents: write
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/c1-single-semantic-authority
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --ignore-scripts
+      - name: Patch v2 authority wiring
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def patch(path, pairs):
+              p = Path(path); s = p.read_text()
+              for old, new in pairs:
+                  if old not in s:
+                      raise SystemExit(f"pattern missing in {path}: {old[:120]!r}")
+                  s = s.replace(old, new)
+              p.write_text(s)
+
+          patch('server.ts', [
+            ('semanticEvent: incomingSemanticEvent,\n      behaviorPolicy:', 'semanticInterpretation: incomingSemanticInterpretation,\n      behaviorPolicy:'),
+            ('incomingSemanticEvent,\n      context:', 'incomingSemanticInterpretation,\n      context:'),
+            ('const canonicalSemantic = {\n      event: languageUnderstanding.event,\n      source: languageUnderstanding.semanticSource,\n    };', 'const canonicalSemantic = {\n      interpretation: languageUnderstanding.interpretation,\n      event: languageUnderstanding.event,\n      source: languageUnderstanding.semanticSource,\n    };'),
+            ('semanticEvent: canonicalSemantic.event,\n', 'semanticInterpretation: canonicalSemantic.interpretation,\n        semanticEvent: canonicalSemantic.event,\n'),
+          ])
+
+          Path('src/services/clientLanguageUnderstanding.ts').write_text('''import type { SemanticEvent } from "./semanticEventEngine";\nimport type { SemanticInterpretation } from "../types/semanticInterpretation";\n\nexport interface ClientLanguageUnderstandingResult {\n  interpretation: SemanticInterpretation;\n  event: SemanticEvent;\n  semanticSource: string;\n  semanticProvider?: string;\n  morphologyProvider?: string;\n  morphology?: unknown;\n  warnings?: string[];\n}\n\nexport async function requestCanonicalLanguageUnderstanding(input: {\n  message: string;\n  userName?: string;\n  characterName?: string;\n  recentMessages?: Array<{ role: "user" | "assistant"; content: string }>;\n  provider?: "gemini" | "openrouter";\n}): Promise<ClientLanguageUnderstandingResult> {\n  const response = await fetch("/api/language-understanding", {\n    method: "POST",\n    headers: { "Content-Type": "application/json" },\n    body: JSON.stringify({ userMessage: input.message, userName: input.userName || "Kullanıcı", characterName: input.characterName || "KAIRO", history: input.recentMessages || [], provider: input.provider || "openrouter" }),\n  });\n  const data = await response.json().catch(() => ({}));\n  if (!response.ok || !data?.interpretation || !data?.event) throw new Error(data?.error || `Dil anlama servisi hatası: ${response.status}`);\n  return {\n    interpretation: data.interpretation as SemanticInterpretation,\n    event: data.event as SemanticEvent,\n    semanticSource: String(data.semanticSource || "unknown"),\n    semanticProvider: data.semanticProvider, morphologyProvider: data.morphologyProvider, morphology: data.morphology,\n    warnings: Array.isArray(data.warnings) ? data.warnings : [],\n  };\n}\n''')
+
+          patch('src/services/kairoConversationGrounding.ts', [
+            ('import type { SemanticEvent } from "./semanticEventEngine";', 'import type { SemanticInterpretation } from "../types/semanticInterpretation";'),
+            ('semanticEvent?: SemanticEvent;', 'semanticInterpretation?: SemanticInterpretation;'),
+          ])
+
+          patch('src/types/nexus.ts', [
+            ("export type NexusTab =", "import type { SemanticInterpretation } from './semanticInterpretation';\n\nexport type NexusTab ="),
+            ('activityPermissionRequestId?: string; semanticEvent?: unknown; semanticSource?: string;', 'activityPermissionRequestId?: string; semanticInterpretation?: SemanticInterpretation; semanticSource?: string;'),
+            ('semanticEvent?: unknown;\n    semanticSource?: string;', 'semanticInterpretation?: SemanticInterpretation;\n    semanticEvent?: unknown;\n    semanticSource?: string;'),
+          ])
+
+          patch('src/services/droitChatService.ts', [
+            ('import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";', 'import type { SemanticEvent } from "./semanticEventEngine";\nimport { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";\nimport { projectSemanticEvent } from "./semanticInterpretationProjection";'),
+            ('languageUnderstanding = {\n        event: interpretSemanticEvent(userMessage),', 'const interpretation = interpretationFromRegexFloor(userMessage);\n      languageUnderstanding = {\n        interpretation,\n        event: projectSemanticEvent(interpretation),'),
+            ('const payload = { sessionId: resolvedSessionId, requestId, userId, userName, userMessage, semanticEvent,', 'const payload = { sessionId: resolvedSessionId, requestId, userId, userName, userMessage, semanticInterpretation: languageUnderstanding.interpretation, semanticEvent,'),
+            ('semanticEvent: m.semanticEvent, semanticSource: m.semanticSource', 'semanticInterpretation: m.semanticInterpretation, semanticSource: m.semanticSource'),
+            ('const canonicalSemanticEvent = (data.kdm?.semanticEvent as SemanticEvent | undefined) ?? semanticEvent;', 'const canonicalSemanticInterpretation = data.kdm?.semanticInterpretation ?? languageUnderstanding.interpretation;\n      const canonicalSemanticEvent = (data.kdm?.semanticEvent as SemanticEvent | undefined) ?? semanticEvent;'),
+            ('semanticEvent: canonicalSemanticEvent,\n        semanticSource,', 'semanticInterpretation: canonicalSemanticInterpretation,\n        semanticEvent: canonicalSemanticEvent,\n        semanticSource,'),
+            ('languageUnderstanding: { ...languageUnderstanding, event: canonicalSemanticEvent }', 'languageUnderstanding: { ...languageUnderstanding, interpretation: canonicalSemanticInterpretation, event: canonicalSemanticEvent }'),
+          ])
+
+          patch('src/services/kdmPersistenceService.ts', [
+            ('semanticEvent?: unknown;\n    semanticSource?: string;', 'semanticInterpretation?: unknown;\n    semanticEvent?: unknown;\n    semanticSource?: string;'),
+          ])
+
+          patch('src/components/studio/NexusStudioLayout.tsx', [
+            ('semanticEvent: response.languageUnderstanding?.event,', 'semanticInterpretation: response.languageUnderstanding?.interpretation,'),
+          ])
+
+          patch('src/services/discourseStateReducer.ts', [
+            ('turn.semanticEvent', 'turn.semanticInterpretation ? projectSemanticEvent(turn.semanticInterpretation) : undefined'),
+            ('import type { SemanticEvent } from "./semanticEventEngine";', 'import type { SemanticEvent } from "./semanticEventEngine";\nimport { projectSemanticEvent } from "./semanticInterpretationProjection";'),
+          ])
+
+          for name in [
+            'src/services/kairaFoundationFirstConversationRegression.test.ts',
+            'src/services/kairoLocalLanguageEngineAuthority.test.ts',
+            'src/services/kairaRuntimeBehaviorLongSessionRegression.test.ts',
+            'src/services/kairaCanonicalSemanticHistoryAuthorityContracts.test.ts',
+            'src/services/kairaCanonicalSemanticHistoryGoldenSessionRegression.test.ts',
+            'src/services/discourseStateReducer.test.ts',
+          ]:
+              p=Path(name)
+              if not p.exists(): continue
+              s=p.read_text()
+              s=s.replace('semanticEvent:', 'semanticInterpretation:')
+              s=s.replace('interpretSemanticEvent(msg)', 'interpretationFromRegexFloor(msg)')
+              s=s.replace('interpretSemanticEvent(message)', 'interpretationFromRegexFloor(message)')
+              if 'interpretationFromRegexFloor' in s and 'semanticInterpretationLegacyProjection' not in s:
+                  s=s.replace('import { describe', 'import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";\nimport { describe', 1)
+              p.write_text(s)
+
+          # Negative authority contract: the normal producer path is v2, and deterministic projection never reparses raw text.
+          Path('src/services/kairaSemanticInterpretationV2AuthorityContracts.test.ts').write_text('''import { readFileSync } from "node:fs";\nimport { describe, expect, it } from "vitest";\nimport { createLlmSemanticUnderstandingProvider } from "./llmSemanticUnderstandingProvider";\nimport { projectSemanticEvent } from "./semanticInterpretationProjection";\nimport { SEMANTIC_INTERPRETATION_SCHEMA_VERSION } from "../types/semanticInterpretation";\n\ndescribe("SemanticInterpretation@2 canonical authority", () => {\n  it("LLM producer emits v2 with explicit uncertainty and discourse facets", async () => {\n    const provider = createLlmSemanticUnderstandingProvider({ generate: async () => JSON.stringify({\n      schemaVersion: SEMANTIC_INTERPRETATION_SCHEMA_VERSION, raw: "x", normalized: "x", primaryIntent: "complaint", secondarySocialActs: [], target: "kaira", valence: "negative",\n      severity: { disrespect: .2, coercion: 0, manipulation: 0, privacy: 0, aggression: .25 }, jokingConfidence: .4, sincerityConfidence: .7, affection: .1, support: 0, compliment: 0, emotionalLoad: .3, apology: false, repairAttempt: false, stopRequest: false,\n      discourseFacets: { socialRoutine: "none", discourseAct: "confusion_or_challenge", repairSignal: "clarification_request", adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: "none", relationalIntensity: .2, stopQuestions: false, stopTalking: false },\n      uncertainty: { overall: .3, intent: .2, target: .2, severity: .4 }, evidence: [{ source: "llm", cues: ["complaint"], confidence: .7 }]\n    }) });\n    const result = await provider.interpret({ message: "kafamı karıştırdın kankam" });\n    expect(result.schemaVersion).toBe(SEMANTIC_INTERPRETATION_SCHEMA_VERSION);\n    expect(result.severity.aggression).toBe(.25);\n    expect(result.discourseFacets.repairSignal).toBe("clarification_request");\n  });\n\n  it("v2 compatibility projection contains no parser or regex authority", () => {\n    const source = readFileSync(new URL("./semanticInterpretationProjection.ts", import.meta.url), "utf8");\n    expect(source).not.toMatch(/interpretSemanticEvent|interpretationFromRegexFloor|RegExp|\\.test\\(/u);\n  });\n\n  it("projecting v2 is deterministic and raw-text independent", () => {\n    const base: any = { schemaVersion: SEMANTIC_INTERPRETATION_SCHEMA_VERSION, raw: "aptalsın", normalized: "aptalsın", primaryIntent: "smalltalk", secondarySocialActs: [], target: "unknown", valence: "neutral", severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 }, jokingConfidence: 0, sincerityConfidence: .5, affection: 0, support: 0, compliment: 0, emotionalLoad: 0, apology: false, repairAttempt: false, stopRequest: false, discourseFacets: { socialRoutine: "none", discourseAct: "none", repairSignal: "none", adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: "none", relationalIntensity: 0, stopQuestions: false, stopTalking: false }, uncertainty: { overall: .5, intent: .5, target: .5, severity: .5 }, evidence: [] };\n    const a = projectSemanticEvent(base);\n    const b = projectSemanticEvent({ ...base, raw: "orospu", normalized: "orospu" });\n    expect(a.insult).toBe(false); expect(b.insult).toBe(false);\n    expect(a.severity).toBe(b.severity);\n  });\n});\n''')
+
+          Path('.github/workflows/c1-v2-authority-migration.yml').unlink()
+      - name: Focused validation
+        run: |
+          npx vitest run src/services/kairaSemanticInterpretationV2AuthorityContracts.test.ts src/services/llmSemanticUnderstandingProvider.test.ts src/services/languageUnderstandingService.test.ts src/services/serverLanguageUnderstanding.test.ts src/services/kairaCanonicalSemanticHistoryAuthorityContracts.test.ts src/services/kairaCanonicalSemanticHistoryGoldenSessionRegression.test.ts src/services/discourseStateReducer.test.ts
+          npx tsc --noEmit
+      - name: Commit migration
+        run: |
+          git config user.name "chatgpt-kaira"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(semantic): promote SemanticInterpretation v2 authority"
+          git push origin HEAD:chatgpt/c1-single-semantic-authority
