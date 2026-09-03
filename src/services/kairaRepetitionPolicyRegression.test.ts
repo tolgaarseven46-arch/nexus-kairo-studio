@@ -52,7 +52,7 @@ describe("repetition policy regression", () => {
 
     expect(plan.move).toBe("answer_or_clarify");
     expect(plan.repeatGuard?.act).toBe("agreement_ack");
-    expect(findDialogueDecisionIssues("he anladım", plan)).not.toHaveLength(0);
+    expect(findDialogueDecisionIssues("aynen", plan)).not.toHaveLength(0);
     expect(findDialogueDecisionIssues("Türkiye'de", plan)).toHaveLength(0);
   });
 });
