@@ -47,10 +47,9 @@ describe('beta conversation acceptance scenario', () => {
     // is intentionally ambiguous under SemanticInterpretation@2 and remains a
     // candidate signal instead of being forced into a Kaira-directed injury.
     const hurt = analyzeKdmInteraction('sen salaksın', NEUTRAL_DROIT_PERSONALITY, closeRelationship);
-    // ADR-0006 intentionally changes the qualitative label at high canonical
-    // injury: legacy classifies this close-relationship turn as hurt, while the
-    // canonical reducer classifies the hard boundary as withdrawn. Both remain
-    // the same reserved/very-short HOW family; this is an explained promotion delta.
+    // ADR-0006 intentionally changes the qualitative label at the canonical
+    // hard boundary: legacy classifies this close-relationship turn as hurt,
+    // while the canonical reducer withdraws. Both stay in the same reserved HOW family.
     expect(hurt.nextDynamicState.reactionMode).toBe(canonicalReducerOn ? 'withdrawn' : 'hurt');
     const hurtSpeech = computeKairoSpeechIdentity(
       NEUTRAL_DROIT_PERSONALITY,
@@ -83,14 +82,15 @@ describe('beta conversation acceptance scenario', () => {
       expect(conflictAfterRepair).toBeLessThan(conflictBeforeRepair);
     }
 
-    // Canonical hard-disengage repair is deliberately staged: one apology makes
-    // measurable repair progress but does not reopen the relationship before the
-    // configured repairing threshold is reached. Legacy may soften in one turn.
+    // Canonical hard-disengage repair is deliberately staged. Runtime apology
+    // sincerity yields ~9.6 progress per explicit repair act against a configured
+    // repairing threshold of 20, so the third apology is the deterministic exit.
     let state = firstRepair.nextDynamicState;
     let expectedInteractionCount = 92;
     if (canonicalReducerOn) {
       expect(state.reactionMode).toBe('withdrawn');
       expect(state.relationship?.conversationState).toBe('disengaged');
+
       const secondRepair = analyzeKdmInteraction(
         'gerçekten özür dilerim',
         NEUTRAL_DROIT_PERSONALITY,
@@ -98,10 +98,20 @@ describe('beta conversation acceptance scenario', () => {
       );
       expect(secondRepair.nextDynamicState.relationship?.repairProgress ?? 0)
         .toBeGreaterThan(state.relationship?.repairProgress ?? 0);
-      expect(secondRepair.nextDynamicState.relationship?.conversationState).toBe('repairing');
-      expect(secondRepair.nextDynamicState.reactionMode).toBe('repairing');
-      state = secondRepair.nextDynamicState;
-      expectedInteractionCount += 1;
+      expect(secondRepair.nextDynamicState.relationship?.conversationState).toBe('disengaged');
+      expect(secondRepair.nextDynamicState.reactionMode).toBe('withdrawn');
+
+      const thirdRepair = analyzeKdmInteraction(
+        'özür dilerim, gerçekten hata ettim',
+        NEUTRAL_DROIT_PERSONALITY,
+        secondRepair.nextDynamicState,
+      );
+      expect(thirdRepair.nextDynamicState.relationship?.repairProgress ?? 0)
+        .toBeGreaterThan(secondRepair.nextDynamicState.relationship?.repairProgress ?? 0);
+      expect(thirdRepair.nextDynamicState.relationship?.conversationState).toBe('repairing');
+      expect(thirdRepair.nextDynamicState.reactionMode).toBe('repairing');
+      state = thirdRepair.nextDynamicState;
+      expectedInteractionCount += 2;
     } else {
       expect(['repairing', 'neutral']).toContain(state.reactionMode);
     }
