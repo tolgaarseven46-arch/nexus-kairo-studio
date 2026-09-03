@@ -41,7 +41,10 @@ describe('beta conversation acceptance scenario', () => {
       allowSpeculation: false,
     });
 
-    const hurt = analyzeKdmInteraction('salak', NEUTRAL_DROIT_PERSONALITY, closeRelationship);
+    // Use an explicitly targeted insult. A lone one-word insult such as "salak"
+    // is intentionally ambiguous under SemanticInterpretation@2 and remains a
+    // candidate signal instead of being forced into a Kaira-directed injury.
+    const hurt = analyzeKdmInteraction('sen salaksın', NEUTRAL_DROIT_PERSONALITY, closeRelationship);
     expect(hurt.nextDynamicState.reactionMode).toBe('hurt');
     const hurtSpeech = computeKairoSpeechIdentity(
       NEUTRAL_DROIT_PERSONALITY,
