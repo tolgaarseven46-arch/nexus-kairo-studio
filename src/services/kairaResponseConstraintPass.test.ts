@@ -138,10 +138,10 @@ describe("Kaira unified response constraint pass", () => {
   });
 
   it("never trusts a supplied fallback; the fallback is passed through the same ordered constraints", () => {
-    const responsePlan = plan({ counterFlirtAllowed: false, emojiBudget: 0 });
+    const responsePlan = plan({ allowQuestion: false });
     const unsafeFallback = "iyi misin bugün";
     const result = runKairaResponseConstraintPass({
-      reply: "😘",
+      reply: "sen bugün nasılsın",
       trace: trace(),
       plan: responsePlan,
       worldItems: neutralWorld.items,
