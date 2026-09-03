@@ -93,12 +93,17 @@ replaceOnce(
 );
 
 // Both local and AI turn persistence paths must store exactly the authoritative server event.
-replaceAllChecked(
+replaceOnce(
   'server.ts',
-  '          metadata: {\n            providerUsed:',
-  '          metadata: {\n            semanticEvent: canonicalSemantic.event,\n            semanticSource: canonicalSemantic.source,\n            providerUsed:',
-  2,
-  'server turn semantic persistence',
+  '          metadata: {\n            providerUsed: "local_language",',
+  '          metadata: {\n            semanticEvent: canonicalSemantic.event,\n            semanticSource: canonicalSemantic.source,\n            providerUsed: "local_language",',
+  'local turn semantic persistence',
+);
+replaceOnce(
+  'server.ts',
+  '        metadata: {\n          providerUsed: activeAiProviderUsed,',
+  '        metadata: {\n          semanticEvent: canonicalSemantic.event,\n          semanticSource: canonicalSemantic.source,\n          providerUsed: activeAiProviderUsed,',
+  'AI turn semantic persistence',
 );
 
 // 3) Historical discourse may consume only persisted canonical events; missing old snapshots fail closed.
