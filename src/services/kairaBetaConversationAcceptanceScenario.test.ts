@@ -49,8 +49,8 @@ describe('beta conversation acceptance scenario', () => {
     const hurt = analyzeKdmInteraction('sen salaksın', NEUTRAL_DROIT_PERSONALITY, closeRelationship);
     // ADR-0006 intentionally changes the qualitative label at high canonical
     // injury: legacy classifies this close-relationship turn as hurt, while the
-    // canonical reducer classifies injury >= 30 as withdrawn. Both remain the
-    // same reserved/very-short HOW family; this is an explained promotion delta.
+    // canonical reducer classifies the hard boundary as withdrawn. Both remain
+    // the same reserved/very-short HOW family; this is an explained promotion delta.
     expect(hurt.nextDynamicState.reactionMode).toBe(canonicalReducerOn ? 'withdrawn' : 'hurt');
     const hurtSpeech = computeKairoSpeechIdentity(
       NEUTRAL_DROIT_PERSONALITY,
@@ -67,10 +67,21 @@ describe('beta conversation acceptance scenario', () => {
     );
     expect(firstRepair.nextDynamicState.relationship?.repairProgress ?? 0)
       .toBeGreaterThan(hurt.nextDynamicState.relationship?.repairProgress ?? 0);
-    expect(firstRepair.nextDynamicState.relationship?.hurtScore ?? 100)
-      .toBeLessThan(hurt.nextDynamicState.relationship?.hurtScore ?? 0);
-    expect(firstRepair.nextDynamicState.relationship?.conflictScore ?? 100)
-      .toBeLessThan(hurt.nextDynamicState.relationship?.conflictScore ?? 0);
+
+    const hurtBeforeRepair = hurt.nextDynamicState.relationship?.hurtScore ?? 0;
+    const conflictBeforeRepair = hurt.nextDynamicState.relationship?.conflictScore ?? 0;
+    const hurtAfterRepair = firstRepair.nextDynamicState.relationship?.hurtScore ?? 0;
+    const conflictAfterRepair = firstRepair.nextDynamicState.relationship?.conflictScore ?? 0;
+    if (canonicalReducerOn) {
+      // Hard boundary is orthogonal to numeric injury scores; with strong prior
+      // relationship history those scores can already be zero. Repair must not
+      // increase them, while repairProgress is the reopening signal.
+      expect(hurtAfterRepair).toBeLessThanOrEqual(hurtBeforeRepair);
+      expect(conflictAfterRepair).toBeLessThanOrEqual(conflictBeforeRepair);
+    } else {
+      expect(hurtAfterRepair).toBeLessThan(hurtBeforeRepair);
+      expect(conflictAfterRepair).toBeLessThan(conflictBeforeRepair);
+    }
 
     // Canonical hard-disengage repair is deliberately staged: one apology makes
     // measurable repair progress but does not reopen the relationship before the
