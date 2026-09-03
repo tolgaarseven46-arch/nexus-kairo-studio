@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import ts from 'typescript';
 
+// One-shot migration helper for ADR-0006 PR5. Remove after the branch is rewritten.
 const path = 'server.ts';
 const source = readFileSync(path, 'utf8');
 const sf = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
