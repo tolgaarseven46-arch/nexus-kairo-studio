@@ -16,6 +16,18 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
+      - name: Make codemod idempotent
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/pr5-finalize-canonical-cleanup.mjs')
+          s = p.read_text()
+          old = "  if (!s.includes(from)) throw new Error(`missing pattern in ${p}: ${from.slice(0,120)}`);\n  write(p, s.replace(from, to));"
+          new = "  if (!s.includes(from)) {\n    if (s.includes(to)) return;\n    throw new Error(`missing pattern in ${p}: ${from.slice(0,120)}`);\n  }\n  write(p, s.replace(from, to));"
+          if old in s:
+              s = s.replace(old, new)
+          p.write_text(s)
+          PY
       - name: Apply cleanup
         run: node scripts/pr5-finalize-canonical-cleanup.mjs
       - name: Commit cleanup
