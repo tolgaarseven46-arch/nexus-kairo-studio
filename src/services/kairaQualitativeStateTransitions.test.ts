@@ -6,11 +6,15 @@ function turn(message: string, state?: DroitDynamicState) {
   return analyzeKdmInteraction(message, undefined, state);
 }
 
+const directInsult = "sen salaksın";
+const repeatedDirectInsult = "sen yine salaksın";
+const hardBoundaryMessage = "seninle ciddi ciddi kavga edeceğiz kaşar herif";
+
 describe("KAIRA qualitative state transition contracts", () => {
-  it("moves relationship damage in the expected direction after repeated direct negativity", () => {
+  it("moves relationship damage in the expected direction after repeated explicitly targeted negativity", () => {
     const baseline = turn("selam kaira naber");
-    const firstNegative = turn("ne diyon lan mal", baseline.nextDynamicState);
-    const secondNegative = turn("ben sakinim salak", firstNegative.nextDynamicState);
+    const firstNegative = turn(directInsult, baseline.nextDynamicState);
+    const secondNegative = turn(repeatedDirectInsult, firstNegative.nextDynamicState);
 
     const before = baseline.nextDynamicState.relationship!;
     const first = firstNegative.nextDynamicState.relationship!;
@@ -24,8 +28,8 @@ describe("KAIRA qualitative state transition contracts", () => {
   });
 
   it("does not reset unresolved relationship damage on a neutral turn", () => {
-    const firstNegative = turn("ne diyon lan mal");
-    const secondNegative = turn("ben sakinim salak", firstNegative.nextDynamicState);
+    const firstNegative = turn(directInsult);
+    const secondNegative = turn(repeatedDirectInsult, firstNegative.nextDynamicState);
     const neutral = turn("bugün hava güzel", secondNegative.nextDynamicState);
 
     const damaged = secondNegative.nextDynamicState.relationship!;
@@ -39,8 +43,8 @@ describe("KAIRA qualitative state transition contracts", () => {
   });
 
   it("treats an apology as repair progress instead of instant forgiveness", () => {
-    const firstNegative = turn("ne diyon lan mal");
-    const secondNegative = turn("ben sakinim salak", firstNegative.nextDynamicState);
+    const firstNegative = turn(directInsult);
+    const secondNegative = turn(repeatedDirectInsult, firstNegative.nextDynamicState);
     const apology = turn("özür dilerim", secondNegative.nextDynamicState);
 
     const damaged = secondNegative.nextDynamicState.relationship!;
@@ -52,8 +56,8 @@ describe("KAIRA qualitative state transition contracts", () => {
     expect(repaired.interactionCount).toBeGreaterThan(damaged.interactionCount);
   });
 
-  it("keeps hard-stop disengagement sticky across unrelated neutral input", () => {
-    const hardStop = turn("orospu");
+  it("keeps a true combined hard-stop disengagement sticky across unrelated neutral input", () => {
+    const hardStop = turn(hardBoundaryMessage);
     const neutral = turn("neyse bugün hava güzel", hardStop.nextDynamicState);
 
     expect(hardStop.nextDynamicState.relationship?.conversationState).toBe("disengaged");
