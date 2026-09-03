@@ -57,14 +57,14 @@ describe("repetition policy boundary", () => {
     expect(findDialogueDecisionIssues("devam edelim", plan)).toHaveLength(0);
   });
 
-  it("does not let repetition context hijack factual, repair, or recall moves", () => {
+  it("does not let repetition context hijack factual or repair moves", () => {
     const discourse = {
       ...EMPTY_DISCOURSE_STATE,
       selfRepeat: { act: "agreement_ack" as const, count: 2 },
     };
 
-    const question = interpretSemanticEvent("bugün günlerden ne");
-    const questionPlan = planDialogueResponse([], "bugün günlerden ne", "Mert", question, undefined, discourse);
+    const question = interpretSemanticEvent("istanbul nerede");
+    const questionPlan = planDialogueResponse([], "istanbul nerede", "Mert", question, undefined, discourse);
     expect(questionPlan.move).toBe("answer_or_clarify");
     expect(questionPlan.repeatGuard?.act).toBe("agreement_ack");
 
