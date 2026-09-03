@@ -25,18 +25,18 @@ jobs:
           if ! grep -q '^## 132\. Canonical promotion + PR5 compatibility removal complete' PROJECT_STATE.md; then
             cat >> PROJECT_STATE.md <<'EOF'
 
-## 132. Canonical promotion + PR5 compatibility removal complete — 2026-09-03
-- PR #33 completed and merged the evidence phase for `CANONICAL_PATH_PROMOTION_GATE`: canonical beta acceptance, recorded/golden replay, explicit all-flags-OFF rollback drill and same-input canonical-vs-legacy diff review all passed. The gate also exposed and fixed hard-boundary repair FSM deadlocks instead of masking them with relaxed tests.
-- PR #34 `refactor(kaira): remove canonical rollout compatibility` merged into `main` as commit `4b9f10d5a1134b6df0c6e8f61520ecc624e5a585`.
-- The five temporary canonical rollout flags and their legacy runtime decision branches are removed. SemanticInterpretation@2, canonical RelationshipReducer, canonical PlanResolver, canonical prompt authority and unified final constraint pass are now the only live behavior path. Runtime rollback is no longer a flag flip; it is repository-level `git revert`.
-- Final PR #34 head `50c25b8b93c64dc7489d0029d771a579d8545701` passed Architecture Review, architecture contracts, autonomous runtime contracts, beta regression, beta conversation acceptance, full Vitest suite, TypeScript check, production build, docs-guard and behavior-guard before merge.
-- Canonical relationship semantics are now locked as follows: a lone lexical insult such as `salak` remains ambiguous/candidate-only; an explicitly targeted insult such as `sen salaksın` can produce relationship-sensitive `irritated` / `hurt` / `withdrawn`; hard-boundary recovery is staged rather than instant; a calm follow-up can preserve residual hurt while injury is measurably recovering, but integer score-floor stalling cannot keep Kaira qualitatively hurt forever.
-- Temporary promotion/debug/codemod workflows, runners and artifacts used during migration are not part of the final runtime architecture.
+          ## 132. Canonical promotion + PR5 compatibility removal complete — 2026-09-03
+          - PR #33 completed and merged the evidence phase for `CANONICAL_PATH_PROMOTION_GATE`: canonical beta acceptance, recorded/golden replay, explicit all-flags-OFF rollback drill and same-input canonical-vs-legacy diff review all passed. The gate also exposed and fixed hard-boundary repair FSM deadlocks instead of masking them with relaxed tests.
+          - PR #34 `refactor(kaira): remove canonical rollout compatibility` merged into `main` as commit `4b9f10d5a1134b6df0c6e8f61520ecc624e5a585`.
+          - The five temporary canonical rollout flags and their legacy runtime decision branches are removed. SemanticInterpretation@2, canonical RelationshipReducer, canonical PlanResolver, canonical prompt authority and unified final constraint pass are now the only live behavior path. Runtime rollback is no longer a flag flip; it is repository-level `git revert`.
+          - Final PR #34 head `50c25b8b93c64dc7489d0029d771a579d8545701` passed Architecture Review, architecture contracts, autonomous runtime contracts, beta regression, beta conversation acceptance, full Vitest suite, TypeScript check, production build, docs-guard and behavior-guard before merge.
+          - Canonical relationship semantics are now locked as follows: a lone lexical insult such as `salak` remains ambiguous/candidate-only; an explicitly targeted insult such as `sen salaksın` can produce relationship-sensitive `irritated` / `hurt` / `withdrawn`; hard-boundary recovery is staged rather than instant; a calm follow-up can preserve residual hurt while injury is measurably recovering, but integer score-floor stalling cannot keep Kaira qualitatively hurt forever.
+          - Temporary promotion/debug/codemod workflows, runners and artifacts used during migration are not part of the final runtime architecture.
 
-### Next verified development question
-- Start from this post-PR5 canonical-only `main`. Do **not** reopen PR #30–#34, rollout flags, or canonical-vs-legacy compatibility work unless a new measured regression specifically requires a revert/audit.
-- Derive the next product task from current `main` and this file. The architecture-migration phase is closed; the next work should return to higher-level Kaira product behavior/quality validation rather than rebuilding compatibility paths.
-EOF
+          ### Next verified development question
+          - Start from this post-PR5 canonical-only `main`. Do **not** reopen PR #30–#34, rollout flags, or canonical-vs-legacy compatibility work unless a new measured regression specifically requires a revert/audit.
+          - Derive the next product task from current `main` and this file. The architecture-migration phase is closed; the next work should return to higher-level Kaira product behavior/quality validation rather than rebuilding compatibility paths.
+          EOF
           fi
           rm -f .github/workflows/pr5-state-append.yml
           git config user.name 'github-actions[bot]'
