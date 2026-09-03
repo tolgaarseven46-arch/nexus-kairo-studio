@@ -16,10 +16,16 @@ describe("Kaira unified guard runtime wiring contracts", () => {
   it("covers both local and model-generated delivery paths without deleting the flag-off legacy rollback", () => {
     const source = server();
     const localStart = source.indexOf("if (!selfMemoryInstruction && local.handled && local.reply)");
-    const aiStart = source.indexOf("const canonicalConstraint = unifiedGuardOn", localStart + 1);
+    const localConstraint = source.indexOf("const canonicalConstraint = unifiedGuardOn", localStart);
+    const localRun = source.indexOf("runKairaResponseConstraintPass({", localConstraint);
+    const aiConstraint = source.indexOf("const canonicalConstraint = unifiedGuardOn", localConstraint + 1);
+    const aiRun = source.indexOf("runKairaResponseConstraintPass({", aiConstraint);
+
     expect(localStart).toBeGreaterThan(-1);
-    expect(source.indexOf("runKairaResponseConstraintPass({", localStart)).toBeLessThan(aiStart);
-    expect(aiStart).toBeGreaterThan(localStart);
+    expect(localConstraint).toBeGreaterThan(localStart);
+    expect(localRun).toBeGreaterThan(localConstraint);
+    expect(aiConstraint).toBeGreaterThan(localRun);
+    expect(aiRun).toBeGreaterThan(aiConstraint);
     expect(source).toContain(': enforceBehaviorContract(baseEnforced.reply, kdm.trace, behaviorContract)');
     expect(source).toContain('if (!canonicalConstraint && postEnforcementPlanIssues.length)');
   });
