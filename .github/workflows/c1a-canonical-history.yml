@@ -6,6 +6,7 @@ on:
       - chatgpt/c1-single-semantic-authority
     paths:
       - .github/scripts/c1a-canonical-history.mjs
+      - .github/scripts/c1a-authority-fixture.mjs
       - .github/workflows/c1a-canonical-history.yml
 
 permissions:
@@ -29,7 +30,9 @@ jobs:
         run: npm install --ignore-scripts
 
       - name: Apply C1a migration
-        run: node .github/scripts/c1a-canonical-history.mjs
+        run: |
+          node .github/scripts/c1a-canonical-history.mjs
+          node .github/scripts/c1a-authority-fixture.mjs
 
       - name: Focused authority tests
         run: npx vitest run src/services/kairaCanonicalSemanticHistoryAuthorityContracts.test.ts src/services/discourseStateReducer.test.ts src/services/kairaCurrentTurnDialogueAuthorityContracts.test.ts src/services/kairaSemanticConsumerAuthorityContracts.test.ts
@@ -40,7 +43,7 @@ jobs:
       - name: Commit migration and remove one-time machinery
         run: |
           set -euo pipefail
-          rm -f .github/scripts/c1a-canonical-history.mjs .github/workflows/c1a-canonical-history.yml
+          rm -f .github/scripts/c1a-canonical-history.mjs .github/scripts/c1a-authority-fixture.mjs .github/workflows/c1a-canonical-history.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
