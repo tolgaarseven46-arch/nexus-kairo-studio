@@ -25,6 +25,7 @@ function requireTestList(name, value) {
 const betaTests = requireTestList('beta acceptance tests', betaManifest.tests);
 const recordedSessionTests = requireTestList('recorded session tests', promotionManifest.recordedSessionTests);
 const rollbackTests = requireTestList('rollback tests', promotionManifest.rollbackTests);
+const diffReviewTests = requireTestList('shared-corpus diff review tests', promotionManifest.diffReviewTests);
 
 function envFor(enabled) {
   const env = { ...process.env };
@@ -34,7 +35,7 @@ function envFor(enabled) {
 
 function runVitest(label, tests, enabled) {
   console.log(`\n=== ${label} ===`);
-  console.log(`canonical flags: ${enabled ? 'ON' : 'OFF'}`);
+  console.log(`canonical flags at process start: ${enabled ? 'ON' : 'OFF'}`);
   const result = spawnSync(
     process.platform === 'win32' ? 'npx.cmd' : 'npx',
     ['vitest', 'run', ...tests],
@@ -44,9 +45,13 @@ function runVitest(label, tests, enabled) {
   if ((result.status ?? 1) !== 0) process.exit(result.status ?? 1);
 }
 
-runVitest('Promotion evidence 1/3: beta acceptance on canonical path', betaTests, true);
-runVitest('Promotion evidence 2/3: recorded-session replay on canonical path', recordedSessionTests, true);
-runVitest('Promotion evidence 3/3: rollback drill on legacy path', rollbackTests, false);
+runVitest('Promotion evidence 1/4: beta acceptance on canonical path', betaTests, true);
+runVitest('Promotion evidence 2/4: recorded-session replay on canonical path', recordedSessionTests, true);
+runVitest('Promotion evidence 3/4: rollback drill on legacy path', rollbackTests, false);
+// This test toggles all five flags internally for the exact same inputs and
+// contains only classified/justified differences. Starting OFF keeps the test
+// isolated from an inherited CI environment.
+runVitest('Promotion evidence 4/4: canonical-vs-legacy shared-corpus diff review', diffReviewTests, false);
 
-console.log('\nAutomated CANONICAL_PATH_PROMOTION_GATE evidence is green.');
-console.log('Manual gate still required: canonical-vs-legacy shared-corpus diff review with every delta explained.');
+console.log('\nCANONICAL_PATH_PROMOTION_GATE automated + encoded review evidence is green.');
+console.log('Any future unclassified shared-corpus behavior delta must fail the permanent diff regression.');
