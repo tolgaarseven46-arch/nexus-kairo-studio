@@ -1,6 +1,6 @@
 name: Unified Guard Wiring
 
-# One-time PR4 server seam materialization; removed before merge.
+# One-time PR4 server seam materialization; removed before merge after targeted guards are green.
 on:
   push:
     branches:
