@@ -24,7 +24,7 @@ describe("explicit behavior policy boundary", () => {
   it("validates the explicit policy at the server boundary and passes it to KDM", () => {
     expect(server).toContain("normalizeBehaviorPolicyInput(incomingBehaviorPolicy)");
     expect(server).toContain("behaviorPolicy: incomingBehaviorPolicy");
-    expect(server).toMatch(/analyzeKdmInteraction\([\s\S]*canonicalSemantic\.event,\s*behaviorPolicy,\s*\)/u);
+    expect(server).toMatch(/analyzeKdmInteractionCanonicalTurn\([\s\S]*canonicalSemantic\.interpretation,\s*canonicalSemantic\.event,\s*behaviorPolicy,\s*\)/u);
   });
 
   it("does not recover live integrated decisions from personality runtime fields inside KDM", () => {
