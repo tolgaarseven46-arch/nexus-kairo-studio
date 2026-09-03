@@ -26,8 +26,8 @@ A passing test is evidence only for the invariant it directly observes. CI green
 ## Runtime safety decisions in PR #31
 
 - Previous-turn dependency is inferred from the pending conversational role plus canonical semantics, not from one exact phrase.
-- Question blocking checks common punctuation-free Turkish question acts in addition to `?`.
-- Autonomous activity permission prompts are fail-closed for ordinary chat unless explicitly enabled; an appended permission prompt is treated as part of the delivered response contract.
+- Question blocking checks common punctuation-free Turkish question acts in addition to `?`, with reported-question counterexamples to reduce false positives.
+- Activity-permission composition is explicitly tested as part of the delivered reply contract. The low-level permission service remains functional; the still-open integration requirement is that ordinary chat must not append a permission question after the response-plan authority has forbidden questions. PR #31 remains draft until that server seam is resolved or isolated out-of-band.
 - Kaira self-repeat detection is evaluated by social act, not exact reply string.
 - ADR-0006 behavior flags retain explicit opt-in/rollback semantics; canonical promotion must be proven at the runtime/deployment boundary rather than implemented as a hidden library default.
 
