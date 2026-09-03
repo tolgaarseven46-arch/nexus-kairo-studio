@@ -31,6 +31,10 @@ A passing test is evidence only for the invariant it directly observes. CI green
 - Kaira self-repeat detection is evaluated by social act, not exact reply string.
 - ADR-0006 behavior flags retain explicit opt-in/rollback semantics; canonical promotion must be proven at the runtime/deployment boundary rather than implemented as a hidden library default.
 
+## Evidence classification
+
+Tests in this strategy must say whether they are **acceptance** (the runtime is required to satisfy the invariant) or **characterization** (the test demonstrates an existing seam/problem without claiming it is fixed). A characterization test may stay green while proving that composing a given side-channel creates a plan violation; it must not be reported as evidence that the runtime has prevented that violation.
+
 ## Consequences
 
 Behavior fixes will generally add more than one test and may intentionally keep a PR in draft while counterexamples are still being found. This increases short-term test work but reduces false confidence from narrow green suites.
