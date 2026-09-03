@@ -3,12 +3,14 @@ import {
   DroitPersonalityTraits,
   ReasoningTrace,
 } from "../types/nexus";
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import {
   computeBehaviorProfile,
   BehaviorLayerProfile,
 } from "./droitBehaviorEngine";
 import { normalizeDroitPersonality } from "./droitPersonalityNormalizer";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
+import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 import { analyzeKdmInteractionCanonical } from "./kdmRelationshipReducerBridge";
 
@@ -99,19 +101,11 @@ export function applyIntegratedBehaviorPolicy(
     tone = "warm";
   }
 
-  if (responseLength <= 30) {
-    directives.push("Cevabı kısa tut; tercihen tek kısa cümle, gerekirse iki cümle.");
-  } else if (responseLength >= 70) {
-    directives.push("Konu gerektiriyorsa biraz daha açıklayıcı ol; yine sosyal sohbet ritmini koru.");
-  }
-
+  if (responseLength <= 30) directives.push("Cevabı kısa tut; tercihen tek kısa cümle, gerekirse iki cümle.");
+  else if (responseLength >= 70) directives.push("Konu gerektiriyorsa biraz daha açıklayıcı ol; yine sosyal sohbet ritmini koru.");
   if (directness >= 70) directives.push("Dolandırmadan, doğrudan ve net konuş.");
-
-  if (priority >= 80) {
-    relationshipParts.push("Üst öncelik değer/sınır katmanında; eğlence, yakınlaşma ve tercih katmanları bunu bastıramaz.");
-  } else if (priority >= 60) {
-    relationshipParts.push("Üst öncelik mevcut ilişki durumunda; önce ilişki mesafesini koru.");
-  }
+  if (priority >= 80) relationshipParts.push("Üst öncelik değer/sınır katmanında; eğlence, yakınlaşma ve tercih katmanları bunu bastıramaz.");
+  else if (priority >= 60) relationshipParts.push("Üst öncelik mevcut ilişki durumunda; önce ilişki mesafesini koru.");
 
   return {
     ...profile,
@@ -152,15 +146,12 @@ export function semanticIntentToKdm(event: SemanticEvent): string {
     case "banter": return "şakalaşma";
     case "insult": return "hakaret_ve_saldiri";
     case "rejection": return "reddetme_ve_mesafe";
-    case "apology": return "özür_ve_telafi";
+    case "apology":
     case "repair": return "özür_ve_telafi";
     case "complaint": return "anlamama_ve_itiraz";
     case "command": return "eylem_talebi";
     case "support": return "duygusal_destek";
-    case "compliment": return "genel_sohbet";
-    case "general_chat":
-    default:
-      return "genel_sohbet";
+    default: return "genel_sohbet";
   }
 }
 
@@ -183,18 +174,6 @@ export function semanticSentimentToKdm(event: SemanticEvent): string {
   return "nötr";
 }
 
-export function semanticPattern(event: SemanticEvent): string | null {
-  const normalized = event.normalized || event.raw.toLocaleLowerCase("tr-TR");
-  if (event.redLine || /(?<![\p{L}])(orosp\p{L}*|kaşa[rs]\p{L}*|sürtük\p{L}*|kahpe\p{L}*|yavşak\p{L}*|şerefsiz\p{L}*|haysiyetsiz\p{L}*)(?![\p{L}])/iu.test(normalized)) return "agir_hakaret";
-  if (event.insult || /(?<![\p{L}])(aptal\p{L}*|salak\p{L}*|gerizekal\p{L}*|geri\s*zekal\p{L}*|mal|ezik\p{L}*|dangalak\p{L}*|öküz\p{L}*)(?![\p{L}])/iu.test(normalized)) return "hakaret";
-  if (event.coercion > 0) return "zorlama";
-  if (event.manipulation > 0) return "manipulasyon";
-  if (event.privacyViolation > 0) return "mahremiyet_ihlali";
-  if (event.intent === "rejection") return "kovma_ve_reddetme";
-  if (event.frustration > 0) return "agresif_dil";
-  return null;
-}
-
 const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
   calmness: 70,
   anger: 10,
@@ -206,9 +185,39 @@ const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
 };
 
 /**
- * ADR-0006 PR5: RelationshipReducer is now the only relationship/state authority.
- * The temporary rollout switch and legacy decision body were removed after promotion.
- * Rollback is repository-level `git revert`.
+ * Authoritative runtime entrypoint (C1b).
+ * Both values originate from the same ingestion-time SemanticInterpretation@2;
+ * `semanticEvent` is only its deterministic compatibility projection.
+ */
+export function analyzeKdmInteractionCanonicalTurn(
+  userMessage: string,
+  personality: Partial<DroitPersonalityTraits> | null | undefined,
+  currentDynamicState: DroitDynamicState | null | undefined,
+  semanticInterpretation: SemanticInterpretation,
+  semanticEvent: SemanticEvent,
+  behaviorPolicy?: BehaviorPolicyInput | null,
+): KdmAnalysisResult {
+  const state: DroitDynamicState = { ...DEFAULT_DYNAMIC_STATE, ...(currentDynamicState || {}) };
+  const normalizedPersonality = normalizeDroitPersonality(personality);
+  const baseBehaviorProfile = computeBehaviorProfile(normalizedPersonality, userMessage);
+  return analyzeKdmInteractionCanonical({
+    state,
+    semanticInterpretation,
+    semanticEvent,
+    normalizedPersonality,
+    baseBehaviorProfile,
+    behaviorPolicy: behaviorPolicy ?? null,
+    applyIntegrated: applyIntegratedBehaviorPolicy,
+    semanticIntentToKdm,
+    semanticSentimentToKdm,
+  });
+}
+
+/**
+ * Legacy/test ingress helper.
+ * Production server code must not call this function: it exists only for older
+ * reducer unit/regression tests that intentionally exercise deterministic regex
+ * ingestion without the HTTP language-understanding gateway.
  */
 export function analyzeKdmInteraction(
   userMessage: string,
@@ -217,23 +226,14 @@ export function analyzeKdmInteraction(
   canonicalSemanticEvent?: SemanticEvent | null,
   behaviorPolicy?: BehaviorPolicyInput | null,
 ): KdmAnalysisResult {
-  const state: DroitDynamicState = {
-    ...DEFAULT_DYNAMIC_STATE,
-    ...(currentDynamicState || {}),
-  };
   const semanticEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage);
-  const normalizedPersonality = normalizeDroitPersonality(personality);
-  const baseBehaviorProfile = computeBehaviorProfile(normalizedPersonality, userMessage);
-
-  return analyzeKdmInteractionCanonical({
-    state,
+  const semanticInterpretation = interpretationFromRegexFloor(userMessage);
+  return analyzeKdmInteractionCanonicalTurn(
+    userMessage,
+    personality,
+    currentDynamicState,
+    semanticInterpretation,
     semanticEvent,
-    normalizedPersonality,
-    baseBehaviorProfile,
-    behaviorPolicy: behaviorPolicy ?? null,
-    applyIntegrated: applyIntegratedBehaviorPolicy,
-    semanticPattern,
-    semanticIntentToKdm,
-    semanticSentimentToKdm,
-  });
+    behaviorPolicy,
+  );
 }
