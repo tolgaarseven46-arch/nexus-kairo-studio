@@ -59,8 +59,26 @@ const wordCount = (reply: string) =>
 
 // Output conformance cannot rely on punctuation alone: casual Turkish often
 // omits '?'. This is deliberately an output-act guard, not semantic parsing.
-const QUESTION_RE =
-  /[?？]|(?:^|[.!…\n]\s*)(?:neden|niye|nas[ıi]l|kim|kime|kimi|hangi|hangisi|nerede|neresi|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|nas[ıi]ls[ıi]n)\b|\b(?:m[ıiuü]|misin|m[ıi]s[ıi]n|musun|m[üu]s[üu]n)\b/iu;
+const QUESTION_PUNCTUATION_RE = /[?？]/u;
+const DIRECT_INTERROGATIVE_START_RE =
+  /^\s*(?:neden|niye|kim|kime|kimi|hangi|hangisi|nerede|neresi|kaç)\b/iu;
+const DIRECT_SOCIAL_QUESTION_RE =
+  /\b(?:nas[ıi]ls[ıi]n|senden\s+naber|sen\s+naber|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|nap[ıi]yon|iyi\s+misin)\b/iu;
+const QUESTION_CLITIC_RE =
+  /\b(?:m[ıiuü]|misin|m[ıi]s[ıi]n|musun|m[üu]s[üu]n|m[ıi]y[ıi]m|muyum|m[üu]y[üu]m|m[ıi]yd[ıi]|m[ıi]yd[ıi]n|m[ıi]yd[ıi]k|m[ıi]yd[ıi]lar)\b/iu;
+const REPORTED_QUESTION_RE =
+  /\b(?:nas[ıi]ls[ıi]n|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|iyi\s+misin)\b.{0,40}\b(?:diye\s+(?:sordu|dedi)|sorduğunu|dediğini)\b/iu;
+
+function looksLikeQuestionAct(text: string): boolean {
+  if (QUESTION_PUNCTUATION_RE.test(text)) return true;
+  if (REPORTED_QUESTION_RE.test(text)) return false;
+  return (
+    DIRECT_INTERROGATIVE_START_RE.test(text) ||
+    DIRECT_SOCIAL_QUESTION_RE.test(text) ||
+    QUESTION_CLITIC_RE.test(text)
+  );
+}
+
 const HUMOR_RE = /(hahaha|hehe|şaka|takılıyorum|dalga|😂|🤣|😏)/iu;
 const AFFECTION_RE = /(öp|öpüc|sarıl|kucağ|dudak|bebeğim|aşkım|tatlım|sevgilim)/iu;
 const FORGIVENESS_RE = /(geçti gitti|sorun yok|affettim|tamamen geçti|kapandı gitti)/iu;
@@ -219,7 +237,7 @@ export function findKairaResponsePlanIssues(
   if (!text) return ["response_plan_empty_reply"];
   const issues: string[] = [];
 
-  if (!plan.allowQuestion && QUESTION_RE.test(text)) issues.push("response_plan_question_blocked");
+  if (!plan.allowQuestion && looksLikeQuestionAct(text)) issues.push("response_plan_question_blocked");
   if (!plan.allowHumor && HUMOR_RE.test(text)) issues.push("response_plan_humor_blocked");
   if (!plan.allowAffection && AFFECTION_RE.test(text)) issues.push("response_plan_affection_blocked");
   // Hard character-policy boundary (canonical path only — `false`, never `undefined`):
