@@ -106,16 +106,16 @@ export async function presentKairaActivityPermissionChatPrompt(input: {
   });
 }
 
+/**
+ * Keep activity-permission UX out of the planner-owned assistant reply.
+ * Prompt/resolution data is returned separately by the chat API and must be
+ * rendered by the caller as structured UI, so it cannot bypass response-plan
+ * constraints such as allowQuestion/maxSentences/maxWords.
+ */
 export function composeKairaActivityPermissionChatReply(input: {
   reply: string;
   resolution: KairaActivityPermissionChatResolution;
   prompt: KairaActivityPermissionChatPrompt | null;
 }): string {
-  const parts: string[] = [];
-  if (input.resolution.status === "applied") {
-    parts.push(input.resolution.result.decision.intent === "grant" ? "İzni aldım." : "Tamam, bu aktiviteyi yapmayacağım.");
-  }
-  if (input.reply.trim()) parts.push(input.reply.trim());
-  if (input.prompt) parts.push(input.prompt.text);
-  return parts.join("\n\n");
+  return input.reply;
 }
