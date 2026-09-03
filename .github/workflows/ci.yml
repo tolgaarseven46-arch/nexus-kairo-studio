@@ -21,42 +21,16 @@ jobs:
       - name: Install dependencies
         run: npm install --ignore-scripts
 
-      - name: isolate response-plan
+      - name: contracts half A
         continue-on-error: true
-        run: npx vitest run src/services/kairaResponsePlan.test.ts
-      - name: isolate response-plan integration
+        run: |
+          FILES=$(node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const a=p.scripts['test:contracts'].split(' ').filter(x=>x.endsWith('.test.ts'));console.log(a.slice(0,Math.ceil(a.length/2)).join(' '))")
+          npx vitest run $FILES
+      - name: contracts half B
         continue-on-error: true
-        run: npx vitest run src/services/kairaResponsePlanIntegrationContracts.test.ts
-      - name: isolate response-plan authority
-        continue-on-error: true
-        run: npx vitest run src/services/kairaResponsePlanFinalAuthorityContracts.test.ts
-      - name: isolate speech authority
-        continue-on-error: true
-        run: npx vitest run src/services/kairaSpeechIdentityAuthorityContracts.test.ts
-      - name: isolate semantic consumer
-        continue-on-error: true
-        run: npx vitest run src/services/kairaSemanticConsumerAuthorityContracts.test.ts
-      - name: isolate KDM semantic authority
-        continue-on-error: true
-        run: npx vitest run src/services/kairaKdmCanonicalSemanticAuthorityContracts.test.ts
-      - name: isolate current-turn dialogue authority
-        continue-on-error: true
-        run: npx vitest run src/services/kairaCurrentTurnDialogueAuthorityContracts.test.ts
-      - name: isolate behavior-profile authority
-        continue-on-error: true
-        run: npx vitest run src/services/kairaBehaviorProfileAuthorityContracts.test.ts
-      - name: isolate temperament authority
-        continue-on-error: true
-        run: npx vitest run src/services/kairaTemperamentBeforeKdmContracts.test.ts
-      - name: isolate behavior-policy boundary
-        continue-on-error: true
-        run: npx vitest run src/services/kairaBehaviorPolicyBoundaryContracts.test.ts
-      - name: isolate base-personality ownership
-        continue-on-error: true
-        run: npx vitest run src/services/kairaBasePersonalityOwnershipContracts.test.ts
-      - name: isolate legacy runtime removal
-        continue-on-error: true
-        run: npx vitest run src/services/kairaLegacyRuntimeFlagRemovalContracts.test.ts
+        run: |
+          FILES=$(node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const a=p.scripts['test:contracts'].split(' ').filter(x=>x.endsWith('.test.ts'));console.log(a.slice(Math.ceil(a.length/2)).join(' '))")
+          npx vitest run $FILES
       - name: Architecture contracts
         run: npm run test:contracts
 
