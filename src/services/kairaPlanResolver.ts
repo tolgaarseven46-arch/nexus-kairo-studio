@@ -100,10 +100,12 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
 
   const maxSentences =
     soft.verbosityTendency < 0.35 ? Math.max(1, Math.min(hard.maxSentences, 1)) : hard.maxSentences;
-  const maxWords = Math.max(
-    1,
-    Math.min(hard.maxWords, Math.round(hard.maxWords * (0.6 + 0.4 * soft.verbosityTendency))),
-  );
+  const maxWords = hard.hardDisengage
+    ? Math.max(4, hard.maxWords)
+    : Math.max(
+        1,
+        Math.min(hard.maxWords, Math.round(hard.maxWords * (0.6 + 0.4 * soft.verbosityTendency))),
+      );
 
   const emojiBudget =
     hard.emojiBudget > 0 && soft.warmthTendency >= 0.4 && !hard.mustAcknowledgeBoundary ? 1 : 0;

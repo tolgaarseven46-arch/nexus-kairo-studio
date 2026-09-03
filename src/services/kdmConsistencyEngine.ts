@@ -184,8 +184,9 @@ export function semanticSentimentToKdm(event: SemanticEvent): string {
 }
 
 export function semanticPattern(event: SemanticEvent): string | null {
-  if (event.redLine) return "agir_hakaret";
-  if (event.insult) return "hakaret";
+  const normalized = event.normalized || event.raw.toLocaleLowerCase("tr-TR");
+  if (event.redLine || /(?<![\p{L}])(orosp|kaşa[rs]|sürtük|kahpe|yavşak|şerefsiz|haysiyetsiz)(?![\p{L}])/iu.test(normalized)) return "agir_hakaret";
+  if (event.insult || /(?<![\p{L}])(aptal|salak|gerizekal|geri\s*zekal|\bmal\b|ezik|dangalak|öküz)(?![\p{L}])/iu.test(normalized)) return "hakaret";
   if (event.coercion > 0) return "zorlama";
   if (event.manipulation > 0) return "manipulasyon";
   if (event.privacyViolation > 0) return "mahremiyet_ihlali";

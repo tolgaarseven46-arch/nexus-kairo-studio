@@ -167,6 +167,26 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
     config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG,
   });
 
+  // Preserve a low-level qualitative reaction across the first calm follow-up
+  // while real relationship injury is still present. This is a projection of
+  // canonical reducer state, not a second relationship authority: scores/FSM/
+  // recovery remain wholly reducer-owned.
+  const projectedReactionMode: AffectiveReactionMode =
+    result.reactionMode === "neutral" &&
+    Math.max(result.scores.hurt, result.scores.conflict) >= 2 &&
+    (prev.reactionMode === "hurt" || prev.reactionMode === "irritated") &&
+    result.recovery.strength < 0.3
+      ? prev.reactionMode
+      : result.reactionMode;
+  const projectedResult: RelationshipReducerResult =
+    projectedReactionMode === result.reactionMode
+      ? result
+      : {
+          ...result,
+          reactionMode: projectedReactionMode,
+          rationale: [...result.rationale, "residual-reaction-persistence"],
+        };
+
   const warmthBefore = clamp100(prev.scores.warmth ?? 50);
   const familiarityDaysLegacy = Math.max(
     prevRel.familiarityDays ?? 0,
@@ -179,48 +199,48 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
     ...prevRel,
     firstSeenAt: prevRel.firstSeenAt ?? nowIso,
     lastInteractionAt: nowIso,
-    interactionCount: result.interactionCount,
+    interactionCount: projectedResult.interactionCount,
     familiarityDays: familiarityDaysLegacy,
-    warmth: result.scores.warmth,
-    trust: result.scores.trust,
-    positiveEvents: result.scores.positiveEvents,
-    negativeEvents: result.scores.negativeEvents,
-    conflictScore: result.scores.conflict,
-    hurtScore: result.scores.hurt,
-    repairProgress: result.scores.repairProgress,
-    repeatedNegativeCount: result.scores.repeatedNegativeCount,
-    conversationState: result.conversationState,
-    repairAttempts: result.repairAttempts,
-    ...(result.lastConflictAt ? { lastConflictAt: result.lastConflictAt } : {}),
-    ...(result.lastNegativePattern ? { lastNegativePattern: result.lastNegativePattern } : {}),
-    ...(result.disengagedAt ? { disengagedAt: result.disengagedAt } : { disengagedAt: undefined }),
-    ...(result.disengageReason ? { disengageReason: result.disengageReason } : { disengageReason: undefined }),
+    warmth: projectedResult.scores.warmth,
+    trust: projectedResult.scores.trust,
+    positiveEvents: projectedResult.scores.positiveEvents,
+    negativeEvents: projectedResult.scores.negativeEvents,
+    conflictScore: projectedResult.scores.conflict,
+    hurtScore: projectedResult.scores.hurt,
+    repairProgress: projectedResult.scores.repairProgress,
+    repeatedNegativeCount: projectedResult.scores.repeatedNegativeCount,
+    conversationState: projectedResult.conversationState,
+    repairAttempts: projectedResult.repairAttempts,
+    ...(projectedResult.lastConflictAt ? { lastConflictAt: projectedResult.lastConflictAt } : {}),
+    ...(projectedResult.lastNegativePattern ? { lastNegativePattern: projectedResult.lastNegativePattern } : {}),
+    ...(projectedResult.disengagedAt ? { disengagedAt: projectedResult.disengagedAt } : { disengagedAt: undefined }),
+    ...(projectedResult.disengageReason ? { disengageReason: projectedResult.disengageReason } : { disengageReason: undefined }),
   };
 
-  const reactionMode: AffectiveReactionMode = result.reactionMode;
+  const reactionMode: AffectiveReactionMode = projectedResult.reactionMode;
   const lastStatus = statusLabel(result);
 
   const deltas = [
-    { label: "Stres", key: "stress", value: result.affectDelta.stress },
-    { label: "Mutluluk", key: "happiness", value: result.affectDelta.happiness },
-    { label: "Sakinlik", key: "calmness", value: result.affectDelta.calmness },
-    { label: "Öfke", key: "anger", value: result.affectDelta.anger },
+    { label: "Stres", key: "stress", value: projectedResult.affectDelta.stress },
+    { label: "Mutluluk", key: "happiness", value: projectedResult.affectDelta.happiness },
+    { label: "Sakinlik", key: "calmness", value: projectedResult.affectDelta.calmness },
+    { label: "Öfke", key: "anger", value: projectedResult.affectDelta.anger },
   ];
 
   const nextDynamicState: DroitDynamicState = {
     ...state,
-    stress: clamp100((state.stress ?? 20) + result.affectDelta.stress),
-    happiness: clamp100((state.happiness ?? 70) + result.affectDelta.happiness),
-    calmness: clamp100((state.calmness ?? 70) + result.affectDelta.calmness),
-    anger: clamp100((state.anger ?? 10) + result.affectDelta.anger),
+    stress: clamp100((state.stress ?? 20) + projectedResult.affectDelta.stress),
+    happiness: clamp100((state.happiness ?? 70) + projectedResult.affectDelta.happiness),
+    calmness: clamp100((state.calmness ?? 70) + projectedResult.affectDelta.calmness),
+    anger: clamp100((state.anger ?? 10) + projectedResult.affectDelta.anger),
     confidence: state.confidence ?? 70,
     surprise: state.surprise ?? 10,
     reactionMode,
     relationship: nextRelationship,
     lastStatus,
     lastEvent: {
-      eventTitle: `KDM(v2): ${result.conversationState}/${reactionMode}${result.hard.disengage ? " [hard]" : ""}`,
-      reactionText: `reducer: ${result.rationale.join("; ")}; axes open=${result.axes.openness} warm=${result.axes.warmth} guard=${result.axes.guardedness}`,
+      eventTitle: `KDM(v2): ${projectedResult.conversationState}/${reactionMode}${projectedResult.hard.disengage ? " [hard]" : ""}`,
+      reactionText: `reducer: ${projectedResult.rationale.join("; ")}; axes open=${projectedResult.axes.openness} warm=${projectedResult.axes.warmth} guard=${projectedResult.axes.guardedness}`,
       deltas,
     },
   };
@@ -229,7 +249,7 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
   const finalBehaviorProfile = applyIntegrated(relationshipBehaviorProfile, behaviorPolicy);
 
   const warmthLabel =
-    result.scores.warmth >= 70 ? "Sıcak" : result.scores.warmth >= 40 ? "Dengeli" : "Mesafeli";
+    projectedResult.scores.warmth >= 70 ? "Sıcak" : projectedResult.scores.warmth >= 40 ? "Dengeli" : "Mesafeli";
 
   const trace: ReasoningTrace = {
     whoSent: {
@@ -241,25 +261,25 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
           : `${prevRel.interactionCount} etkileşimlik tanışıklık.`,
     },
     relationship: {
-      warmthScore: result.scores.warmth,
+      warmthScore: projectedResult.scores.warmth,
       warmthLabel,
-      note: `familiarity=${result.scores.familiarity}; güven %${result.scores.trust}; çatışma %${result.scores.conflict}; kırgınlık %${result.scores.hurt}; onarım %${result.scores.repairProgress}; ilişki=${result.conversationState}; hard=${result.hard.disengage ? result.hard.reason : "no"}.`,
+      note: `familiarity=${projectedResult.scores.familiarity}; güven %${projectedResult.scores.trust}; çatışma %${projectedResult.scores.conflict}; kırgınlık %${projectedResult.scores.hurt}; onarım %${projectedResult.scores.repairProgress}; ilişki=${projectedResult.conversationState}; hard=${projectedResult.hard.disengage ? projectedResult.hard.reason : "no"}.`,
       familiarityDays: familiarityDaysLegacy,
-      interactionCount: result.interactionCount,
-      trustScore: result.scores.trust,
-      conflictScore: result.scores.conflict,
-      hurtScore: result.scores.hurt,
-      repairProgress: result.scores.repairProgress,
-      repeatedNegativeCount: result.scores.repeatedNegativeCount,
-      conversationState: result.conversationState,
-      repairAttempts: result.repairAttempts,
+      interactionCount: projectedResult.interactionCount,
+      trustScore: projectedResult.scores.trust,
+      conflictScore: projectedResult.scores.conflict,
+      hurtScore: projectedResult.scores.hurt,
+      repairProgress: projectedResult.scores.repairProgress,
+      repeatedNegativeCount: projectedResult.scores.repeatedNegativeCount,
+      conversationState: projectedResult.conversationState,
+      repairAttempts: projectedResult.repairAttempts,
     },
     currentMood: {
       moodText: lastStatus,
       reactionMode,
-      reasonText: result.hard.disengage
-        ? `Birleşik sınır ihlali (${result.hard.reason}); mevcut turda gerçek severity ${result.recovery ? "" : ""}mevcut. Nötr mesaj veya yakınlaşma bu durumu tek turda silemez.`
-        : `Canonical reducer: ${result.rationale.join("; ")}.`,
+      reasonText: projectedResult.hard.disengage
+        ? `Birleşik sınır ihlali (${projectedResult.hard.reason}); mevcut turda gerçek severity ${projectedResult.recovery ? "" : ""}mevcut. Nötr mesaj veya yakınlaşma bu durumu tek turda silemez.`
+        : `Canonical reducer: ${projectedResult.rationale.join("; ")}.`,
     },
     messageInterpretation: {
       intent: kdmIntent,
@@ -274,14 +294,14 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
     },
     decision: {
       chosenTone: finalBehaviorProfile.tone,
-      explanation: `Canonical KairaResponsePlan öncesi katman: reducer axes open=${result.axes.openness}/warm=${result.axes.warmth}/guard=${result.axes.guardedness}; ton=${finalBehaviorProfile.tone}.`,
+      explanation: `Canonical KairaResponsePlan öncesi katman: reducer axes open=${projectedResult.axes.openness}/warm=${projectedResult.axes.warmth}/guard=${projectedResult.axes.guardedness}; ton=${finalBehaviorProfile.tone}.`,
     },
     memoryUpdate: {
       warmthBefore,
-      warmthAfter: result.scores.warmth,
-      warmthDelta: result.scores.warmth - warmthBefore,
+      warmthAfter: projectedResult.scores.warmth,
+      warmthDelta: projectedResult.scores.warmth - warmthBefore,
       moodChange: lastStatus,
-      reason: `Canonical reducer ${result.conversationState}/${reactionMode}; recovery strength=${result.recovery.strength} [${result.recovery.rationale.join("+")}].`,
+      reason: `Canonical reducer ${projectedResult.conversationState}/${reactionMode}; recovery strength=${projectedResult.recovery.strength} [${projectedResult.recovery.rationale.join("+")}].`,
     },
   };
 
