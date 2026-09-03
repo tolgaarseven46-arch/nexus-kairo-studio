@@ -30,7 +30,9 @@ describe("canonical KairaResponsePlan runtime integration", () => {
     expect(server).toContain("postEnforcementPlanIssues = canonicalConstraint?.issues ?? findKairaResponsePlanIssues(reply, responsePlan)");
     expect(server).toContain("findKairaResponsePlanIssues(candidateReply, responsePlan)");
     expect(server).toContain("response_plan_delivery_fallback");
-    expect(server).toContain("finalIssues = [...new Set([...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues])]");
+    expect(server).toContain("const finalIssues = canonicalConstraint");
+    expect(server).toContain("...canonicalExternalIssues, ...finalPlanIssues");
+    expect(server).toContain("...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues");
     expect(unifiedPass).toContain("findKairaResponsePlanIssues(delivered, input.plan)");
     expect(unifiedPass).toContain("const candidate = runOrderedPass(preferredFallback, input)");
   });
