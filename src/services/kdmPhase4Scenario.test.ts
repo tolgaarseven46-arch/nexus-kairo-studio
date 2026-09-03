@@ -19,6 +19,8 @@ function backdateDisengagement(state: DroitDynamicState, minutes = 31): DroitDyn
   };
 }
 
+const directInsult = "sen tam bir salaksın";
+const repeatedDirectInsult = "sen yine tam bir salaksın";
 const hardBoundaryMessage = "seninle ciddi ciddi kavga edeceğiz kaşar herif";
 
 describe("KDM Phase 4 end-to-end relationship scenarios", () => {
@@ -32,9 +34,9 @@ describe("KDM Phase 4 end-to-end relationship scenarios", () => {
     expect(contract.playfulness).toBe("allowed");
   });
 
-  it("escalates repeated direct insults into distancing instead of resetting", () => {
-    const first = turn("ne diyon lan mal");
-    const second = turn("ben sakinim salak", first.nextDynamicState);
+  it("escalates repeated explicitly targeted insults into distancing instead of resetting", () => {
+    const first = turn(directInsult);
+    const second = turn(repeatedDirectInsult, first.nextDynamicState);
     const relationship = second.nextDynamicState.relationship!;
     const contract = buildBehaviorContract(second.nextDynamicState, second.trace);
 
@@ -47,8 +49,8 @@ describe("KDM Phase 4 end-to-end relationship scenarios", () => {
   });
 
   it("does not erase distancing with one apology", () => {
-    const first = turn("ne diyon lan mal");
-    const second = turn("ben sakinim salak", first.nextDynamicState);
+    const first = turn(directInsult);
+    const second = turn(repeatedDirectInsult, first.nextDynamicState);
     const apology = turn("özür dilerim", second.nextDynamicState);
     const contract = buildBehaviorContract(apology.nextDynamicState, apology.trace);
 
@@ -72,12 +74,13 @@ describe("KDM Phase 4 end-to-end relationship scenarios", () => {
     expect(contract.affection).toBe("forbidden");
   });
 
-  it("requires time and repeated repair before reactivation", () => {
+  it("requires accumulated repair before moving disengaged -> repairing -> active", () => {
     const hardStop = turn(hardBoundaryMessage);
     const state = backdateDisengagement(hardStop.nextDynamicState, 31);
 
     const repair1 = turn("özür dilerim", state);
-    expect(repair1.nextDynamicState.relationship?.conversationState).toBe("repairing");
+    expect(repair1.nextDynamicState.relationship?.conversationState).toBe("disengaged");
+    expect(repair1.nextDynamicState.relationship?.repairProgress ?? 0).toBeGreaterThan(0);
 
     const repair2 = turn("özür dilerim gerçekten", repair1.nextDynamicState);
     expect(repair2.nextDynamicState.relationship?.conversationState).toBe("repairing");
@@ -97,8 +100,8 @@ describe("KDM Phase 4 end-to-end relationship scenarios", () => {
   });
 
   it("blocks semantically playful reopening while relationship damage is unresolved", () => {
-    const first = turn("ne diyon lan mal");
-    const second = turn("ben sakinim salak", first.nextDynamicState);
+    const first = turn(directInsult);
+    const second = turn(repeatedDirectInsult, first.nextDynamicState);
     const contract = buildBehaviorContract(second.nextDynamicState, second.trace);
 
     const enforced = enforceBehaviorContract(
