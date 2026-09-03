@@ -99,20 +99,41 @@ describe("Kaira cross-layer runtime behavior proofs", () => {
     );
   });
 
-  it("characterizes the activity permission side-channel as delivered text that can violate a no-question plan", () => {
+  it("keeps activity-permission prompts out of the planner-owned reply", () => {
     const prompt = buildKairaActivityPermissionChatPrompt({
       requestId: "req-1",
       activityId: "archive_exploration",
       activityType: "archive exploration",
     });
+    const plannerReply = "iyi valla";
     const delivered = composeKairaActivityPermissionChatReply({
-      reply: "iyi valla",
+      reply: plannerReply,
       resolution: { status: "none" },
       prompt,
     });
 
-    const issues = findKairaResponsePlanIssues(delivered, focusedPlan({ move: "follow_previous_answer" }));
-    expect(issues).toContain("response_plan_question_blocked");
+    expect(delivered).toBe(plannerReply);
+    expect(delivered).not.toContain(prompt.text);
+    expect(
+      findKairaResponsePlanIssues(delivered, focusedPlan({ move: "follow_previous_answer" })),
+    ).not.toContain("response_plan_question_blocked");
+  });
+
+  it("keeps activity-permission resolution acknowledgements out of the planner-owned reply", () => {
+    const plannerReply = "tamamdır";
+    const delivered = composeKairaActivityPermissionChatReply({
+      reply: plannerReply,
+      resolution: {
+        status: "applied",
+        result: {
+          decision: { intent: "grant" },
+        } as never,
+      },
+      prompt: null,
+    });
+
+    expect(delivered).toBe(plannerReply);
+    expect(delivered).not.toContain("İzni aldım");
   });
 
   it("detects self-repeat by social act rather than exact reply text", () => {
