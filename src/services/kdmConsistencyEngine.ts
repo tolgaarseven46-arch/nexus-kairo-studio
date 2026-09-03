@@ -185,8 +185,8 @@ export function semanticSentimentToKdm(event: SemanticEvent): string {
 
 export function semanticPattern(event: SemanticEvent): string | null {
   const normalized = event.normalized || event.raw.toLocaleLowerCase("tr-TR");
-  if (event.redLine || /(?<![\p{L}])(orosp|kaşa[rs]|sürtük|kahpe|yavşak|şerefsiz|haysiyetsiz)(?![\p{L}])/iu.test(normalized)) return "agir_hakaret";
-  if (event.insult || /(?<![\p{L}])(aptal|salak|gerizekal|geri\s*zekal|\bmal\b|ezik|dangalak|öküz)(?![\p{L}])/iu.test(normalized)) return "hakaret";
+  if (event.redLine || /(?<![\p{L}])(orosp\p{L}*|kaşa[rs]\p{L}*|sürtük\p{L}*|kahpe\p{L}*|yavşak\p{L}*|şerefsiz\p{L}*|haysiyetsiz\p{L}*)(?![\p{L}])/iu.test(normalized)) return "agir_hakaret";
+  if (event.insult || /(?<![\p{L}])(aptal\p{L}*|salak\p{L}*|gerizekal\p{L}*|geri\s*zekal\p{L}*|mal|ezik\p{L}*|dangalak\p{L}*|öküz\p{L}*)(?![\p{L}])/iu.test(normalized)) return "hakaret";
   if (event.coercion > 0) return "zorlama";
   if (event.manipulation > 0) return "manipulasyon";
   if (event.privacyViolation > 0) return "mahremiyet_ihlali";
