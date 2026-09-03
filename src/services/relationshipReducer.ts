@@ -216,9 +216,12 @@ export function evaluateRedline(
     ["privacy", w.privacy * s.privacy],
   ];
   // Targeting raises the score, but it is context rather than a second harm
-  // dimension. `minCombinedSignals` must therefore be satisfied by actual harm
-  // dimensions; otherwise one targeted insult becomes an immediate hard-stop.
-  const contributors = harmContributors.filter(([, v]) => v >= floor).length;
+  // dimension. Low lexical aggression commonly co-occurs with an insult and is
+  // also correlated evidence, so it only becomes an independent contributor
+  // when its raw present-turn severity clears the hard-stop severity gate.
+  const contributors = harmContributors.filter(([name, v]) =>
+    v >= floor && (name !== "aggression" || s.aggression >= rl.minPresentSeverity)
+  ).length;
   const base = harmContributors.reduce((acc, [, v]) => acc + v, 0) + (signal.targetsKaira ? w.targetsKaira : 0);
 
   const repetitionFactor = clamp01(num(prev.scores.repeatedNegativeCount, 0) / 2);
