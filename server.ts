@@ -953,6 +953,8 @@ app.post("/api/chat", async (req, res) => {
             warnings: enforced.reasons,
           },
           metadata: {
+            semanticEvent: canonicalSemantic.event,
+            semanticSource: canonicalSemantic.source,
             providerUsed: "local_language",
             languageStyleMemory,
             controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" },
@@ -1395,6 +1397,8 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           warnings: enforced.reasons,
         },
         metadata: {
+          semanticEvent: canonicalSemantic.event,
+          semanticSource: canonicalSemantic.source,
           providerUsed: activeAiProviderUsed,
           languageStyleMemory,
           controlledSpontaneity: spontaneityDecision,

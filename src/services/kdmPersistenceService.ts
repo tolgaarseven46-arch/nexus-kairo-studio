@@ -113,6 +113,8 @@ export interface SaveTestSessionTurnPayload {
   metadata?: {
     providerUsed?: string;
     model?: string;
+    semanticEvent?: unknown;
+    semanticSource?: string;
     timings?: Record<string, number>;
     languageStyleMemory?: unknown;
     controlledSpontaneity?: unknown;
@@ -141,6 +143,8 @@ export function turnsToTestMessages(turns: TestSessionTurnRecord[]): TestMessage
         sender: 'user',
         text: turn.userMessage,
         participantName: turn.speaker,
+        semanticEvent: turn.metadata?.semanticEvent,
+        semanticSource: turn.metadata?.semanticSource,
         timestamp: timeStr,
       });
     }
@@ -237,6 +241,8 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
     metadata: {
       providerUsed: payload.metadata?.providerUsed,
       model: payload.metadata?.model,
+      semanticEvent: payload.metadata?.semanticEvent,
+      semanticSource: payload.metadata?.semanticSource,
       timings: payload.metadata?.timings,
       speechIdentity: payload.metadata?.speechIdentity,
       entityResolution: payload.metadata?.entityResolution,

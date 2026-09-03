@@ -452,6 +452,11 @@ export const NexusStudioLayout: React.FC = () => {
           }
         }
         setIsolatedConversation(false);
+        const canonicalUserMsg: TestMessage = {
+          ...userMsg,
+          semanticEvent: response.languageUnderstanding?.event,
+          semanticSource: response.languageUnderstanding?.semanticSource,
+        };
         const dm: TestMessage = {
           id: `msg-${Date.now() + 1}`,
           sender: "droit",
@@ -464,9 +469,12 @@ export const NexusStudioLayout: React.FC = () => {
             minute: "2-digit",
           }),
         };
-        setMessages((p) => [...p, dm]);
+        setMessages((p) => [
+          ...p.map((message) => message.id === userMsg.id ? canonicalUserMsg : message),
+          dm,
+        ]);
         if (!relationshipLevel) {
-          void persistMessageSafely(userMsg);
+          void persistMessageSafely(canonicalUserMsg);
           void persistMessageSafely(dm);
         }
       } catch (e: any) {

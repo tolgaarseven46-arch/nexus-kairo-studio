@@ -101,7 +101,7 @@ describe("Kaira self-repetition", () => {
 describe("deriveDiscourseState folds history + current turn", () => {
   it("replays the request history and the current user message with no persistence", () => {
     const history = [
-      { sender: "user", text: "naber" },
+      { sender: "user", text: "naber", semanticEvent: interpretSemanticEvent("naber") },
       { sender: "droit", text: "iyi valla sen nasılsın" },
     ];
     const s = deriveDiscourseState(history, { message: "iyi dedim ya", event: interpretSemanticEvent("iyi dedim ya") });
