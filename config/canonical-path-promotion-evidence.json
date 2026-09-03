@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "recordedSessionTests": [
     "src/services/relationshipReducerGoldenSession.test.ts",
     "src/services/kairaFoundationFirstConversationRegression.test.ts",
@@ -13,7 +13,13 @@
     "src/services/kairaTwentyTurnPersistenceRoundtripRegression.test.ts",
     "src/services/kairaRuntimeBehaviorLongSessionRegression.test.ts"
   ],
-  "manualRequirements": [
-    "canonical-vs-legacy behavior diff review is complete and every shared-corpus delta is explained"
+  "diffReviewTests": [
+    "src/services/kairaCanonicalLegacySharedCorpusDiffReview.test.ts"
+  ],
+  "reviewRequirements": [
+    "same-input canonical-vs-legacy behavioral deltas are encoded as exact explained expectations",
+    "ordinary neutral social behavior remains aligned",
+    "semantic target-resolution and staged hard-boundary repair deltas are intentional and documented",
+    "any newly observed unclassified delta fails the permanent regression instead of being silently accepted"
   ]
 }
