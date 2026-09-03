@@ -12,9 +12,12 @@ import {
   classifyUserSocialAct,
   kairaActIsQuestion,
   userSignalsAlreadyAnswered,
+  userSignalsAnswerFriction,
+  userSignalsStateAnswer,
 } from "./discourseSocialAct";
 import {
   EMPTY_DISCOURSE_STATE,
+  type DiscoursePendingQuestion,
   type DiscoursePreviousTurnDependency,
   type DiscourseSocialAct,
   type DiscourseState,
@@ -59,9 +62,9 @@ function startsNewTopic(event: SemanticEvent): boolean {
     event.discourseAct === "topic_shift" ||
     event.intent === "information_request" ||
     event.intent === "emotional_share" ||
-    (event.socialRoutine ?? "none") === "none" &&
+    ((event.socialRoutine ?? "none") === "none" &&
       event.discourseAct === "none" &&
-      !isShortIntent(event)
+      !isShortIntent(event))
   );
 }
 
@@ -71,6 +74,30 @@ function isShortIntent(event: SemanticEvent): boolean {
     event.intent === "general_chat" ||
     (event.socialRoutine ?? "none") !== "none"
   );
+}
+
+/**
+ * Contextual answer recognition is based on the pending conversational role,
+ * not on one magic phrase. The per-message semantic label can legitimately be
+ * `banter`/`general_chat` while the turn is still an answer to Kaira's question.
+ * This is deliberately coarse: it only establishes dependency, never sentiment
+ * or relationship meaning.
+ */
+function answersPendingQuestion(
+  pending: DiscoursePendingQuestion,
+  message: string,
+  act: DiscourseSocialAct,
+): boolean {
+  const text = message.trim().toLocaleLowerCase("tr-TR");
+  if (!text) return false;
+  if (act === "answer" || act === "agreement_ack" || act === "correction") return true;
+
+  if (pending.kind === "how_are_you") return userSignalsStateAnswer(message);
+  if (pending.kind === "what_doing") {
+    return /^(?:tak[ıi]l|çalış|çal[ıi][şs]|otur|evde|işte|okulda|dışarı|boş|hiçbir|bi\s+şey|bir\s+şey)/iu.test(text);
+  }
+
+  return isShort(message) && act !== "greeting" && act !== "farewell";
 }
 
 export function reduceDiscourseState(
@@ -101,25 +128,38 @@ export function reduceDiscourseState(
         ? prev.pendingQuestion
         : null;
     const isOwnRoutine =
-      act === "greeting" || act === "farewell" || act === "thanks" || act === "banter";
+      act === "greeting" || act === "farewell" || act === "thanks";
+    const contextualAnswer =
+      kairaPending !== null && answersPendingQuestion(kairaPending, turn.message, act);
+    const answerFriction =
+      userSignalsAlreadyAnswered(turn.message) || userSignalsAnswerFriction(turn.message);
+    const explicitDependency =
+      answerFriction ||
+      act === "correction" ||
+      act === "complaint";
+    const responseEvidence = contextualAnswer || (!isOwnRoutine && explicitDependency);
+    // A canonical semantic label such as complaint/general_chat must not erase a
+    // stronger turn-taking fact: a state-shaped answer to Kaira's still-pending
+    // question remains dependent on that question. Only treat it as a new topic
+    // when there is no contextual/explicit response evidence.
+    const unambiguousNewTopic = startsNewTopic(turn.event) && !responseEvidence;
     const respondsToKaira =
       prev.lastKairaAct !== null &&
-      !isOwnRoutine &&
-      !startsNewTopic(turn.event) &&
-      (userSignalsAlreadyAnswered(turn.message) ||
-        act === "correction" ||
-        act === "complaint" ||
-        (kairaPending !== null &&
-          (isShort(turn.message) || act === "answer" || act === "agreement_ack")));
+      !unambiguousNewTopic &&
+      responseEvidence;
 
     if (respondsToKaira) {
-      const friction = userSignalsAlreadyAnswered(turn.message) || act === "complaint";
+      const friction =
+        answerFriction ||
+        act === "complaint" ||
+        turn.event.discourseAct === "correction" ||
+        turn.event.frustration >= 0.25;
       previousTurnDependency = {
         on: kairaPending ? "kaira_question" : "kaira_statement",
         responseKind:
           act === "correction"
             ? "correction"
-            : act === "complaint" && !userSignalsAlreadyAnswered(turn.message)
+            : act === "complaint" && !answerFriction
               ? "clarification"
               : friction
                 ? "answer_with_friction"
@@ -234,7 +274,7 @@ export function buildDiscourseObservationalInstruction(state: DiscourseState): s
         d.on === "kaira_question" ? "sorusuna" : "sözüne"
       } verilmiş bir ${
         d.responseKind === "answer_with_friction"
-          ? "cevap + hafif sitem (kullanıcı 'zaten söyledim' diyor)"
+          ? "cevap + hafif sitem (kullanıcı daha önce cevap verdiğini belirtiyor)"
           : d.responseKind === "correction"
             ? "düzeltme"
             : d.responseKind === "clarification"
