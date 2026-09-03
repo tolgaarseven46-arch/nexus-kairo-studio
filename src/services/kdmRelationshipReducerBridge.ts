@@ -2,22 +2,26 @@
  * ADR-0006 wiring: canonical RelationshipReducer bridge.
  *
  * C1b authority rule: RelationshipReducer consumes the ingestion-time
- * SemanticInterpretation@2 directly. The compatibility SemanticEvent may still
- * be used for legacy KNT labels, but it is never reparsed or enriched here.
+ * SemanticInterpretation@2 directly. The compatibility/appraisal event may
+ * contribute deterministic entity/world grounding such as relationshipScope,
+ * but nothing in this bridge reparses raw text.
  */
 import type { AffectiveReactionMode, DroitDynamicState, DroitPersonalityTraits, ReasoningTrace, RelationshipState } from "../types/nexus";
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import type { BehaviorLayerProfile } from "./droitBehaviorEngine";
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 import type { SemanticEvent } from "./semanticEventEngine";
+import type { SemanticRelationshipScope } from "./languageUnderstandingService";
 import { applyRelationshipContext } from "./relationshipBehaviorService";
 import { reduceRelationshipTurn, type RelationshipReducerResult, type RelationshipReducerPrev, type RelationshipTurnSignal } from "./relationshipReducer";
 import { DEFAULT_RELATIONSHIP_REDUCER_CONFIG } from "./relationshipReducerConfig";
 
+type GroundedSemanticEvent = SemanticEvent & { relationshipScope?: SemanticRelationshipScope };
+
 export interface KdmCanonicalInput {
   state: DroitDynamicState;
   semanticInterpretation: SemanticInterpretation;
-  semanticEvent: SemanticEvent;
+  semanticEvent: GroundedSemanticEvent;
   normalizedPersonality: DroitPersonalityTraits;
   baseBehaviorProfile: BehaviorLayerProfile;
   behaviorPolicy: BehaviorPolicyInput | null;
@@ -59,21 +63,27 @@ export function semanticNegativePattern(interp: SemanticInterpretation): string 
   return null;
 }
 
-function buildTurnSignal(interp: SemanticInterpretation, negativePattern: string | null): RelationshipTurnSignal {
+function buildTurnSignal(
+  interp: SemanticInterpretation,
+  event: GroundedSemanticEvent,
+  negativePattern: string | null,
+): RelationshipTurnSignal {
+  const thirdParty = event.relationshipScope === "third_party";
+  const dyadic = !thirdParty && event.relationshipScope !== "event" && interp.target === "kaira";
   return {
-    valence: interp.valence,
-    targetsKaira: interp.target === "kaira",
+    valence: thirdParty ? "neutral" : interp.valence,
+    targetsKaira: dyadic,
     severity: interp.severity,
     jokingConfidence: interp.jokingConfidence,
     sincerityConfidence: interp.sincerityConfidence,
-    apology: interp.apology,
-    repairAttempt: interp.repairAttempt,
-    support: interp.support,
-    compliment: interp.compliment,
-    affection: interp.affection,
-    userStop: interp.stopRequest,
+    apology: thirdParty ? false : interp.apology,
+    repairAttempt: thirdParty ? false : interp.repairAttempt,
+    support: thirdParty ? 0 : interp.support,
+    compliment: thirdParty ? 0 : interp.compliment,
+    affection: thirdParty ? 0 : interp.affection,
+    userStop: thirdParty ? false : interp.stopRequest,
     uncertainty: interp.uncertainty.overall,
-    negativePattern,
+    negativePattern: thirdParty ? null : negativePattern,
   };
 }
 
@@ -94,7 +104,8 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
   const { state, semanticInterpretation, semanticEvent, baseBehaviorProfile, behaviorPolicy, applyIntegrated } = input;
   const nowIso = new Date().toISOString();
   const prevRel: RelationshipState = state.relationship ?? {};
-  const negativePattern = semanticNegativePattern(semanticInterpretation);
+  const rawNegativePattern = semanticNegativePattern(semanticInterpretation);
+  const negativePattern = semanticEvent.relationshipScope === "third_party" ? null : rawNegativePattern;
   const samePattern = !!negativePattern && prevRel.lastNegativePattern === negativePattern;
   const repeatedProblem = samePattern && (prevRel.repeatedNegativeCount ?? 0) >= 1;
   const kdmIntent = semanticInterpretation.apology
@@ -103,7 +114,7 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
       ? "tekrarlanan_olumsuz_davranış"
       : input.semanticIntentToKdm(semanticEvent);
   const kdmSentiment = input.semanticSentimentToKdm(semanticEvent);
-  const signal = buildTurnSignal(semanticInterpretation, negativePattern);
+  const signal = buildTurnSignal(semanticInterpretation, semanticEvent, negativePattern);
   const elapsedMinutesSincePrev = minutesBetween(prevRel.lastInteractionAt, nowIso);
 
   const prev: RelationshipReducerPrev = {
@@ -239,7 +250,7 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
     messageInterpretation: {
       intent: kdmIntent,
       sentiment: kdmSentiment,
-      explanation: `Canonical SemanticInterpretation@2: primary=${semanticInterpretation.primaryIntent}, hedef=${semanticInterpretation.target}, present-severity=${presentSeverity.toFixed(2)}, joking=${signal.jokingConfidence.toFixed(2)}, uncertainty=${signal.uncertainty.toFixed(2)}.`,
+      explanation: `Canonical SemanticInterpretation@2: primary=${semanticInterpretation.primaryIntent}, hedef=${semanticInterpretation.target}, scope=${semanticEvent.relationshipScope ?? "unknown"}, present-severity=${presentSeverity.toFixed(2)}, joking=${signal.jokingConfidence.toFixed(2)}, uncertainty=${signal.uncertainty.toFixed(2)}.`,
     },
     decision: {
       chosenTone: finalBehaviorProfile.tone,
