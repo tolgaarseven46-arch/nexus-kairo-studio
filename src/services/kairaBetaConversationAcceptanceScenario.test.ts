@@ -35,6 +35,7 @@ const closeRelationship: DroitDynamicState = {
 
 describe('beta conversation acceptance scenario', () => {
   it('keeps social continuity, relationship-sensitive reaction, repair and long-session recovery coherent', () => {
+    const canonicalReducerOn = isCanonicalBehaviorFlagEnabled('RELATIONSHIP_REDUCER_V2');
     const greeting = planDialogueResponse([], 'naber kanka', 'Mert');
     expect(greeting).toMatchObject({
       move: 'natural_reaction',
@@ -50,9 +51,7 @@ describe('beta conversation acceptance scenario', () => {
     // injury: legacy classifies this close-relationship turn as hurt, while the
     // canonical reducer classifies injury >= 30 as withdrawn. Both remain the
     // same reserved/very-short HOW family; this is an explained promotion delta.
-    expect(hurt.nextDynamicState.reactionMode).toBe(
-      isCanonicalBehaviorFlagEnabled('RELATIONSHIP_REDUCER_V2') ? 'withdrawn' : 'hurt',
-    );
+    expect(hurt.nextDynamicState.reactionMode).toBe(canonicalReducerOn ? 'withdrawn' : 'hurt');
     const hurtSpeech = computeKairoSpeechIdentity(
       NEUTRAL_DROIT_PERSONALITY,
       hurt.nextDynamicState,
@@ -61,22 +60,41 @@ describe('beta conversation acceptance scenario', () => {
     expect(hurtSpeech.register).toBe('hurt');
     expect(hurtSpeech.sentenceLength).toBe('very_short');
 
-    const repair = analyzeKdmInteraction(
+    const firstRepair = analyzeKdmInteraction(
       'özür dilerim',
       NEUTRAL_DROIT_PERSONALITY,
       hurt.nextDynamicState,
     );
-    // Close relationships may settle directly back to neutral after an accepted apology;
-    // the durable acceptance invariant is that repair progresses and damage decreases.
-    expect(['repairing', 'neutral']).toContain(repair.nextDynamicState.reactionMode);
-    expect(repair.nextDynamicState.relationship?.repairProgress ?? 0)
+    expect(firstRepair.nextDynamicState.relationship?.repairProgress ?? 0)
       .toBeGreaterThan(hurt.nextDynamicState.relationship?.repairProgress ?? 0);
-    expect(repair.nextDynamicState.relationship?.hurtScore ?? 100)
+    expect(firstRepair.nextDynamicState.relationship?.hurtScore ?? 100)
       .toBeLessThan(hurt.nextDynamicState.relationship?.hurtScore ?? 0);
-    expect(repair.nextDynamicState.relationship?.conflictScore ?? 100)
+    expect(firstRepair.nextDynamicState.relationship?.conflictScore ?? 100)
       .toBeLessThan(hurt.nextDynamicState.relationship?.conflictScore ?? 0);
 
-    let state = repair.nextDynamicState;
+    // Canonical hard-disengage repair is deliberately staged: one apology makes
+    // measurable repair progress but does not reopen the relationship before the
+    // configured repairing threshold is reached. Legacy may soften in one turn.
+    let state = firstRepair.nextDynamicState;
+    let expectedInteractionCount = 92;
+    if (canonicalReducerOn) {
+      expect(state.reactionMode).toBe('withdrawn');
+      expect(state.relationship?.conversationState).toBe('disengaged');
+      const secondRepair = analyzeKdmInteraction(
+        'gerçekten özür dilerim',
+        NEUTRAL_DROIT_PERSONALITY,
+        state,
+      );
+      expect(secondRepair.nextDynamicState.relationship?.repairProgress ?? 0)
+        .toBeGreaterThan(state.relationship?.repairProgress ?? 0);
+      expect(secondRepair.nextDynamicState.relationship?.conversationState).toBe('repairing');
+      expect(secondRepair.nextDynamicState.reactionMode).toBe('repairing');
+      state = secondRepair.nextDynamicState;
+      expectedInteractionCount += 1;
+    } else {
+      expect(['repairing', 'neutral']).toContain(state.reactionMode);
+    }
+
     for (let index = 0; index < 30; index += 1) {
       const message = index % 3 === 0 ? 'tamam devam edelim' : index % 3 === 1 ? 'naber' : 'bugün işler yoğundu';
       state = analyzeKdmInteraction(message, NEUTRAL_DROIT_PERSONALITY, state).nextDynamicState;
@@ -86,6 +104,6 @@ describe('beta conversation acceptance scenario', () => {
     expect(state.relationship?.conversationState).toBe('active');
     expect(state.relationship?.hurtScore ?? 100).toBeLessThan(5);
     expect(state.relationship?.conflictScore ?? 100).toBeLessThan(5);
-    expect(state.relationship?.interactionCount).toBe(92);
+    expect(state.relationship?.interactionCount).toBe(expectedInteractionCount);
   });
 });
