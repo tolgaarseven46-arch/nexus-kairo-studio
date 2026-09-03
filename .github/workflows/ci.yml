@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -34,7 +37,25 @@ jobs:
         run: node scripts/run-beta-conversation-acceptance.mjs
 
       - name: Tests
-        run: npm test -- --run
+        id: full_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm test -- --run 2>&1 | tee /tmp/full-tests.log
+
+      - name: Persist one-shot full test failure tail
+        if: steps.full_tests.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          if [ ! -f full-tests-debug.txt ]; then
+            tail -n 1600 /tmp/full-tests.log > full-tests-debug.txt
+            git config user.email "tolgaarseven46@gmail.com"
+            git config user.name "tolgaarseven46-arch"
+            git add full-tests-debug.txt
+            git commit -m "chore(ci): capture current full-test failure tail"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
+          exit 1
 
       - name: TypeScript check
         run: npm run lint
