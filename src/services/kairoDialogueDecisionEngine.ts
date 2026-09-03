@@ -11,7 +11,8 @@ import {
 } from "./semanticEventEngine";
 import { projectSemanticEventToDialogueAnalysis } from "./kairaDialogueTurnProjection";
 import type { DialogueTurnAnalysis } from "./kairoDialogueChaosEngine";
-import type { DiscourseState } from "../types/discourseState";
+import type { DiscourseSocialAct, DiscourseState } from "../types/discourseState";
+import { classifyKairaReplyAct } from "./discourseSocialAct";
 
 export type DialogueMove =
   | "grounded_recall"
@@ -30,6 +31,8 @@ export interface DialogueDecisionPlan {
   target?: string;
   socialRoutine?: SemanticSocialRoutine;
   repairSignal?: SemanticRepairSignal;
+  /** Observed Kaira social act that must not be emitted again on this turn. */
+  repeatGuard?: { act: DiscourseSocialAct; count: number };
   allowFollowUpQuestion: boolean;
   allowSpeculation: boolean;
   maxSentences: number;
@@ -177,7 +180,7 @@ function isShortAnswerToPreviousKairaTurn(
   );
 }
 
-export function planDialogueResponse(
+function planDialogueResponseBase(
   history: ConversationTurn[],
   userMessage: string,
   userName: string,
@@ -420,6 +423,43 @@ export function planDialogueResponse(
   };
 }
 
+function applyRepetitionPolicy(
+  plan: DialogueDecisionPlan,
+  discourse?: DiscourseState,
+): DialogueDecisionPlan {
+  const repeated = discourse?.selfRepeat;
+  // Farewell is intentionally exempt: if the user is ending the conversation,
+  // completing the farewell remains the correct social obligation even when
+  // Kaira has recently said goodbye more than once.
+  if (!repeated || repeated.act === "farewell") return plan;
+  return {
+    ...plan,
+    repeatGuard: { act: repeated.act, count: repeated.count },
+    reason:
+      `${plan.reason} Kaira son turlarda "${repeated.act}" sosyal işini ${repeated.count} kez yaptı; bu tur aynı sosyal işi tekrar üretme. Mevcut semantik hareketi koru, yalnız tekrar eden yüzeyi değiştir.`,
+  };
+}
+
+export function planDialogueResponse(
+  history: ConversationTurn[],
+  userMessage: string,
+  userName: string,
+  semanticEvent?: SemanticEvent,
+  currentAnalysis?: DialogueTurnAnalysis,
+  discourse?: DiscourseState,
+): DialogueDecisionPlan {
+  const event = semanticEvent ?? interpretSemanticEvent(userMessage);
+  const basePlan = planDialogueResponseBase(
+    history,
+    userMessage,
+    userName,
+    event,
+    currentAnalysis,
+    discourse,
+  );
+  return applyRepetitionPolicy(basePlan, discourse);
+}
+
 export function buildDialogueDecisionInstruction(
   plan: DialogueDecisionPlan,
   effectiveAllowQuestion = plan.allowFollowUpQuestion,
@@ -437,6 +477,7 @@ export function buildDialogueDecisionInstruction(
 - Desteksiz tahmin: ${plan.allowSpeculation ? "yalnızca açık şaka bağlamında" : "yasak"}
 - Uzunluk bütçesi: en fazla ${effectiveMaxSentences} kısa cümle
 - Kelime bütçesi: ${effectiveMaxWords ? `en fazla ${effectiveMaxWords} kelime` : "özel sınır yok"}
+- Tekrar koruması: ${plan.repeatGuard ? `"${plan.repeatGuard.act}" sosyal işini yeniden üretme` : "yok"}
 - Gerekçe: ${effectiveReason}
 Doğru cevabı verdikten sonra ikinci bir tahmin, seçenek listesi, yeni şaka veya otomatik soru ekleyerek cevabın mantığını BOZMA.`;
 }
@@ -461,6 +502,9 @@ export function findDialogueDecisionIssues(
   );
   const effectiveMaxSentences = style?.maxSentences ?? plan.maxSentences;
   const effectiveMaxWords = style?.maxWords ?? plan.maxWords;
+  if (plan.repeatGuard && classifyKairaReplyAct(reply) === plan.repeatGuard.act) {
+    issues.push(`Kaira son turlarda tekrarladığı "${plan.repeatGuard.act}" sosyal işini yeniden üretti`);
+  }
   if (emojiCount > emojiBudget) {
     issues.push(
       `Konuşma kimliği bu turda en fazla ${emojiBudget} emojiye izin veriyor`,
@@ -549,16 +593,19 @@ export function buildGroundedDialogueFallback(
     return "biraz saçmaladım galiba";
   }
   if (plan.move === "complete_social_routine") {
-    if (plan.socialRoutine === "greeting") return "selam";
+    if (plan.socialRoutine === "greeting")
+      return plan.repeatGuard?.act === "greeting" ? "burdayım" : "selam";
     if (plan.socialRoutine === "thanks") return "rica ederim";
-    if (plan.socialRoutine === "agreement") return "aynen";
+    if (plan.socialRoutine === "agreement")
+      return plan.repeatGuard?.act === "agreement_ack" ? "devam edelim" : "aynen";
     if (plan.socialRoutine === "goodbye") return "görüşürüz";
     if (plan.socialRoutine === "good_night") return "iyi geceler";
     return "tamam";
   }
   if (plan.move === "follow_previous_answer") return "he tamam o zaman";
   if (plan.move === "acknowledge_correction") return "he doğru";
-  if (plan.move === "natural_reaction") return "he anladım";
+  if (plan.move === "natural_reaction")
+    return plan.repeatGuard?.act === "agreement_ack" ? "devam edelim" : "he anladım";
   if (plan.move === "follow_topic_shift") return "he tamam";
   if (plan.move === "join_banter") {
     return PROCRASTINATION_BANTER_RE.test(userMessage)
