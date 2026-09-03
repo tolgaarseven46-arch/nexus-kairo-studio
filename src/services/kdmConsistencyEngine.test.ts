@@ -275,7 +275,8 @@ describe("KDM response consistency gate", () => {
     expect(result.behaviorProfile.curiosity).toBe(0);
     expect(result.behaviorProfile.relationshipInstruction).toContain("konuşmadan çekiliyor");
     expect(result.behaviorProfile.behaviorDirectives.some((x) => x.includes("Cevabı kısa tut"))).toBe(true);
-    expect(result.nextDynamicState.relationship?.conversationState).toBe("disengaged");
+    // Response policy controls delivery behavior; canonical relationship FSM remains semantic-authority owned.
+    expect(result.nextDynamicState.relationship?.conversationState).toBe("active");
   });
 
   it("recognizes the tested typo 'oropu' as a direct severe insult", () => {

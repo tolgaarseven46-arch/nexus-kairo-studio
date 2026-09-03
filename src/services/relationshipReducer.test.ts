@@ -140,7 +140,7 @@ describe("RelationshipReducer — combined-signal redline, config-driven (RC-2 /
 
   it("thresholds are config-driven: lowering hardStopThreshold flips the borderline case", () => {
     // present-turn severity is above the gate but only borderline against the score threshold
-    const borderline = baseSignal({ valence: "negative", targetsKaira: true, severity: { disrespect: 0.56, coercion: 0, manipulation: 0, privacy: 0, aggression: 0.1 }, sincerityConfidence: 0.8, uncertainty: 0.25 });
+    const borderline = baseSignal({ valence: "negative", targetsKaira: true, severity: { disrespect: 0.56, coercion: 0, manipulation: 0, privacy: 0, aggression: 0.4 }, sincerityConfidence: 0.8, uncertainty: 0.25 });
     const prev = { scores: { repeatedNegativeCount: 0 }, conversationState: "active" as const, reactionMode: "neutral" as const, affect: { anger: 10, stress: 20, happiness: 70, calmness: 70 } };
     const strict = evaluateRedline(borderline, prev, DEFAULT_RELATIONSHIP_REDUCER_CONFIG);
     const lenient = { ...DEFAULT_RELATIONSHIP_REDUCER_CONFIG, redline: { ...DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline, hardStopThreshold: 0.2 } };
