@@ -137,7 +137,10 @@ export function isSemanticInterpretation(value: unknown): value is SemanticInter
   const finite01 = (x: unknown) => typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 1;
   return finite01(v.jokingConfidence) && finite01(v.sincerityConfidence) && finite01(v.affection) &&
     finite01(v.support) && finite01(v.compliment) && finite01(v.emotionalLoad) &&
-    typeof v.apology === "boolean" && typeof v.repairAttempt === "boolean" && typeof v.stopRequest === "boolean";
+    typeof v.apology === "boolean" && typeof v.repairAttempt === "boolean" && typeof v.stopRequest === "boolean" &&
+    typeof (v.discourseFacets as Record<string, unknown>).stopQuestions === "boolean" &&
+    typeof (v.discourseFacets as Record<string, unknown>).stopTalking === "boolean" &&
+    v.stopRequest === (v.discourseFacets as Record<string, unknown>).stopTalking;
 }
 
 export function normalizeSemanticInterpretation(value: unknown, message = ""): SemanticInterpretation {
@@ -146,6 +149,7 @@ export function normalizeSemanticInterpretation(value: unknown, message = ""): S
   const acts = Array.isArray(v.secondarySocialActs)
     ? Array.from(new Set((v.secondarySocialActs as unknown[]).filter((a): a is SemanticSocialAct => SOCIAL_ACTS.has(a as SemanticSocialAct))))
     : [];
+  const discourseFacets = normalizeDiscourseFacets(v.discourseFacets);
   return {
     schemaVersion: SEMANTIC_INTERPRETATION_SCHEMA_VERSION,
     raw,
@@ -158,8 +162,8 @@ export function normalizeSemanticInterpretation(value: unknown, message = ""): S
     jokingConfidence: clamp01(v.jokingConfidence),
     sincerityConfidence: v.sincerityConfidence === undefined ? 0.5 : clamp01(v.sincerityConfidence),
     affection: clamp01(v.affection), support: clamp01(v.support), compliment: clamp01(v.compliment), emotionalLoad: clamp01(v.emotionalLoad),
-    apology: asBool(v.apology), repairAttempt: asBool(v.repairAttempt), stopRequest: asBool(v.stopRequest),
-    discourseFacets: normalizeDiscourseFacets(v.discourseFacets),
+    apology: asBool(v.apology), repairAttempt: asBool(v.repairAttempt), stopRequest: discourseFacets.stopTalking,
+    discourseFacets,
     uncertainty: normalizeUncertainty(v.uncertainty), evidence: normalizeEvidence(v.evidence),
   };
 }

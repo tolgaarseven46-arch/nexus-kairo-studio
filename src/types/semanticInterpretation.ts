@@ -155,6 +155,7 @@ export interface SemanticInterpretation {
 
   apology: boolean;
   repairAttempt: boolean;
+  /** Dyadic full-conversation stop only; must equal discourseFacets.stopTalking. */
   stopRequest: boolean;
 
   discourseFacets: SemanticDiscourseFacets;

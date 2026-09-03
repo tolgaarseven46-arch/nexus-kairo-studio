@@ -368,7 +368,7 @@ function buildInterpretation(event: SemanticEvent, message: string): SemanticInt
       emotionalLoad: clamp01(event.emotionalLoad ?? 0),
       apology: Boolean(event.apology),
       repairAttempt: Boolean(event.repairAttempt),
-      stopRequest: Boolean(event.stopTalking || event.stopQuestions),
+      stopRequest: Boolean(event.stopTalking),
       discourseFacets: {
         socialRoutine: event.socialRoutine ?? "none",
         discourseAct: event.discourseAct ?? "none",

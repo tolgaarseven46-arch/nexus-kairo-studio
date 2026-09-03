@@ -97,6 +97,7 @@ selfMemoryQuery = null veya {surface, scope:self_fact|autobiographical_memory|an
 relationalAct = none | reassurance_seek | repair_probe | reconciliation_attempt | challenge | mockery | closeness_bid
 relationalIntensity 0..1
 stopQuestions / stopTalking yalnız açık durdurma talebinde true
+stopRequest = YALNIZ tam konuşmayı durdurma isteği; discourseFacets.stopTalking ile birebir aynı olmalı. “soru sorma” gibi yalnız soru yasağı stopRequest değildir.
 
 EVIDENCE:
 source her zaman llm. cues kısa gözlenebilir sinyaller olsun; iç chain-of-thought yazma. confidence 0..1.
