@@ -15,11 +15,15 @@ describe('learned language style vs relationship HOW authority', () => {
     ).toEqual([]);
   });
 
-  it('passes the canonical SpeechIdentity relationship level through every AI rhythm validation seam', async () => {
+  it('passes the canonical SpeechIdentity relationship level through every runtime rhythm validation seam', async () => {
     const server = await readFile('server.ts', 'utf8');
-    const matches = server.match(/findKairoResponseRhythmIssues\([^\n]+speech\.relationshipLevel\)/g) ?? [];
-    // 5 in the AI path + 1 added on the local delivery-parity path (foundation repair).
-    expect(matches).toHaveLength(6);
+    const allCalls = server.match(/findKairoResponseRhythmIssues\([^\n]+\)/g) ?? [];
+    const canonicalCalls = server.match(/findKairoResponseRhythmIssues\([^\n]+speech\.relationshipLevel\)/g) ?? [];
+
+    // Every runtime rhythm check, including the unified final-delivery seam,
+    // must consume the same canonical SpeechIdentity relationship level.
+    expect(allCalls.length).toBeGreaterThanOrEqual(1);
+    expect(canonicalCalls).toHaveLength(allCalls.length);
   });
 
   it('keeps learned language memory explicitly lower-authority than SpeechIdentity and ResponsePlan', async () => {
