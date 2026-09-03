@@ -1,75 +1,33 @@
-import {
-  interpretSemanticEvent,
-  type SemanticEvent,
-} from "./semanticEventEngine";
-import { canonicalizeSemanticEvent } from "./semanticEventCanonicalizer";
-import {
-  isSemanticEvent,
-  type SemanticEventSource,
-} from "./semanticEventAuthority";
-import {
-  resolveMessageEntities,
-  type EntityResolutionResult,
-} from "./entityResolutionEngine";
-import {
-  buildCanonicalWorldEvent,
-  type CanonicalWorldEvent,
-} from "./worldEventEngine";
+import type { SemanticEvent } from "./semanticEventEngine";
+import { resolveMessageEntities, type EntityResolutionResult } from "./entityResolutionEngine";
+import { buildCanonicalWorldEvent, type CanonicalWorldEvent } from "./worldEventEngine";
+import { isSemanticInterpretation, normalizeSemanticInterpretation } from "./semanticInterpretationSchema";
+import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";
+import { projectSemanticEvent } from "./semanticInterpretationProjection";
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
 
-export type SemanticRelationshipScope =
-  | "kaira_user"
-  | "third_party"
-  | "event"
-  | "unknown";
-
-export type AppraisalSemanticEvent = SemanticEvent & {
-  relationshipScope?: SemanticRelationshipScope;
-};
+export type SemanticRelationshipScope = "kaira_user" | "third_party" | "event" | "unknown";
+export type AppraisalSemanticEvent = SemanticEvent & { relationshipScope?: SemanticRelationshipScope };
 
 export interface TurkishMorphToken {
-  surface: string;
-  normalized?: string;
-  lemma?: string;
-  pos?: string;
-  morphemes?: string[];
-  confidence?: number;
+  surface: string; normalized?: string; lemma?: string; pos?: string; morphemes?: string[]; confidence?: number;
 }
-
-export interface TurkishMorphologyResult {
-  provider: string;
-  normalizedText: string;
-  tokens: TurkishMorphToken[];
-}
-
+export interface TurkishMorphologyResult { provider: string; normalizedText: string; tokens: TurkishMorphToken[]; }
 export interface LanguageUnderstandingContext {
-  recentMessages?: Array<{
-    role: "user" | "assistant";
-    content: string;
-  }>;
-  userName?: string;
-  characterName?: string;
+  recentMessages?: Array<{ role: "user" | "assistant"; content: string }>;
+  userName?: string; characterName?: string;
 }
-
-export interface MorphologyProvider {
-  name: string;
-  analyze(message: string): Promise<TurkishMorphologyResult>;
-}
-
+export interface MorphologyProvider { name: string; analyze(message: string): Promise<TurkishMorphologyResult>; }
 export interface SemanticUnderstandingProvider {
   name: string;
-  interpret(input: {
-    message: string;
-    morphology?: TurkishMorphologyResult;
-    context?: LanguageUnderstandingContext;
-  }): Promise<SemanticEvent>;
+  interpret(input: { message: string; morphology?: TurkishMorphologyResult; context?: LanguageUnderstandingContext }): Promise<SemanticInterpretation>;
 }
 
-export type LanguageUnderstandingSource =
-  | SemanticEventSource
-  | "semantic_provider"
-  | "fallback_regex";
-
+export type LanguageUnderstandingSource = "client_shared" | "semantic_provider" | "fallback_regex";
 export interface LanguageUnderstandingResult {
+  /** Canonical immutable per-turn semantic truth. */
+  interpretation: SemanticInterpretation;
+  /** Deterministic compatibility/appraisal projection; never a second authority. */
   event: AppraisalSemanticEvent;
   entityResolution: EntityResolutionResult;
   worldEvent: CanonicalWorldEvent;
@@ -79,29 +37,13 @@ export interface LanguageUnderstandingResult {
   morphologyProvider?: string;
   warnings: string[];
 }
-
 export interface LanguageUnderstandingOptions {
-  incomingSemanticEvent?: unknown;
+  incomingSemanticInterpretation?: unknown;
   morphologyProvider?: MorphologyProvider;
   semanticProvider?: SemanticUnderstandingProvider;
   context?: LanguageUnderstandingContext;
 }
 
-/**
- * Producer -> appraisal seam.
- *
- * SemanticEvent.target alone cannot represent who caused an event. For
- * relationship appraisal, a user reporting an event about Ayşe/Merve must not
- * be treated as if the user performed that act toward Kaira. Entity/world-event
- * grounding therefore adds a conservative relationshipScope to the canonical
- * semantic event. Downstream KDM consumes this projection instead of re-parsing
- * arbitrary person names.
- *
- * For explicit third-party positive acts (for example "Ayşe bana özür diledi")
- * the world event preserves the apology, while the appraisal projection removes
- * Kaira-user repair/reward signals. This keeps world truth and relationship
- * impact as separate contracts.
- */
 export function groundSemanticEventForAppraisal(
   message: string,
   event: SemanticEvent,
@@ -112,63 +54,41 @@ export function groundSemanticEventForAppraisal(
   const actorSource = worldEvent.actor?.source;
   const targetId = worldEvent.target?.id;
   const targetSource = worldEvent.target?.source;
-
   let relationshipScope: SemanticRelationshipScope = "unknown";
-
-  const explicitThirdPartyActor =
-    actorSource === "explicit_name" && actorId !== "current_user";
-  const explicitThirdPartyTarget =
-    targetSource === "explicit_name" &&
-    targetId !== "current_user" &&
-    targetId !== "kaira";
-
-  if (explicitThirdPartyActor || explicitThirdPartyTarget || event.target === "third_party") {
-    relationshipScope = "third_party";
-  } else if (actorId === "current_user" && targetId === "kaira") {
-    relationshipScope = "kaira_user";
-  } else if (
-    event.target === "kaira" && entityResolution.namedPeople.length === 0
-  ) {
-    relationshipScope = "kaira_user";
-  } else if (event.target === "event") {
-    relationshipScope = "event";
-  }
+  const explicitThirdPartyActor = actorSource === "explicit_name" && actorId !== "current_user";
+  const explicitThirdPartyTarget = targetSource === "explicit_name" && targetId !== "current_user" && targetId !== "kaira";
+  if (explicitThirdPartyActor || explicitThirdPartyTarget || event.target === "third_party") relationshipScope = "third_party";
+  else if (actorId === "current_user" && targetId === "kaira") relationshipScope = "kaira_user";
+  else if (event.target === "kaira" && entityResolution.namedPeople.length === 0) relationshipScope = "kaira_user";
+  else if (event.target === "event") relationshipScope = "event";
 
   let appraisalEvent: AppraisalSemanticEvent = {
     ...event,
     target: relationshipScope === "third_party" ? "third_party" : event.target,
     relationshipScope,
   };
-
   if (relationshipScope === "third_party" && event.valence === "positive") {
-    appraisalEvent = {
-      ...appraisalEvent,
-      valence: "neutral",
-      apology: false,
-      repairAttempt: false,
-      support: 0,
-      compliment: 0,
-      affection: 0,
-    };
+    appraisalEvent = { ...appraisalEvent, valence: "neutral", apology: false, repairAttempt: false, support: 0, compliment: 0, affection: 0 };
   }
-
   return { event: appraisalEvent, worldEvent };
 }
 
+function buildResult(
+  message: string,
+  interpretation: SemanticInterpretation,
+  entityResolution: EntityResolutionResult,
+  rest: Omit<LanguageUnderstandingResult, "interpretation" | "event" | "entityResolution" | "worldEvent">,
+): LanguageUnderstandingResult {
+  const projected = projectSemanticEvent(interpretation);
+  const grounded = groundSemanticEventForAppraisal(message, projected, entityResolution);
+  return { interpretation, event: grounded.event, entityResolution, worldEvent: grounded.worldEvent, ...rest };
+}
+
 /**
- * Single language-understanding gateway for Kaira.
- *
- * Downstream KDM/appraisal/relationship layers should consume the returned
- * canonical appraisal event instead of re-parsing Turkish independently.
- * Entity resolution and a conservative canonical world event are produced
- * alongside that event so later layers can reason about who did what to whom
- * without inventing participants when the discourse is ambiguous.
- *
- * Provider priority:
- * 1) already validated incoming semantic event (shared authority)
- * 2) optional morphology provider (for example Zemberek)
- * 3) optional semantic provider (for example an LLM structured parser)
- * 4) legacy regex semantic engine as a safe fallback
+ * Single language-understanding gateway.
+ * Normal path: LLM provider -> SemanticInterpretation@2.
+ * Regex is legal only as an explicit provider-failure fallback, and it must emit
+ * the same canonical schema. No downstream raw-text reparse is allowed.
  */
 export async function understandTurkishMessage(
   message: string,
@@ -176,95 +96,44 @@ export async function understandTurkishMessage(
 ): Promise<LanguageUnderstandingResult> {
   const entityResolution = resolveMessageEntities(message, options.context);
 
-  if (isSemanticEvent(options.incomingSemanticEvent)) {
-    const canonicalEvent = canonicalizeSemanticEvent(
-      message,
-      options.incomingSemanticEvent,
-    );
-    const grounded = groundSemanticEventForAppraisal(
-      message,
-      canonicalEvent,
-      entityResolution,
-    );
-    return {
-      event: grounded.event,
-      entityResolution,
-      worldEvent: grounded.worldEvent,
-      semanticSource: "client_shared",
-      warnings: [],
-    };
+  if (isSemanticInterpretation(options.incomingSemanticInterpretation)) {
+    const interpretation = normalizeSemanticInterpretation(options.incomingSemanticInterpretation, message);
+    return buildResult(message, interpretation, entityResolution, { semanticSource: "client_shared", warnings: [] });
   }
 
   const warnings: string[] = [];
   let morphology: TurkishMorphologyResult | undefined;
-
   if (options.morphologyProvider) {
-    try {
-      morphology = await options.morphologyProvider.analyze(message);
-    } catch (error) {
-      warnings.push(
-        `Morphology provider ${options.morphologyProvider.name} failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+    try { morphology = await options.morphologyProvider.analyze(message); }
+    catch (error) {
+      warnings.push(`Morphology provider ${options.morphologyProvider.name} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   if (options.semanticProvider) {
     try {
-      const event = await options.semanticProvider.interpret({
-        message,
-        morphology,
-        context: options.context,
-      });
-
-      if (isSemanticEvent(event)) {
-        const canonicalEvent = canonicalizeSemanticEvent(message, event);
-        const grounded = groundSemanticEventForAppraisal(
-          message,
-          canonicalEvent,
-          entityResolution,
-        );
-        return {
-          event: grounded.event,
-          entityResolution,
-          worldEvent: grounded.worldEvent,
+      const provided = await options.semanticProvider.interpret({ message, morphology, context: options.context });
+      if (isSemanticInterpretation(provided)) {
+        const interpretation = normalizeSemanticInterpretation(provided, message);
+        return buildResult(message, interpretation, entityResolution, {
           semanticSource: "semantic_provider",
           semanticProvider: options.semanticProvider.name,
           morphology,
           morphologyProvider: options.morphologyProvider?.name,
           warnings,
-        };
+        });
       }
-
-      warnings.push(
-        `Semantic provider ${options.semanticProvider.name} returned an invalid SemanticEvent.`,
-      );
+      warnings.push(`Semantic provider ${options.semanticProvider.name} returned an invalid SemanticInterpretation@2.`);
     } catch (error) {
-      warnings.push(
-        `Semantic provider ${options.semanticProvider.name} failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      warnings.push(`Semantic provider ${options.semanticProvider.name} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  const fallbackEvent = canonicalizeSemanticEvent(
-    message,
-    interpretSemanticEvent(message),
-  );
-  const grounded = groundSemanticEventForAppraisal(
-    message,
-    fallbackEvent,
-    entityResolution,
-  );
-  return {
-    event: grounded.event,
-    entityResolution,
-    worldEvent: grounded.worldEvent,
+  const interpretation = interpretationFromRegexFloor(message);
+  return buildResult(message, interpretation, entityResolution, {
     semanticSource: "fallback_regex",
     morphology,
     morphologyProvider: options.morphologyProvider?.name,
     warnings,
-  };
+  });
 }
