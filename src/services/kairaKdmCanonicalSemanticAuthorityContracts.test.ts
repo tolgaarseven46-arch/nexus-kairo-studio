@@ -9,11 +9,14 @@ describe("KDM canonical SemanticEvent authority", () => {
     expect(server).toMatch(/analyzeKdmInteraction\(\s*userMessage,\s*basePersonality,\s*effective,\s*canonicalSemantic\.event,\s*behaviorPolicy,\s*\)/u);
   });
 
-  it("uses the supplied canonical event and keeps only the central semantic fallback", () => {
+  it("uses the supplied canonical event and delegates semantic projections to the single canonical bridge", () => {
     const kdm = source("src/services/kdmConsistencyEngine.ts");
     expect(kdm).toContain("const semanticEvent = canonicalSemanticEvent ?? interpretSemanticEvent(userMessage)");
-    expect(kdm).toContain("semanticIntentToKdm(semanticEvent)");
-    expect(kdm).toContain("semanticSentimentToKdm(semanticEvent)");
+    expect(kdm).toContain("return analyzeKdmInteractionCanonical({");
+    expect(kdm).toContain("semanticEvent,");
+    expect(kdm).toContain("semanticIntentToKdm,");
+    expect(kdm).toContain("semanticSentimentToKdm,");
+    expect(kdm).not.toContain("RELATIONSHIP_REDUCER_V2");
   });
 
   it("does not carry an independent raw-message intent or sentiment parser", () => {
