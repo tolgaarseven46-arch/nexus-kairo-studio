@@ -15,6 +15,7 @@ import {
 } from "./discourseSocialAct";
 import {
   EMPTY_DISCOURSE_STATE,
+  type DiscoursePendingQuestion,
   type DiscoursePreviousTurnDependency,
   type DiscourseSocialAct,
   type DiscourseState,
@@ -59,9 +60,9 @@ function startsNewTopic(event: SemanticEvent): boolean {
     event.discourseAct === "topic_shift" ||
     event.intent === "information_request" ||
     event.intent === "emotional_share" ||
-    (event.socialRoutine ?? "none") === "none" &&
+    ((event.socialRoutine ?? "none") === "none" &&
       event.discourseAct === "none" &&
-      !isShortIntent(event)
+      !isShortIntent(event))
   );
 }
 
@@ -71,6 +72,32 @@ function isShortIntent(event: SemanticEvent): boolean {
     event.intent === "general_chat" ||
     (event.socialRoutine ?? "none") !== "none"
   );
+}
+
+/**
+ * Contextual answer recognition is based on the pending conversational role,
+ * not on one magic phrase. The per-message semantic label can legitimately be
+ * `banter`/`general_chat` while the turn is still an answer to Kaira's question.
+ * This is deliberately coarse: it only establishes dependency, never sentiment
+ * or relationship meaning.
+ */
+function answersPendingQuestion(
+  pending: DiscoursePendingQuestion,
+  message: string,
+  act: DiscourseSocialAct,
+): boolean {
+  const text = message.trim().toLocaleLowerCase("tr-TR");
+  if (!text) return false;
+  if (act === "answer" || act === "agreement_ack" || act === "correction") return true;
+
+  if (pending.kind === "how_are_you") {
+    return /^(?:iyi(?:yim|dir)?|k[öo]t[üu](?:y[üu]m)?|fena\s+değil|eh\b|idare\b|normal\b|ayn[ıi]\b|moral(?:im)?\b|mod(?:um)?\b)/iu.test(text);
+  }
+  if (pending.kind === "what_doing") {
+    return /^(?:tak[ıi]l|çalış|çal[ıi][şs]|otur|evde|işte|okulda|dışarı|boş|hiçbir|bi\s+şey|bir\s+şey)/iu.test(text);
+  }
+
+  return isShort(message) && act !== "greeting" && act !== "farewell";
 }
 
 export function reduceDiscourseState(
@@ -101,19 +128,24 @@ export function reduceDiscourseState(
         ? prev.pendingQuestion
         : null;
     const isOwnRoutine =
-      act === "greeting" || act === "farewell" || act === "thanks" || act === "banter";
+      act === "greeting" || act === "farewell" || act === "thanks";
+    const contextualAnswer =
+      kairaPending !== null && answersPendingQuestion(kairaPending, turn.message, act);
+    const explicitDependency =
+      userSignalsAlreadyAnswered(turn.message) ||
+      act === "correction" ||
+      act === "complaint";
     const respondsToKaira =
       prev.lastKairaAct !== null &&
-      !isOwnRoutine &&
       !startsNewTopic(turn.event) &&
-      (userSignalsAlreadyAnswered(turn.message) ||
-        act === "correction" ||
-        act === "complaint" ||
-        (kairaPending !== null &&
-          (isShort(turn.message) || act === "answer" || act === "agreement_ack")));
+      (contextualAnswer || (!isOwnRoutine && explicitDependency));
 
     if (respondsToKaira) {
-      const friction = userSignalsAlreadyAnswered(turn.message) || act === "complaint";
+      const friction =
+        userSignalsAlreadyAnswered(turn.message) ||
+        act === "complaint" ||
+        turn.event.discourseAct === "correction" ||
+        turn.event.frustration >= 0.25;
       previousTurnDependency = {
         on: kairaPending ? "kaira_question" : "kaira_statement",
         responseKind:
