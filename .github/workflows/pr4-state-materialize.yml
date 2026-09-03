@@ -1,0 +1,37 @@
+name: PR4 State Materialize
+
+on:
+  push:
+    branches:
+      - chatgpt/unified-guard-pass-v1
+    paths:
+      - scripts/append-pr4-project-state.mjs
+      - .github/workflows/pr4-state-materialize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: chatgpt/unified-guard-pass-v1
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Append checkpoint
+        run: node scripts/append-pr4-project-state.mjs
+      - name: Commit checkpoint
+        run: |
+          if git diff --quiet -- PROJECT_STATE.md; then
+            echo 'No checkpoint change.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PROJECT_STATE.md
+          git commit -m 'docs(state): checkpoint unified guard PR4'
+          git push origin HEAD:chatgpt/unified-guard-pass-v1
