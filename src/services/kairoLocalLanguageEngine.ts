@@ -5,7 +5,8 @@ import type {
 } from "../types/nexus";
 import type { DialogueMove } from "./kairoDialogueDecisionEngine";
 import type { KairaResponsePlan } from "./kairaResponsePlan";
-import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
+import type { SemanticEvent } from "./semanticEventEngine";
+import type { DiscourseState } from "../types/discourseState";
 import { chooseLanguageReply } from "./kairoLanguageMemory";
 import { normalizeKairoLanguageInput } from "./kairoLanguageNormalizer";
 import { resolveKairoRelationshipLevel } from "./kairoSpeechIdentity";
@@ -29,86 +30,72 @@ export interface LocalLanguageResult {
   normalization?: ReturnType<typeof normalizeKairoLanguageInput>;
 }
 
-function localIntentFromEvent(event: SemanticEvent): LocalIntent | null {
-  switch (event.socialRoutine) {
-    case "greeting": return "greeting";
-    case "how_are_you": return "how_are_you";
-    case "what_doing": return "what_doing";
-    case "thanks": return "thanks";
-    case "agreement": return "agreement";
-    case "goodbye": return "goodbye";
-    case "good_night": return "good_night";
-    case "emotional_opening": return "emotional_opening";
-    default:
-      return event.intent === "emotional_share"
-        ? "emotional_opening"
-        : event.intent === "greeting"
-          ? "greeting"
-          : null;
-  }
-}
+/**
+ * Local rendering intent (ADR-0006 foundation repair).
+ *
+ * The local engine no longer classifies intent itself. It renders ONLY when the
+ * dialogue decision has already chosen a trivial-routine move AND the shared
+ * SemanticEvent's routine matches AND the DiscourseState says that routine has
+ * not saturated this conversation. It never re-parses the message, never invents
+ * a social intent, and never overrides the dialogue decision.
+ */
+/** Dialogue moves under which a trivial local render is permitted at all. */
+const TRIVIAL_RENDER_MOVES = new Set<DialogueMove>([
+  "complete_social_routine",
+  "natural_reaction",
+  "invite_emotional_context",
+]);
 
-function canUseCanonicalRoutineFallback(event: SemanticEvent): boolean {
-  const discourseAct = event.discourseAct ?? "none";
-  return (
-    (event.intent === "general_chat" || event.intent === "greeting") &&
-    (event.socialRoutine ?? "none") === "none" &&
-    discourseAct === "none" &&
-    !event.adviceRequested &&
-    !event.insult &&
-    !event.redLine &&
-    !event.apology &&
-    !event.repairAttempt &&
-    !event.stopQuestions &&
-    !event.stopTalking &&
-    event.coercion <= 0 &&
-    event.manipulation <= 0 &&
-    event.privacyViolation <= 0 &&
-    event.emotionalLoad <= 0
-  );
-}
-
-function localIntentFromSemanticEvent(
-  message: string,
-  semanticEvent: SemanticEvent | undefined,
-  normalization: ReturnType<typeof normalizeKairoLanguageInput>,
+function trivialRenderIntent(
+  dialogueMove: DialogueMove | undefined,
+  event: SemanticEvent | undefined,
+  discourse: DiscourseState | undefined,
 ): LocalIntent | null {
-  const event = semanticEvent ?? interpretSemanticEvent(message);
-  if (event.adviceRequested) return null;
-
-  // Exact local social routines are deterministic and narrower than a coarse external
-  // semantic label. Preserve reciprocal "naber/nasılsın/ne yapıyorsun" behavior even
-  // when an upstream provider collapses the turn to generic greeting/general chat.
-  const locallyObserved = interpretSemanticEvent(message);
-  const locallyObservedIntent = localIntentFromEvent(locallyObserved);
-  const raw = message
-    .trim()
-    .toLocaleLowerCase("tr-TR")
-    .replace(/[!?.,…]+$/u, "")
-    .trim();
-  if (/^(?:naber|nasılsın)(?:\s+(?:kank[a-zçğıöşü]*|kaira|kairo))?$/u.test(raw)) {
-    return "how_are_you";
-  }
-  if (/^ne\s+yapıyorsun(?:\s+(?:kank[a-zçğıöşü]*|kaira|kairo))?$/u.test(raw)) {
-    return "what_doing";
-  }
-  if (locallyObservedIntent === "how_are_you" || locallyObservedIntent === "what_doing") {
-    return locallyObservedIntent;
-  }
-
-  const directIntent = localIntentFromEvent(event);
-  if (directIntent) return directIntent;
-
-  const canonical = normalization.canonical.trim();
+  if (!event || event.adviceRequested) return null;
+  // Hard content -> the main pipeline must handle it, never a canned pool.
   if (
-    canonical === normalization.normalized ||
-    normalization.confidence < 0.85 ||
-    !canUseCanonicalRoutineFallback(event)
-  ) return null;
+    event.insult ||
+    event.redLine ||
+    event.apology ||
+    event.repairAttempt ||
+    event.stopTalking ||
+    event.coercion > 0 ||
+    event.manipulation > 0 ||
+    event.privacyViolation > 0 ||
+    (event.discourseAct ?? "none") === "recall_request" ||
+    (event.discourseAct ?? "none") === "confusion_or_challenge"
+  ) {
+    return null;
+  }
+  // The dialogue decision must have chosen a trivial move (or be absent for a
+  // direct/legacy call). The local engine never overrides a non-trivial move.
+  if (dialogueMove !== undefined && !TRIVIAL_RENDER_MOVES.has(dialogueMove)) return null;
+  // A pending previous-turn dependency means the current turn is a reply to
+  // Kaira, not a fresh routine — hand it to the pipeline.
+  if (discourse?.previousTurnDependency) return null;
 
-  const canonicalEvent = interpretSemanticEvent(canonical);
-  if (canonicalEvent.adviceRequested) return null;
-  return localIntentFromEvent(canonicalEvent);
+  // Intent comes ONLY from the shared SemanticEvent's routine — never a re-parse.
+  const routine = event.socialRoutine ?? "none";
+  switch (routine) {
+    case "greeting":
+      return (discourse?.routines.greeting.count ?? 0) >= 2 ? null : "greeting";
+    case "how_are_you":
+      return (discourse?.routines.howAreYou.count ?? 0) >= 2 ? null : "how_are_you";
+    case "what_doing":
+      return (discourse?.routines.whatDoing.count ?? 0) >= 2 ? null : "what_doing";
+    case "thanks":
+      return "thanks";
+    case "agreement":
+      return "agreement";
+    case "goodbye":
+      return "goodbye";
+    case "good_night":
+      return "good_night";
+    case "emotional_opening":
+      return "emotional_opening";
+    default:
+      return null;
+  }
 }
 
 const runtimeFlag = (personality: DroitPersonalityTraits, key: string, fallback: boolean) => {
@@ -126,9 +113,10 @@ export function tryLocalKairoReply(
   responsePlan?: KairaResponsePlan,
   semanticEvent?: SemanticEvent,
   useLearnedMemory = true,
+  discourse?: DiscourseState,
 ): LocalLanguageResult {
   const normalization = normalizeKairoLanguageInput(message);
-  const intent = localIntentFromSemanticEvent(message, semanticEvent, normalization);
+  const intent = trivialRenderIntent(dialogueMove, semanticEvent, discourse);
   if (!intent) return { handled: false, confidence: 0, source: "ai", normalization };
 
   const continueConversation = responsePlan?.continueConversation

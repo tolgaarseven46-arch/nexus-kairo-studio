@@ -1,0 +1,567 @@
+# KAIRA — FULL ARCHITECTURE FALSIFICATION AUDIT
+
+No code changed. All claims below cite `file:line` from the working tree at `b6efa96` (main + PR3 branch). Where I could not verify from code I write **kanıt yok**.
+
+---
+
+## A. EXECUTIVE VERDICT
+
+**KISMEN — ama temel yön yanlış.**
+
+Doğru olan: canonical behavior authority fikri (tek `KairaResponsePlan`), hard/soft ayrımı, pure `relationshipReducer`, semantic→appraisal seam ayrımı, KNT observability, governance. Bunlar sağlam çekirdek.
+
+Yanlış olan, tek tek bug değil **üç sistemik şey**:
+
+1. **İki gerçeklik hattı var ve prod yanlış olanda.** `RELATIONSHIP_REDUCER_V2`, `PLAN_RESOLVER_V2`, `CANONICAL_PROMPT_BUILDER` üçü de default OFF (`src/config/canonicalBehaviorFlags.ts:104-117`); hiçbir deploy/CI dosyası bunları set etmiyor (`grep` boş). `SEMANTIC_SCHEMA_V2` ve `UNIFIED_GUARD_PASS` non-test kodda **hiç okunmuyor**. Yani PR#26 + PR3'te yapılan canonical mimarinin tamamı **karanlık**. Canlı hat: legacy `kdmConsistencyEngine` + regex `interpretSemanticEvent` + legacy `buildKairaResponsePlan` + legacy prompt yığını. İlk testin çıktığı sistem bu.
+
+2. **YDM (`kairoLocalLanguageEngine`) ikinci ve daha aptal bir beyin.** Sohbet geçmişi görmüyor, tek mesajı regex'le sınıflandırıp hardcoded cevap havuzundan seçim yapıyor, ve "handled" derse **tüm pipeline'ı (LLM, prompt, plan enforcement'ın çoğu, spontaneity) atlıyor** (`server.ts:802`). İlk testin 8 turunun 6'sı buradan geçti; `merhaba → selam` döngüsü ve "iyi dedim ya → merhaba" tam olarak bunun sonucu.
+
+3. **Discourse/working-memory diye bir katman yok.** `history` var; `dialogueDecision` bir kısmını görüyor; ama YDM'e, appraisal'a, relationship reducer'a, "bu selamlaşma bitti", "3 turdur aynı şeyi söylüyorum", "bu mesaj önceki soruma cevap" bilgisi **yapısal olarak ulaşmıyor**. Her katman mesajı izole okuyor.
+
+Sıfırdan kursam: canonical plan + hard/soft + pure reducer fikrini **korurdum**; sequential-pipeline + YDM-mini-brain + flat-history + tek-pass-semantic + env-flag-dual-truth kısımlarını **seçmezdim**. Bir **shared discourse/working-memory (blackboard)** üzerine oturan, tek gerçeklik hattı olan bir sistem kurardım.
+
+---
+
+## B. CURRENT ARCHITECTURE MAP
+
+```
+POST /api/chat  (server.ts:530 — tek ~860 satırlık handler)
+│
+├─ idempotency claim  (kairaChatIdempotencyCoordinator)
+├─ activity permission dialogue  (kairaActivityPermissionChatRuntime)
+├─ cleanHistory = sanitizeKairoChatHistory(history)
+│
+├─ WORLD (persistentWorldModel policy ise)
+│   loadRecentWorldEventObservations → rankWorldEventObservations
+│   → appraiseRetrievedWorldState → deriveWorldReasoningPolicy
+│
+├─ UNDERSTANDING  resolveServerLanguageUnderstanding → understandTurkishMessage
+│   ├─ resolveMessageEntities (entityResolutionEngine)
+│   ├─ Zemberek morphology provider
+│   ├─ LLM semantic provider  → SemanticEvent  (varsa)
+│   └─ fallback: interpretSemanticEvent (regex)   ← flat SemanticEvent
+│   → groundSemanticEventForAppraisal (relationshipScope ekler)
+│   → canonicalSemantic.event
+│
+├─ epistemic:  knowledgeQuery → loadKairaKnowledgeProfile → evaluateKairaKnowledge
+├─ self memory: resolveKairaAutobiographicalRecallRuntime
+├─ dialogueAnalysis = projectSemanticEventToDialogueAnalysis(event)
+├─ dialogueInstruction = buildDialogueBoardInstruction(history,…)   (kairoDialogueChaosEngine)
+├─ dialogueDecision  = planDialogueResponse(history, msg, …event, analysis)   ← geçmişi GÖRÜR
+│
+├─ STATE  (Promise.all)
+│   persistedState = loadKdmState   |   persistentMemory = getFastRecentMemory   |   hydrateLanguageMemory
+│   effective = normalizeDynamicState(persistedState ?? request)
+│
+├─ kdm = analyzeKdmInteraction(msg, basePersonality, effective, semanticEvent, behaviorPolicy)   ← geçmiş YOK
+│   ├─ if RELATIONSHIP_REDUCER_V2 (OFF)  → analyzeKdmInteractionCanonical → relationshipReducer   [DARK]
+│   └─ LEGACY:
+│       ├─ recoverRelationshipConditionedState  (preTurnRecovery)          ┐
+│       ├─ inline warmth/trust/conflict/hurt/repair deltas (kdm…:415-450)  ├─ 3 ayrı mutation yüzeyi
+│       ├─ appraiseRelationshipConditionedEvent                            ┘
+│       ├─ conversationState FSM  (kdm…:452-492)
+│       ├─ applyRelationshipContext → applyIntegratedBehaviorPolicy → behaviorProfile
+│       └─ trace (flat: messageInterpretation{intent,sentiment}, decision{chosenTone})
+│
+├─ behaviorContract  = buildBehaviorContract(kdm.nextDynamicState, trace, event)
+├─ speech            = computeKairoSpeechIdentity(personality, state, trace, expressionStyle)  ← affect'i YENİDEN türetir
+├─ responsePlan      = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech)
+│                        └─ if PLAN_RESOLVER_V2 (OFF) → Hard∩Soft→resolve  [DARK]
+├─ spontaneityDecision = decideKairaControlledSpontaneity({responsePlan, state, history})
+│
+├─ local = tryLocalKairoReply(msg, personality, state, trace, userId, move, responsePlan, event, mem)   ← geçmiş YOK
+│
+├─ IF (local.handled && local.reply && !selfMemoryInstruction):          ← YDM SHORT-CIRCUIT (server.ts:802)
+│     worldMemoryGuard → epistemicGuard → enforceKairoResponse → enforceBehaviorContract
+│     → findKairaResponsePlanIssues → persist (saveKdm/saveKnt/saveTestSession) → RETURN
+│
+└─ ELSE (LLM path):
+      system = [identity, speechIdentityPrompt, langStyleMemory, dyadicAlignment, socialStyle,
+                grounding, activeParticipant, entityGrounding, worldEvent, worldEventMemory,
+                worldStateAppraisal, worldReasoningPolicy, epistemic, selfMemory,
+                dialogueBoard, dialogueDecision,
+                { CANONICAL_PROMPT_BUILDER ON  → canonical behavior block + observational KDM
+                  OFF → relationshipInstruction + behaviorContractInstruction + "KDM … bağlayıcıdır" }
+                responsePlanInstruction + controlledSpontaneityInstruction,
+                sessionWorkingMemory, memoryContext, "Ton:<tone>"]
+      msgs = formatKairoHistoryForModel(history) + user turn
+      reply = generateTextResult(system, msgs)
+      GUARD LOOP (server.ts:1055-1218): 8 issue-finder × {initial, repaired-reprompt, worldGuard-changed, fallback, planSafeFallback}
+      → enforceKaira… guards → persist → RETURN
+```
+
+---
+
+## C. CODE-VERIFIED DATA FLOW (bir mesaj, uçtan uca)
+
+Mesaj: **"iyi dedim ya"** (ilk test, turn 4), önceki Kaira turu "iyi valla sen nasılsın".
+
+1. `server.ts:612` `cleanHistory = sanitizeKairoChatHistory(history)` — 3 önceki tur burada.
+2. `server.ts:626` `resolveServerLanguageUnderstanding` → `understandTurkishMessage` (`languageUnderstandingService.ts:173`). LLM semantic provider dener; başarısızsa `interpretSemanticEvent("iyi dedim ya")` (`semanticEventEngine.ts:151`).
+   - `CORRECTION_RE` (`:126`) "iyi dedim ya"'yı yakalamaz. `inferSocialRoutine` (`:129`) hiçbir kalıba uymaz → `routine="none"`. `intent` zinciri (`:205-221`): hiçbir şey → `intent="general_chat"`, `valence="neutral"`, `target=inferTarget(...)` → negative/command değil → `"unknown"`.
+   - **"iyi dedim ya" bir önceki tura bağlı bir cevaptır; `interpretSemanticEvent` bunu bilecek girdiye sahip değil.**
+3. `server.ts:683` `dialogueAnalysis = projectSemanticEventToDialogueAnalysis(event)` — flat event'ten türetme.
+4. `server.ts:690` `dialogueDecision = planDialogueResponse(cleanHistory, "iyi dedim ya", …)` — **geçmişi görür**. `kairoDialogueDecisionEngine.ts:160-173`: önceki Kaira turu "iyi valla sen nasılsın" → `KAIRA_SHORT_ACK_RE` muhtemelen eşleşmez; `follow_previous_answer` tetiklenmeyebilir → `move` büyük olasılıkla `natural_reaction` / generic. (kanıt yok: exact move için `PREVIOUS_CONTEXT_INVITE_RE` / `KAIRA_SHORT_ACK_RE` gövdesini turn metniyle çalıştırmadım.)
+5. `server.ts:714` `kdm = analyzeKdmInteraction("iyi dedim ya", …)` — **geçmiş parametresi yok**. `semanticSentimentToKdm` → `"nötr"` (emotionalLoad 0). Relationship: neutral branch (`kdmConsistencyEngine.ts:446-450`) → conflict/hurt biraz düşer, `repairAfter = baseRepair`.
+6. `server.ts:729` `responsePlan = buildKairaResponsePlan(contract, dialogueDecision, speech)` — legacy (`PLAN_RESOLVER_V2` OFF) → `kairaResponsePlan.ts:150` erken dönüş.
+7. `server.ts:771` `local = tryLocalKairoReply("iyi dedim ya", …, dialogueDecision.move, responsePlan, event, …)`.
+   - `kairoLocalLanguageEngine.ts:131` `localIntentFromSemanticEvent("iyi dedim ya", event, normalization)`:
+     - `:82` `locallyObserved = interpretSemanticEvent("iyi dedim ya")` → routine none, intent general_chat.
+     - `:89,92` regex'ler eşleşmez.
+     - `:99` `directIntent = localIntentFromEvent(event)` → `null`.
+     - `:102-107` canonical fallback: `normalizeKairoLanguageInput("iyi dedim ya")` `confidence >= 0.85` ve `canonical !== normalized` ve `canUseCanonicalRoutineFallback` (general_chat, tüm flag'ler temiz → **true**) ise → `:109` `canonicalEvent = interpretSemanticEvent(canonical)` → `:111` `localIntentFromEvent(canonicalEvent)`.
+   - **İlk yanlış karar tam burada doğuyor**: normalizer'ın "iyi dedim ya"yı ürettiği canonical biçim, `interpretSemanticEvent` içinde `greeting` (`^selam|merhaba|hey|naber|nasılsın`) veya `agreement` kalıbına düşüyor → YDM `intent = "greeting"` → `:164-173` greeting havuzu (`new` kullanıcı) `["selam","merhaba"]` → `chooseLanguageReply` → **"merhaba"**. (kanıt: çıktı "merhaba"; normalizer'ın tam canonical stringi için `normalizeKairoLanguageInput` gövdesini bu input'la çalıştırmadım — **mekanizma kesin, tetik stringi kanıt yok**.)
+8. `server.ts:802` `!selfMemoryInstruction && local.handled && local.reply` → **true** → YDM cevabı ("merhaba") guard'lardan geçip persist edilip **return**. LLM, prompt, `dialogueDecision`, `sessionWorkingMemory`, spontaneity — hiçbiri kullanılmadı.
+
+Ana bulgu: **discourse'a bağlı bir utterance, discourse görmeyen bir realizer tarafından, discourse gören katmanların çıktısı atılarak yorumlandı.**
+
+---
+
+## D. FIRST TEST AUTOPSY
+
+| Tur | Girdi | Çıktı | İlk yanlış karar noktası | Kanıt |
+|---|---|---|---|---|
+| 1-2 | "naber" ×2 | "iyi valla sen nasılsın" / "iyiyim sen" | — (kabul edilebilir tek başına) | YDM `how_are_you` havuzu `kairoLocalLanguageEngine.ts:175-197` |
+| 3 | "iyi be kanka nasıl olsun" | "iyi valla sen nasılsın" | **YDM `how_are_you` yeniden tetiklendi**; "3. kez, zaten sordum, Mert zaten cevapladı" bilgisi YDM'de yok. `inferSocialRoutine` "nasıl" içeren mesajı `how_are_you`'ya çekiyor (`semanticEventEngine.ts:131`). Discourse state yok. | çıktı = turn 1'in aynısı; `chooseLanguageReply` seed'i tur indeksini içermiyor (`kairoLocalLanguageEngine.ts:233`) |
+| 4 | "iyi dedim ya" | "merhaba" | **YDM normalizer→`interpretSemanticEvent` canonical fallback yanlış sınıf** (`kairoLocalLanguageEngine.ts:102-111`). "iyi dedim ya" önceki turdaki "nasılsın?"a cevap+sitem; hiçbir katman bunu önceki tura bağlamıyor. `dialogueDecision` bağlayabilirdi ama YDM `move`'u içerik için kullanmıyor. | §C above |
+| 5-6 | "merhaba kanka" / "selam" | "selam" / "merhaba" | **selamlaşma-tamamlandı sinyali sistemde hiç üretilmiyor.** `inferSocialRoutine` her turu bağımsız `greeting` sayıyor; `dialogueDecision`'da "greeting exchange saturated" tespiti yok (`kairoDialogueDecisionEngine.ts` grep: repeat/loop yok); persist edilen state'te böyle bir alan yok (`nexus.ts` relationship shape). | Sistem "selamlaşma tamamlandı"yı **hiç üretmiyor** — persist/router meselesi değil |
+| 7 | "ee başka bişey konuşmayacakmıydık" | "konuşuruz tabi de sen konuyu hiç getirmiyorsun 😄" | LLM'e düştü (YDM intent yok) → makul cevap. Ama ironi: **Mert konuyu getiriyor, Kaira getirmiyor** — Kaira kendi ajandası/initiative'i olmadığı için suçu Mert'e atıyor. Reactive-only mimari. | KNT: turn 7-8 OpenRouter |
+| 8 | "sen sürekli merhaba diyorsun" | "he anladım" | **Kaira kendi tekrarını doğrulayacak bilgiye sahip değil.** Kendi geçmiş cevapları LLM'e `msgs` olarak gidiyor ama "kendi davranışımı izle / tekrar ettim mi" diye bir self-monitor yok. `he anladım` = kabul ama düzeltme yok, çünkü self-repair mekanizması yok. | server.ts: reply feedback olarak state'e/self-model'e girmiyor |
+
+### D.4 conflict=0 / hurt=0 iken repairProgress>0
+
+**Legacy hat, `kdmConsistencyEngine.ts:442-445`:**
+```js
+} else if (kind === "positive") {
+  conflictAfter = clamp(conflictAfter - 2 * forgivenessFactor);
+  hurtAfter   = clamp(hurtAfter - forgivenessFactor);
+  if (priorConversationState === "active") repairAfter = clamp(repairAfter + 3 * forgivenessFactor);
+}
+```
+Herhangi bir pozitif-valence turda (`apology||support>0||compliment>0||affection>0` → `semanticEventEngine.ts:226`), `active` state'te, **onarılacak bir yara olup olmadığına bakılmadan** `repairProgress += ~1.65…4.65`. **Wiring bug + yanlış abstraction ikisi birden**: `repairProgress` "gerçek hasarın onarımına doğru ilerleme" olmalı ama burada "pozitif tur sayacı" gibi davranıyor. Kanonik `relationshipReducer` PR#26'da `repairInjuryFloor` kapısını aldı (`relationshipReducer.ts:406`) — **ama o hat OFF.** Ayrıca `repairProgress` **12 dosyada** geçiyor (`grep`) → abstraction sızıntısı.
+
+### D.5 normal mesajların `duygusal_yük` işaretlenmesi
+
+`semanticEventEngine.ts:122-123` `EMOTIONAL_SHARE_RE` / `LOW_MOOD_RE` — geniş `.{0,30}` aralıklı, **binary**, bağlamsız yüksek-recall alternation regex'leri. `:201` `emotionalLoad = LOW_MOOD_RE ? 0.8 : emotionalShare ? 0.45 : 0`. `kdmConsistencyEngine.ts:196` `semanticSentimentToKdm`: `if (event.emotionalLoad > 0) return "duygusal_yük"`. **Tasarım gereği binary + eşiksiz + güven skorsuz** → sıradan mesajlar (veya LLM parser'ın over-label'ı, veya normalizer canonical'ı) `duygusal_yük` damgası yiyebiliyor. İlk testteki tam tetikleyici tur için **kanıt yok** (KNT payload verilmedi); mekanizma kesin.
+
+---
+
+## E. CORE ARCHITECTURAL FAILURES (sistemik)
+
+**E1 — İki gerçeklik hattı (env-flag dual truth).** `RELATIONSHIP_REDUCER_V2`/`PLAN_RESOLVER_V2`/`CANONICAL_PROMPT_BUILDER` OFF (`canonicalBehaviorFlags.ts:104`), deploy set etmiyor. `kdmConsistencyEngine.ts:269` ve `kairaResponsePlan.ts:150` iki tam paralel implementasyon. Sonuç: her davranış kuralı iki kez yazılıyor, testler her iki yolu ayrı doğrulamak zorunda, prod eski yolda, "düzelttik" denen şeyler canlıda yok. `SEMANTIC_SCHEMA_V2` + `UNIFIED_GUARD_PASS` hiç bağlanmamış ölü flag.
+
+**E2 — YDM ikinci beyin.** `kairoLocalLanguageEngine.ts` sosyal karar veriyor (intent sınıflandırma + ilişki-seviyesine göre cevap seçimi), geçmiş görmüyor, ve `server.ts:802`'de tüm pipeline'ı kısa devre yapıyor. "Verbalizer only" yorumu (`:141`) yanlış — havuz seçimi = içerik kararı.
+
+**E3 — Discourse/working-memory katmanı yok.** `history` düz dizi. `dialogueDecision` kısmi discourse mantığı taşıyor ama çıktısı sadece bir `move` etiketi olarak YDM'e/prompt'a gidiyor; `analyzeKdmInteraction` ve `tryLocalKairoReply` geçmiş parametresi almıyor. `buildSessionWorkingMemory` `history.length <= 8` iken inert (`server.ts:336`). "Selamlaşma tamamlandı", "3 turdur aynı kalıp", "bu mesaj önceki soruma cevap" gibi discourse gerçekleri **hiçbir yerde durmuyor**.
+
+**E4 — Tek-pass, tek-etiket, belirsizliksiz semantic.** `interpretSemanticEvent` (`semanticEventEngine.ts:151`) → flat `SemanticEvent`: bir `intent`, binary flag'ler, skalar `severity`. `uncertainty` yok, hipotez yok, `discourseAct` sadece current-string regex. LLM parser bile aynı flat şekle çöküyor. İroni/ağır şaka/argo/yanlış-anlama bu şekilde temsil edilemez.
+
+**E5 — Relationship state 3+1 mutation yüzeyi + 12-dosya sızıntısı.** Legacy KDM: `recoverRelationshipConditionedState` + inline deltas + `appraiseRelationshipConditionedEvent`. Kanonik `relationshipReducer` 4.'sü (dark). `repairProgress`/`warmth`/`trust`/`conflict`/`hurt` 12 dosyada. Homeostasis sabit baseline'a çekiyor (`relationshipReducer.ts:511` `towardBaseline(..., NEUTRAL_AFFECT_BASELINE, step)`; legacy `warmthHomeostasis`) → mood robotikleşiyor.
+
+**E6 — Erken çözülen tek `ResponsePlan` + mood/relationship karışması.** `buildKairaResponsePlan` `dialogueDecision.move` + `contract` + `speech`'ten tek objede allow* kapılarını sabitliyor; alternatif dürtüler / belirsizlik korunmuyor. `computeKairoSpeechIdentity` (`kairoSpeechIdentity.ts`) "HOW only" iddiasıyla `sentiment`/`hurtScore`/`conflictScore`/`reactionMode` okuyup `register`+`emojiLevel=0`+`sentenceLength="very_short"` set ediyor — HOW katmanında yaşayan soft davranış kapısı.
+
+**E7 — Reply state'e feedback değil.** Final `reply` sadece persist ediliyor (`server.ts:1245-1281`); Kaira'nın kendi turu olarak discourse/self-model'e geri girmiyor. Self-repair, "kendi tekrarımı fark etme", "az önce çelişki kurdum" yapısal olarak imkânsız.
+
+**E8 — Guard yığını = geç, regex-tabanlı, tekrarlı.** `server.ts:1055-1218`: 8 issue-finder × 4-5 çağrı. Plan-conformance yerine dar tone/keyword regex'leri (`findKairoAffectiveResponseIssues`, `findDialogueDecisionIssues`). Repair = LLM'i yeniden çağır; son çare canned fallback. Doğru cevabı kurmak yerine yanlışı yakalayıp yamıyor.
+
+**E9 — KNT = flat projeksiyon.** `nexus.ts:37-38` `messageInterpretation:{intent,sentiment}`, `decision:{chosenTone}`. Gerçek karar grafiği (hangi impuls, hangi hard constraint, hangi alternatif elendi) yok — özet var.
+
+**E10 — Testler implementasyon string'i ölçüyor.** 293 test dosyasının **35'i** `server.ts` kaynak metnine assert ediyor (`server.indexOf`, `readFileSync`). Golden session = elle yazılmış 18 sinyalin reducer'a replay'i (fixture note), uçtan uca değil, ve **canlıda olmayan** "corrected" davranışı doğruluyor.
+
+---
+
+## F. FALSE COMPLEXITY (gereksiz / erken / yanlış yerde)
+
+- **Dual-flag paralel implementasyonlar** (E1). En büyük gereksiz karmaşıklık: her katmanın iki kopyası.
+- **`kairoDialogueChaosEngine` "KARMAŞIK DİYALOG TAHTASI"** (`:292-340`) — claim ledger + topic tokens + social signals, ayrı bir mini-discourse motoru — ama çıktısı sadece prompt string'i; `dialogueDecision` ile örtüşen sorumluluk, ikisi de ayrı ayrı history parse ediyor.
+- **`interpretSemanticEvent`'in 3+ kez çağrılması** bir turda (understanding fallback + YDM `:82` + YDM canonical `:109` + `planDialogueResponse:139`). Aynı regex motoru, farklı stringlerle, paylaşımsız.
+- **Guard pipeline'ın 4-5× tekrarı** (E8) — 30+ regex passı bir cevap için.
+- **`recoverRelationshipConditionedState`'in `Math.pow(base, exponent)` retention matrisi** (`relationshipConditionedRecovery.ts:52-79`) — reaction×affect başına elle ayarlı üs; kalibrasyonu imkânsız, davranışsal faydası kanıtlanmamış.
+- **`temperamentEngine` + `relationshipConditionedAppraisal` + `appraisalEngine`** üç ayrı appraisal-benzeri modül; sorumluluk sınırları bulanık (kanıt: `grep repairProgress` üçünde de var).
+- **`kairaControlledSpontaneity`** — %3-12 olasılıkla, sadece `move==='natural_reaction'` + neutral + budget≥2/8 + safe topic varsa bir yan-not ekliyor (`kairaControlledSpontaneity.ts`). Pratikte neredeyse hiç ateşlenmiyor; "insanilik" için eklenen bu knob şu an ölü ağırlık.
+
+---
+
+## G. MISSING FOUNDATIONS (gerçekten eksik temel abstraction'lar)
+
+1. **`ConversationState` / Discourse Model.** Çok-taraflı katılımcı listesi, addressee, açık konu dalları, her katılımcının son N turu + act'i, "routine saturation" (selamlaşma bitti), pending question (kim kime ne sordu, cevaplandı mı), Kaira'nın kendi son turları + tekrar tespiti. Şu an: yok.
+2. **Shared working memory / blackboard.** Understanding, appraisal, planning, realization'ın hepsinin okuyup yazdığı tek yapı. Şu an: her katman kendi girdisini ayrı parse ediyor, bilgi seam'lerde kayboluyor.
+3. **Uncertainty / multiple-hypothesis semantic.** `SemanticInterpretation@2` şeması (`src/types/semanticInterpretation.ts`) bunu HEDEFLİYOR ama (a) dark, (b) yine tek sonuç + tek `uncertainty` skalar, hipotez listesi yok.
+4. **Self-model / self-monitor.** "Ne yaptım, tekrarladım mı, çeliştim mi, stall mı ettim, kendi ajandam ne" — final reply'ı event olarak alan hafif bir izleyici.
+5. **Mood ≠ Relationship ayrımı.** Ayrı bir kısa-vadeli affect (PAD-benzeri, momentum/decay) katmanı; ilişki skorları (yavaş trajektori + episodic) ondan bağımsız. Şu an ikisi `dynamicState` içinde iç içe.
+6. **Initiative / agenda subsystem.** Kaira'nın konuşmaya getirebileceği şeyler (offscreen life, son olaylar, merak ettikleri). Reactive-only pipeline bunu doğal taşımıyor.
+7. **Episodic relationship memory.** "Bu kişiyle 3 gün önce şu konuda tartıştık" — event-level, şu anki skalar skorların altında.
+
+---
+
+## H. KEEP / MERGE / DELETE / REWRITE / MISSING
+
+| Katman (dosya) | Amaç | Gerçekte ne yapıyor | Aynı kararı başka yerde? | Sınıf | Patchability |
+|---|---|---|---|---|---|
+| `server.ts /api/chat` | orkestrasyon | 860 satır inline; understanding→state→plan→realize→guard→persist | — | **REWRITE** (orchestrator + stages) | C |
+| `semanticEventEngine.interpretSemanticEvent` | mesaj→anlam | tek-pass regex, flat, contextless, belirsizliksiz | LLM parser + YDM + dialogueEngine ayrı parse | **REWRITE** (→ hypothesis+uncertainty, LLM-primary) | C |
+| `languageUnderstandingService` | provider seam | LLM→regex fallback, groundSemanticEventForAppraisal | — | **KEEP** (seam iyi), output şekli REWRITE | B |
+| `entityResolutionEngine` / `worldEventEngine` | kim-kime-ne | actor/target/relationshipScope | — | **KEEP** | A |
+| `kairoDialogueChaosEngine` (dialogueBoard) | discourse tahtası | claim ledger + topics → prompt string | `planDialogueResponse` ile örtüşür | **MERGE** → Discourse Model | B |
+| `kairoDialogueDecisionEngine.planDialogueResponse` | tur hareketi | history-aware move seçimi, kısmi repair mantığı | `dialogueBoard` + `responsePlan.move` | **MERGE** → BehaviorResolver girdisi | B |
+| `kdmConsistencyEngine` (legacy) | ilişki+appraisal+profil | 680 satır, 3 mutation yüzeyi, magic numbers | `relationshipReducer` (dark) aynısını yapıyor | **DELETE** (reducer canonical olunca) | C |
+| `relationshipConditionedRecovery` | zaman-bazlı toparlanma | Math.pow retention matrisi | reducer `computeRecovery` | **MERGE** → tek reducer recovery | C |
+| `relationshipConditionedAppraisal` / `appraisalEngine` / `temperamentEngine` | appraisal + mizaç | OCC-benzeri + reaction mode | birbirleriyle + reducer | **MERGE** → tek appraisal→impulses | C |
+| `relationshipReducer` + `relationshipReducerConfig` | pure ilişki reducer | prensipli, config'li, saf | legacy KDM (paralel) | **KEEP** (canlıya al, tek yap) | A |
+| `relationshipReducer` axes (openness/warmth/guardedness) | ortogonal projeksiyon | K2 doğru | — | **KEEP** | A |
+| `buildBehaviorContract` | state→izinler | conversationState + skorlardan izin türetir | contract + reducer + speech örtüşür | **MERGE** → HardConstraints | B |
+| `kairaHardConstraints` / `kairaSoftTendencies` / `kairaPlanResolver` | canonical plan | doğru ayrım, dark | legacy `buildKairaResponsePlan` | **KEEP** (canlıya al) | A |
+| `kairaResponsePlan` (legacy dalı) | plan | legacy allow* hesabı | resolver | **DELETE** (flag kalkınca) | B |
+| `KairaResponsePlan` tek-obje | davranış kontratı | erken çözülüyor, alternatif/belirsizlik kaybı | — | **REWRITE** (resolved snapshot + retained impulses + uncertainty) | B |
+| `computeKairoSpeechIdentity` | HOW/stil | affect'i yeniden türetir, emoji/length kapısı koyar | reducer/contract | **MERGE** (saf projeksiyon: sadece plan+personality'den stil) | B |
+| `kairaCanonicalPromptBuilder` (PR3) | tek prompt otoritesi | tek blok, lockdown clause | legacy prompt yığını (flag OFF) | **KEEP** (canlıya al) | A |
+| `kairaControlledSpontaneity` | spontane nudge | neredeyse hiç ateşlenmez | — | **MERGE** → Impulse ("bring-up-topic") | B |
+| `kairoLocalLanguageEngine` (YDM) | hızlı realization | intent sınıflandırma + canned pool + short-circuit | LLM realization + dialogueDecision | **REWRITE** (sadece renderer, plan+discourse tüketir, short-circuit YOK) | C |
+| output guards (`kairoResponseConsistency`, `findDialogueDecisionIssues`, `findKairaResponsePlanIssues`, `worldModelResponseGuard`, epistemic/autobiographical) | teslim güvencesi | 8× regex, 4-5 tekrar | birbirleriyle | **MERGE** → tek plan-conformance passı (UNIFIED_GUARD_PASS niyeti) | B |
+| `kdmPersistenceService` / hydration | kalıcılık | state + KNT + testSession | — | **KEEP** | A |
+| KNT trace (`nexus.ts ReasoningTrace`) | gözlemlenebilirlik | flat özet | — | **REWRITE** (karar grafiği: impulses, constraints, elenenler) | B |
+| epistemic access (`evaluateKairaKnowledge`) | sınırlı bilgi | knowledgeQuery→profile→decision→prompt instruction | — | **KEEP** (ama enforcement zayıf, §P) | B |
+| self/lived/world memory ayrımı | hafıza tipleri | 3 ayrı store + retrieval | — | **KEEP** (ayrım doğru), retrieval MERGE | B |
+| governance (AI_CONTEXT §8, ADR, CI, architecture-review) | değişim disiplini | çalışıyor | — | **KEEP** | A |
+
+**MISSING**: Discourse Model, blackboard, uncertainty/hypotheses, self-monitor, mood≠relationship ayrımı, initiative subsystem, episodic relationship memory (§G).
+
+---
+
+## I. DETERMINISTIC / LLM / HYBRID BOUNDARY
+
+| İş | Kim | Neden |
+|---|---|---|
+| Morfoloji, entity resolution, dünya-olay grounding | **Deterministic** | Test edilebilir, ucuz, kararlı |
+| Semantic yorum (intent + act'ler + hedef + ton + ironi/şaka + **belirsizlik + 2-3 hipotez**) | **LLM (primary)**, deterministic **doğrulayıcı/sınırlayıcı** | Bu tam da LLM'in güçlü olduğu yer; regex ironi/argo/yanlış-anlama yapamaz. Deterministic katman şemayı zorlar, saçma çıktıyı reddeder, güven düşükse "belirsiz" işaretler |
+| Discourse state güncelleme (addressee, pending question, routine saturation, Kaira'nın kendi tekrarı) | **Deterministic** | Kesin, ucuz, her turda; state bütünlüğü |
+| Appraisal → impulses (intensity + gerekçe) | **Deterministic** (kural + config), LLM opsiyonel danışman | Tekrarlanabilir, kalibre edilebilir, test edilebilir |
+| Relationship reducer (skorlar, conversationState, axes, recovery) | **Deterministic pure reducer** | State integrity; asla LLM'e verilmez |
+| Hard constraints (karakter politikası, güvenlik, flört sınırı, epistemik dürüstlük) | **Deterministic, mutlak** | Bunlar LLM'e teslim edilemez |
+| Behavior resolution (hard clamp + soft fill + impulse arbitrasyonu → ResponsePlan) | **Deterministic** | Tek otorite, açıklanabilir |
+| Realization (planı tek doğal cümleye render) | **LLM (primary)**; trivial turlar için **küçük local template renderer** opsiyonel | Doğallık/mizah LLM'de; local sadece "selam"/"iyiyim" gibi turlarda latency için, **karar vermeden** |
+| Post-delivery: plan-conformance + tutarlılık (teslim edilen metin üzerinde) | **Deterministic tek pass** | Plan kontrat; metin plana uyuyor mu |
+| Self-monitor (tekrar/çelişki/stall) | **Deterministic** (delivered reply → discourse + self-model) | Ucuz sinyal, bir sonraki tur self-repair impulse'u besler |
+
+**İlke:** LLM iki yerde primary — *anlama* ve *ifade*. Ortadaki her şey (state, constraints, karar) deterministic. Şu anki sistem bunu tersine yapıyor: anlama regex, ifade kısmen canned (YDM), ama davranış kararı prompt'ta LLM'e de sızıyor (legacy `KDM ... bağlayıcıdır` satırı + `chosenTone`).
+
+---
+
+## J. YDM FINAL VERDICT
+
+**Mevcut hali yanlış. Kalmalı ama tamamen küçülmeli — sadece realization shortcut olmalı, karar verici olmamalı.**
+
+- **Sorun 1:** Sosyal karar veriyor — intent sınıflandırma (`localIntentFromSemanticEvent`) + ilişki-seviyesine/reaction-mode'a göre cevap havuzu seçimi. Bu WHAT/WHETHER kararıdır, `KairaResponsePlan`'ın işidir.
+- **Sorun 2:** `server.ts:802` short-circuit — pipeline'ı atlıyor, `dialogueDecision`/`sessionWorkingMemory`/spontaneity kullanılmıyor, guard'ların yarısı çalışmıyor.
+- **Sorun 3:** Geçmiş görmüyor (`kairoLocalLanguageEngine.ts:119` signature) → döngü, bağlam-kaybı.
+- **Sorun 4:** Kendi regex'iyle yeniden parse ediyor (`:82`, `:109`) → understanding katmanıyla çelişebilir.
+
+**Hedef YDM:** girdi = `ResponsePlan` + `DiscourseState` + `SpeechIdentity`. Yalnızca planın `move`'u trivial ve deterministik render edilebilir bir şeyse (ör. `simple_ack`, `greeting_back` ve discourse "routine not saturated" diyorsa) bir template üretir. "handled=false" default; short-circuit yok — çıktısı yine tek guard pass'ten geçer. Intent sınıflandırma YDM'den çıkar, plan'a girer. Havuzlar kalabilir ama seçim anahtarı discourse-aware olur (routine saturation → "greeting_back" hiç seçilmez).
+
+---
+
+## K. DISCOURSE / WORKING MEMORY VERDICT
+
+**Hem gerçek eksik state var HEM mevcut context'in wiring'i bozuk — ama ağırlık: eksik state.**
+
+- **Eksik state (yapısal):** routine saturation, pending-question ledger, Kaira'nın kendi son turlarının act özeti + tekrar tespiti, açık konu dalları, çok-taraflı addressee. `nexus.ts` relationship/dynamicState şeklinde bunların hiçbiri yok. `dialogueDecision` bunları her turda sıfırdan history'den türetmeye çalışıyor ve kısmen başarıyor (`follow_previous_answer`, `repair_or_rephrase`) ama loop/saturation yok.
+- **Bozuk wiring:** `analyzeKdmInteraction` ve `tryLocalKairoReply` history parametresi almıyor. `buildSessionWorkingMemory` `<=8` turda inert (`server.ts:336`) ve sadece LLM prompt'una gidiyor. `dialogueDecision`'ın discourse çıktısı YDM'e sadece `move` etiketi olarak ulaşıyor.
+
+**Sonuç:** Persistent, her katmanın okuduğu bir `DiscourseState` + onu her turda deterministik güncelleyen bir reducer gerekiyor. "Context zaten var, sadece bağla" yeterli değil — bağlanacak yapının kendisi eksik.
+
+---
+
+## L. SEMANTIC UNDERSTANDING VERDICT
+
+**Tek-pass yeterli DEĞİL. Uncertainty + 2-3 hipotez GEREKLİ. LLM primary olmalı.**
+
+- `interpretSemanticEvent` flat tek-etiket (`semanticEventEngine.ts:53-82`). "neden sen kaşar değilmisin" (golden turn 11) — soru mu, hakaret mi, şaka mı? Tek `intent` + skalar `severity` bunu taşıyamaz; `jokingConfidence`/`sincerityConfidence` `SemanticInterpretation@2`'de var ama o dark ve yine tek sonuç.
+- İroni/ağır şaka/argo/yanlış-anlama ayrımı **bağlam + hipotez** ister: "bu turda muhtemelen banter (0.6) / olası hakaret (0.3) / retorik soru (0.1)". Downstream appraisal bu dağılımı taşımalı, tek etikete çökmemeli.
+- **LLM'in rolü:** primary parser — {primaryIntent + secondarySocialActs[] + target + SeverityVector + joking/sincerity + **hypotheses[] + uncertainty** + discourse-act (önceki tura göre)}. Deterministic katman: şema doğrulama, güvenlik-floor (redline regex asla düşürülmez), düşük-güven alanları güvenilir kabul etmeme. Regex sadece LLM yoksa fallback + güvenlik tabanı.
+- Belirsizlik downstream'de **kapı çevirmemeli**, dampen etmeli (canonical reducer bunu zaten yapıyor: `uncertaintyDampen` — o kısım doğru).
+
+---
+
+## M. APPRAISAL / MOOD / RELATIONSHIP VERDICT
+
+**Mevcut modeller insaniliği doğal taşımıyor; homeostasis kısmen yanlış; repair/trust/warmth/hurt/conflict ayrımı kısmen doğru ama repairProgress yanlış abstraction.**
+
+- **Mood ≠ Relationship karışıyor.** `dynamicState` içinde `anger/stress/happiness/calmness` (mood) ve `relationship.{warmth,trust,conflict,hurt,repairProgress}` iç içe; `computeKairoSpeechIdentity` ikisini birden okuyup register türetiyor. İnsanda mood dakikalar-saatler ölçeğinde oynar, ilişki günler-haftalar. Ayrı katman + ayrı zaman sabiti gerek.
+- **Homeostasis robotik.** `relationshipReducer.ts:511` `towardBaseline(prev.affect.X, NEUTRAL_AFFECT_BASELINE.X, step)` — sabit noktaya sabit adım. İnsan affect'i momentum + decay ister (bir tur önceki eğilim + üstel sönüm), sabit-nokta-çekimi değil. Legacy `warmthHomeostasis.driftPerCalmTurn` aynı sorun.
+- **`repairProgress` yanlış abstraction.** "Onarıma doğru ilerleme" bir skalar sayaç değil, **injury olayına bağlı bir süreç** olmalı: hangi olay, ne kadar ağırdı, hangi onarım eylemleri oldu, ne kadar zaman geçti. Şu an 12 dosyada, injury yokken artabiliyor (legacy `:445`), ve `conversationState` çıkış kapısı olarak kullanılıyor (`relationshipReducer.ts:460`). Episodic bir `RelationshipInjury[]` + türetilmiş `repairState` daha doğru.
+- **Doğru olanlar:** warmth/trust/conflict/hurt'ün ayrı tutulması mantıklı; canonical reducer'ın "recovery = time + interaction", "derived injury asymmetry", "maturity damping (no positive-feedback term)", "orthogonal axes" kararları iyi (`relationshipReducer.ts:535-564`). Bunlar KEEP.
+- **Legacy'nin 3 mutation yüzeyi** (§E5) → tek pure reducer. `appraiseRelationshipConditionedEvent` + `recoverRelationshipConditionedState` + inline deltas birleşmeli.
+
+---
+
+## N. RESPONSEPLAN VERDICT
+
+**Tek resolved `KairaResponsePlan` fikri DOĞRU, ama şu an fazla erken çözülüyor ve bilgi kaybediyor.**
+
+- **Doğru:** tek davranış kontratı, hard clamp + soft fill, realizer'ın yeniden yorumlayamaması (PR3 lockdown clause). Bu korunmalı.
+- **Sorun 1 — erken çözüm:** `buildKairaResponsePlan(contract, dialogueDecision, speech)` tek `move` + boolean kapılara indiriyor. Alternatif dürtüler (ör. "sınır koy" vs "şakaya ortak ol" — golden turn 11'de ikisi de geçerli) ve bunların gerilimi kayboluyor. Plan **resolved snapshot + elenen impulse'lar + uncertainty**'yi taşımalı; realizer resolved kısmı uygular ama trace elenenleri gösterir (self-repair ve KNT için).
+- **Sorun 2 — competing impulses eksik:** appraisal tek sonuç veriyor. OCC-benzeri paralel appraisal → `Impulse[]` (respond_warm, set_boundary, deflect_flirt, ask_clarify, self_correct, stay_quiet, bring_up_topic) her biri intensity + kaynak. `BehaviorResolver` bunları hard constraint altında arbitrasyon yapıp plana çözer. Bu **daha doğru** çünkü insan da aynı anda çelişkili dürtüler taşır ve bunlardan biri kazanır.
+- **Sorun 3 — gelecekte darboğaz:** grup sohbetinde tek `move` + tek `target` yetmez (Kaira aynı turda A'ya cevap verip B'nin kavgasına girmeyebilir). `move` başına-katılımcı olmalı.
+- **Verdict:** `KairaResponsePlan`'ı KEEP + REWRITE: `{ resolved gates (mevcut) , impulses: {chosen, rejected[]}, uncertainty, perAddressee? }`. Competing-impulses ekle ama plan yine tek çözülmüş çıktı olarak kalsın (state machine değil).
+
+---
+
+## O. PROMPT / REALIZATION VERDICT
+
+- **Canonical prompt builder (PR3) doğru yönde** — tek davranış bloğu, her alan bir kez, lockdown clause. **Ama dark (flag OFF).** Canlı prompt hâlâ `behaviorContractInstruction` + `relationshipInstruction` direktifleri + `KDM ... bağlayıcıdır` satırı + `chosenTone` = 4 ayrı otorite (`server.ts:1013` else dalı).
+- **Modeli fazla kısıtlıyor mu?** Canlı hat: EVET — `socialStyle` (`server.ts:994`) 15 madde "yapma" + `dialogueDecisionInstruction` "yeni şaka ekleme / soru sorma" + `behaviorContractInstruction` "aykırı sosyal anlam üretme" + `relationshipInstruction` + rhythm guard + length budget + emoji budget. Spontanlık ve mizah bu yığın altında eziliyor; `findKairoResponseRhythmIssues` + `findDialogueDecisionIssues` beğenmezse LLM'i düşük sıcaklıkla (0.35) yeniden çağırıyor veya canned fallback'e düşüyor (`server.ts:1075-1152`) → tekdüzeleşme.
+- **Canonical builder daha iyi ama hâlâ risk:** blok kapıları listeliyor (`allowHumor=yasak` vb.) — kapı KAPALIYSA bu doğru; kapı AÇIKSA blok bir şey "emretmiyor", iyi. Lockdown clause stil'i doğru şekilde alt sıraya alıyor. Yine de `socialStyle`'ın 15 maddesi + guard yığını canonical'da da duruyor → asıl daraltma orada.
+- **LLM yeniden karar verebiliyor mu?** Canlı: kısmen (prompt'ta kapı listesi + `chosenTone` var ama post-hoc guard'lar plana zorluyor). Canonical: hayır (tek blok + lockdown + plan-conformance guard).
+- **Verdict:** Canonical builder'ı KEEP + canlıya al. Ama gerçek "mizahı öldüren" şey prompt otoritesi çokluğu değil, **guard yığınının regex-tabanlı reddet-ve-yeniden-üret döngüsü** (§E8). O da UNIFIED_GUARD_PASS ile plan-conformance'a inmeli.
+
+---
+
+## P. MEMORY / KNOWLEDGE / EPISTEMIC VERDICT
+
+- **Memory tipleri doğru ayrılmış:** self memory (`resolveKairaAutobiographicalRecallRuntime`) / lived memory (`kairaLivedMemoryRuntime`) / world memory (`worldModelEventStore`) / user language memory (`kairoLanguageMemory`) / session working memory. Ayrım kavramsal olarak doğru — **KEEP**.
+- **Retrieval parçalı:** her tipin ayrı retrieval'ı, `server.ts`'de 6+ ayrı `build*Instruction`. **MERGE** → tek retrieval orchestrator + relevance skoru.
+- **Sınırlı bilgi mekanik mi?** Kısmen. `knowledgeQuery.confidence >= 0.72` (`server.ts:648`) ile tetikleniyor, `evaluateKairaKnowledge` bir `decision` üretiyor, `buildKairaEpistemicInstruction` prompt'a yazıyor, `enforceKairaEpistemicResponse` + `findKairaEpistemicResponseIssues` post-hoc kontrol ediyor. Yani **prompt talimatı + regex post-check** — LLM'in genel bilgisini "mekanik olarak engellemiyor", "lütfen bilmiyormuş gibi yap" diyor + çıktıda bilgi sızıntısı ararsa yakalıyor. Gerçek mekanik engelleme (bilgiyi context'ten çıkarma / bilmediği konuları retrieval'da hiç getirmeme) yok. **B — kırılgan**, özellikle `knowledgeQuery` tespiti kaçarsa Kaira her şeyi bilir.
+- **Yanlış hatırlama / emin olmama:** `memoryContext` `validateMemoryAgainstMessage` ile filtreleniyor (`server.ts:783`) + prompt "kayıt yoksa uydurma" diyor. Ama "yanlış hatırlama" (kayıt var ama Kaira farklı hatırlıyor) doğal olarak modellenmiyor — ya kayıt var (doğru söyler) ya yok (bilmiyorum der). İnsan-benzeri belirsiz/çarpık hatırlama için episodic memory + confidence gerekli.
+
+---
+
+## Q. FUTURE PRESSURE TEST (6-12 ay)
+
+| Ekleme | Ne kırılır | Neden |
+|---|---|---|
+| **Group chat / 6 kişi** | `dialogueDecision` tek `target`, `SemanticEvent.target ∈ {kaira,third_party,event,unknown}` (`semanticEventEngine.ts:2`), YDM tek-kullanıcı havuzları, `ResponsePlan` tek `move`. Addressee tracking yok. | Discourse model çok-taraflı değil; her yerde 1:1 varsayımı |
+| **Kaira hedef değilken 2 kişinin kavgası** | `groundSemanticEventForAppraisal` third_party'yi neutral'a çekiyor (`languageUnderstandingService.ts:143`) → Kaira hiç tepki vermez. "İki arkadaşım kavga ediyor, rahatsızım" = geçerli sosyal tepki, ama sistem bunu event olarak bile taşımıyor | relationshipScope ikili (kaira_user / third_party), "witness" hali yok |
+| **Initiative / offscreen life** | Pipeline tamamen reactive (`/api/chat` = mesaj gelince). `kairaControlledSpontaneity` %3-12 nudge dışında Kaira konu açamaz. Autonomous life ayrı worker'da, chat'e bağlı değil | Agenda/initiative subsystem yok (§G6) |
+| **Long-term memory (aylar)** | `repairProgress` skalar, episodic injury yok; "3 ay önce şu konuda küstük" temsil edilemez. Skorlar tek boyut | Episodic relationship memory yok (§G7) |
+| **100-turlu konuşma** | `buildSessionWorkingMemory` token-overlap retriever `history.slice(0,-8)` — 100 turda O(n) her turda, alaka çökebilir. Discourse state olmadığı için drift birikir | Discourse model yok; working memory naif |
+| **Multi-instance / 100k user** | `getLanguageMemory(userId)` in-memory profile (`kairoLanguageMemory`), `memoryCache` in-process. Her `/api/chat` turunda: 1 LLM understanding + 1 LLM generation + (guard başarısızsa) +1 repair LLM. 3× LLM/turn worst case. Legacy KDM + reducer + guard yığını CPU. | Stateless horizontal scale için in-memory profile/cache sorun; LLM çağrı sayısı maliyet |
+| **Voice / realtime** | Guard reddet→repair→fallback döngüsü (`server.ts:1075-1218`) latency 8-24s bütçesiyle çalışıyor (`now()-aiStart < 24000`). Realtime'da kabul edilemez | Guard mimarisi geç ve iteratif |
+| **World simulation** | World memory var ama appraisal'a `retrievedWorldEvents` sadece prompt string'i; Kaira'nın dünya-modeli reasoning'i LLM'e delege | Deterministic dünya-durumu reasoning yok |
+
+**Genel:** Her yeni durum bugün **yeni field + yeni if/else + yeni guard** gerektiriyor (group chat → `target` genişlet + addressee field + guard; initiative → yeni subsystem + yeni prompt bloğu). Bu **sistemik başarısızlık** — mimari kompozisyonel değil, additive.
+
+---
+
+## R. ALTERNATIVE ARCHITECTURES (2 ciddi + hibrit)
+
+### Alt-1: Blackboard / Working-Memory-Centric
+
+Merkezi `WorkingMemory` (bir tur = bir "problem"). Bağımsız **Knowledge Sources** (understanding, discourse-tracker, appraisal, relationship-reducer, memory-retrieval, constraint-checker, planner, realizer) blackboard'a yazar/okur. Bir controller hangi KS'in ne zaman çalışacağını yönetir.
+
+- **Kazanç:** bilgi seam'de kaybolmaz (herkes aynı WM'yi görür); yeni yetenek = yeni KS, mevcutları değiştirmeden; discourse state doğal yer bulur; parçalı test kolay (WM in → WM out).
+- **Complexity:** controller/scheduling mantığı; KS bağımlılık sırası; debugging "hangi KS ne zaman yazdı".
+- **Latency:** KS'ler çoğunlukla deterministic + hızlı; LLM sadece understanding + realization. Sequential'a yakın, hafif overhead.
+- **Maliyet:** LLM çağrısı sequential ile aynı (2/turn).
+- **Deterministic testability:** çok yüksek — WM snapshot'ları golden.
+- **İnsanilik:** orta — WM iyi ama karar hâlâ tek planner'da.
+- **Ölçek:** WM per-request, stateless-friendly; KS'ler saf → yatay ölçek iyi.
+- **Patchability:** A.
+- **Mevcut sistem nerede daha iyi:** hiçbir yerde; bu mevcut sistemin olması gereken hali.
+
+### Alt-2: Competing Drives / Impulse + Resolver (utility-AI esintili)
+
+Appraisal paralel `Impulse[]` üretir (her biri: type, intensity, target, justification, decay). Bir **Resolver** hard constraint'ler altında utility maksimize ederek 1-2 impulse seçer → `ResponsePlan`. Seçilmeyenler trace'te + bir sonraki turda decay ile taşınır (momentum).
+
+- **Kazanç:** çelişkili dürtüler doğal ("sınır koy" 0.7 vs "şakaya gir" 0.5 → sınır kazanır ama trace'te ikisi de var); self-repair bir impulse tipi olur; grup sohbeti = katılımcı başına impulse seti; initiative = "bring_up_topic" impulse'u; insan-benzeri "kararsızlık" temsil edilir.
+- **Complexity:** utility fonksiyonu kalibrasyonu; impulse taksonomisi; decay/momentum tuning.
+- **Latency:** deterministic, hızlı.
+- **Maliyet:** LLM 2/turn.
+- **Deterministic testability:** yüksek (impulse set + resolver kararı golden), ama utility ağırlıkları property-test ister.
+- **İnsanilik:** yüksek — bu KAIRA hedefine en yakın davranış modeli.
+- **Ölçek:** saf fonksiyonlar, iyi.
+- **Patchability:** A ama kalibrasyon riski (B).
+- **Mevcut sistem nerede daha iyi:** basitlik — tek `move` seçmek utility arbitrasyonundan öngörülebilir; küçük ekipte tuning yükü.
+
+### Alt-3 (ÖNERİLEN): Hibrit — Blackboard + Discourse Model + Deterministic Reducers + Competing Impulses + Constrained Realization
+
+Alt-1'in WM'si üzerinde Alt-2'nin impulse/resolver'ı; understanding çok-hipotezli + LLM-primary; relationship tek pure reducer; realization plan-kısıtlı LLM (+ opsiyonel trivial local renderer).
+
+Detay §S.
+
+---
+
+## S. RECOMMENDED TARGET ARCHITECTURE
+
+```
+POST /api/chat  → thin orchestrator (stage runner), ~150 satır
+
+WorkingMemory (per turn)  ← tüm stage'ler okur/yazar
+├─ input: {message, sender, participants, rawHistory}
+│
+STAGE 1  UNDERSTANDING            [LLM primary + deterministic validator]
+  → SemanticInterpretation {
+      hypotheses: [{intent, socialActs[], target, severityVector, joking, sincerity, prob}],
+      chosen (argmax), uncertainty, discourseAct (önceki tura göre) }
+  regex = güvenlik tabanı + LLM-yok fallback
+│
+STAGE 2  DISCOURSE UPDATE          [deterministic reducer]
+  DiscourseState' = reduce(DiscourseState, interpretation, deliveredReplyLastTurn)
+  → participants, addressee, openTopics[], pendingQuestions[] (soran/soru/cevaplandı),
+    routineSaturation {greeting: n, howAreYou: n}, kairaRecentActs[] (+ selfRepeat flag),
+    misunderstandingSignal
+│
+STAGE 3  MEMORY RETRIEVAL          [deterministic orchestrator]
+  self / lived / world / episodic-relationship / user-style → RelevantContext (scored, tek liste)
+│
+STAGE 4  APPRAISAL → IMPULSES      [deterministic + config; LLM opsiyonel danışman]
+  OCC-benzeri appraisal(interpretation, DiscourseState, RelationshipState, Mood, RelevantContext)
+  → Impulse[] { type, intensity, target, justification }
+     örn: respond_warm .5, set_boundary .7, deflect_flirt .9(hard), ask_clarify .6(misunderstanding),
+          self_correct .8(selfRepeat), bring_up_topic .3(agenda), stay_quiet .2
+│
+STAGE 5  STATE REDUCERS            [deterministic pure]
+  MoodReducer(Mood, interpretation, timing)                → Mood'   (PAD-benzeri, momentum+decay)
+  RelationshipReducer(RelationshipState, interpretation, timing, cfg) → RelationshipState'
+     (mevcut relationshipReducer + episodic injury[] ; repairProgress = injury[]'den türetilir)
+  ikisi AYRI; Mood dakika ölçeği, Relationship gün ölçeği
+│
+STAGE 6  HARD CONSTRAINTS          [deterministic, mutlak]
+  deriveHardConstraints(characterPolicy, safety, RelationshipState', DiscourseState)
+  → flirtationAllowed=false, epistemicHonesty, maxIntimacy, hardDisengage?, mustAckBoundary?, budgets
+│
+STAGE 7  BEHAVIOR RESOLVER         [deterministic]
+  resolve(Impulse[], HardConstraints, SoftTendencies(RelationshipState'.axes, Mood))
+  → ResponsePlan {
+      resolved gates (continue/question/humor/affection/forgiveness/reopening/flirt/budgets),
+      chosenImpulses[], rejectedImpulses[],   ← erken bilgi kaybı YOK
+      requiredContent[], perAddressee?, uncertainty, hardReasons[] }
+│
+STAGE 8  REALIZATION               [LLM primary | trivial→local renderer]
+  canonical prompt = identity + SpeechIdentity(HOW, plan+personality projeksiyonu) +
+                     RelevantContext + ONE canonical behavior block + realizer lockdown
+  msgs = history + user turn
+  reply = LLM.render(plan)   VEYA   localRenderer(plan, DiscourseState) trivial+saturation-safe ise
+│
+STAGE 9  DELIVERY GUARD            [deterministic, TEK pass]
+  planConformance(reply, ResponsePlan) + consistency(reply, RelevantContext) + safety
+  fail → tek bounded repair (LLM low-temp) → yine fail → deterministic plan-shaped fallback
+│
+STAGE 10 FEEDBACK + PERSIST
+  deliveredReply → DiscourseState.kairaRecentActs (bir sonraki turda selfRepeat/self_correct için)
+  persist(RelationshipState', Mood', episodic injury, DiscourseState, KNT graph trace)
+
+KNT TRACE = full karar grafiği: hypotheses, discourse delta, impulses (chosen+rejected),
+            hard constraints, resolver kararı, guard sonucu.  (özet değil)
+```
+
+**Bu mimari KAIRA hedeflerini kompozisyonel taşır:**
+- group chat → DiscourseState.participants + ResponsePlan.perAddressee (yeni if/else değil, mevcut alanların çok-değerli hali)
+- misunderstanding + self-repair → `ask_clarify` / `self_correct` impulse tipleri + DiscourseState.selfRepeat
+- ironi/şaka → hypotheses[] + jokingConfidence downstream'de taşınır
+- offscreen life/initiative → `bring_up_topic` impulse'u (Impulse taksonomisine ekleme, yeni katman değil)
+- bounded knowledge → STAGE 3 retrieval bilmediğini getirmez + STAGE 6 hard epistemicHonesty + STAGE 9 conformance
+- deterministic integrity → STAGE 5 saf reducer'lar, LLM asla state yazmaz
+- eski kırgınlığın sürmesi → episodic injury[] + RelationshipReducer trajektori
+- multi-instance → tüm stage'ler saf/per-request; in-memory profile → store
+
+---
+
+## T. MIGRATION STRATEGY (big-bang YOK, strangler-fig)
+
+**Faz 0 (temizlik, davranış değişmez):**
+- `SEMANTIC_SCHEMA_V2` + `UNIFIED_GUARD_PASS` ölü flag'leri sil ya da bağla. Karar ver: canonical hattı canlıya al ya da geri çek. **İki gerçeklik hattını sonlandır** — dark canonical kod ya prod olur ya silinir; yarı-yarıya kalması en kötü hal.
+- Canonical hattı (reducer + resolver + prompt builder) staging'de ON, golden + beta + gerçek session replay yeşil → prod ON → flag'leri ve legacy dalları sil. (PR#26 exit criteria zaten bunu tanımlıyor.)
+
+**Faz 1 (blackboard iskeleti, davranış değişmez):**
+- `WorkingMemory` tipi + `/api/chat`'i stage-runner'a böl. Her mevcut fonksiyon aynı kalır ama girdilerini WM'den okur. Byte-identical prompt/response. Bu sadece refactor — 35 source-assertion testini bu fazda contract-testine çevir (§U).
+
+**Faz 2 (DiscourseState, en yüksek ROI):**
+- STAGE 2 reducer'ı ekle. İlk müşteri: `dialogueDecision` + `tryLocalKairoReply` + prompt. `routineSaturation` + `pendingQuestions` + `selfRepeat` → ilk testteki döngü/bağlam bug'ları kapanır. Feature flag: `DISCOURSE_STATE_V1`, OFF=mevcut. Golden: ilk testin 8 turu regression fixture olur.
+
+**Faz 3 (YDM demote):**
+- `tryLocalKairoReply` → `localRenderer(plan, DiscourseState)`; intent-sınıflandırma çıkar, `server.ts:802` short-circuit kaldır (çıktı yine STAGE 9'dan geçer). Flag: `YDM_RENDERER_ONLY`.
+
+**Faz 4 (understanding → hypotheses):**
+- LLM parser'ı hypotheses[] + uncertainty döndürecek şekilde genişlet; downstream tek `chosen`'ı kullanır (geriye uyumlu), sonra appraisal dağılımı tüketmeye başlar.
+
+**Faz 5 (impulses + resolver):**
+- Appraisal → `Impulse[]`; `BehaviorResolver` mevcut `kairaPlanResolver`'ın yerini alır (aynı `ResponsePlan` çıktısı + `rejectedImpulses`). Flag: `IMPULSE_RESOLVER_V1`.
+
+**Faz 6 (state ayrımı):**
+- Mood'u Relationship'ten ayır; legacy `kdmConsistencyEngine` sil (reducer tek yazar); `repairProgress` → episodic injury türevi.
+
+Her faz: tek flag, OFF=önceki davranış, golden + beta + gerçek-session diff, sonra flag+eski-kod silinir (AI_CONTEXT §8.8). **Aynı anda en fazla 1 açık faz-flag'i.**
+
+---
+
+## U. TEST / SIMULATION ARCHITECTURE
+
+**Önce hedef mimariyi doğrula** (bu audit + §X self-critique + Codex ikinci-göz). Yanlış mimariyi sonsuza patch'lemek için test kurma.
+
+Hedef test mimarisi:
+- **State invariants (property-based):** `RelationshipReducer` / `MoodReducer` / `DiscourseReducer` için — ör. "redline olmadan `conversationState` asla disengaged'a gitmez", "injury yokken `repairProgress` artmaz", "openness ∈ [0,1]", "monotonic familiarity same-day". `fast-check` ile 1000+ rastgele dizi.
+- **Contract tests (string değil):** mevcut 35 `server.indexOf` testini davranış testine çevir — `system` prompt'unu bir fonksiyondan al (stage-runner refactor bunu mümkün kılar) ve "her authoritative alan tam bir kez", "flört yasağı var", "legacy authority bloğu yok" gibi contract assert et. Kaynak metnine asla assert etme.
+- **Golden conversations (uçtan uca):** ilk test + KNT full-session + 5-10 kürasyonlu senaryo. Gerçek pipeline (mock LLM = deterministic stub), tam WM snapshot'ı + delivered reply karşılaştır. Fixture = mesaj dizisi, elle-yazılmış sinyal değil.
+- **Long-session simulation:** 100-tur sentetik (greeting loop, konu değişimi, tekrar, sessizlik, geri dönüş). Drift metrikleri: cevap çeşitliliği, `warmth` varyansı, tekrar oranı, guard-fallback oranı.
+- **Adversarial scenario generator:** §M-listesi (ironi, ağır şaka, argo, yanlış-anlama, hakaret→özür→tekrar-saldırı, 3 saat/3 gün dönüş, flört, grup kavgası) her biri için parametrik üreteç + beklenen davranış sınıfı (hard assert değil, sınıf: "boundary set", "not disengaged", "counter-flirt absent").
+- **Differential testing:** migration boyunca flag-OFF vs flag-ON aynı korpusta; beklenen diff'ler in-PR triage, beklenmeyen diff = fail.
+- **Mutation testing:** reducer'lar + resolver + hard constraints üzerinde (`stryker`) — bu çekirdek mantığın testleri gerçekten öldürücü mü.
+- **Fuzz:** `interpretSemanticEvent` / normalizer / entity resolution — crash + şema ihlali + hedef-karışması.
+- **KNT graph replay:** üretimden gerçek KNT trace'lerini alıp reducer'ları replay et, trajektori bound'ları içinde mi.
+
+---
+
+## V. WHAT NOT TO BUILD YET
+
+- **Grup sohbeti tam implementasyonu** — önce DiscourseState çok-taraflı tasarlansın, tek-kullanıcıda çalışsın; grup UI/routing sonra.
+- **Voice / realtime** — guard mimarisi latency'e inmeden anlamsız.
+- **World simulation reasoning** — world memory retrieval yeterli; deterministic dünya-durumu motoru şimdi değil.
+- **PAD tam duygu modeli** — önce Mood'u Relationship'ten AYIR (2-3 eksen yeter), sonra genişlet.
+- **LLM-danışmanlı appraisal** — önce deterministic impulse üreteci; LLM danışman opsiyonu ölçüldükten sonra.
+- **Initiative/offscreen life'ın chat'e derin entegrasyonu** — önce `bring_up_topic` impulse'u + agenda store; autonomous worker'ı chat pipeline'ına bağlamak sonra.
+- **Yeni ADR** — bu audit bir ADR-0006 ekine (seam: iki-hat sonlandırma + DiscourseState) sığar; yeni "mega mimari" ADR'si üretme.
+- **`kairaControlledSpontaneity`'yi genişletme** — impulse modeline eriyecek, ayrı knob olarak yatırım yapma.
+
+---
+
+## W. PATCHABILITY (A/B/C)
+
+| Alan | Sınıf | Not |
+|---|---|---|
+| governance (AI_CONTEXT §8, ADR, CI, architecture-review) | **A** | temel doğru, genişler |
+| `relationshipReducer` + config + axes (canonical) | **A** | prensipli; canlıya alınmalı |
+| `kairaHardConstraints` / `kairaSoftTendencies` / `kairaPlanResolver` | **A** | doğru ayrım; dark |
+| `kairaCanonicalPromptBuilder` (PR3) | **A** | doğru; dark |
+| entity resolution / world event grounding | **A** | sağlam |
+| persistence / hydration | **A** | çalışıyor |
+| memory tip ayrımı (self/lived/world/user) | **B** | ayrım doğru, retrieval parçalı |
+| `languageUnderstandingService` seam | **B** | seam iyi, output şekli (flat) yanlış |
+| epistemic access | **B** | prompt+regex enforcement kırılgan |
+| `KairaResponsePlan` (tek obje) | **B** | erken çözüm, impulse/uncertainty kaybı |
+| `computeKairoSpeechIdentity` | **B** | affect'i yeniden türetir, emoji/length kapısı |
+| output guard yığını | **B** | geç, regex, tekrarlı — plan-conformance'a inmeli |
+| KNT trace şekli | **B** | flat özet; graph olmalı |
+| `buildBehaviorContract` | **B** | reducer/resolver ile örtüşen sorumluluk |
+| **env-flag dual truth** | **C** | iki paralel implementasyon; en yüksek risk |
+| **`kairoLocalLanguageEngine` (YDM)** | **C** | ikinci beyin + short-circuit + geçmiş yok |
+| **`interpretSemanticEvent`** | **C** | tek-pass, tek-etiket, contextless, belirsizliksiz |
+| **`kdmConsistencyEngine` (legacy)** | **C** | 680 satır, 3 mutation yüzeyi, magic numbers |
+| **discourse/working-memory** | **C** (MISSING) | yapısal eksik |
+| `relationshipConditionedRecovery` / `Appraisal` / `temperamentEngine` | **C** | 3 örtüşen appraisal-benzeri; tek reducer'a birleşmeli |
+| homeostasis (sabit-baseline çekim) | **C** | momentum/decay modeline geçmeli |
+| `repairProgress` abstraction | **C** | skalar sayaç; episodic injury türevi olmalı |
+| mood ⊂ relationship karışması | **C** | ayrı katman + ayrı zaman sabiti |
+
+---
+
+## X. SELF-CRITIQUE
+
+**Önerdiğim hibrit mimariye saldırı:**
+
+1. **Competing-impulses + Resolver overengineering olabilir.** İyi faktörlenmiş bir tek appraisal → tek `ResponsePlan` (mevcut canonical yapı) + `rejectedAlternatives` alanı, tam bir utility-arbitrasyon motoru kurmadan self-repair ve KNT ihtiyacının %80'ini karşılayabilir. Impulse taksonomisi + utility ağırlıkları yeni bir kalibrasyon cehennemi (mevcut `kdmConsistencyEngine`'in magic-number'larını başka isimle geri getirebilir). **Kodu daha derin inceledikten sonra impulse modelini geri çekip "tek resolver + retained alternatives" ile yetinebilirim.**
+
+2. **Blackboard controller kendi karmaşıklığını getirir.** "Hangi KS ne zaman, hangi sırayla" scheduling mantığı, sequential pipeline'ın açık `const a = f(); const b = g(a)` okunabilirliğini kaybettirebilir. Eğer stage'ler zaten lineer bağımlıysa (understanding→discourse→appraisal→state→constraints→resolve→realize→guard genelde bu sırada), tam blackboard yerine **düz stage-runner + paylaşılan `WorkingMemory` objesi** yeterli olabilir — "blackboard" adı fazla iddialı. Muhtemelen bunu öneririm.
+
+3. **Multi-hypothesis semantic latency + maliyet.** LLM'den 3 hipotez + olasılık istemek prompt/parse maliyetini artırır ve downstream'in dağılımı gerçekten kullanacağı yerler sınırlı olabilir (çoğu tur net). `chosen + uncertainty + secondaryActs[]` (yani `SemanticInterpretation@2`'nin mevcut şekli) çoğu KAIRA hedefi için yeterli olabilir; tam hipotez listesi sadece yüksek-belirsizlik turlarında. **Hipotez listesini "uncertainty > eşik" ile koşullu yapardım.**
+
+4. **"Delivered reply'ı event olarak geri besleme" double-counting riski.** STAGE 10 feedback'i dikkatsiz yazılırsa Kaira'nın kendi cevabı bir sonraki turda relationship/mood delta'sı üretebilir. Sadece DiscourseState'e (tekrar/act takibi) girmeli, state reducer'lara ASLA. Bunu yanlış kurmak yeni bir bug sınıfı açar.
+
+5. **Mevcut sistem nerede gerçekten daha iyi:**
+   - **Basitlik/onboarding:** tek `/api/chat` handler'ı, ne kadar çirkin olsa da, tek dosyada okunur; stage/blackboard'a bölmek yeni geliştiriciye daha çok "sihir" gösterir.
+   - **YDM latency:** trivial turlarda ("naber"→"iyiyim") LLM'i tamamen atlamak gerçek bir kazanç; benim "renderer ama yine guard'dan geç" önerim bu latency avantajını kısmen yer.
+   - **Legacy KDM'in tek-çağrı bütünlüğü:** ne kadar karmaşık olsa da `analyzeKdmInteraction` tek fonksiyonda deterministik; çok reducer'a bölmek "hangi reducer hangi sırayla" koordinasyon bug'ları açabilir.
+   - **Guard yığınının paranoyası:** regex-tabanlı ve çok tekrarlı ama kötü LLM çıktısını gerçekten yakalıyor (`server.ts:1118` fallback). Plan-conformance'a inerken bu güvenlik ağını zayıflatma riski var.
+
+6. **Geri çekebileceğim öneriler (daha derin inceleme sonrası):** (a) tam impulse/utility motoru → "tek resolver + retained alternatives"; (b) "blackboard" → düz stage-runner; (c) multi-hypothesis → koşullu; (d) Mood/Relationship tam ayrımı belki YAGNI, `dynamicState` içinde ayrı zaman-sabitli alanlar yeterli olabilir.
+
+**Değişmeyen kanaat:** İki gerçeklik hattının sonlandırılması (E1), YDM'in karar-vericilikten çıkarılması (E2), ve bir `DiscourseState` reducer'ının eklenmesi (E3) — bu üçü, hangi hedef mimari seçilirse seçilsin, ön koşuldur ve ilk testteki hataların kök nedenidir.

@@ -15,7 +15,7 @@ describe("canonical current-turn dialogue authority", () => {
 
   it("passes the same current projection to board and decision planning", () => {
     expect(server).toMatch(/buildDialogueBoardInstruction\(\s*cleanHistory,\s*userMessage,\s*userName,\s*dialogueAnalysis,\s*\)/u);
-    expect(server).toMatch(/planDialogueResponse\(\s*cleanHistory,\s*userMessage,\s*userName,\s*languageUnderstanding\.event,\s*dialogueAnalysis,\s*\)/u);
+    expect(server).toMatch(/planDialogueResponse\(\s*cleanHistory,\s*userMessage,\s*userName,\s*languageUnderstanding\.event,\s*dialogueAnalysis,\s*discourseState,\s*\)/u);
   });
 
   it("passes the same projection through every server attribution gate", () => {

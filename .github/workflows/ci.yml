@@ -30,6 +30,9 @@ jobs:
       - name: Beta runtime regression gate
         run: npm run test:beta
 
+      - name: Canonical path (ADR-0006 flags ON)
+        run: npm run test:canonical
+
       - name: Beta conversation acceptance
         run: node scripts/run-beta-conversation-acceptance.mjs
 

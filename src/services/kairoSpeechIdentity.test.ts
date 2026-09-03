@@ -5,6 +5,7 @@ import type {
 } from "../types/nexus";
 import { DEFAULT_PERSONALITY_TRAITS } from "./droitPersonalityService";
 import { tryLocalKairoReply } from "./kairoLocalLanguageEngine";
+import { interpretSemanticEvent } from "./semanticEventEngine";
 import {
   computeKairoSpeechIdentity,
   speechIdentityPrompt,
@@ -92,6 +93,9 @@ describe("Kaira written speech identity", () => {
       state(1, 0, 50, 50),
       trace(),
       "new-user",
+      "complete_social_routine",
+      undefined,
+      interpretSemanticEvent("selam"),
     );
 
     expect(result.handled).toBe(true);

@@ -11,6 +11,7 @@ import {
 } from "./semanticEventEngine";
 import { projectSemanticEventToDialogueAnalysis } from "./kairaDialogueTurnProjection";
 import type { DialogueTurnAnalysis } from "./kairoDialogueChaosEngine";
+import type { DiscourseState } from "../types/discourseState";
 
 export type DialogueMove =
   | "grounded_recall"
@@ -182,12 +183,93 @@ export function planDialogueResponse(
   userName: string,
   semanticEvent?: SemanticEvent,
   currentAnalysis?: DialogueTurnAnalysis,
+  discourse?: DiscourseState,
 ): DialogueDecisionPlan {
   const event = semanticEvent ?? interpretSemanticEvent(userMessage);
   const dialogueAnalysis = currentAnalysis ?? projectSemanticEventToDialogueAnalysis(event);
   const target = recallTarget(history, userMessage, userName);
   const claims = buildDialogueClaimLedger(history, userMessage, userName, dialogueAnalysis);
   const supportedClaims = supportedClaimsFor(claims, target);
+
+  // --- DiscourseState-driven overrides (context, not a new authority) --------
+  // The current user turn is a response to Kaira's previous turn, not a fresh
+  // topic or a greeting. Handles "Kaira: nasılsın? / User: iyi dedim ya".
+  if (
+    discourse?.previousTurnDependency &&
+    event.discourseAct !== "recall_request" &&
+    event.intent !== "information_request" &&
+    !event.adviceRequested
+  ) {
+    const dep = discourse.previousTurnDependency;
+    if (dep.responseKind === "correction") {
+      return {
+        move: "acknowledge_correction",
+        allowFollowUpQuestion: false,
+        allowSpeculation: false,
+        maxSentences: 1,
+        maxWords: 8,
+        hasSupportedTargetClaim: false,
+        reason:
+          "Kullanıcı Kaira'nın önceki turunu düzeltiyor. Düzeltmeyi kabul et; selamlama, yeni konu, savunma veya soru ekleme.",
+      };
+    }
+    if (dep.responseKind === "clarification") {
+      return {
+        move: "repair_or_rephrase",
+        repairSignal: event.repairSignal ?? "none",
+        allowFollowUpQuestion: false,
+        allowSpeculation: false,
+        maxSentences: 1,
+        maxWords: 8,
+        hasSupportedTargetClaim: false,
+        reason:
+          "Kullanıcı Kaira'nın önceki turunu anlamadı veya itiraz etti. Aynı fikri kısa ve net yeniden söyle; selamlama, yeni konu veya soru ekleme.",
+      };
+    }
+    return {
+      move: "follow_previous_answer",
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 10,
+      hasSupportedTargetClaim: false,
+      reason:
+        dep.responseKind === "answer_with_friction"
+          ? "Kullanıcı Kaira'nın önceki sorusuna zaten cevap verdiğini söylüyor (hafif sitem). Bunu bir SELAMLAMA veya yeni konu sanma; kısaca durumu kabul et, gerekirse özür/şaka ile yumuşat, tekrar aynı soruyu sorma."
+          : "Bu kısa mesaj Kaira'nın yakın önceki sorusuna/sözüne verilmiş cevaptır. Selamlama veya yeni konu açma; yalnızca doğrulanan şeyi bağla, yeni soru sorma.",
+    };
+  }
+
+  // A social routine that has already saturated this conversation must not be
+  // completed with a fresh greeting / re-asked "sen nasılsın".
+  if (event.socialRoutine === "greeting" && (discourse?.routines.greeting.count ?? 0) >= 2) {
+    return {
+      move: "natural_reaction",
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 10,
+      hasSupportedTargetClaim: false,
+      reason:
+        "Selamlaşma bu sohbette zaten yapıldı. Yeni bir 'selam/merhaba' verme; kullanıcının bunu dile getirdiğini fark et ve sohbeti ilerletecek kısa doğal bir şey söyle.",
+    };
+  }
+  if (
+    isReciprocalSocialRoutine(event) &&
+    ((event.socialRoutine === "how_are_you" && (discourse?.routines.howAreYou.count ?? 0) >= 2) ||
+      (event.socialRoutine === "what_doing" && (discourse?.routines.whatDoing.count ?? 0) >= 2))
+  ) {
+    return {
+      move: "natural_reaction",
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 10,
+      hasSupportedTargetClaim: false,
+      reason:
+        "Bu karşılıklı rutin (nasılsın/napıyorsun) bu sohbette zaten yapıldı. Kısa cevap ver ama tekrar 'sen nasılsın / sen napıyorsun' diye SORMA.",
+    };
+  }
 
   if (event.discourseAct === "confusion_or_challenge" && hasImmediateKairaTurn(history)) {
     const repairSignal = event.repairSignal ?? "none";

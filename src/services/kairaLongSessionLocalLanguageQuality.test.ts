@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { analyzeKdmInteraction } from './kdmConsistencyEngine';
 import { tryLocalKairoReply } from './kairoLocalLanguageEngine';
+import { planDialogueResponse } from './kairoDialogueDecisionEngine';
+import { deriveDiscourseState } from './discourseStateReducer';
+import { interpretSemanticEvent } from './semanticEventEngine';
 import { findKairoResponseRhythmIssues } from './kairoResponseRhythm';
 import { normalizeDroitPersonality } from './droitPersonalityNormalizer';
 import type { ConversationTurn } from './kairoConversationGrounding';
@@ -22,37 +25,49 @@ describe('long-session local-language quality', () => {
       const history: ConversationTurn[] = [];
       const replies: string[] = [];
 
-      messages.forEach((message, index) => {
+      let localCount = 0;
+      messages.forEach((message) => {
         const kdm = analyzeKdmInteraction(message, personality, state);
         state = kdm.nextDynamicState;
+        const event = interpretSemanticEvent(message);
+        const discourse = deriveDiscourseState(history, { message, event });
+        const dialogue = planDialogueResponse(history, message, 'Tolga', event, undefined, discourse);
         const local = tryLocalKairoReply(
           message,
           personality,
           state,
           kdm.trace,
           'long_session_local_quality_user',
+          dialogue.move,
+          undefined,
+          event,
+          true,
+          discourse,
         );
 
-        expect(local.handled).toBe(true);
-        expect(local.source).toBe('local_language');
-        expect(local.reply).toBeTruthy();
+        // A trivial non-saturated routine renders locally; a saturated repeat is
+        // deferred to the main pipeline (correct — no blind greeting loop).
+        let reply: string;
+        if (local.handled) {
+          localCount += 1;
+          expect(local.source).toBe('local_language');
+          expect(local.reply).toBeTruthy();
+          reply = String(local.reply);
+          const wordCount = reply.trim().split(/\s+/u).filter(Boolean).length;
+          expect(wordCount).toBeLessThanOrEqual(8);
+          expect(findKairoResponseRhythmIssues(reply, history, 'natural_reaction')).toEqual([]);
+          replies.push(reply);
+        } else {
+          reply = `[pipeline] ${message}`;
+        }
 
-        const reply = String(local.reply);
-        const wordCount = reply.trim().split(/\s+/u).filter(Boolean).length;
-        expect(wordCount).toBeLessThanOrEqual(8);
-        expect(findKairoResponseRhythmIssues(reply, history, 'natural_reaction')).toEqual([]);
-
-        replies.push(reply);
         history.push({ sender: 'user', text: message, participantName: 'Tolga' } as ConversationTurn);
         history.push({ sender: 'droit', text: reply, participantName: 'Kaira' } as ConversationTurn);
-
-        if (index > 0) {
-          expect(reply.length).toBeGreaterThan(0);
-        }
       });
 
-      expect(replies).toHaveLength(20);
-      expect(new Set(replies).size).toBeGreaterThanOrEqual(7);
+      // Most trivial turns still short-circuit locally; the session stays varied.
+      expect(localCount).toBeGreaterThanOrEqual(8);
+      expect(new Set(replies).size).toBeGreaterThanOrEqual(5);
       const frequencies = replies.reduce<Record<string, number>>((acc, reply) => {
         acc[reply] = (acc[reply] ?? 0) + 1;
         return acc;
