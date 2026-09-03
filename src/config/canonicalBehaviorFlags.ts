@@ -2,14 +2,12 @@
  * Canonical behavior-authority rollout flags (ADR-0006).
  *
  * Every flag here is TEMPORARY. Each one names its owner, the PR that removes it,
- * and the concrete exit criteria that must be green before it is deleted.
+ * and the concrete exit criteria that must be green before it is flipped on in an
+ * environment and before it is deleted. No flag may outlive PR5.
  *
- * The three behavior foundations already validated and merged by PR #30 are now
- * default-ON: relationship reducer, plan resolver and canonical prompt builder.
- * An explicit false/off/0/no value remains the rollback mechanism. Unpromoted
- * flags remain default-OFF. This avoids the mixed-runtime failure mode where
- * tests exercise canonical code but ordinary local/live runs silently fall back
- * to legacy behavior.
+ * Default is OFF everywhere: with all flags off the runtime behaves byte-identically
+ * to pre-ADR-0006 `main`. Turning a flag on activates the canonical path for that
+ * layer only.
  */
 
 export type CanonicalBehaviorFlag =
@@ -104,27 +102,17 @@ export const CANONICAL_PATH_PROMOTION_GATE = {
 } as const;
 
 const TRUTHY = new Set(["1", "true", "on", "yes"]);
-const FALSY = new Set(["0", "false", "off", "no"]);
-const DEFAULT_ON_FLAGS = new Set<CanonicalBehaviorFlag>([
-  "RELATIONSHIP_REDUCER_V2",
-  "PLAN_RESOLVER_V2",
-  "CANONICAL_PROMPT_BUILDER",
-]);
 
 /**
- * Runtime check. Promoted foundations are canonical by default, with explicit
- * environment rollback. Unpromoted flags stay opt-in. Never throws.
+ * Runtime check. Reads process.env only; safe in browser bundles (returns false
+ * when process is undefined). Never throws.
  */
 export function isCanonicalBehaviorFlagEnabled(flag: CanonicalBehaviorFlag): boolean {
   try {
     const env = typeof process !== "undefined" ? process.env : undefined;
     const raw = env?.[flag];
-    if (typeof raw !== "string" || !raw.trim()) return DEFAULT_ON_FLAGS.has(flag);
-    const normalized = raw.trim().toLowerCase();
-    if (FALSY.has(normalized)) return false;
-    if (TRUTHY.has(normalized)) return true;
-    return DEFAULT_ON_FLAGS.has(flag);
+    return typeof raw === "string" && TRUTHY.has(raw.trim().toLowerCase());
   } catch {
-    return DEFAULT_ON_FLAGS.has(flag);
+    return false;
   }
 }
