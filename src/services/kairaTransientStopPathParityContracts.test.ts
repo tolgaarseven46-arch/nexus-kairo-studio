@@ -111,16 +111,16 @@ describe("transient explicit-stop local/AI path parity", () => {
     expect(findKairaResponsePlanIssues(enforced.reply, result.responsePlan)).toEqual([]);
   });
 
-  it("greeting + stopQuestions remains locally answerable without reopening questions", () => {
+  it("greeting bundled with an explicit stop instruction defers to the pipeline (questions still forbidden)", () => {
+    // A greeting carrying a boundary signal is no longer a trivial local render;
+    // the main pipeline realizes it and the no-question gate still holds.
     const result = pipeline("naber kaira, soru sorma artık");
 
     expect(result.event.intent).toBe("greeting");
     expect(result.responsePlan.continueConversation).toBe(true);
     expect(result.responsePlan.allowQuestion).toBe(false);
-    expect(result.local.handled).toBe(true);
-    expect(result.local.reply).toBeTruthy();
-    expect(result.local.reply).not.toContain("?");
-    expect(findKairaResponsePlanIssues(result.local.reply!, result.responsePlan)).toEqual([]);
+    expect(result.local.handled).toBe(false);
+    expect(result.local.source).toBe("ai");
   });
 
   it("confusion + stopQuestions stays on the AI repair path with questions forbidden", () => {

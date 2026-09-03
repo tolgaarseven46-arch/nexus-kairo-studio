@@ -60,6 +60,14 @@ türetimi, idempotency/retry (`kairaChatIdempotency*`, `kairaDistributedChatIdem
 
 - PR1–PR4 feature-flag arkasında, davranış değişimi flag flip ile.
   Flag sahipleri + kaldırılacağı PR + exit criteria: `src/config/canonicalBehaviorFlags.ts`.
+- **Foundation-repair eki (2026-09-03):** `interpretSemanticEvent`/`buildKairaResponsePlan`
+  seam'lerine minimal `DiscourseState` bağlamı eklendi (`src/types/discourseState.ts`,
+  `src/services/discourseStateReducer.ts`, `discourseSocialAct.ts`). `planDialogueResponse`
+  ve `tryLocalKairoReply` 6.–10. parametre olarak `discourseState` alır; YD
+  (`kairoLocalLanguageEngine`) artık intent sınıflandırmaz — yalnız paylaşılan
+  `SemanticEvent.socialRoutine` + trivial `dialogueMove` + doygunluk kontrolüyle
+  render eder. Bu değişiklikler flag'e bağlı DEĞİL (üçüncü gerçeklik hattı yaratmaz);
+  `npm run test:canonical` üç canonical flag açıkken bu hattı ayrıca doğrular.
 - PR5 (compat söküm + flag kaldırma) yalnız `git revert` ile geri alınır;
   ön koşulu **süre değil**, `CANONICAL_PATH_PROMOTION_GATE` (aynı dosya).
 - PR6 yalnız config/fixture kalibrasyonu.

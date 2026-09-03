@@ -17,6 +17,11 @@ import {
   buildCanonicalDialogueMoveContext,
 } from "./src/services/kairaCanonicalPromptBuilder";
 import {
+  deriveDiscourseState,
+  reduceDiscourseState,
+  buildDiscourseObservationalInstruction,
+} from "./src/services/discourseStateReducer";
+import {
   decideKairaControlledSpontaneity,
   kairaControlledSpontaneityInstruction,
 } from "./src/services/kairaControlledSpontaneity";
@@ -687,12 +692,20 @@ app.post("/api/chat", async (req, res) => {
       userName,
       dialogueAnalysis,
     );
+    // Minimal session-scoped discourse context (routine saturation, pending
+    // question, Kaira self-repetition, previous-turn dependency). Recomputed
+    // from history each turn — no separate persistence, no decision authority.
+    const discourseState = deriveDiscourseState(cleanHistory, {
+      message: userMessage,
+      event: languageUnderstanding.event,
+    });
     const dialogueDecision = planDialogueResponse(
       cleanHistory,
       userMessage,
       userName,
       languageUnderstanding.event,
       dialogueAnalysis,
+      discourseState,
     );
     const memoryStart = now();
     const [persistedState, persistentMemory] = await Promise.all([
@@ -778,6 +791,7 @@ app.post("/api/chat", async (req, res) => {
         responsePlan,
         languageUnderstanding.event,
         kairaPolicy.persistentUserMemory,
+        discourseState,
       ),
       kdmMs = Math.round(now() - kdmStart),
       validatedMemory = persistentMemory.filter(
@@ -824,6 +838,17 @@ app.post("/api/chat", async (req, res) => {
           score: Math.max(0, localBaseConsistency.score - (localPlanIssues.length + localEpistemicIssues.length) * 15),
           issues: [...localBaseConsistency.issues, ...localPlanIssues, ...localEpistemicIssues],
         };
+      // The local renderer must not escape the main delivery boundary. If the
+      // rendered reply fails any plan / dialogue / grounding / rhythm check,
+      // abandon the fast path and let the full LLM pipeline produce the turn.
+      const localDeliveryIssues = [
+        ...localPlanIssues,
+        ...localEpistemicIssues,
+        ...findDialogueDecisionIssues(reply, dialogueDecision, dialogueOutputStyle),
+        ...findKairoResponseRhythmIssues(reply, cleanHistory, dialogueDecision.move, speech.relationshipLevel),
+        ...findKairoGroundingIssues(reply, cleanHistory, userMessage),
+      ];
+      if (localDeliveryIssues.length === 0) {
       const userFacingReply = await attachActivityPermission(reply);
       if (kairaPolicy.persistentUserMemory && consistency.accepted) {
         learnLanguageReply(stateUserId, reply);
@@ -989,6 +1014,7 @@ app.post("/api/chat", async (req, res) => {
         timings,
       });
       return;
+      }
     }
     const relationship = kdm.trace.relationship;
     const socialStyle = `SOSYAL SOHBET KURALI:\nSen bir yardımcı/asistan gibi konuşmuyorsun; sosyal medyada gerçek bir arkadaş gibi mesajlaşıyorsun.\n- Varsayılan cevap 1-2 kısa cümle olsun. Konu gerçekten gerektirirse uzat.\n- Kullanıcı istemedikçe madde listesi, rehber, seçenek menüsü, özet veya tavsiye paketi verme.\n- Her cevabı soruyla bitirme. Soru sormak zorunda değilsin.\n- \"istersen\", \"yardımcı olabilirim\", \"anlatmak ister misin\", \"şöyle yapalım\" gibi asistan kalıplarını alışkanlık olarak kullanma.\n- Kullanıcı sadece bir duygu/durum paylaşıyorsa önce onunla sohbet et; hemen problemi çözmeye çalışma.\n- Gerektiğinde kısa, eksik, gündelik cümle kurabilirsin. Argo ve emoji yalnızca konuşma kimliğin uygunsa doğal miktarda kullanılabilir.\n- Kendi Droit oluşunu sürekli hatırlatma; CPU, log, sunucu, veri merkezi gibi yapay persona şakalarını durduk yere üretme.\n- KDM verileri iç kararındır. Bunları açıklama, puanları söyleme veya analiz raporu gibi konuşma.\n- Hafızayı yalnızca gerçekten ilgiliyse kullan; sırf bildiğini göstermek için eski konuyu açma.\n- Geçmiş konuşma/anı sorularında yalnızca aşağıdaki oturum veya doğrulanmış hafıza kayıtlarına dayan. Kayıt desteklemiyorsa ayrıntı UYDURMA; doğal biçimde hatırlamadığını veya emin olmadığını söyle.\n- En doğru/yararlı cevabı vermek zorunda değilsin. Doğal bir sosyal tepki yeterlidir.\n- Kullanıcının mesajındaki her ayrıntıya tek tek cevap vermek zorunda değilsin.`;
@@ -1026,8 +1052,9 @@ app.post("/api/chat", async (req, res) => {
     // Flag ON: behaviorContractInstruction, the relationship directives and the
     // "KDM ... bağlayıcıdır" line are dropped — the canonical block is the only
     // place a social decision is stated.
+    const discourseInstruction = buildDiscourseObservationalInstruction(discourseState);
     const system = `${buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character)}\n${speechIdentityPrompt(speech)}\n${languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)}\
-${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${selfMemoryInstruction}\n${dialogueInstruction}\n${dialogueDecisionInstruction}\n${canonicalPromptOn ? `${responsePlanInstruction}\n${canonicalObservationalContext}` : `${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.`}\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${selfMemoryInstruction}\n${dialogueInstruction}\n${discourseInstruction}\n${dialogueDecisionInstruction}\n${canonicalPromptOn ? `${responsePlanInstruction}\n${canonicalObservationalContext}` : `${relationshipInstruction}\n${behaviorContractInstruction(behaviorContract)}\n${responsePlanInstruction}\nKDM: niyet=${kdm.trace.messageInterpretation.intent}, duygu=${kdm.trace.messageInterpretation.sentiment}, sıcaklık=${relationship.warmthScore}, güven=${relationship.trustScore ?? 50}, çatışma=${relationship.conflictScore ?? 0}, kırgınlık=${relationship.hurtScore ?? 0}, karar=${kdm.trace.decision.chosenTone}. Bu davranış kararları bağlayıcıdır; soru/mizah/mesafe/konuşmayı sürdürme sınırlarını ihlal etme.`}\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();

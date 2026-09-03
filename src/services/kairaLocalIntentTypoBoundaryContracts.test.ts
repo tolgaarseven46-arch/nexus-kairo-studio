@@ -72,18 +72,44 @@ const negatives = [
   'slm soru sorma artık',
 ];
 
-describe('local intent typo and near-neighbor boundaries', () => {
-  it.each(positives)('handles canonicalized short routine %s as %s', (message, intent) => {
+describe('local renderer no longer classifies intent (ADR-0006 foundation repair)', () => {
+  // The local renderer intent now comes ONLY from the shared SemanticEvent's
+  // routine. It never re-parses the message or invents a routine from a
+  // normalizer canonical form. When the shared event has no routine (typo the
+  // understanding layer did not resolve), the renderer defers to the pipeline.
+  it.each(positives)('local render follows the shared event routine for %s (%s)', (message, intent) => {
+    const sharedRoutine = interpretSemanticEvent(message).socialRoutine ?? 'none';
     const result = resolve(message);
-    expect(result.handled).toBe(true);
-    expect(result.intent).toBe(intent);
-    expect(result.source).toBe('local_language');
-    expect(result.normalization?.canonical).not.toBe('');
+    if (sharedRoutine !== 'none') {
+      expect(result.handled).toBe(true);
+      expect(result.intent).toBe(intent);
+      expect(result.source).toBe('local_language');
+    } else {
+      // Typo the understanding layer did not resolve -> defer to the pipeline.
+      expect(result.handled).toBe(false);
+      expect(result.source).toBe('ai');
+    }
   });
 
-  it.each(negatives)('does not let canonical fallback swallow richer semantics: %s', (message) => {
+  it.each(negatives)('also defers a routine-shaped message that carries richer semantics: %s', (message) => {
     const result = resolve(message);
     expect(result.handled).toBe(false);
     expect(result.source).toBe('ai');
+  });
+
+  it('renders when the shared event already carries the routine (no re-parse needed)', () => {
+    const result = tryLocalKairoReply(
+      'selam',
+      personality,
+      state,
+      trace,
+      'typo-boundary-shared-routine',
+      'complete_social_routine',
+      undefined,
+      interpretSemanticEvent('selam'),
+    );
+    expect(result.handled).toBe(true);
+    expect(result.intent).toBe('greeting');
+    expect(result.source).toBe('local_language');
   });
 });

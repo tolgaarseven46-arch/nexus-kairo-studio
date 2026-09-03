@@ -24,20 +24,23 @@ describe("canonical SemanticEvent consumer authority", () => {
   });
 
   it("feeds the canonical server event and its single current-turn projection to dialogue planning", () => {
-    expect(server).toMatch(/planDialogueResponse\(\s*cleanHistory,\s*userMessage,\s*userName,\s*languageUnderstanding\.event,\s*dialogueAnalysis,\s*\)/u);
+    expect(server).toMatch(/planDialogueResponse\(\s*cleanHistory,\s*userMessage,\s*userName,\s*languageUnderstanding\.event,\s*dialogueAnalysis,\s*discourseState,\s*\)/u);
     expect(dialogue).toContain("semanticEvent?: SemanticEvent");
     expect(dialogue).not.toContain("const analysis = analyzeDialogueTurn(userMessage)");
   });
 
   it("feeds the same canonical event to the local verbalizer", () => {
-    expect(server).toMatch(/dialogueDecision\.move,\s*responsePlan,\s*languageUnderstanding\.event,\s*kairaPolicy\.persistentUserMemory,\s*\)/u);
+    expect(server).toMatch(/dialogueDecision\.move,\s*responsePlan,\s*languageUnderstanding\.event,\s*kairaPolicy\.persistentUserMemory,\s*discourseState,\s*\)/u);
     expect(local).toContain("semanticEvent?: SemanticEvent");
-    expect(local).toContain("localIntentFromSemanticEvent");
+    // ADR-0006 foundation repair: the local renderer no longer classifies intent
+    // — its trivial-render decision reads ONLY the shared event's routine.
+    expect(local).toContain("trivialRenderIntent");
     expect(local).not.toContain("function detectIntent(text:");
   });
 
-  it("keeps fallback parsing centralized in semanticEventEngine", () => {
+  it("keeps ALL parsing centralized: the dialogue engine may fall back, the local renderer never re-parses", () => {
     expect(dialogue).toContain("interpretSemanticEvent(userMessage)");
-    expect(local).toContain("interpretSemanticEvent(message)");
+    // The local renderer imports the type only and never calls interpretSemanticEvent.
+    expect(local).not.toMatch(/\binterpretSemanticEvent\s*\(/u);
   });
 });

@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { analyzeKdmInteraction } from './kdmConsistencyEngine';
 import { tryLocalKairoReply } from './kairoLocalLanguageEngine';
+import { planDialogueResponse } from './kairoDialogueDecisionEngine';
+import { interpretSemanticEvent } from './semanticEventEngine';
+import { deriveDiscourseState } from './discourseStateReducer';
 import type { DroitDynamicState } from '../types/nexus';
+import type { ConversationTurn } from './kairoConversationGrounding';
 
 const turns = [
   'selam kaira',
@@ -35,23 +39,30 @@ function runWithRouteInspection() {
   let state: DroitDynamicState | undefined;
   const snapshots: string[] = [];
   const routes: Array<'local_language' | 'ai'> = [];
+  const history: ConversationTurn[] = [];
 
   for (const message of turns) {
     const result = analyzeKdmInteraction(message, undefined, state);
     state = result.nextDynamicState;
+    const event = interpretSemanticEvent(message);
+    const discourse = deriveDiscourseState(history, { message, event });
+    const dialogue = planDialogueResponse(history, message, 'Mert', event, undefined, discourse);
     const local = tryLocalKairoReply(
       message,
       {} as any,
       state,
       result.trace,
       'mixed-provider-stateful-regression',
+      dialogue.move,
       undefined,
-      undefined,
-      undefined,
+      event,
       false,
+      discourse,
     );
     routes.push(local.handled ? 'local_language' : 'ai');
     snapshots.push(JSON.stringify(state));
+    history.push({ sender: 'user', text: message } as ConversationTurn);
+    history.push({ sender: 'droit', text: local.reply || `[pipeline] ${message}` } as ConversationTurn);
   }
 
   return { snapshots, routes };

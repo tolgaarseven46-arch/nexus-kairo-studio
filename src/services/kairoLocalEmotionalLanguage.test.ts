@@ -6,6 +6,7 @@ import {
   planDialogueResponse,
 } from "./kairoDialogueDecisionEngine";
 import { tryLocalKairoReply } from "./kairoLocalLanguageEngine";
+import { interpretSemanticEvent } from "./semanticEventEngine";
 
 const state = {
   calmness: 70,
@@ -52,6 +53,8 @@ describe("Kaira local emotional language", () => {
       trace,
       `local-${message}`,
       plan.move,
+      undefined,
+      interpretSemanticEvent(message),
     );
 
     expect(result).toMatchObject({
@@ -72,6 +75,8 @@ describe("Kaira local emotional language", () => {
       trace,
       "advice-user",
       plan.move,
+      undefined,
+      interpretSemanticEvent(message),
     );
 
     expect(result.handled).toBe(false);
@@ -98,6 +103,9 @@ describe("Kaira local emotional language", () => {
       hurtCloseState,
       trace,
       "local-hurt-close",
+      undefined,
+      undefined,
+      interpretSemanticEvent("selam"),
     );
 
     expect(result.handled).toBe(true);
@@ -125,6 +133,9 @@ describe("Kaira local emotional language", () => {
       repairingCloseState,
       trace,
       "local-repairing-close",
+      undefined,
+      undefined,
+      interpretSemanticEvent("selam"),
     );
 
     expect(result.handled).toBe(true);

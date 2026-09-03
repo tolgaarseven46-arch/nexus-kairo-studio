@@ -69,10 +69,14 @@ describe("session 0209 regressions", () => {
     },
   );
 
-  it("keeps exact local how-are-you routine when provider collapses naber to greeting", () => {
+  it("renders the how-are-you routine from the CANONICAL event (understanding fixes the collapse, not the renderer)", () => {
+    // The server passes the canonicalized SemanticEvent to the local renderer.
+    // The renderer trusts that shared authority and never re-classifies itself.
     const coarseProviderEvent = event({
       raw: "naber", normalized: "naber", intent: "greeting", socialRoutine: "greeting", target: "kaira",
     });
+    const canonicalEvent = canonicalizeSemanticEvent("naber", coarseProviderEvent);
+    expect(canonicalEvent.socialRoutine).toBe("how_are_you");
     const local = tryLocalKairoReply(
       "naber",
       { humor: 50 } as any,
@@ -81,7 +85,7 @@ describe("session 0209 regressions", () => {
       "session-0209-regression",
       "natural_reaction",
       { continueConversation: true, allowQuestion: true, allowHumor: true, relationshipLevel: "new" } as any,
-      coarseProviderEvent,
+      canonicalEvent,
       false,
     );
     expect(local.handled).toBe(true);
