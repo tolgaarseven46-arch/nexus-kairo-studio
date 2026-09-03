@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DroitDynamicState } from '../types/nexus';
+import { isCanonicalBehaviorFlagEnabled } from '../config/canonicalBehaviorFlags';
 import { analyzeKdmInteraction } from './kdmConsistencyEngine';
 import { planDialogueResponse } from './kairoDialogueDecisionEngine';
 import { computeKairoSpeechIdentity } from './kairoSpeechIdentity';
@@ -45,7 +46,13 @@ describe('beta conversation acceptance scenario', () => {
     // is intentionally ambiguous under SemanticInterpretation@2 and remains a
     // candidate signal instead of being forced into a Kaira-directed injury.
     const hurt = analyzeKdmInteraction('sen salaksın', NEUTRAL_DROIT_PERSONALITY, closeRelationship);
-    expect(hurt.nextDynamicState.reactionMode).toBe('hurt');
+    // ADR-0006 intentionally changes the qualitative label at high canonical
+    // injury: legacy classifies this close-relationship turn as hurt, while the
+    // canonical reducer classifies injury >= 30 as withdrawn. Both remain the
+    // same reserved/very-short HOW family; this is an explained promotion delta.
+    expect(hurt.nextDynamicState.reactionMode).toBe(
+      isCanonicalBehaviorFlagEnabled('RELATIONSHIP_REDUCER_V2') ? 'withdrawn' : 'hurt',
+    );
     const hurtSpeech = computeKairoSpeechIdentity(
       NEUTRAL_DROIT_PERSONALITY,
       hurt.nextDynamicState,
