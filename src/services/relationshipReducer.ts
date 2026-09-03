@@ -215,7 +215,10 @@ export function evaluateRedline(
     ["manipulation", w.manipulation * s.manipulation],
     ["privacy", w.privacy * s.privacy],
   ];
-  const contributors = harmContributors.filter(([, v]) => v >= floor).length + (signal.targetsKaira ? 1 : 0);
+  // Targeting raises the score, but it is context rather than a second harm
+  // dimension. `minCombinedSignals` must therefore be satisfied by actual harm
+  // dimensions; otherwise one targeted insult becomes an immediate hard-stop.
+  const contributors = harmContributors.filter(([, v]) => v >= floor).length;
   const base = harmContributors.reduce((acc, [, v]) => acc + v, 0) + (signal.targetsKaira ? w.targetsKaira : 0);
 
   const repetitionFactor = clamp01(num(prev.scores.repeatedNegativeCount, 0) / 2);
