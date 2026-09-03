@@ -213,7 +213,10 @@ export function planDialogueResponse(
           "Kullanıcı Kaira'nın önceki turunu düzeltiyor. Düzeltmeyi kabul et; selamlama, yeni konu, savunma veya soru ekleme.",
       };
     }
-    if (dep.responseKind === "clarification") {
+    if (
+      dep.responseKind === "clarification" &&
+      (event.repairSignal ?? "none") !== "none"
+    ) {
       return {
         move: "repair_or_rephrase",
         repairSignal: event.repairSignal ?? "none",
@@ -271,7 +274,7 @@ export function planDialogueResponse(
     };
   }
 
-  if (event.discourseAct === "confusion_or_challenge" && hasImmediateKairaTurn(history)) {
+  if ((event.repairSignal ?? "none") !== "none" && hasImmediateKairaTurn(history)) {
     const repairSignal = event.repairSignal ?? "none";
     const reason =
       repairSignal === "clarification_request"

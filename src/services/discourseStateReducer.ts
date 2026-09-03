@@ -135,10 +135,11 @@ export function reduceDiscourseState(
       kairaPending !== null && answersPendingQuestion(kairaPending, turn.message, act);
     const answerFriction =
       userSignalsAlreadyAnswered(turn.message) || userSignalsAnswerFriction(turn.message);
+    const explicitRepair = (turn.event.repairSignal ?? "none") !== "none";
     const explicitDependency =
       answerFriction ||
       act === "correction" ||
-      act === "complaint";
+      explicitRepair;
     const responseEvidence = contextualAnswer || (!isOwnRoutine && explicitDependency);
     // A canonical semantic label such as complaint/general_chat must not erase a
     // stronger turn-taking fact: a state-shaped answer to Kaira's still-pending
@@ -153,7 +154,7 @@ export function reduceDiscourseState(
     if (respondsToKaira) {
       const friction =
         answerFriction ||
-        act === "complaint" ||
+        explicitRepair ||
         turn.event.discourseAct === "correction" ||
         turn.event.frustration >= 0.25;
       previousTurnDependency = {
@@ -161,7 +162,7 @@ export function reduceDiscourseState(
         responseKind:
           act === "correction"
             ? "correction"
-            : act === "complaint" && !answerFriction
+            : explicitRepair
               ? "clarification"
               : friction
                 ? "answer_with_friction"
