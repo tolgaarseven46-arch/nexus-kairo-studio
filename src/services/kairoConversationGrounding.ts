@@ -1,4 +1,4 @@
-import type { SemanticEvent } from "./semanticEventEngine";
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
 export interface ConversationTurn {
   sender?: string;
   text?: string;
@@ -6,7 +6,7 @@ export interface ConversationTurn {
   participantName?: string;
   replyToParticipantId?: string;
   replyToParticipantName?: string;
-  semanticEvent?: SemanticEvent;
+  semanticInterpretation?: SemanticInterpretation;
   semanticSource?: string;
 }
 

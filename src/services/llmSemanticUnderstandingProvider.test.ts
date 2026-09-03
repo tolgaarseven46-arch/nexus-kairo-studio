@@ -68,7 +68,7 @@ describe("llm semantic understanding provider", () => {
     expect(interpretation.target).toBe("kaira");
     expect(interpretation.severity.disrespect).toBe(0.9);
     expect(generate).toHaveBeenCalledOnce();
-    expect(generate.mock.calls[0]![0].prompt).toContain("lemma=salak");
+    expect(((generate.mock.calls as any)[0][0] as { prompt: string }).prompt).toContain("lemma=salak");
   });
 
   it("extracts complete v2 JSON even if a provider wraps it in extra text", async () => {

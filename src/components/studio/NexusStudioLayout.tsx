@@ -454,7 +454,7 @@ export const NexusStudioLayout: React.FC = () => {
         setIsolatedConversation(false);
         const canonicalUserMsg: TestMessage = {
           ...userMsg,
-          semanticEvent: response.languageUnderstanding?.event,
+          semanticInterpretation: response.languageUnderstanding?.interpretation,
           semanticSource: response.languageUnderstanding?.semanticSource,
         };
         const dm: TestMessage = {

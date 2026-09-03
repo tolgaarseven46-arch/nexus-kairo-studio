@@ -7,6 +7,8 @@
  */
 
 import type { SemanticEvent } from "./semanticEventEngine";
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
+import { projectSemanticEvent } from "./semanticInterpretationProjection";
 import {
   classifyKairaReplyAct,
   classifyUserSocialAct,
@@ -223,12 +225,12 @@ export function reduceDiscourseState(
 
 /**
  * Fold the reducer over canonical request history, then (optionally) over the current
- * user message. Historical user turns MUST carry their ingestion-time SemanticEvent;
+ * user message. Historical user turns MUST carry their ingestion-time SemanticInterpretation@2;
  * raw historical text is never reparsed. History already contains Kaira's last delivered
  * reply, so delivered Kaira turns still feed self-observation directly.
  */
 export function deriveDiscourseState(
-  history: Array<{ sender?: string; text?: string; semanticEvent?: SemanticEvent }>,
+  history: Array<{ sender?: string; text?: string; semanticInterpretation?: SemanticInterpretation }>, 
   current?: { message: string; event: SemanticEvent },
 ): DiscourseState {
   let state = EMPTY_DISCOURSE_STATE;
@@ -239,11 +241,11 @@ export function deriveDiscourseState(
       // Canonical authority rule: historical text is evidence, not a new parse request.
       // Old turns without a persisted semantic snapshot fail closed instead of silently
       // creating a second semantic truth with the regex parser.
-      if (!raw.semanticEvent) continue;
+      if (!raw.semanticInterpretation) continue;
       state = reduceDiscourseState(state, {
         actor: "user",
         message: text,
-        event: raw.semanticEvent,
+        event: projectSemanticEvent(raw.semanticInterpretation),
       });
     } else if (raw?.sender === "droit") {
       state = reduceDiscourseState(state, { actor: "kaira", reply: text });

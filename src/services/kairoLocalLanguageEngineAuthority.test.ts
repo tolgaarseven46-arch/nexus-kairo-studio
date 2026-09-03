@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { tryLocalKairoReply } from "./kairoLocalLanguageEngine";
 import { interpretSemanticEvent } from "./semanticEventEngine";
+import { interpretationFromLegacyEvent } from "./semanticInterpretationLegacyProjection";
 import { deriveDiscourseState } from "./discourseStateReducer";
 import type { ConversationTurn } from "./kairoConversationGrounding";
 import type { DroitDynamicState, ReasoningTrace } from "../types/nexus";
@@ -30,7 +31,7 @@ const personality = { humor: 60 } as never;
 
 function ingestionHistory(history: Array<{ sender: string; text: string }>): ConversationTurn[] {
   return history.map((turn) => turn.sender === "user"
-    ? { ...turn, sender: "user", semanticEvent: interpretSemanticEvent(turn.text) } as ConversationTurn
+    ? { ...turn, sender: "user", semanticInterpretation: interpretationFromLegacyEvent(interpretSemanticEvent(turn.text), turn.text) } as ConversationTurn
     : { ...turn, sender: "droit" } as ConversationTurn);
 }
 

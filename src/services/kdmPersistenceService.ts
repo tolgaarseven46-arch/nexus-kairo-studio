@@ -113,6 +113,7 @@ export interface SaveTestSessionTurnPayload {
   metadata?: {
     providerUsed?: string;
     model?: string;
+    semanticInterpretation?: unknown;
     semanticEvent?: unknown;
     semanticSource?: string;
     timings?: Record<string, number>;
@@ -143,7 +144,7 @@ export function turnsToTestMessages(turns: TestSessionTurnRecord[]): TestMessage
         sender: 'user',
         text: turn.userMessage,
         participantName: turn.speaker,
-        semanticEvent: turn.metadata?.semanticEvent,
+        semanticInterpretation: turn.metadata?.semanticInterpretation,
         semanticSource: turn.metadata?.semanticSource,
         timestamp: timeStr,
       });

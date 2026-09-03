@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { interpretSemanticEvent } from "./semanticEventEngine";
+import { interpretationFromLegacyEvent } from "./semanticInterpretationLegacyProjection";
 import { deriveDiscourseState, reduceDiscourseState } from "./discourseStateReducer";
 import { EMPTY_DISCOURSE_STATE } from "../types/discourseState";
 
@@ -101,7 +102,7 @@ describe("Kaira self-repetition", () => {
 describe("deriveDiscourseState folds history + current turn", () => {
   it("replays the request history and the current user message with no persistence", () => {
     const history = [
-      { sender: "user", text: "naber", semanticEvent: interpretSemanticEvent("naber") },
+      { sender: "user", text: "naber", semanticInterpretation: interpretationFromLegacyEvent(interpretSemanticEvent("naber"), "naber") },
       { sender: "droit", text: "iyi valla sen nasılsın" },
     ];
     const s = deriveDiscourseState(history, { message: "iyi dedim ya", event: interpretSemanticEvent("iyi dedim ya") });

@@ -548,7 +548,7 @@ app.post("/api/chat", async (req, res) => {
       dynamicState = defaultDynamicState,
       provider = "openrouter",
       suppressRecentMemory = false,
-      semanticEvent: incomingSemanticEvent,
+      semanticInterpretation: incomingSemanticInterpretation,
       behaviorPolicy: incomingBehaviorPolicy,
       sessionId: incomingSessionId,
       kairaInstanceId: incomingKairaInstanceId,
@@ -630,7 +630,7 @@ app.post("/api/chat", async (req, res) => {
     const worldReasoningPolicyInstruction = buildWorldReasoningPolicyInstruction(worldReasoningPolicy);
     const languageUnderstanding = await resolveServerLanguageUnderstanding({
       message: userMessage,
-      incomingSemanticEvent,
+      incomingSemanticInterpretation,
       context: {
         userName,
         characterName: character.name || "KAIRO",
@@ -646,6 +646,7 @@ app.post("/api/chat", async (req, res) => {
       generateText,
     });
     const canonicalSemantic = {
+      interpretation: languageUnderstanding.interpretation,
       event: languageUnderstanding.event,
       source: languageUnderstanding.semanticSource,
     };
@@ -953,7 +954,8 @@ app.post("/api/chat", async (req, res) => {
             warnings: enforced.reasons,
           },
           metadata: {
-            semanticEvent: canonicalSemantic.event,
+            semanticInterpretation: canonicalSemantic.interpretation,
+        semanticEvent: canonicalSemantic.event,
             semanticSource: canonicalSemantic.source,
             providerUsed: "local_language",
             languageStyleMemory,
@@ -1397,7 +1399,8 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           warnings: enforced.reasons,
         },
         metadata: {
-          semanticEvent: canonicalSemantic.event,
+          semanticInterpretation: canonicalSemantic.interpretation,
+        semanticEvent: canonicalSemantic.event,
           semanticSource: canonicalSemantic.source,
           providerUsed: activeAiProviderUsed,
           languageStyleMemory,

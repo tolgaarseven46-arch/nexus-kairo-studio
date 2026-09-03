@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { deriveDiscourseState } from "./discourseStateReducer";
 import { interpretSemanticEvent } from "./semanticEventEngine";
+import { interpretationFromLegacyEvent } from "./semanticInterpretationLegacyProjection";
 import { findKairaResponsePlanIssues, type KairaResponsePlan } from "./kairaResponsePlan";
 import type { ConversationTurn } from "./kairoConversationGrounding";
 
@@ -23,7 +24,7 @@ const noQuestionPlan: KairaResponsePlan = {
 
 function ingestionHistory(history: Array<{ sender: string; text: string }>): ConversationTurn[] {
   return history.map((turn) => turn.sender === "user"
-    ? ({ ...turn, sender: "user", semanticEvent: interpretSemanticEvent(turn.text) } as ConversationTurn)
+    ? ({ ...turn, sender: "user", semanticInterpretation: interpretationFromLegacyEvent(interpretSemanticEvent(turn.text), turn.text) } as ConversationTurn)
     : ({ ...turn, sender: "droit" } as ConversationTurn));
 }
 
