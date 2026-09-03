@@ -7,19 +7,22 @@ const persistence = fs.readFileSync(
   path.resolve(process.cwd(), "src/services/kdmPersistenceService.ts"),
   "utf8",
 );
+const unifiedPass = fs.readFileSync(
+  path.resolve(process.cwd(), "src/services/kairaResponseConstraintPass.ts"),
+  "utf8",
+);
 
 function count(source: string, needle: string) {
   return source.split(needle).length - 1;
 }
 
 describe("KAIRA local-language / AI parity contracts", () => {
-  it("runs deterministic world-memory guard on both response paths", () => {
-    expect(server).toContain(
-      "const worldMemoryGuard = enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext)",
-    );
-    expect(server).toContain(
-      "const worldMemoryGuard = enforceWorldModelRecallResponse(reply, retrievedWorldEvents, worldReasoningContext)",
-    );
+  it("runs the same deterministic world-memory authority on both response paths", () => {
+    // Both paths either consume the canonical unified pass result or fall back to
+    // the same legacy world guard during rollout. This proves parity without
+    // freezing the implementation to pre-unification local variable syntax.
+    expect(count(server, "canonicalConstraint?.worldGuard ?? enforceWorldModelRecallResponse(")).toBeGreaterThanOrEqual(2);
+    expect(unifiedPass).toContain("enforceWorldModelRecallResponse(");
   });
 
   it("persists appraisal, policy and guard metadata from both paths", () => {
