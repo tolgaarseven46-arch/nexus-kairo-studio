@@ -35,6 +35,7 @@ const closeRelationship: DroitDynamicState = {
 
 describe('beta conversation acceptance scenario', () => {
   it('keeps social continuity, relationship-sensitive reaction, repair and long-session recovery coherent', () => {
+    const canonicalSemanticOn = isCanonicalBehaviorFlagEnabled('SEMANTIC_SCHEMA_V2');
     const canonicalReducerOn = isCanonicalBehaviorFlagEnabled('RELATIONSHIP_REDUCER_V2');
     const greeting = planDialogueResponse([], 'naber kanka', 'Mert');
     expect(greeting).toMatchObject({
@@ -43,13 +44,11 @@ describe('beta conversation acceptance scenario', () => {
       allowSpeculation: false,
     });
 
-    // Use an explicitly targeted insult. A lone one-word insult such as "salak"
-    // is intentionally ambiguous under SemanticInterpretation@2 and remains a
-    // candidate signal instead of being forced into a Kaira-directed injury.
-    const hurt = analyzeKdmInteraction('sen salaksın', NEUTRAL_DROIT_PERSONALITY, closeRelationship);
-    // ADR-0006 intentionally changes the qualitative label at the canonical
-    // hard boundary: legacy classifies this close-relationship turn as hurt,
-    // while the canonical reducer withdraws. Both stay in the same reserved HOW family.
+    // Preserve the pre-ADR-0006 legacy acceptance fixture when semantic V2 is
+    // OFF. Under SemanticInterpretation@2 a lone one-word insult is intentionally
+    // ambiguous/candidate-only, so the canonical path uses an explicit target.
+    const insultMessage = canonicalSemanticOn ? 'sen salaksın' : 'salak';
+    const hurt = analyzeKdmInteraction(insultMessage, NEUTRAL_DROIT_PERSONALITY, closeRelationship);
     expect(hurt.nextDynamicState.reactionMode).toBe(canonicalReducerOn ? 'withdrawn' : 'hurt');
     const hurtSpeech = computeKairoSpeechIdentity(
       NEUTRAL_DROIT_PERSONALITY,
@@ -72,9 +71,6 @@ describe('beta conversation acceptance scenario', () => {
     const hurtAfterRepair = firstRepair.nextDynamicState.relationship?.hurtScore ?? 0;
     const conflictAfterRepair = firstRepair.nextDynamicState.relationship?.conflictScore ?? 0;
     if (canonicalReducerOn) {
-      // Hard boundary is orthogonal to numeric injury scores; with strong prior
-      // relationship history those scores can already be zero. Repair must not
-      // increase them, while repairProgress is the reopening signal.
       expect(hurtAfterRepair).toBeLessThanOrEqual(hurtBeforeRepair);
       expect(conflictAfterRepair).toBeLessThanOrEqual(conflictBeforeRepair);
     } else {
@@ -82,9 +78,6 @@ describe('beta conversation acceptance scenario', () => {
       expect(conflictAfterRepair).toBeLessThan(conflictBeforeRepair);
     }
 
-    // Canonical hard-disengage repair is deliberately staged. Runtime apology
-    // sincerity yields ~9.6 progress per explicit repair act against a configured
-    // repairing threshold of 20, so the third apology is the deterministic exit.
     let state = firstRepair.nextDynamicState;
     let expectedInteractionCount = 92;
     if (canonicalReducerOn) {
