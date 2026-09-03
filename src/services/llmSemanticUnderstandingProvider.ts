@@ -107,7 +107,7 @@ DISCOURSE FACET OPERASYONEL EŞLEMELERİ:
 - Genel şikâyet veya olumsuz değerlendirme tek başına repairSignal üretmez. repairSignal yalnız kullanıcının önceki Kaira içeriğini açıklatma/alaka düzeltme talebidir; davranış kararı değildir.
 - "Mert yarın ne yapacaktı?", "Mert ne demişti?", "hatırlıyor musun ne olacaktı?" geçmiş konuşmadaki kişi/olay bilgisini geri çağırıyorsa discourseAct:recall_request. Yeni genel bilgi sorusu recall_request değildir.
 - "Mert bana salak dedi", "Ayşe ona kızmış" gibi üçüncü kişi hakkında bildirilen söz/olayda target:third_party kullan; alıntıdaki hakareti Kaira'ya yöneltilmiş saldırı sayma.
-- Yalnız "salak" gibi hedefi belirsiz tek hakaret sözcüğünde target:unknown, uncertainty yüksek ve severity temkinli olmalı. "sen salaksın" / "Kaira sen salaksın" gibi açık ikinci-şahıs hedefinde target:kaira ve gerçek hostility kanıtına uygun severity üret.
+- Yalnız "salak" gibi hedefi belirsiz tek hakaret sözcüğünde target:unknown, primaryIntent:other, secondarySocialActs içinde insult YOK, uncertainty yüksek ve severity temkinli olmalı; bu yalnız lexical candidate kanıtıdır. "sen salaksın" / "Kaira sen salaksın" gibi açık ikinci-şahıs hedefinde target:kaira ve gerçek hostility kanıtına uygun primaryIntent:insult / insult act / severity üret.
 - "soru sorma artık" = stopQuestions:true, stopTalking:false, stopRequest:false. "sus artık", "konuşma artık" = stopTalking:true + stopRequest:true; stopQuestions yalnız mesaj ayrıca soruları da durduruyorsa true.
 - "moralim bozuk, ne yapmalıyım?", "sence ne yapayım?" gibi açık öneri/tavsiye talebi = adviceRequested:true. Düz duygu paylaşımı veya bilgi sorusu adviceRequested değildir.
 Bu örnekler karar/policy üretmez; yalnız canonical utterance semantiğini sabitler.
