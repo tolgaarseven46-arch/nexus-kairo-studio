@@ -35,49 +35,16 @@ function finalize(message: string, draft: string, previousState?: ReturnType<typ
 
 function reportedMertPlan(): WorldEventObservation {
   return {
-    id: 'mert-plan',
-    userId: 'final_delivery_user',
-    kairaInstanceId: 'kaira_a',
-    sessionId: 'final_delivery_session',
-    speakerName: 'Ali',
-    kind: 'reported_claim',
-    status: 'grounded',
-    createdAt: '2026-08-31T18:00:00.000Z',
-    event: {
-      raw: 'Mert yarın istifa edeceğini söyledi',
-      eventType: 'general',
-      actor: { name: 'Mert', source: 'explicit_name', confidence: 0.99 },
-      target: { name: 'Mert', source: 'explicit_name', confidence: 0.99 },
-      reportedSpeech: true,
-      certainty: 0.95,
-      ambiguities: [],
-      evidence: [],
-      polarity: 'positive',
-      temporal: { relation: 'future', asksLatest: false },
-      proposition: {
-        key: 'mert|general|mert|istifa',
-        predicate: 'general',
-        actorKey: 'mert',
-        targetKey: 'mert',
-        contentKey: 'istifa',
-      },
-      modality: { kind: 'plan', strength: 0.8 },
-      lifecycle: { kind: 'unspecified', strength: 0 },
-    },
+    id: 'mert-plan', userId: 'final_delivery_user', kairaInstanceId: 'kaira_a', sessionId: 'final_delivery_session', speakerName: 'Ali', kind: 'reported_claim', status: 'grounded', createdAt: '2026-08-31T18:00:00.000Z',
+    event: { raw: 'Mert yarın istifa edeceğini söyledi', eventType: 'general', actor: { name: 'Mert', source: 'explicit_name', confidence: 0.99 }, target: { name: 'Mert', source: 'explicit_name', confidence: 0.99 }, reportedSpeech: true, certainty: 0.95, ambiguities: [], evidence: [], polarity: 'positive', temporal: { relation: 'future', asksLatest: false }, proposition: { key: 'mert|general|mert|istifa', predicate: 'general', actorKey: 'mert', targetKey: 'mert', contentKey: 'istifa' }, modality: { kind: 'plan', strength: 0.8 }, lifecycle: { kind: 'unspecified', strength: 0 } },
   };
 }
 
 describe('final delivery authority regression', () => {
   it('does not let an over-familiar playful draft erase qualitative hurt', () => {
-    const insult = analyzeKdmInteraction('salak mısın ya');
+    const insult = analyzeKdmInteraction('sen salaksın');
     expect(insult.nextDynamicState.reactionMode).not.toBe('neutral');
-
-    const result = finalize(
-      'selam tekrar',
-      'hahaha kanka sorun yok ya 😂',
-      insult.nextDynamicState,
-    );
-
+    const result = finalize('selam tekrar', 'hahaha kanka sorun yok ya 😂', insult.nextDynamicState);
     expect(result.enforced.changed).toBe(true);
     expect(result.enforced.reply.toLocaleLowerCase('tr-TR')).not.toContain('kanka');
     expect(result.enforced.reply.toLocaleLowerCase('tr-TR')).not.toContain('hahaha');
@@ -86,11 +53,7 @@ describe('final delivery authority regression', () => {
   });
 
   it('keeps conversation open while removing a forbidden follow-up question', () => {
-    const result = finalize(
-      'moralim bozuk, soru sorma artık',
-      'anladım. ne oldu?',
-    );
-
+    const result = finalize('moralim bozuk, soru sorma artık', 'anladım. ne oldu?');
     expect(result.plan.continueConversation).toBe(true);
     expect(result.plan.allowQuestion).toBe(false);
     expect(result.enforced.reply).not.toContain('?');
@@ -99,11 +62,7 @@ describe('final delivery authority regression', () => {
   });
 
   it('hard-closes a stop-talking turn even if the model tries to reopen chat', () => {
-    const result = finalize(
-      'sus artık',
-      'tamam kanka, ne oldu? hahaha 😂',
-    );
-
+    const result = finalize('sus artık', 'tamam kanka, ne oldu? hahaha 😂');
     expect(result.plan.continueConversation).toBe(false);
     expect(result.plan.allowQuestion).toBe(false);
     expect(result.plan.allowHumor).toBe(false);
@@ -118,16 +77,9 @@ describe('final delivery authority regression', () => {
     const result = finalize(message, 'Mert yarın istifa edecek.');
     expect(result.plan.move).toBe('grounded_recall');
     expect(findKairaResponsePlanIssues(result.enforced.reply, result.plan)).toEqual([]);
-
-    const retrieved = rankWorldEventObservations(
-      message,
-      [reportedMertPlan()],
-      5,
-      '2026-08-31T18:10:00.000Z',
-    );
+    const retrieved = rankWorldEventObservations(message, [reportedMertPlan()], 5, '2026-08-31T18:10:00.000Z');
     const appraisal = appraiseRetrievedWorldState(retrieved);
     const guarded = enforceWorldModelRecallResponse(result.enforced.reply, retrieved, { appraisal, policy: deriveWorldReasoningPolicy(appraisal) });
-
     expect(guarded.changed).toBe(true);
     expect(guarded.reply).toContain('Mert');
     expect(guarded.reply).toMatch(/Bana daha önce|demiştin|kayda göre/iu);
