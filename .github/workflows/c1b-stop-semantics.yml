@@ -1,0 +1,67 @@
+name: C1b Stop Semantics
+
+on:
+  push:
+    branches: [chatgpt/c1-single-semantic-authority]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: chatgpt/c1-single-semantic-authority
+      - name: Patch canonical stop semantics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('src/services/semanticInterpretationLegacyProjection.ts')
+          s=p.read_text()
+          old='stopRequest: Boolean(event.stopTalking || event.stopQuestions),'
+          new='stopRequest: Boolean(event.stopTalking),'
+          if old not in s and new not in s: raise SystemExit('legacy stopRequest pattern missing')
+          s=s.replace(old,new)
+          p.write_text(s)
+
+          p=Path('src/services/semanticInterpretationSchema.ts')
+          s=p.read_text()
+          old='''  return {\n    schemaVersion: SEMANTIC_INTERPRETATION_SCHEMA_VERSION,'''
+          new='''  const discourseFacets = normalizeDiscourseFacets(v.discourseFacets);\n  return {\n    schemaVersion: SEMANTIC_INTERPRETATION_SCHEMA_VERSION,'''
+          if old not in s and new not in s: raise SystemExit('schema return pattern missing')
+          s=s.replace(old,new,1)
+          s=s.replace('''    apology: asBool(v.apology), repairAttempt: asBool(v.repairAttempt), stopRequest: asBool(v.stopRequest),\n    discourseFacets: normalizeDiscourseFacets(v.discourseFacets),''','''    apology: asBool(v.apology), repairAttempt: asBool(v.repairAttempt), stopRequest: discourseFacets.stopTalking,\n    discourseFacets,''')
+          old_check='''    typeof v.apology === "boolean" && typeof v.repairAttempt === "boolean" && typeof v.stopRequest === "boolean";'''
+          new_check='''    typeof v.apology === "boolean" && typeof v.repairAttempt === "boolean" && typeof v.stopRequest === "boolean" &&\n    typeof (v.discourseFacets as Record<string, unknown>).stopQuestions === "boolean" &&\n    typeof (v.discourseFacets as Record<string, unknown>).stopTalking === "boolean" &&\n    v.stopRequest === (v.discourseFacets as Record<string, unknown>).stopTalking;'''
+          if old_check not in s and new_check not in s: raise SystemExit('schema validation pattern missing')
+          s=s.replace(old_check,new_check)
+          p.write_text(s)
+
+          p=Path('src/types/semanticInterpretation.ts')
+          s=p.read_text()
+          old='''  stopRequest: boolean;'''
+          new='''  /** Dyadic full-conversation stop only; must equal discourseFacets.stopTalking. */\n  stopRequest: boolean;'''
+          if old not in s and new not in s: raise SystemExit('type stopRequest pattern missing')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+
+          p=Path('src/services/llmSemanticUnderstandingProvider.ts')
+          s=p.read_text()
+          needle='''stopQuestions / stopTalking yalnız açık durdurma talebinde true'''
+          repl='''stopQuestions / stopTalking yalnız açık durdurma talebinde true\nstopRequest = YALNIZ tam konuşmayı durdurma isteği; discourseFacets.stopTalking ile birebir aynı olmalı. “soru sorma” gibi yalnız soru yasağı stopRequest değildir.'''
+          if needle not in s and repl not in s: raise SystemExit('provider prompt stop semantics pattern missing')
+          s=s.replace(needle,repl)
+          p.write_text(s)
+          PY
+      - name: Self-remove and commit
+        run: |
+          rm .github/workflows/c1b-stop-semantics.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/services/semanticInterpretationLegacyProjection.ts src/services/semanticInterpretationSchema.ts src/types/semanticInterpretation.ts src/services/llmSemanticUnderstandingProvider.ts .github/workflows/c1b-stop-semantics.yml
+          git commit -m 'fix(semantic): distinguish question stop from conversation stop'
+          git push origin HEAD:chatgpt/c1-single-semantic-authority
