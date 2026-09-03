@@ -11,16 +11,21 @@ describe("world reasoning policy runtime integration contract", () => {
     expect(server).toContain("buildWorldReasoningPolicyInstruction(worldReasoningPolicy)");
   });
 
-  it("injects reasoning policy after appraisal and before dialogue/behavior instructions", () => {
+  it("injects reasoning policy after appraisal and before canonical dialogue/behavior authority", () => {
     const appraisalIndex = server.indexOf("${worldStateAppraisalInstruction}");
     const policyIndex = server.indexOf("${worldReasoningPolicyInstruction}");
     const dialogueIndex = server.indexOf("${dialogueInstruction}");
-    const behaviorIndex = server.indexOf("${behaviorContractInstruction(behaviorContract)}");
+    const dialogueDecisionIndex = server.indexOf("${dialogueDecisionInstruction}");
+    const responsePlanIndex = server.indexOf("${responsePlanInstruction}");
+    const observationalIndex = server.indexOf("${canonicalObservationalContext}", responsePlanIndex);
 
     expect(appraisalIndex).toBeGreaterThan(0);
     expect(policyIndex).toBeGreaterThan(appraisalIndex);
     expect(dialogueIndex).toBeGreaterThan(policyIndex);
-    expect(behaviorIndex).toBeGreaterThan(dialogueIndex);
+    expect(dialogueDecisionIndex).toBeGreaterThan(dialogueIndex);
+    expect(responsePlanIndex).toBeGreaterThan(dialogueDecisionIndex);
+    expect(observationalIndex).toBeGreaterThan(responsePlanIndex);
+    expect(server).not.toContain("${behaviorContractInstruction(behaviorContract)}");
   });
 
   it("passes the canonical reasoning policy to deterministic final enforcement", () => {
