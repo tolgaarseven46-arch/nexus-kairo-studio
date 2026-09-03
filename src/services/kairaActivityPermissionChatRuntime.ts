@@ -18,23 +18,6 @@ export type KairaActivityPermissionChatResolution =
   | { status: "none" | "uncorrelated" }
   | { status: "unmatched" | "execution_rejected" | "applied"; result: KairaActivityPermissionDialogueApplyResult };
 
-const TRUTHY = new Set(["1", "true", "on", "yes"]);
-
-/**
- * Autonomous/offscreen activity is not allowed to inject a new user-visible
- * question into ordinary chat until that side-channel is explicitly enabled and
- * covered by the final response-plan authority. This is an integration safety
- * gate, not a conversational decision.
- */
-export function kairaActivityPermissionChatPromptsEnabled(): boolean {
-  try {
-    const raw = typeof process !== "undefined" ? process.env?.KAIRA_CHAT_ACTIVITY_PERMISSION_PROMPTS : undefined;
-    return typeof raw === "string" && TRUTHY.has(raw.trim().toLowerCase());
-  } catch {
-    return false;
-  }
-}
-
 const activityLabel = (value: string) =>
   String(value || "")
     .trim()
@@ -92,8 +75,6 @@ export async function presentKairaActivityPermissionChatPrompt(input: {
   promptTurnId: string;
   now: string;
 }): Promise<KairaActivityPermissionChatPrompt | null> {
-  if (!kairaActivityPermissionChatPromptsEnabled()) return null;
-
   const active = await loadActiveKairaActivityPermissionSessionPointer(input);
   if (active) {
     return buildKairaActivityPermissionChatPrompt({
