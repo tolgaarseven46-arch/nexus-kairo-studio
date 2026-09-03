@@ -104,7 +104,7 @@ function runConversation(messages: string[]): TurnTrace[] {
       localIntent: local.intent,
     });
 
-    history.push({ sender: "user", text: msg, participantName: "Mert" } as ConversationTurn);
+    history.push({ sender: "user", text: msg, participantName: "Mert", semanticEvent: event } as ConversationTurn);
     history.push({ sender: "droit", text: reply, participantName: "Kaira" } as ConversationTurn);
   }
   return traces;
