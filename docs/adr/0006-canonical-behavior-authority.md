@@ -49,6 +49,15 @@ Aşağıdaki kalıcı mimari değişmezler kabul edilir:
    başına zaman tam reset yapar.
 8. Injury asimetrisi sabit oran değildir; recovery hızını `severity`,
    `repetition`, `relationship history` ve `repair quality` türetir.
+9. **PR4 final-delivery otoritesi:** `UNIFIED_GUARD_PASS` açıkken davranış
+   uygunluğu yalnız çözülmüş `KairaResponsePlan` üzerinden denetlenir. World,
+   autobiographical ve epistemic katmanları yalnız truth/evidence sınırıdır;
+   sosyal izin üretmez. Ordered pass `world truth → autobiographical truth →
+   epistemic truth → plan enforcement → final conformance` sırasını kullanır.
+   Fallback hiçbir zaman doğrudan teslim edilmez; aynı ordered pass'ten tekrar
+   geçer. Canonical consistency yalnız son kullanıcıya teslim edilecek metinde
+   hesaplanır. Legacy `chosenTone`/intent/sentiment keyword eşleşmeleri canonical
+   kabul/red otoritesi değildir.
 
 ## Kapsam dışı (dokunulmaz)
 
@@ -67,7 +76,11 @@ türetimi, idempotency/retry (`kairaChatIdempotency*`, `kairaDistributedChatIdem
   (`kairoLocalLanguageEngine`) artık intent sınıflandırmaz — yalnız paylaşılan
   `SemanticEvent.socialRoutine` + trivial `dialogueMove` + doygunluk kontrolüyle
   render eder. Bu değişiklikler flag'e bağlı DEĞİL (üçüncü gerçeklik hattı yaratmaz);
-  `npm run test:canonical` üç canonical flag açıkken bu hattı ayrıca doğrular.
+  `npm run test:canonical` canonical flag'ler açıkken bu hattı ayrıca doğrular.
+- **Unified-guard eki (2026-09-03):** `src/services/kairaResponseConstraintPass.ts`
+  canonical final-delivery pass'ini tanımlar. Bu pass plan bütçelerini deterministik
+  uygular, truth guard fallback'lerini aynı plan sınırından geçirir ve consistency'yi
+  delivered text üzerinde plan-conformance + structural checks ile üretir.
 - PR5 (compat söküm + flag kaldırma) yalnız `git revert` ile geri alınır;
   ön koşulu **süre değil**, `CANONICAL_PATH_PROMOTION_GATE` (aynı dosya).
 - PR6 yalnız config/fixture kalibrasyonu.
