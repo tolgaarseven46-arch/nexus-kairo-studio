@@ -42,6 +42,19 @@ describe("KDM canonical SemanticInterpretation@2 authority", () => {
     expect(bridge).not.toContain("buildCanonicalWorldEvent(");
   });
 
+  it("keeps question-stop distinct from full-conversation stop at the v2 boundary", () => {
+    const typeSource = source("src/types/semanticInterpretation.ts");
+    const schema = source("src/services/semanticInterpretationSchema.ts");
+    const fallback = source("src/services/semanticInterpretationLegacyProjection.ts");
+    const provider = source("src/services/llmSemanticUnderstandingProvider.ts");
+    expect(typeSource).toContain("must equal discourseFacets.stopTalking");
+    expect(schema).toContain("stopRequest: discourseFacets.stopTalking");
+    expect(schema).toContain("v.stopRequest === (v.discourseFacets as Record<string, unknown>).stopTalking");
+    expect(fallback).toContain("stopRequest: Boolean(event.stopTalking)");
+    expect(fallback).not.toContain("stopRequest: Boolean(event.stopTalking || event.stopQuestions)");
+    expect(provider).toContain("stopRequest = YALNIZ tam konuşmayı durdurma isteği");
+  });
+
   it("keeps the old raw-text helper outside the production server authority", () => {
     const kdm = source("src/services/kdmConsistencyEngine.ts");
     const server = source("server.ts");
