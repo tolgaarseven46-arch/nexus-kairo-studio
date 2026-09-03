@@ -18,10 +18,10 @@
   },
 
   "redline": {
-    "hardStopThreshold": 0.78,
+    "hardStopThreshold": 1.35,
     "minCombinedSignals": 2,
     "minPresentSeverity": 0.55,
-    "note": "PR1-review fix: no hard-stop unless THIS turn's top harm dimension >= minPresentSeverity. repetition/priorBoundarySet are AMPLIFIERS of present harm, never independent contributors — so an apology or a benign remark can never hard-stop from history alone.",
+    "note": "PR5 calibration: an ordinary explicitly targeted insult must still flow through relationship-sensitive irritated/hurt/withdrawn handling; hard-stop is reserved for stronger or amplified combined harm. repetition/priorBoundarySet remain amplifiers of present harm, never independent contributors.",
     "weights": {
       "disrespect": 0.9,
       "coercion": 0.85,

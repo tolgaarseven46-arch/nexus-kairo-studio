@@ -23,8 +23,10 @@ describe("Kaira autobiographical runtime integration contracts", () => {
     expect(dialogueIndex).toBeGreaterThan(selfMemoryIndex);
   });
 
-  it("guards generated and fallback replies against unsupported autobiography on both rollout paths", () => {
-    expect(server).toContain('isCanonicalBehaviorFlagEnabled("UNIFIED_GUARD_PASS")');
+  it("guards generated and fallback replies against unsupported autobiography through the canonical pass", () => {
+    expect(server).not.toContain('isCanonicalBehaviorFlagEnabled("UNIFIED_GUARD_PASS")');
+    expect(server).toContain("runKairaResponseConstraintPass({");
+    expect(server).toContain("selfMemoryRuntime,");
     expect(server).toContain("canonicalConstraint?.autobiographicalGuard ?? enforceKairaAutobiographicalResponse(reply, selfMemoryRuntime)");
     expect(server).toContain("fallbackFactory: () =>");
 

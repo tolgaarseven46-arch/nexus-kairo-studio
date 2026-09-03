@@ -1,5 +1,4 @@
 import {
-  AffectiveReactionMode,
   DroitDynamicState,
   DroitPersonalityTraits,
   ReasoningTrace,
@@ -9,12 +8,8 @@ import {
   BehaviorLayerProfile,
 } from "./droitBehaviorEngine";
 import { normalizeDroitPersonality } from "./droitPersonalityNormalizer";
-import { applyRelationshipContext } from "./relationshipBehaviorService";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
-import { appraiseRelationshipConditionedEvent } from "./relationshipConditionedAppraisal";
-import { recoverRelationshipConditionedState } from "./relationshipConditionedRecovery";
-import { isCanonicalBehaviorFlagEnabled } from "../config/canonicalBehaviorFlags";
 import { analyzeKdmInteractionCanonical } from "./kdmRelationshipReducerBridge";
 
 export interface KdmAnalysisResult {
@@ -22,18 +17,6 @@ export interface KdmAnalysisResult {
   behaviorProfile: BehaviorLayerProfile;
   nextDynamicState: DroitDynamicState;
 }
-
-type EventKind = "positive" | "negative" | "neutral";
-type NegativeTarget = "kaira" | "third_party" | "event";
-
-const clamp = (value: number, min = 0, max = 100) =>
-  Math.max(min, Math.min(max, Math.round(value)));
-
-const trait = (
-  p: DroitPersonalityTraits | null | undefined,
-  key: keyof DroitPersonalityTraits,
-  fallback = 50,
-) => clamp(typeof p?.[key] === "number" ? p[key]! : fallback);
 
 function behaviorPolicyStanceCode(value?: BehaviorPolicyInput["decision"]["stance"]): number {
   if (value === "warm") return 0;
@@ -200,12 +183,6 @@ export function semanticSentimentToKdm(event: SemanticEvent): string {
   return "nötr";
 }
 
-function semanticNegativeTarget(event: SemanticEvent): NegativeTarget {
-  if (event.target === "kaira") return "kaira";
-  if (event.target === "third_party") return "third_party";
-  return "event";
-}
-
 export function semanticPattern(event: SemanticEvent): string | null {
   if (event.redLine) return "agir_hakaret";
   if (event.insult) return "hakaret";
@@ -215,25 +192,6 @@ export function semanticPattern(event: SemanticEvent): string | null {
   if (event.intent === "rejection") return "kovma_ve_reddetme";
   if (event.frustration > 0) return "agresif_dil";
   return null;
-}
-
-function semanticWarmthDelta(event: SemanticEvent, sentiment: string): number {
-  let delta = sentiment === "pozitif" ? 2 : sentiment === "negatif" ? -3 : 0;
-  if (event.apology || event.repairAttempt || event.support > 0 || event.compliment > 0) delta += 2;
-  if (event.insult) delta -= 5;
-  else if (event.coercion > 0 || event.manipulation > 0 || event.privacyViolation > 0) delta -= 3;
-  return clamp(delta, -10, 10);
-}
-
-function moodChangeFromDelta(delta: number): string {
-  if (delta >= 4) return "daha pozitif ve sıcak";
-  if (delta <= -4) return "daha temkinli ve mesafeli";
-  return "stabil";
-}
-
-function approachBaseline(value: number, baseline: number, maxStep = 1): number {
-  if (value === baseline) return 0;
-  return value > baseline ? -Math.min(maxStep, value - baseline) : Math.min(maxStep, baseline - value);
 }
 
 const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
@@ -246,6 +204,11 @@ const DEFAULT_DYNAMIC_STATE: DroitDynamicState = {
   lastStatus: "Sakin ve kontrollü",
 };
 
+/**
+ * ADR-0006 PR5: RelationshipReducer is now the only relationship/state authority.
+ * The temporary rollout switch and legacy decision body were removed after promotion.
+ * Rollback is repository-level `git revert`.
+ */
 export function analyzeKdmInteraction(
   userMessage: string,
   personality?: Partial<DroitPersonalityTraits> | null,
@@ -253,7 +216,7 @@ export function analyzeKdmInteraction(
   canonicalSemanticEvent?: SemanticEvent | null,
   behaviorPolicy?: BehaviorPolicyInput | null,
 ): KdmAnalysisResult {
-  let state: DroitDynamicState = {
+  const state: DroitDynamicState = {
     ...DEFAULT_DYNAMIC_STATE,
     ...(currentDynamicState || {}),
   };
@@ -261,419 +224,15 @@ export function analyzeKdmInteraction(
   const normalizedPersonality = normalizeDroitPersonality(personality);
   const baseBehaviorProfile = computeBehaviorProfile(normalizedPersonality, userMessage);
 
-  // ADR-0006: canonical relationship reducer. Flag OFF (default) -> the legacy
-  // body below runs unchanged. Flag ON -> the reducer is authoritative for
-  // scores / conversationState / reactionMode / affect; behaviorProfile + trace
-  // are then derived from that state through the SAME applyRelationshipContext /
-  // applyIntegratedBehaviorPolicy path.
-  if (isCanonicalBehaviorFlagEnabled("RELATIONSHIP_REDUCER_V2")) {
-    return analyzeKdmInteractionCanonical({
-      state,
-      semanticEvent,
-      normalizedPersonality,
-      baseBehaviorProfile,
-      behaviorPolicy: behaviorPolicy ?? null,
-      applyIntegrated: applyIntegratedBehaviorPolicy,
-      semanticPattern,
-      semanticIntentToKdm,
-      semanticSentimentToKdm,
-    });
-  }
-  const intent = semanticIntentToKdm(semanticEvent);
-  const sentiment = semanticSentimentToKdm(semanticEvent);
-
-  const patience = trait(normalizedPersonality, "patience");
-  const sensitivity = trait(normalizedPersonality, "emotionalSensitivity");
-  const angerTrait = trait(normalizedPersonality, "anger");
-  const empathy = trait(normalizedPersonality, "empathy");
-  const loyalty = trait(normalizedPersonality, "loyalty");
-
-  const negativeSensitivity = Math.max(
-    0.55,
-    Math.min(1.65, 1 + (sensitivity - 50) / 160 + (angerTrait - 50) / 220 - (patience - 50) / 180),
-  );
-  const forgivenessFactor = Math.max(
-    0.55,
-    Math.min(1.55, 1 + (empathy - 50) / 150 + (patience - 50) / 220 - (angerTrait - 50) / 260),
-  );
-
-  const relationship = state.relationship || {
-    firstSeenAt: new Date().toISOString(),
-    lastInteractionAt: new Date().toISOString(),
-    interactionCount: 0,
-    familiarityDays: 0,
-    warmth: 50,
-    trust: 50,
-    positiveEvents: 0,
-    negativeEvents: 0,
-    conflictScore: 0,
-    hurtScore: 0,
-    repairProgress: 0,
-    repeatedNegativeCount: 0,
-    conversationState: "active" as const,
-    repairAttempts: 0,
-  };
-
-  const calculatedDays = Number.isFinite(new Date(relationship.firstSeenAt!).getTime())
-    ? Math.max(0, Math.floor((Date.now() - new Date(relationship.firstSeenAt!).getTime()) / 86400000))
-    : 0;
-  const familiarityDays = Math.max(0, relationship.familiarityDays || 0, calculatedDays);
-  const interactionCount = Math.max(0, relationship.interactionCount || 0);
-  const nextInteractionCount = interactionCount + 1;
-  const interactionAt = new Date().toISOString();
-  const baseWarmth = clamp(relationship.warmth ?? 50);
-  const baseTrust = clamp(relationship.trust ?? 50);
-  const positiveEvents = Math.max(0, relationship.positiveEvents || 0);
-  const negativeEvents = Math.max(0, relationship.negativeEvents || 0);
-  const baseConflict = clamp(relationship.conflictScore ?? Math.min(100, negativeEvents * 4));
-  const baseHurt = clamp(relationship.hurtScore ?? 0);
-  const baseRepair = clamp(relationship.repairProgress ?? 0);
-  const priorConversationState = relationship.conversationState ?? "active";
-  const priorRepairAttempts = Math.max(0, relationship.repairAttempts ?? 0);
-  const elapsedSinceInteractionMinutes = relationship.lastInteractionAt && Number.isFinite(new Date(relationship.lastInteractionAt).getTime())
-    ? Math.max(0, (Date.now() - new Date(relationship.lastInteractionAt).getTime()) / 60000)
-    : 0;
-  const preTurnRecovery = recoverRelationshipConditionedState({
-    elapsedMinutes: elapsedSinceInteractionMinutes,
-    reactionMode: state.reactionMode,
-    state: {
-      anger: state.anger ?? 10,
-      stress: state.stress ?? 20,
-      happiness: state.happiness ?? 70,
-      calmness: state.calmness ?? 70,
-    },
-    relationship: {
-      hurt: baseHurt,
-      conflict: baseConflict,
-      repairProgress: baseRepair,
-      conversationState: priorConversationState,
-    },
-    repairSignal: Boolean(semanticEvent.apology || semanticEvent.repairAttempt),
+  return analyzeKdmInteractionCanonical({
+    state,
+    semanticEvent,
+    normalizedPersonality,
+    baseBehaviorProfile,
+    behaviorPolicy: behaviorPolicy ?? null,
+    applyIntegrated: applyIntegratedBehaviorPolicy,
+    semanticPattern,
+    semanticIntentToKdm,
+    semanticSentimentToKdm,
   });
-  state = {
-    ...state,
-    ...preTurnRecovery.state,
-    reactionMode: preTurnRecovery.reactionMode,
-  };
-  const integratedDecision = behaviorPolicy?.decision;
-  const integratedPriority = behaviorPolicyPriorityCode(integratedDecision?.priority);
-  const integratedStance = behaviorPolicyStanceCode(integratedDecision?.stance);
-  const requestedDisengage =
-    integratedDecision?.continueConversation === false &&
-    integratedDecision.stance === "disengage" &&
-    integratedPriority >= 80;
-
-  const passiveHealingDays = relationship.lastConflictAt && Number.isFinite(new Date(relationship.lastConflictAt).getTime())
-    ? Math.max(0, Math.floor((Date.now() - new Date(relationship.lastConflictAt).getTime()) / 86400000))
-    : 0;
-  const healingRate = Math.max(0.45, Math.min(1.6, forgivenessFactor - (sensitivity - 50) / 350));
-  const passivelyHealedHurt = clamp(baseHurt - Math.min(18, passiveHealingDays * healingRate));
-  const passivelyHealedConflict = clamp(baseConflict - Math.min(12, Math.floor(passiveHealingDays / 2) * healingRate));
-
-  const familiarityFactor = Math.min(familiarityDays / 30, 1);
-  const closeness = clamp(
-    familiarityFactor * 30 + Math.min(interactionCount / 40, 1) * 20 + baseWarmth * 0.25 + baseTrust * 0.25,
-  );
-  const loyaltyBetrayalFactor = 1 + ((loyalty - 50) / 250) * (closeness / 100);
-  const historyQuality = clamp(50 + positiveEvents * 3 - negativeEvents * 5 - passivelyHealedConflict * 0.35 - passivelyHealedHurt * 0.25);
-  const relationshipQuality = clamp(baseWarmth * 0.35 + baseTrust * 0.35 + historyQuality * 0.3);
-  const toleranceMultiplier = Math.max(
-    0.35,
-    1 - 0.55 * familiarityFactor * (relationshipQuality / 100) + (passivelyHealedConflict / 100) * 0.25 + (passivelyHealedHurt / 100) * 0.2,
-  );
-
-  const rawKind: EventKind = semanticEvent.valence === "positive"
-    ? "positive"
-    : semanticEvent.valence === "negative" && hasActionableNegativeEvidence(semanticEvent)
-      ? "negative"
-      : "neutral";
-  const negativeTarget: NegativeTarget | null = rawKind === "negative" ? semanticNegativeTarget(semanticEvent) : null;
-  const targetsKaira = rawKind === "negative" && negativeTarget === "kaira";
-  const kind: EventKind = rawKind === "negative" && !targetsKaira ? "neutral" : rawKind;
-  const apology = semanticEvent.apology;
-  const repairSignal = apology || semanticEvent.repairAttempt;
-  const pattern = kind === "negative" ? semanticPattern(semanticEvent) : null;
-  const samePattern = !!pattern && relationship.lastNegativePattern === pattern;
-  const priorRepeatCount = Math.max(0, relationship.repeatedNegativeCount || 0);
-  const repeatCount = pattern ? (samePattern ? priorRepeatCount + 1 : 1) : priorRepeatCount;
-  const repeatEscalation = samePattern ? Math.min(2.2, 1 + Math.max(0, repeatCount - 1) * 0.25) : 1;
-  const personalityImpact = kind === "negative" ? negativeSensitivity * loyaltyBetrayalFactor : 1;
-
-  const rawWarmthDelta = rawKind === "negative" && !targetsKaira ? 0 : semanticWarmthDelta(semanticEvent, sentiment);
-  const warmthDelta = Math.round(rawWarmthDelta * toleranceMultiplier * (kind === "negative" ? repeatEscalation * personalityImpact : 1));
-  const warmthBefore = baseWarmth;
-  const warmthAfter = clamp(warmthBefore + warmthDelta);
-  const trustDelta = kind === "negative"
-    ? -4 * repeatEscalation * personalityImpact
-    : apology
-      ? 1.5 * forgivenessFactor
-      : kind === "positive" && priorConversationState === "active"
-        ? 2
-        : 0;
-  const trustAfter = clamp(baseTrust + Math.round(trustDelta * toleranceMultiplier));
-
-  let conflictAfter = passivelyHealedConflict;
-  let hurtAfter = passivelyHealedHurt;
-  let repairAfter = baseRepair;
-  let lastConflictAt = relationship.lastConflictAt;
-  let lastNegativePattern = relationship.lastNegativePattern;
-  let lastNegativePatternAt = relationship.lastNegativePatternAt;
-
-  if (kind === "negative") {
-    const severityBoost = semanticEvent.redLine ? 1.35 : semanticEvent.severity >= 0.8 ? 1.15 : 1;
-    // Established, healthy relationships may absorb ordinary conflict better, but
-    // red-line violations remain strongly injurious regardless of familiarity.
-    const relationshipInjuryMultiplier = semanticEvent.redLine
-      ? Math.max(0.85, toleranceMultiplier)
-      : Math.max(0.5, toleranceMultiplier);
-    conflictAfter = clamp(conflictAfter + 8 * repeatEscalation * personalityImpact * severityBoost * relationshipInjuryMultiplier);
-    hurtAfter = clamp(hurtAfter + 12 * repeatEscalation * personalityImpact * severityBoost * relationshipInjuryMultiplier);
-    repairAfter = clamp(repairAfter - 8 * repeatEscalation * personalityImpact * severityBoost * relationshipInjuryMultiplier);
-    lastConflictAt = interactionAt;
-    if (pattern) {
-      lastNegativePattern = pattern;
-      lastNegativePatternAt = lastConflictAt;
-    }
-  } else if (apology) {
-    const apologyPower = (4 + (baseTrust / 100) * 3) * forgivenessFactor;
-    conflictAfter = clamp(conflictAfter - apologyPower);
-    hurtAfter = clamp(hurtAfter - Math.max(2, apologyPower * 0.7));
-    repairAfter = clamp(repairAfter + 10 * forgivenessFactor);
-  } else if (kind === "positive") {
-    conflictAfter = clamp(conflictAfter - 2 * forgivenessFactor);
-    hurtAfter = clamp(hurtAfter - forgivenessFactor);
-    if (priorConversationState === "active") repairAfter = clamp(repairAfter + 3 * forgivenessFactor);
-  } else {
-    conflictAfter = clamp(conflictAfter - healingRate);
-    hurtAfter = clamp(hurtAfter - Math.max(1, healingRate));
-    repairAfter = baseRepair;
-  }
-
-  let conversationState = priorConversationState;
-  let disengagedAt = relationship.disengagedAt;
-  let disengageReason = relationship.disengageReason;
-  let repairAttempts = priorRepairAttempts;
-  const disengagedMinutes = disengagedAt && Number.isFinite(new Date(disengagedAt).getTime())
-    ? Math.max(0, (Date.now() - new Date(disengagedAt).getTime()) / 60000)
-    : 0;
-
-  if (requestedDisengage || (kind === "negative" && semanticEvent.redLine)) {
-    conversationState = "disengaged";
-    disengagedAt = interactionAt;
-    disengageReason = pattern || "boundary";
-    repairAttempts = 0;
-    repairAfter = 0;
-  } else if (priorConversationState === "disengaged") {
-    if (repairSignal) repairAttempts += 1;
-    const enoughForRepairing = repairSignal && (repairAttempts >= 2 || repairAfter >= 20 || disengagedMinutes >= 30);
-    conversationState = enoughForRepairing ? "repairing" : "disengaged";
-  } else if (priorConversationState === "repairing") {
-    if (kind === "negative") {
-      conversationState = "disengaged";
-      disengagedAt = interactionAt;
-      disengageReason = pattern || "new_negative_event";
-      repairAttempts = 0;
-      repairAfter = 0;
-    } else {
-      if (repairSignal) repairAttempts += 1;
-      const enoughToReactivate = repairSignal && repairAttempts >= 3 && repairAfter >= 35 && disengagedMinutes >= 30;
-      conversationState = enoughToReactivate ? "active" : "repairing";
-    }
-  } else if (kind === "negative" && targetsKaira) {
-    conversationState = conflictAfter >= 18 || hurtAfter >= 22 ? "distancing" : conversationState;
-  } else if (conversationState === "distancing" && conflictAfter < 10 && hurtAfter < 15) {
-    conversationState = "active";
-  }
-
-  if (conversationState === "active") {
-    disengagedAt = undefined;
-    disengageReason = undefined;
-    repairAttempts = 0;
-  }
-
-  const positiveEventsAfter = positiveEvents + (kind === "positive" ? 1 : 0);
-  const negativeEventsAfter = negativeEvents + (kind === "negative" ? 1 : 0);
-  const unresolvedHurt = hurtAfter >= 20 || conflictAfter >= 20;
-  const repeatedProblem = samePattern && repeatCount >= 2;
-  const relationshipAppraisal = appraiseRelationshipConditionedEvent({
-    event: {
-      kind,
-      targetsKaira,
-      redLine: Boolean(semanticEvent.redLine),
-      repairSignal,
-    },
-    relationship: {
-      closeness,
-      familiarityDays,
-      interactionCount,
-      warmth: warmthAfter,
-      trust: trustAfter,
-      relationshipQuality,
-      conflict: conflictAfter,
-      hurt: hurtAfter,
-      repairProgress: repairAfter,
-      priorConversationState,
-      conversationState,
-    },
-    internalState: {
-      anger: state.anger ?? 10,
-      stress: state.stress ?? 20,
-      calmness: state.calmness ?? 70,
-      priorReactionMode: state.reactionMode,
-    },
-    modulation: {
-      repeatEscalation,
-      personalityImpact,
-      negativeSensitivity,
-      angerTrait,
-      toleranceMultiplier,
-      forgivenessFactor,
-    },
-  });
-  const reactionMode: AffectiveReactionMode = relationshipAppraisal.reactionTendency;
-
-  const {
-    stress: stressDelta,
-    happiness: happinessDelta,
-    calmness: calmnessDelta,
-    anger: angerDelta,
-  } = relationshipAppraisal.emotionDelta;
-
-  const confidenceDelta = intent === "eylem_talebi" ? Math.max(1, Math.round(toleranceMultiplier)) : 0;
-  const lastStatus = conversationState === "disengaged"
-    ? "Konuşmadan çekildi"
-    : conversationState === "repairing"
-      ? "Mesafeli, onarımı değerlendiriyor"
-      : conversationState === "distancing"
-        ? "Mesafe koyuyor"
-        : repeatedProblem
-          ? "Tekrarlanan davranıştan rahatsız"
-          : kind === "negative" && targetsKaira
-            ? hurtAfter >= 45 || conflictAfter >= 45
-              ? "Kırgın ve sınır koyuyor"
-              : "Rahatsız ve mesafeli"
-            : apology && unresolvedHurt
-              ? "Yumuşuyor ama temkinli"
-              : unresolvedHurt
-                ? "Kırgınlık sürüyor"
-                : sentiment === "duygusal_yük"
-                  ? "Empatik ve dikkatli"
-                  : moodChangeFromDelta(warmthDelta);
-
-  const nextDynamicState: DroitDynamicState = {
-    ...state,
-    stress: clamp((state.stress ?? 20) + stressDelta),
-    happiness: clamp((state.happiness ?? 70) + happinessDelta),
-    confidence: clamp((state.confidence ?? 70) + confidenceDelta),
-    calmness: clamp((state.calmness ?? 70) + calmnessDelta),
-    anger: clamp((state.anger ?? 10) + angerDelta),
-    reactionMode,
-    relationship: {
-      ...relationship,
-      lastInteractionAt: interactionAt,
-      interactionCount: nextInteractionCount,
-      familiarityDays,
-      warmth: warmthAfter,
-      trust: trustAfter,
-      positiveEvents: positiveEventsAfter,
-      negativeEvents: negativeEventsAfter,
-      conflictScore: conflictAfter,
-      hurtScore: hurtAfter,
-      repairProgress: repairAfter,
-      repeatedNegativeCount: repeatCount,
-      conversationState,
-      repairAttempts,
-      ...(disengagedAt ? { disengagedAt } : {}),
-      ...(disengageReason ? { disengageReason } : {}),
-      ...(lastConflictAt ? { lastConflictAt } : {}),
-      ...(lastNegativePattern ? { lastNegativePattern } : {}),
-      ...(lastNegativePatternAt ? { lastNegativePatternAt } : {}),
-    },
-    lastStatus,
-    lastEvent: {
-      eventTitle: repeatedProblem
-        ? `KDM: tekrarlanan ${pattern}`
-        : apology
-          ? "KDM: özür/telafi"
-          : `KDM: ${intent}`,
-      reactionText: `Kişilik etkisi x${personalityImpact.toFixed(2)}; affetme x${forgivenessFactor.toFixed(2)}; güven %${trustAfter}; çatışma %${conflictAfter}; kırgınlık %${hurtAfter}; ilişki=${conversationState}; reaction=${reactionMode}; recovery=${preTurnRecovery.rationale.join("+") || "none"}; appraisal=${relationshipAppraisal.rationale.join("+") || "neutral"}.`,
-      deltas: [
-        { label: "Stres", key: "stress", value: stressDelta },
-        { label: "Mutluluk", key: "happiness", value: happinessDelta },
-        { label: "Sakinlik", key: "calmness", value: calmnessDelta },
-        { label: "Öfke", key: "anger", value: angerDelta },
-      ],
-    },
-  };
-
-  const relationshipBehaviorProfile = applyRelationshipContext(baseBehaviorProfile, nextDynamicState);
-  const finalBehaviorProfile = applyIntegratedBehaviorPolicy(relationshipBehaviorProfile, behaviorPolicy);
-  const targetNote = rawKind === "negative" ? ` Negatif hedef=${negativeTarget}.` : "";
-  const trace: ReasoningTrace = {
-    whoSent: {
-      userName: "Kullanıcı",
-      isNewUser: interactionCount === 0,
-      recognitionText: interactionCount === 0 ? "İlk etkileşim." : `${interactionCount} etkileşimlik tanışıklık.`,
-    },
-    relationship: {
-      warmthScore: warmthAfter,
-      warmthLabel: warmthAfter >= 70 ? "Sıcak" : warmthAfter >= 40 ? "Dengeli" : "Mesafeli",
-      note: `${familiarityDays} gün; güven %${trustAfter}; çatışma %${conflictAfter}; kırgınlık %${hurtAfter}; ilişki=${conversationState}; kişilik etkisi x${personalityImpact.toFixed(2)}.${targetNote}`,
-      familiarityDays,
-      interactionCount: nextInteractionCount,
-      toleranceMultiplier,
-      trustScore: trustAfter,
-      conflictScore: conflictAfter,
-      hurtScore: hurtAfter,
-      repairProgress: repairAfter,
-      repeatedNegativeCount: repeatCount,
-      conversationState,
-      repairAttempts,
-    },
-    currentMood: {
-      moodText: lastStatus,
-      reactionMode,
-      reasonText: conversationState === "disengaged"
-        ? "İlişki hard-stop sonrasında disengaged durumda; nötr mesaj veya yakınlaşma bu durumu tek turda silemez."
-        : conversationState === "repairing"
-          ? "İlişki kontrollü onarım aşamasında; zaman ve tekrarlı samimi telafi gerekiyor."
-          : repeatedProblem
-            ? `Aynı olumsuz davranış (${pattern}) tekrarlandı; sabır, hassasiyet, öfke ve sadakat tepki ağırlığını belirledi. Appraisal=${relationshipAppraisal.rationale.join("+")}.`
-            : apology
-              ? `Özür; empati ve sabır kaynaklı x${forgivenessFactor.toFixed(2)} affetme katsayısıyla değerlendirildi.`
-              : unresolvedHurt
-                ? `Çözülmemiş kırgınlık mevcut; nötr mesajlar bu duyguyu otomatik olarak silmiyor.${targetNote}`
-                : `Mesaj ve ilişki geçmişi Kaira'nın kişilik özellikleriyle birlikte değerlendirildi.${targetNote}`,
-    },
-    messageInterpretation: {
-      intent: apology ? "özür_ve_telafi" : repeatedProblem ? "tekrarlanan_olumsuz_davranış" : intent,
-      sentiment,
-      explanation: `Ortak SemanticEvent kullanıldı: intent=${semanticEvent.intent}, hedef=${semanticEvent.target}, severity=${semanticEvent.severity.toFixed(2)}.${targetNote} KDM kişilik×ilişki katmanı aktif: sabır ${patience}, hassasiyet ${sensitivity}, öfke ${angerTrait}, empati ${empathy}, sadakat ${loyalty}.`,
-    },
-    decision: {
-      chosenTone: finalBehaviorProfile.tone,
-      explanation: behaviorPolicy && integratedPriority >= 60
-        ? `Açık ${behaviorPolicy.schemaVersion} girdisi KDM profilinde değerlendirildi; kaynak=${behaviorPolicy.source}, öncelik=${integratedDecision?.priority ?? "expression"}, duruş=${integratedDecision?.stance ?? "neutral"}, ton=${finalBehaviorProfile.tone}.`
-        : repeatedProblem
-          ? "Tekrar etkisi ve kişilik hassasiyeti birlikte uygulanarak tolerans düşürüldü."
-          : unresolvedHurt
-            ? `Çözülmemiş kırgınlık nedeniyle ${finalBehaviorProfile.tone} tonuna geçildi; playful ton bastırıldı.`
-            : `${finalBehaviorProfile.decisionSpeed} karar stili uygulandı.`,
-    },
-    memoryUpdate: {
-      warmthBefore,
-      warmthAfter,
-      warmthDelta,
-      moodChange: lastStatus,
-      reason: apology
-        ? `Affetme katsayısı x${forgivenessFactor.toFixed(2)} ile telafi işlendi; ilişki durumu=${conversationState}.`
-        : rawKind === "negative" && !targetsKaira
-          ? `Negatif ifade ${negativeTarget} hedefli olduğu için Kaira-kullanıcı ilişkisine hasar yazılmadı.`
-          : kind === "negative"
-            ? `Olumsuz SemanticEvent kişilik etkisi x${personalityImpact.toFixed(2)} ve tekrar etkisi x${repeatEscalation.toFixed(2)} ile işlendi; ilişki durumu=${conversationState}.`
-            : `KDM ${intent}/${sentiment} etkileşimini ortak SemanticEvent, kişilik, homeostaz ve ilişki geçmişine dönüştürdü; ilişki durumu=${conversationState}.`,
-    },
-  };
-
-  return { trace, behaviorProfile: finalBehaviorProfile, nextDynamicState };
 }

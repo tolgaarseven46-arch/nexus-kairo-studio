@@ -34,10 +34,10 @@ const base = (kind: 'new' | 'close' | 'damaged'): DroitDynamicState => {
 };
 
 describe('qualitative reaction speech differentiation', () => {
-  it('maps the same insult to distinct irritated, hurt and withdrawn HOW', () => {
-    const fresh = analyzeKdmInteraction('salak', NEUTRAL_DROIT_PERSONALITY, base('new'));
-    const close = analyzeKdmInteraction('salak', NEUTRAL_DROIT_PERSONALITY, base('close'));
-    const damaged = analyzeKdmInteraction('salak', NEUTRAL_DROIT_PERSONALITY, base('damaged'));
+  it('maps the same explicitly targeted insult to distinct irritated, hurt and withdrawn HOW', () => {
+    const fresh = analyzeKdmInteraction('sen salaksın', NEUTRAL_DROIT_PERSONALITY, base('new'));
+    const close = analyzeKdmInteraction('sen salaksın', NEUTRAL_DROIT_PERSONALITY, base('close'));
+    const damaged = analyzeKdmInteraction('sen salaksın', NEUTRAL_DROIT_PERSONALITY, base('damaged'));
 
     expect(fresh.nextDynamicState.reactionMode).toBe('irritated');
     expect(close.nextDynamicState.reactionMode).toBe('hurt');
@@ -59,7 +59,7 @@ describe('qualitative reaction speech differentiation', () => {
   });
 
   it('uses controlled softening for repairing instead of hurt/firm carry-over', () => {
-    const damaged = analyzeKdmInteraction('salak', NEUTRAL_DROIT_PERSONALITY, base('damaged'));
+    const damaged = analyzeKdmInteraction('sen salaksın', NEUTRAL_DROIT_PERSONALITY, base('damaged'));
     const repair = analyzeKdmInteraction('özür dilerim', NEUTRAL_DROIT_PERSONALITY, damaged.nextDynamicState);
     expect(repair.nextDynamicState.reactionMode).toBe('repairing');
 
