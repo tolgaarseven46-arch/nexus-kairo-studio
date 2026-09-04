@@ -42,16 +42,10 @@ export interface CoordinatedWorldEventRetrieval {
 
 type RetrievalSemantics = Pick<SemanticInterpretation, "discourseFacets">;
 
-export function shouldCoordinateWorldEventRetrieval(input: {
-  message: string;
-  interpretation: RetrievalSemantics;
-}): boolean {
-  if (!shouldRetrieveWorldEvents(input.interpretation)) return false;
-  return Boolean(detectExplicitTemporalRelationDirection(input.message)) ||
-    Boolean(detectTemporalDiscourseDirection(input.message)) ||
-    isPlanOutcomeRecallQuery(input.message) ||
-    isPlanRecallQuery(input.message) ||
-    true;
+export function shouldCoordinateWorldEventRetrieval(
+  interpretation: RetrievalSemantics,
+): boolean {
+  return shouldRetrieveWorldEvents(interpretation);
 }
 
 function graphItems(
