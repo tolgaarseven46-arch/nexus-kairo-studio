@@ -1,79 +1,26 @@
 name: One-time Phase3 Checkpoint
 on:
   push:
-    branches:
-      - docs/phase3-production-checkpoint
+    branches: [docs/phase3-production-checkpoint]
 permissions:
   contents: write
 jobs:
   checkpoint:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
     steps:
       - uses: actions/checkout@v4
         with:
           ref: docs/phase3-production-checkpoint
           fetch-depth: 0
-      - name: Append verified Phase 3 checkpoint
-        shell: bash
-        run: |
-          cat >> PROJECT_STATE.md <<'EOF'
-
-## 2026-09-04 — Phase 3 Claim / Event / provenance separation — CLOSED
-
-### Architecture result
-- Canonical Claim provenance owner moved to `src/services/claimProvenance.ts`.
-- Claim source and subject are distinct typed fields.
-- Denial/correction appends a new opposing Claim; the original assertion remains immutable.
-- Effective support is a derived view (`isClaimEffectivelySupported` / `effectivelySupportedClaims`).
-- Raw reported speech is not automatically persisted as WorldEvent truth.
-- Direct grounded WorldEvent persistence remains enabled.
-- Claim → WorldEvent promotion requires an explicit grounded seam.
-- ADR: `docs/adr/0037-claim-world-event-provenance.md`.
-
-### PR / merge / CI
-- PR #68: `feat(kaira): separate claim provenance from world events`.
-- Final PR head: `94747a53a942dc78f09d71954eda157966c3ad13`.
-- Full CI PASS, including architecture contracts, full tests, TypeScript, production build and guards.
-- Architecture Review PASS for exact head SHA.
-- Merge commit: `e929e693e5b62dfc2b7cfce095d6ae863484a7e3`.
-
-### Production acceptance
-- Render service `nexus-kairo-studio` verified exact merge commit `e929e693e5b62dfc2b7cfce095d6ae863484a7e3` LIVE.
-- Production S6 smoke: GitHub Actions run `33895702987` PASS.
-- Distinct participant identities used in canonical history: Mert (`participantId=mert`) and Ali (`participantId=ali`).
-- Intermediate Claim trace PASS:
-  - Mert → Emre assertion remained `asserted` and immutable.
-  - Ali → Emre denial was a separate Claim.
-  - denial `opposesClaimId` linked to the original Claim.
-  - original effective support became `false`.
-- Recall plan PASS:
-  - `move=grounded_recall`
-  - `target=Emre`
-  - `hasSupportedTargetClaim=false`
-  - opposed resignation claim was not revived.
-- Claim/Event boundary PASS:
-  - canonical reported claim classification: `persist=false`, `kind=reported_claim`.
-  - canonical direct grounded interaction classification: `persist=true`, `kind=direct_interaction`.
-- LIVE final response: `Emre için yarına dair net bir plan yok. İstifa iddiasını reddetti.`
-- LIVE consistency: accepted, score 100.
-- LIVE recall turn world-event persistence: `world_event_skipped`.
-
-### Diagnostic note
-- First S6 diagnostic harness incorrectly assumed `interpretSemanticEvent("Emre yarın işi bırakacakmış.")` itself would set `reportedSpeech=true`; that was classified as a harness failure, not used to relax the Phase 3 contract. The corrected harness exercised the precommitted canonical `reportedSpeech=true` boundary and passed.
-- Temporary Phase 3 patch/finalizer workflows were removed before PR #68.
-- Temporary production S6 workflow was removed from the diagnostic branch after PASS.
-
-### Phase status
-PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new independent regression falsifies the architecture.
-EOF
-      - name: Commit checkpoint and remove temporary workflow
-        shell: bash
+      - name: Append checkpoint
+        run: echo 'CgojIyAyMDI2LTA5LTA0IOKAlCBQaGFzZSAzIENsYWltIC8gRXZlbnQgLyBwcm92ZW5hbmNlIHNlcGFyYXRpb24g4oCUIENMT1NFRAoKIyMjIEFyY2hpdGVjdHVyZSByZXN1bHQKLSBDYW5vbmljYWwgQ2xhaW0gcHJvdmVuYW5jZSBvd25lciBtb3ZlZCB0byBgc3JjL3NlcnZpY2VzL2NsYWltUHJvdmVuYW5jZS50c2AuCi0gQ2xhaW0gc291cmNlIGFuZCBzdWJqZWN0IGFyZSBkaXN0aW5jdCB0eXBlZCBmaWVsZHMuCi0gRGVuaWFsL2NvcnJlY3Rpb24gYXBwZW5kcyBhIG5ldyBvcHBvc2luZyBDbGFpbTsgdGhlIG9yaWdpbmFsIGFzc2VydGlvbiByZW1haW5zIGltbXV0YWJsZS4KLSBFZmZlY3RpdmUgc3VwcG9ydCBpcyBhIGRlcml2ZWQgdmlldyAoYGlzQ2xhaW1FZmZlY3RpdmVseVN1cHBvcnRlZGAgLyBgZWZmZWN0aXZlbHlTdXBwb3J0ZWRDbGFpbXNgKS4KLSBSYXcgcmVwb3J0ZWQgc3BlZWNoIGlzIG5vdCBhdXRvbWF0aWNhbGx5IHBlcnNpc3RlZCBhcyBXb3JsZEV2ZW50IHRydXRoLgotIERpcmVjdCBncm91bmRlZCBXb3JsZEV2ZW50IHBlcnNpc3RlbmNlIHJlbWFpbnMgZW5hYmxlZC4KLSBDbGFpbSDihpIgV29ybGRFdmVudCBwcm9tb3Rpb24gcmVxdWlyZXMgYW4gZXhwbGljaXQgZ3JvdW5kZWQgc2VhbS4KLSBBRFI6IGBkb2NzL2Fkci8wMDM3LWNsYWltLXdvcmxkLWV2ZW50LXByb3ZlbmFuY2UubWRgLgoKIyMjIFBSIC8gbWVyZ2UgLyBDSQotIFBSICM2ODogYGZlYXQoa2FpcmEpOiBzZXBhcmF0ZSBjbGFpbSBwcm92ZW5hbmNlIGZyb20gd29ybGQgZXZlbnRzYC4KLSBGaW5hbCBQUiBoZWFkOiBgOTQ3NDdhNTNhOTQyZGM3OGYwOWQ3MTk1NGVkYTE1Nzk2NmMzYWQxM2AuCi0gRnVsbCBDSSBQQVNTLCBpbmNsdWRpbmcgYXJjaGl0ZWN0dXJlIGNvbnRyYWN0cywgZnVsbCB0ZXN0cywgVHlwZVNjcmlwdCwgcHJvZHVjdGlvbiBidWlsZCBhbmQgZ3VhcmRzLgotIEFyY2hpdGVjdHVyZSBSZXZpZXcgUEFTUyBmb3IgZXhhY3QgaGVhZCBTSEEuCi0gTWVyZ2UgY29tbWl0OiBgZTkyOWU2OTNlNWI2MmRmYzJiN2NmY2UwOTVkNmFlODYzNDg0YTdlM2AuCgojIyMgUHJvZHVjdGlvbiBhY2NlcHRhbmNlCi0gUmVuZGVyIHNlcnZpY2UgYG5leHVzLWthaXJvLXN0dWRpb2AgdmVyaWZpZWQgZXhhY3QgbWVyZ2UgY29tbWl0IGBlOTI5ZTY5M2U1YjYyZGZjMmI3Y2ZjZTA5NWQ2YWU4NjM0ODRhN2UzYCBMSVZFLgotIFByb2R1Y3Rpb24gUzYgc21va2U6IEdpdEh1YiBBY3Rpb25zIHJ1biBgMzM4OTU3MDI5ODdgIFBBU1MuCi0gRGlzdGluY3QgcGFydGljaXBhbnQgaWRlbnRpdGllcyB1c2VkIGluIGNhbm9uaWNhbCBoaXN0b3J5OiBNZXJ0IChgcGFydGljaXBhbnRJZD1tZXJ0YCkgYW5kIEFsaSAoYHBhcnRpY2lwYW50SWQ9YWxpYCkuCi0gSW50ZXJtZWRpYXRlIENsYWltIHRyYWNlIFBBU1M6CiAgLSBNZXJ0IOKGkiBFbXJlIGFzc2VydGlvbiByZW1haW5lZCBgYXNzZXJ0ZWRgIGFuZCBpbW11dGFibGUuCiAgLSBBbGkg4oaSIEVtcmUgZGVuaWFsIHdhcyBhIHNlcGFyYXRlIENsYWltLgogIC0gZGVuaWFsIGBvcHBvc2VzQ2xhaW1JZGAgbGlua2VkIHRvIHRoZSBvcmlnaW5hbCBDbGFpbS4KICAtIG9yaWdpbmFsIGVmZmVjdGl2ZSBzdXBwb3J0IGJlY2FtZSBgZmFsc2VgLgotIFJlY2FsbCBwbGFuIFBBU1M6CiAgLSBgbW92ZT1ncm91bmRlZF9yZWNhbGxgCiAgLSBgdGFyZ2V0PUVtcmVgCiAgLSBgaGFzU3VwcG9ydGVkVGFyZ2V0Q2xhaW09ZmFsc2VgCiAgLSBvcHBvc2VkIHJlc2lnbmF0aW9uIGNsYWltIHdhcyBub3QgcmV2aXZlZC4KLSBDbGFpbS9FdmVudCBib3VuZGFyeSBQQVNTOgogIC0gY2Fub25pY2FsIHJlcG9ydGVkIGNsYWltIGNsYXNzaWZpY2F0aW9uOiBgcGVyc2lzdD1mYWxzZWAsIGBraW5kPXJlcG9ydGVkX2NsYWltYC4KICAtIGNhbm9uaWNhbCBkaXJlY3QgZ3JvdW5kZWQgaW50ZXJhY3Rpb24gY2xhc3NpZmljYXRpb246IGBwZXJzaXN0PXRydWVgLCBga2luZD1kaXJlY3RfaW50ZXJhY3Rpb25gLgotIExJVkUgZmluYWwgcmVzcG9uc2U6IGBFbXJlIGnDp2luIHlhcsSxbmEgZGFpciBuZXQgYmlyIHBsYW4geW9rLiDEsHN0aWZhIGlkZGlhc8SxbsSxIHJlZGRldHRpLmAKLSBMSVZFIGNvbnNpc3RlbmN5OiBhY2NlcHRlZCwgc2NvcmUgMTAwLgotIExJVkUgcmVjYWxsIHR1cm4gd29ybGQtZXZlbnQgcGVyc2lzdGVuY2U6IGB3b3JsZF9ldmVudF9za2lwcGVkYC4KCiMjIyBEaWFnbm9zdGljIG5vdGUKLSBGaXJzdCBTNiBkaWFnbm9zdGljIGhhcm5lc3MgaW5jb3JyZWN0bHkgYXNzdW1lZCBgaW50ZXJwcmV0U2VtYW50aWNFdmVudCgiRW1yZSB5YXLEsW4gaGnFn2kgYsSxcmFrYWNhxJ/EsW0uIilgIGl0c2VsZiB3b3VsZCBzZXQgYHJlcG9ydGVkU3BlZWNoPXRydWVgOyB0aGF0IHdhcyBjbGFzc2lmaWVkIGFzIGEgaGFybmVzcyBmYWlsdXJlLCBub3QgdXNlZCB0byByZWxheCB0aGUgUGhhc2UgMyBjb250cmFjdC4gVGhlIGNvcnJlY3RlZCBoYXJuZXNzIGV4ZXJjaXNlZCB0aGUgcHJlY29tbWl0dGVkIGNhbm9uaWNhbCBgcmVwb3J0ZWRTcGVlY2g9dHJ1ZWAgYm91bmRhcnkgYW5kIHBhc3NlZC4KLSBUZW1wb3JhcnkgUGhhc2UgMyBwYXRjaC9maW5hbGl6ZXIgd29ya2Zsb3dzIHdlcmUgcmVtb3ZlZCBiZWZvcmUgUFIgIzY4LgotIFRlbXBvcmFyeSBwcm9kdWN0aW9uIFM2IHdvcmtmbG93IHdhcyByZW1vdmVkIGZyb20gdGhlIGRpYWdub3N0aWMgYnJhbmNoIGFmdGVyIFBBU1MuCgojIyMgUGhhc2Ugc3RhdHVzClBIQVNFIDMgQ0xPU0VELiBEbyBub3QgcmVvcGVuIFBSICM2OCAvIENsYWltIHByb3ZlbmFuY2Ugd29yayB1bmxlc3MgYSBuZXcgaW5kZXBlbmRlbnQgcmVncmVzc2lvbiBmYWxzaWZpZXMgdGhlIGFyY2hpdGVjdHVyZS4K' | base64 -d >> PROJECT_STATE.md
+      - name: Commit checkpoint
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git rm .github/workflows/one-time-phase3-checkpoint.yml
           git add PROJECT_STATE.md
-          git commit -m "docs: checkpoint phase3 production acceptance"
+          git commit -m 'docs: checkpoint phase3 production acceptance'
           git push origin HEAD:docs/phase3-production-checkpoint
-# retrigger after workflow registration
+# registered
