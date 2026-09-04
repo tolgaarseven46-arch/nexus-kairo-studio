@@ -58,6 +58,18 @@ async function run(output: SemanticInterpretation, context?: Array<{ role: "user
 }
 
 describe("measured live semantic-provider drift regression", () => {
+  it("stabilizes how-are-you routine as canonical greeting even when the model emits smalltalk", async () => {
+    const output = base("naber kaira");
+    output.primaryIntent = "smalltalk";
+    output.target = "kaira";
+    output.discourseFacets.socialRoutine = "how_are_you";
+
+    const { interpretation } = await run(output);
+    expect(interpretation.primaryIntent).toBe("greeting");
+    expect(interpretation.target).toBe("kaira");
+    expect(interpretation.discourseFacets.socialRoutine).toBe("how_are_you");
+  });
+
   it("cannot manufacture repair without a prior assistant turn and compatible discourse act", async () => {
     const output = base("bu cevap saçma olmuş");
     output.primaryIntent = "complaint";
@@ -96,8 +108,9 @@ describe("measured live semantic-provider drift regression", () => {
     expect(interpretation.secondarySocialActs).not.toContain("stop_request");
   });
 
-  it("locks the measured prompt corrections for complaint, third-party insult and lone lexical hostility", async () => {
+  it("locks the measured prompt corrections for social routine, complaint, third-party insult and lone lexical hostility", async () => {
     const { system } = await run(base("kontrol"));
+    expect(system).toContain('"naber", "nasılsın" = primaryIntent:greeting + socialRoutine:how_are_you');
     expect(system).toContain('"bu cevap saçma olmuş"');
     expect(system).toContain("repairSignal:none");
     expect(system).toContain("secondarySocialActs içinde insult KORUNUR");
