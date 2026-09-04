@@ -1,0 +1,58 @@
+name: One-time stop-questions production characterization
+
+on:
+  push:
+    branches:
+      - chatgpt/stop-questions-production-characterization
+
+jobs:
+  characterize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Measure stop-questions semantic and reaction behavior
+        shell: bash
+        run: |
+          node <<'NODE'
+          const endpoint = 'https://nexus-kairo-studio.onrender.com/api/chat';
+          const userId = `stop_questions_prod_${Date.now()}`;
+          const sessionId = `session_${userId}`;
+          const history = [];
+          let dynamicState;
+          let sequence = 0;
+          const messages = ['naber kaira','bugün işler yoğundu','ama hallederiz','soru sorma artık','zaten cevabını biliyorum','tamam','bi şey sorcam'];
+          for (const userMessage of messages) {
+            const response = await fetch(endpoint, {
+              method: 'POST', headers: {'content-type':'application/json'},
+              body: JSON.stringify({
+                userId,userName:'Ali',userMessage,
+                character:{name:'Kaira',roleTitle:'Arkadaş',raceName:'Sentetik Droit'},
+                personality:{},dynamicState,history:history.slice(-24),provider:'openrouter',
+                sessionId,requestId:`${userId}_${sequence++}`,
+                kairaInstanceId:'kaira_reference_001',kairaInstanceType:'reference'
+              })
+            });
+            const text = await response.text(); let data;
+            try { data = JSON.parse(text); } catch { data = {raw:text.slice(0,1000)}; }
+            if (!response.ok) { console.log('STOPQ_HTTP_FAIL '+JSON.stringify({userMessage,status:response.status,data})); process.exit(1); }
+            dynamicState = data?.kdm?.dynamicState || dynamicState;
+            const semantic = data?.kdm?.semanticInterpretation || data?.semanticInterpretation || data?.kdm?.trace?.semanticInterpretation || {};
+            const facets = semantic?.discourseFacets || {};
+            const traceRel = data?.kdm?.trace?.relationship || {};
+            const plan = data?.kdm?.responsePlan || data?.responsePlan || {};
+            const record = {
+              userMessage, reply:String(data.reply||''), providerUsed:data.providerUsed,
+              semanticSource:data?.kdm?.semanticSource,
+              stopQuestions:facets.stopQuestions, stopTalking:facets.stopTalking, stopRequest:semantic.stopRequest,
+              primaryIntent:semantic.primaryIntent,
+              reactionMode:dynamicState?.reactionMode ?? traceRel.reactionMode ?? null,
+              conversationState:dynamicState?.relationship?.conversationState ?? traceRel.conversationState ?? null,
+              conflictScore:dynamicState?.relationship?.conflictScore ?? traceRel.conflictScore ?? null,
+              hurtScore:dynamicState?.relationship?.hurtScore ?? traceRel.hurtScore ?? null,
+              repeatedNegativeCount:dynamicState?.relationship?.repeatedNegativeCount ?? traceRel.repeatedNegativeCount ?? null,
+              move:plan.move,allowQuestion:plan.allowQuestion,consistencyAccepted:data?.consistency?.accepted
+            };
+            console.log('STOPQ_PROD_TURN '+JSON.stringify(record));
+            history.push({sender:'user',text:userMessage,participantId:userId,participantName:'Ali'},{sender:'droit',text:String(data.reply||''),participantId:'reference_kaira',participantName:'Kaira',replyToParticipantId:userId,replyToParticipantName:'Ali'});
+          }
+          NODE
