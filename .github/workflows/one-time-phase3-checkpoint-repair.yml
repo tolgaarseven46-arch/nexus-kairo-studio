@@ -21,8 +21,8 @@ jobs:
           import base64
           p = Path('PROJECT_STATE.md')
           s = p.read_text()
-          old = base64.b64decode('aW50ZXJwcmV0U2VtYW50aWNFdmVudChcIkVtcmUgeWFyxLFuIGhpxZ9pIGLEsXJha2FjYcSfxLFtLlwiKQ==').decode()
-          new = base64.b64decode('aW50ZXJwcmV0U2VtYW50aWNFdmVudChcIkVtcmUgeWFyxLFuIGnFn2kgYsSxcmFrYWNha23EscWfLlwiKQ==').decode()
+          old = base64.b64decode('aW50ZXJwcmV0U2VtYW50aWNFdmVudCgiRW1yZSB5YXLEsW4gaGnFn2kgYsSxcmFrYWNhxJ/EsW0uIik=').decode()
+          new = base64.b64decode('aW50ZXJwcmV0U2VtYW50aWNFdmVudCgiRW1yZSB5YXLEsW4gacWfaSBixLFyYWthY2FrbcSxxZ8uIik=').decode()
           if old not in s:
               raise SystemExit('checkpoint typo target not found')
           p.write_text(s.replace(old, new, 1))
@@ -35,3 +35,4 @@ jobs:
           git add PROJECT_STATE.md
           git commit -m 'docs: fix phase3 checkpoint diagnostic text'
           git push origin HEAD:docs/phase3-production-checkpoint
+# retrigger
