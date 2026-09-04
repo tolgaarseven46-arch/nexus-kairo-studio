@@ -26,10 +26,7 @@ jobs:
           from pathlib import Path
           p = Path('src/services/kairoDialogueDecisionEngine.ts')
           s = p.read_text()
-          needle = '''  if (event.discourseAct === "topic_shift") {
-            return {
-              move: "follow_topic_shift",
-          '''
+          marker = '  if (event.discourseAct === "topic_shift") {'
           insert = '''  // A typed advice request is a user-facing conversational obligation. A
           // simultaneous topic-shift facet describes the transition, but cannot erase
           // the request. Keep recall/correction/repair authorities above this seam;
@@ -46,13 +43,10 @@ jobs:
             };
           }
 
-          if (event.discourseAct === "topic_shift") {
-            return {
-              move: "follow_topic_shift",
           '''
-          if needle not in s:
+          if marker not in s:
               raise SystemExit('target seam not found')
-          p.write_text(s.replace(needle, insert, 1))
+          p.write_text(s.replace(marker, insert + marker, 1))
           PY
       - run: npx vitest run src/services/kairaDialogueAdviceTopicShiftPriority.test.ts src/services/discourseOpenThreadContinuity.test.ts
       - run: npx tsc --noEmit
