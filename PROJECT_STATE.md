@@ -1503,7 +1503,7 @@ Yeni sohbet açıldığında:
 - LIVE recall turn world-event persistence: `world_event_skipped`.
 
 ### Diagnostic note
-- First S6 diagnostic harness incorrectly assumed `interpretSemanticEvent("Emre yarın hişi bırakacağım.")` itself would set `reportedSpeech=true`; that was classified as a harness failure, not used to relax the Phase 3 contract. The corrected harness exercised the precommitted canonical `reportedSpeech=true` boundary and passed.
+- First S6 diagnostic harness incorrectly assumed `interpretSemanticEvent("Emre yarın işi bırakacakmış.")` itself would set `reportedSpeech=true`; that was classified as a harness failure, not used to relax the Phase 3 contract. The corrected harness exercised the precommitted canonical `reportedSpeech=true` boundary and passed.
 - Temporary Phase 3 patch/finalizer workflows were removed before PR #68.
 - Temporary production S6 workflow was removed from the diagnostic branch after PASS.
 
