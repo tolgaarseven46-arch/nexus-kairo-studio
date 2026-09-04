@@ -1,0 +1,75 @@
+name: One-time deep recall patch
+
+on:
+  push:
+    branches:
+      - chatgpt/deep-persistent-recall-window
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: chatgpt/deep-persistent-recall-window
+          fetch-depth: 0
+
+      - name: Patch deep recall wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          server = Path('server.ts')
+          text = server.read_text(encoding='utf-8')
+
+          import_anchor = 'import { validateMemoryAgainstMessage } from "./src/services/kairoMemoryConsistency";\n'
+          import_line = 'import { persistentMemoryFetchLimitForDialogueMove, FAST_RECENT_MEMORY_LIMIT } from "./src/services/kairaPersistentMemoryRetrievalPolicy";\n'
+          if import_line not in text:
+              if import_anchor not in text:
+                  raise SystemExit('server import anchor missing')
+              text = text.replace(import_anchor, import_anchor + import_line, 1)
+
+          old_fast = 'loadRecentKdmMemory(6, scopedUserId)'
+          if old_fast in text:
+              text = text.replace(old_fast, 'loadRecentKdmMemory(FAST_RECENT_MEMORY_LIMIT, scopedUserId)', 1)
+          elif 'loadRecentKdmMemory(FAST_RECENT_MEMORY_LIMIT, scopedUserId)' not in text:
+              raise SystemExit('fast-memory anchor missing')
+
+          old_load = 'suppressRecentMemory || !kairaPolicy.persistentUserMemory ? Promise.resolve([]) : getFastRecentMemory(userId, kairaInstance.instanceId),'
+          new_load = '''suppressRecentMemory || !kairaPolicy.persistentUserMemory
+        ? Promise.resolve([])
+        : persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move) === FAST_RECENT_MEMORY_LIMIT
+          ? getFastRecentMemory(userId, kairaInstance.instanceId)
+          : loadRecentKdmMemory(
+              persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move),
+              stateUserId,
+            ),'''
+          if old_load in text:
+              text = text.replace(old_load, new_load, 1)
+          elif 'persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move)' not in text:
+              raise SystemExit('persistent-memory load anchor missing')
+
+          server.write_text(text, encoding='utf-8')
+
+          persistence = Path('src/services/kdmPersistenceService.ts')
+          ptext = persistence.read_text(encoding='utf-8')
+          old_cap = 'const safeLimit = Math.max(1, Math.min(maxItems, 20));'
+          if old_cap in ptext:
+              ptext = ptext.replace(old_cap, 'const safeLimit = Math.max(1, Math.min(maxItems, 100));', 1)
+          elif 'const safeLimit = Math.max(1, Math.min(maxItems, 100));' not in ptext:
+              raise SystemExit('persistence cap anchor missing')
+          persistence.write_text(ptext, encoding='utf-8')
+          PY
+
+          rm .github/workflows/one-time-deep-recall-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts src/services/kdmPersistenceService.ts .github/workflows/one-time-deep-recall-patch.yml
+          git commit -m "fix(kaira): deepen persisted recall only for grounded recall"
+          git push origin HEAD:chatgpt/deep-persistent-recall-window
