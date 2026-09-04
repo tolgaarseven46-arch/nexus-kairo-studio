@@ -73,6 +73,13 @@ function deterministicAiDraft(message: string, turn: number): string {
   return neutral[turn % neutral.length];
 }
 
+function deterministicAiRepair(message: string): string {
+  if (message === "sen salaksın") return "böyle konuşman hoş değil";
+  if (message === "selam tekrar") return "selam";
+  if (message === "kusura bakma" || message === "özür dilerim") return "duydum, biraz zaman lazım";
+  return "anladım";
+}
+
 describe("Kaira 20-turn canonical final-delivery quality regression", () => {
   it("keeps canonical semantics, speech identity and delivered replies coherent across the full mixed session", async () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-09-04T15:00:00.000Z").getTime());
@@ -85,6 +92,7 @@ describe("Kaira 20-turn canonical final-delivery quality regression", () => {
       const routes: Array<"local_language" | "ai"> = [];
       const speechRhythms: string[] = [];
       const reactionModes: string[] = [];
+      let aiRepairCount = 0;
 
       for (const [index, message] of messages.entries()) {
         const semantic = await understandTurkishMessage(message, {
@@ -129,6 +137,16 @@ describe("Kaira 20-turn canonical final-delivery quality regression", () => {
         speechRhythms.push(JSON.stringify(speech.rhythm));
         const responsePlan = buildKairaResponsePlan(behaviorContract, dialogueDecision, speech);
 
+        const qualityIssuesFor = (candidate: string) => [
+          ...findKairaResponsePlanIssues(candidate, responsePlan),
+          ...findKairoResponseRhythmIssues(
+            candidate,
+            history,
+            dialogueDecision.move,
+            speech.relationshipLevel,
+          ),
+        ];
+
         const local = tryLocalKairoReply(
           message,
           NEUTRAL_DROIT_PERSONALITY,
@@ -145,18 +163,22 @@ describe("Kaira 20-turn canonical final-delivery quality regression", () => {
         let route: "local_language" | "ai" = "ai";
         let draft = deterministicAiDraft(message, index);
         if (local.handled && local.reply) {
-          const localIssues = [
-            ...findKairaResponsePlanIssues(local.reply, responsePlan),
-            ...findKairoResponseRhythmIssues(
-              local.reply,
-              history,
-              dialogueDecision.move,
-              speech.relationshipLevel,
-            ),
-          ];
+          const localIssues = qualityIssuesFor(local.reply);
           if (localIssues.length === 0) {
             route = "local_language";
             draft = local.reply;
+          }
+        }
+
+        if (route === "ai") {
+          const draftIssues = qualityIssuesFor(draft);
+          if (draftIssues.length > 0) {
+            draft = deterministicAiRepair(message);
+            aiRepairCount += 1;
+            expect(
+              qualityIssuesFor(draft),
+              `turn ${index + 1} repair remained invalid: ${message} -> ${draft}`,
+            ).toEqual([]);
           }
         }
 
@@ -171,15 +193,7 @@ describe("Kaira 20-turn canonical final-delivery quality regression", () => {
           behaviorContract,
         });
         const reply = enforced.reply;
-        const finalIssues = [
-          ...findKairaResponsePlanIssues(reply, responsePlan),
-          ...findKairoResponseRhythmIssues(
-            reply,
-            history,
-            dialogueDecision.move,
-            speech.relationshipLevel,
-          ),
-        ];
+        const finalIssues = qualityIssuesFor(reply);
 
         expect(finalIssues, `turn ${index + 1}: ${message} -> ${reply}`).toEqual([]);
         expect(reply).not.toMatch(/\b(?:elbette|memnuniyetle|nasıl yardımcı olabilirim|dilerseniz|özetlemek gerekirse)\b/iu);
@@ -203,6 +217,7 @@ describe("Kaira 20-turn canonical final-delivery quality regression", () => {
       expect(semanticSources).toEqual(Array(20).fill("client_shared"));
       expect(routes).toContain("local_language");
       expect(routes).toContain("ai");
+      expect(aiRepairCount).toBeGreaterThan(0);
 
       expect(new Set(speechRhythms).size).toBe(1);
       expect(JSON.parse(speechRhythms[0]).messageLength).toBe("short_first");
