@@ -23,31 +23,31 @@ jobs:
           cat >> PROJECT_STATE.md <<'EOF'
 
 
-## 2026-09-04 — Autonomous Life production recovery + scheduler hardening — CLOSED
+          ## 2026-09-04 — Autonomous Life production recovery + scheduler hardening — CLOSED
 
-### Production recovery
-- PR #70 fixed autonomous planning-inbox idempotency so semantically identical Firestore-backed trigger payloads no longer conflict because of nested map key ordering.
-- PR #71 fixed expired proposal-recovery reclaim writes so terminal-only fields are omitted rather than persisted as `undefined`.
-- PR #72 fixed proposal semantic correlation by using canonical recursive object-key ordering while preserving array order and still rejecting real semantic drift.
-- PR #72 merged as `4fa061d041416987be3f9c428b706db2ebc11dd4`; Render served that exact commit live before final recovery acceptance.
-- The previously stuck selected proposal was reclaimed and materialized in production with `discovered=1`, `processed=1`, `failed=0`.
-- Fresh full production acceptance run `33903556164` (`final-acceptance-33903556164`) completed with planning `25/25` and `failed=0`, recovery `failed=0`, schedules `failed=0`, durable replay verified, and holistic health `healthy`.
+          ### Production recovery
+          - PR #70 fixed autonomous planning-inbox idempotency so semantically identical Firestore-backed trigger payloads no longer conflict because of nested map key ordering.
+          - PR #71 fixed expired proposal-recovery reclaim writes so terminal-only fields are omitted rather than persisted as `undefined`.
+          - PR #72 fixed proposal semantic correlation by using canonical recursive object-key ordering while preserving array order and still rejecting real semantic drift.
+          - PR #72 merged as `4fa061d041416987be3f9c428b706db2ebc11dd4`; Render served that exact commit live before final recovery acceptance.
+          - The previously stuck selected proposal was reclaimed and materialized in production with `discovered=1`, `processed=1`, `failed=0`.
+          - Fresh full production acceptance run `33903556164` (`final-acceptance-33903556164`) completed with planning `25/25` and `failed=0`, recovery `failed=0`, schedules `failed=0`, durable replay verified, and holistic health `healthy`.
 
-### Repository-owned scheduler hardening
-- PR #73 (`fix(kaira): harden autonomous wakeup acceptance`) merged as `00c01b50f7a9cdc7467426d879388dd560cb79c3`.
-- ADR-0041 records the permanent acceptance rule: HTTP success alone is insufficient; every terminal durable summary must report `planning.failed=0`, `recovery.failed=0`, and `schedules.failed=0`, and the same invariant is rechecked on replay.
-- The first worker call now has a bounded 240-second production timeout; replay remains bounded to 90 seconds, health to 60 seconds, and the GitHub Actions job timeout is 7 minutes.
-- PR #73 exact head passed Architecture Review, architecture contracts, autonomous runtime contracts, beta regression, beta conversation acceptance, full tests, TypeScript, production build, docs-guard and behavior-guard.
-- Main CI run `33904310271` passed all validation stages after merge.
-- Render deploy `dep-dadgi9nlk1mc73bfkuk0` became LIVE from exact merge commit `00c01b50f7a9cdc7467426d879388dd560cb79c3`.
-- The first permanent repository-owned scheduled wakeup after that deploy, run `33904521304` / `gha-autonomous-33904521304`, completed SUCCESS on the exact merge commit with planning `25/25, failed=0`, recovery `failed=0`, schedules `failed=0`, `replayVerified=true`, and health `healthy`.
+          ### Repository-owned scheduler hardening
+          - PR #73 (`fix(kaira): harden autonomous wakeup acceptance`) merged as `00c01b50f7a9cdc7467426d879388dd560cb79c3`.
+          - ADR-0041 records the permanent acceptance rule: HTTP success alone is insufficient; every terminal durable summary must report `planning.failed=0`, `recovery.failed=0`, and `schedules.failed=0`, and the same invariant is rechecked on replay.
+          - The first worker call now has a bounded 240-second production timeout; replay remains bounded to 90 seconds, health to 60 seconds, and the GitHub Actions job timeout is 7 minutes.
+          - PR #73 exact head passed Architecture Review, architecture contracts, autonomous runtime contracts, beta regression, beta conversation acceptance, full tests, TypeScript, production build, docs-guard and behavior-guard.
+          - Main CI run `33904310271` passed all validation stages after merge.
+          - Render deploy `dep-dadgi9nlk1mc73bfkuk0` became LIVE from exact merge commit `00c01b50f7a9cdc7467426d879388dd560cb79c3`.
+          - The first permanent repository-owned scheduled wakeup after that deploy, run `33904521304` / `gha-autonomous-33904521304`, completed SUCCESS on the exact merge commit with planning `25/25, failed=0`, recovery `failed=0`, schedules `failed=0`, `replayVerified=true`, and health `healthy`.
 
-### Phase status
-- **AUTONOMOUS LIFE PRODUCTION RECOVERY + SCHEDULER HARDENING CLOSED.**
-- No known Autonomous Life production blocker remains from the PR #70–#73 chain.
-- Do not reopen planning-inbox idempotency, recovery reclaim, proposal correlation, or scheduler timeout/failure acceptance without a new measured production regression.
-- Next development work should be derived from the current `main` plus this checkpoint and should return to evidence-driven Kaira product behavior/quality work rather than repeating this production recovery chain.
-EOF
+          ### Phase status
+          - **AUTONOMOUS LIFE PRODUCTION RECOVERY + SCHEDULER HARDENING CLOSED.**
+          - No known Autonomous Life production blocker remains from the PR #70–#73 chain.
+          - Do not reopen planning-inbox idempotency, recovery reclaim, proposal correlation, or scheduler timeout/failure acceptance without a new measured production regression.
+          - Next development work should be derived from the current `main` plus this checkpoint and should return to evidence-driven Kaira product behavior/quality work rather than repeating this production recovery chain.
+          EOF
           git rm .github/workflows/one-time-autonomous-final-checkpoint.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
