@@ -85,7 +85,7 @@ describe("measured live semantic-provider drift regression", () => {
     output.primaryIntent = "command";
     output.target = "kaira";
     output.secondarySocialActs = ["stop_request"];
-    output.stopRequest = true;
+    output.stopRequest = false;
     output.discourseFacets.stopQuestions = true;
     output.discourseFacets.stopTalking = false;
 
