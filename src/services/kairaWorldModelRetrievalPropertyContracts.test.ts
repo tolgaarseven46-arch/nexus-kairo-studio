@@ -15,6 +15,10 @@ import {
 } from "./worldEventRetrieval";
 import { validateRetrievalContract } from "./kairaArchitectureContracts";
 
+const recallSemantics = {
+  discourseFacets: { discourseAct: "recall_request" },
+} as Parameters<typeof shouldRetrieveWorldEvents>[0];
+
 const NAMES = [
   "Ayşe", "Merve", "Selin", "Burak", "Deniz", "Cem", "Ece", "Kerem",
   "Zeynep", "Emre", "Derya", "Can", "Elif", "Onur", "Seda", "Baran",
@@ -42,7 +46,6 @@ function canonical(message: string) {
     characterName: "KAIRO",
   });
   return {
-    semantic,
     entities,
     event: buildCanonicalWorldEvent(message, semantic, entities),
   };
@@ -85,9 +88,9 @@ describe("Kaira world-model/retrieval property contracts", () => {
         `${name} bana ne dedi?`,
         `${name} hakkında ne biliyorsun?`,
       ]) {
-        const { event, semantic } = canonical(query);
+        const { event } = canonical(query);
         expect(classifyWorldEventObservation(event).persist, query).toBe(false);
-        expect(shouldRetrieveWorldEvents(semantic), query).toBe(true);
+        expect(shouldRetrieveWorldEvents(recallSemantics), query).toBe(true);
       }
     }
   });
