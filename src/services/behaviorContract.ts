@@ -16,12 +16,14 @@ export interface BehaviorContract {
   stance: "open" | "distant-responsive" | "repairing-cautious" | "closed";
   maxResponseLength: "short" | "medium";
   reasons: string[];
+  /** Canonical semantic observation passthrough. It never grants/revokes a hard permission by itself. */
+  semanticUncertainty?: number;
 }
 
 export function buildBehaviorContract(
   dynamicState: DroitDynamicState,
   trace?: ReasoningTrace | null,
-  semanticEvent?: Pick<SemanticEvent, "stopTalking" | "stopQuestions"> | null,
+  semanticEvent?: (Pick<SemanticEvent, "stopTalking" | "stopQuestions"> & { semanticUncertainty?: number }) | null,
 ): BehaviorContract {
   const relationship = dynamicState.relationship;
   const state = (relationship?.conversationState ?? "active") as BehaviorContract["conversationState"];
@@ -35,6 +37,10 @@ export function buildBehaviorContract(
   const unresolvedDamage = hurt >= 20 || conflict >= 20 || state !== "active";
   const stopTalking = semanticEvent?.stopTalking === true;
   const stopQuestions = semanticEvent?.stopQuestions === true;
+  const semanticUncertainty = Number.isFinite(semanticEvent?.semanticUncertainty)
+    ? Number(semanticEvent?.semanticUncertainty)
+    : undefined;
+  const observation = semanticUncertainty === undefined ? {} : { semanticUncertainty };
   const reasons: string[] = [];
 
   if (state === "disengaged") {
@@ -51,6 +57,7 @@ export function buildBehaviorContract(
       stance: "closed",
       maxResponseLength: "short",
       reasons,
+      ...observation,
     };
   }
 
@@ -68,6 +75,7 @@ export function buildBehaviorContract(
       stance: "repairing-cautious",
       maxResponseLength: "short",
       reasons,
+      ...observation,
     };
   }
 
@@ -85,6 +93,7 @@ export function buildBehaviorContract(
       stance: "distant-responsive",
       maxResponseLength: "short",
       reasons,
+      ...observation,
     };
   }
 
@@ -102,6 +111,7 @@ export function buildBehaviorContract(
       stance: "closed",
       maxResponseLength: "short",
       reasons,
+      ...observation,
     };
   }
 
@@ -120,6 +130,7 @@ export function buildBehaviorContract(
       "İlişki aktif ve çözülmemiş hasar eşiği yok.",
       ...(stopQuestions ? ["Kullanıcı bu tur yeni soru sorulmamasını açıkça istedi."] : []),
     ],
+    ...observation,
   };
 }
 
