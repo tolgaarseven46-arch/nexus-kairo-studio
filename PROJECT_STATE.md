@@ -1405,3 +1405,19 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Return to evidence-driven live multi-turn conversation-quality characterization. Inspect semantic snapshot, relationship/reaction state, response plan, provider route and final delivered text together; patch only newly reproduced failures. Do not reopen the question-stop target/severity chain without new production evidence.
+
+
+## 141. World-memory semantic retrieval authority — PR #57 — 2026-09-04
+- Real 21-turn KNT characterization exposed a higher-level authority bug: ordinary temporal self-share such as `bugün çok enerjik hissediyorum` could open persistent world-memory retrieval merely because raw text contained a temporal cue, allowing unrelated past world events to hijack the reply.
+- Root cause was not cross-session persistence itself. World-memory storage remains intentionally scoped by `userId + kairaInstanceId` so the same Kaira can remember grounded events across sessions. The defect was the retrieval authorization gate reparsing raw text downstream of canonical semantic ingestion.
+- PR #57 merged as commit `834d02e9f7579afbcb7c8e7248c9de421872c9a4` and makes world-event retrieval authorization semantic-only: downstream retrieval consumes canonical `SemanticInterpretation@2`, and only typed `discourseAct=recall_request` authorizes persistent world-event lookup. Coordinator/property/lifecycle callers were migrated to the same typed boundary; no raw-string fallback or session-only filter was added.
+- Permanent regression `kairaWorldMemorySemanticGateRegression.test.ts` locks both sides: temporal emotional self-share does not authorize world retrieval; explicit recall does. Full architecture contracts, autonomous runtime contracts, beta regression, beta conversation acceptance, 1694-test Vitest suite, TypeScript, production build, behavior/docs guards and Architecture Review passed before merge.
+- Render auto-deploy `dep-dad9q54s728c73ae2hvg` became live from exact merge commit `834d02e9f7579afbcb7c8e7248c9de421872c9a4`.
+- Final production smoke workflow run `33863838394` passed on the live service using one isolated user + Kaira instance:
+  - seed `Ayşe bana salak dedi` persisted a grounded third-party reported world event;
+  - `bugün çok enerjik hissediyorum` resolved as `intent=emotional_share`, `socialRoutine=emotional_opening`, `discourseAct=none`, and returned `retrievedWorldEvents=[]`; world-memory guard made no change;
+  - `Ayşe bana ne demişti?` resolved as `discourseAct=recall_request`, retrieved the seeded event with score `10.88`, and answered `Daha önce bana, Ayşe’nin sana “salak” dediğini söylemiştin.`
+- Conclusion: persistent world memory remains cross-session capable but no longer gains response authority from raw temporal keywords. Canonical semantic ingestion is the only retrieval-authorization authority.
+
+### Next verified development question
+- Continue the evidence-driven 21-turn findings in order. Next target is relationship accountability/complaint handling: distinguish user harm toward Kaira from legitimate user criticism of Kaira's own prior bad response, without adding raw-text patches or weakening RelationshipReducer invariants.
