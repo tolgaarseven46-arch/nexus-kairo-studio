@@ -4,6 +4,10 @@ import {
   findKairaResponsePlanIssues,
 } from "./kairaResponsePlan";
 import {
+  buildKairaDialogueObligationFallback,
+  findKairaDialogueObligationIssues,
+} from "./kairaDialogueObligation";
+import {
   enforceKairoResponse,
   validateKairoResponse,
   type KairoResponseEnforcementResult,
@@ -46,10 +50,10 @@ export interface KairaResponseConstraintPassInput {
   additionalIssueFinder?: (reply: string) => string[];
   /**
    * Optional grounded/dialogue-aware fallback. It is never trusted directly:
-   * the same ordered truth + plan + delivery-quality pass is applied to it
-   * before delivery.
+   * the same ordered truth + plan + obligation + delivery-quality pass is
+   * applied to it before delivery.
    */
-  fallbackFactory?: () => string;
+  fallbackFactory?: () => string | null;
 }
 
 export interface KairaCanonicalConsistencyResult extends ResponseConsistencyResult {
@@ -146,6 +150,7 @@ function runOrderedPass(
 
   const issues = [
     ...findKairaResponsePlanIssues(delivered, input.plan),
+    ...findKairaDialogueObligationIssues(delivered, input.plan),
     ...findWorldModelResponseIssues(delivered, input.worldItems, input.worldContext).map(
       (issue) => issue.message,
     ),
@@ -181,10 +186,14 @@ function runOrderedPass(
  *
  * Order is fixed and explicit:
  *   world truth -> autobiographical truth -> epistemic truth -> ResponsePlan
- *   deterministic enforcement -> final conformance on the delivered text.
+ *   deterministic enforcement -> dialogue-obligation conformance -> final
+ *   conformance on the delivered text.
  *
- * Any fallback goes through the exact same pass. Consistency is computed only
- * after the final delivered candidate is known.
+ * Any fallback goes through the exact same pass. A DialogueDecision-owned
+ * obligation fallback is attempted before the legacy generic acknowledgement,
+ * preventing a structurally-clean fallback from silently erasing an active
+ * answer/clarify obligation. Consistency is computed only after the final
+ * delivered candidate is known.
  */
 export function runKairaResponseConstraintPass(
   input: KairaResponseConstraintPassInput,
@@ -195,11 +204,21 @@ export function runKairaResponseConstraintPass(
 
   if (first.issues.length > 0) {
     fallbackUsed = true;
-    const preferredFallback = String(input.fallbackFactory?.() ?? "").trim() || "tamam";
-    const candidate = runOrderedPass(preferredFallback, input);
-    final = candidate.issues.length === 0
-      ? candidate
-      : runOrderedPass("tamam", input);
+    const preferredFallback = String(input.fallbackFactory?.() ?? "").trim();
+    const obligationFallback = String(
+      buildKairaDialogueObligationFallback(input.plan) ?? "",
+    ).trim();
+    const candidates = [...new Set([
+      preferredFallback,
+      obligationFallback,
+      "tamam",
+    ].filter(Boolean))];
+
+    for (const fallback of candidates) {
+      const candidate = runOrderedPass(fallback, input);
+      final = candidate;
+      if (candidate.issues.length === 0) break;
+    }
   }
 
   const consistency = structuralConsistency(final.reply, input.trace, final.issues);
