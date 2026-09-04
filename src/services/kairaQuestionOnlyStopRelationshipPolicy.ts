@@ -12,10 +12,9 @@ const INDEPENDENT_HARM_ACTS = new Set<SemanticInterpretation["secondarySocialAct
 
 const RELATIONSHIP_HARM_COMPONENT_FLOOR = 0.15;
 
-function hasCanonicalNonAggressionHarm(interp: SemanticInterpretation): boolean {
+function hasCanonicalNonImperativeHarm(interp: SemanticInterpretation): boolean {
   return Math.max(
     interp.severity.disrespect,
-    interp.severity.coercion,
     interp.severity.manipulation,
     interp.severity.privacy,
   ) >= RELATIONSHIP_HARM_COMPONENT_FLOOR;
@@ -27,7 +26,7 @@ export function hasIndependentRelationshipHarm(interp: SemanticInterpretation): 
     interp.primaryIntent === "rejection" ||
     interp.primaryIntent === "boundary_test" ||
     interp.secondarySocialActs.some((act) => INDEPENDENT_HARM_ACTS.has(act)) ||
-    hasCanonicalNonAggressionHarm(interp)
+    hasCanonicalNonImperativeHarm(interp)
   );
 }
 
