@@ -1,0 +1,51 @@
+name: One-time question-only stop relationship patch
+
+on:
+  push:
+    branches:
+      - chatgpt/question-only-stop-relationship-neutrality
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: chatgpt/question-only-stop-relationship-neutrality
+          fetch-depth: 0
+      - name: Wire typed relationship policy and remove helper workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          p = Path('src/services/kdmRelationshipReducerBridge.ts')
+          text = p.read_text(encoding='utf-8')
+          anchor = 'import { DEFAULT_RELATIONSHIP_REDUCER_CONFIG } from "./relationshipReducerConfig";\n'
+          imp = 'import { isRelationshipNeutralQuestionOnlyStop, relationshipSeverityForInterpretation } from "./kairaQuestionOnlyStopRelationshipPolicy";\n'
+          if imp not in text:
+              if anchor not in text: raise SystemExit('import anchor missing')
+              text = text.replace(anchor, anchor + imp, 1)
+          old = '    severity: interp.severity,'
+          new = '    severity: relationshipSeverityForInterpretation(interp),'
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit('severity anchor missing')
+          old_pattern = '  const rawNegativePattern = semanticNegativePattern(semanticInterpretation);'
+          new_pattern = '  const rawNegativePattern = isRelationshipNeutralQuestionOnlyStop(semanticInterpretation) ? null : semanticNegativePattern(semanticInterpretation);'
+          if old_pattern in text:
+              text = text.replace(old_pattern, new_pattern, 1)
+          elif new_pattern not in text:
+              raise SystemExit('negative-pattern anchor missing')
+          p.write_text(text, encoding='utf-8')
+          PY
+          rm .github/workflows/one-time-question-only-stop-relationship-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kdmRelationshipReducerBridge.ts .github/workflows/one-time-question-only-stop-relationship-patch.yml
+          git commit -m "fix(kaira): keep question-only stop relationship-neutral"
+          git push origin HEAD:chatgpt/question-only-stop-relationship-neutrality
