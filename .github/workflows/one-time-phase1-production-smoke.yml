@@ -1,0 +1,65 @@
+name: One-time Phase1 Production Smoke
+on:
+  push:
+    branches:
+      - diag/phase1-production-smoke
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run S3 production sequence
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://nexus-kairo-studio.onrender.com'
+          user="phase1_smoke_${GITHUB_RUN_ID}"
+          session="session_${user}"
+          history='[]'
+
+          send_turn() {
+            local msg="$1"
+            local payload resp reply semantic source
+            payload=$(jq -n \
+              --arg userId "$user" \
+              --arg sessionId "$session" \
+              --arg msg "$msg" \
+              --argjson history "$history" \
+              '{userId:$userId,userName:"Mert",userMessage:$msg,sessionId:$sessionId,provider:"openrouter",suppressRecentMemory:true,history:$history}')
+            resp=$(curl --fail-with-body --silent --show-error \
+              -H 'content-type: application/json' \
+              -d "$payload" \
+              "$base/api/chat")
+            echo "USER: $msg"
+            echo "$resp" | jq '{reply, semanticSource, semanticInterpretation, responsePlan: .kdm.responsePlan, relationship: .dynamicState.relationship}'
+            reply=$(echo "$resp" | jq -r '.reply // empty')
+            test -n "$reply"
+            semantic=$(echo "$resp" | jq '.semanticInterpretation // null')
+            source=$(echo "$resp" | jq -r '.semanticSource // "unknown"')
+            history=$(jq -n \
+              --argjson h "$history" \
+              --arg msg "$msg" \
+              --arg reply "$reply" \
+              --arg source "$source" \
+              --argjson semantic "$semantic" \
+              '$h + [
+                {sender:"user",text:$msg,participantId:"mert",participantName:"Mert",semanticInterpretation:$semantic,semanticSource:$source},
+                {sender:"droit",text:$reply,participantId:"kaira",participantName:"Kaira",replyToParticipantId:"mert",replyToParticipantName:"Mert"}
+              ]')
+            LAST_RESPONSE="$resp"
+          }
+
+          send_turn 'bugün Ahmetle tartıştık'
+          send_turn 'çocuk benim yaptığım işi kendi yapmış gibi müdüre anlatmış'
+          send_turn 'sonra özür diledi ama hala sinirliyim'
+          send_turn 'sence abartıyor muyum?'
+
+          final_reply=$(echo "$LAST_RESPONSE" | jq -r '.reply' | tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g; s/[.!?…]+$//')
+          echo "FINAL_NORMALIZED=$final_reply"
+          if echo "$final_reply" | grep -Eq '^(tamam|tamamdır|peki|aynen|anladım|he|hee|hmm|olur|evet)$'; then
+            echo 'FAIL: active advice obligation collapsed to acknowledgement-only final reply' >&2
+            exit 1
+          fi
+          final_move=$(echo "$LAST_RESPONSE" | jq -r '.kdm.responsePlan.move // .responsePlan.move // "unknown"')
+          echo "FINAL_MOVE=$final_move"
+          echo 'PASS: S3 final advice turn did not collapse to acknowledgement-only delivery.'
