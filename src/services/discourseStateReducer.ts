@@ -121,6 +121,24 @@ function updateThreadState(
   let resumedThreadId: string | null = null;
   let ambiguousThreadResumption = false;
 
+  // A typed resumption signal must bind to already-open discourse context
+  // before the same compound turn is considered a fresh third-party opening.
+  // Otherwise `target=third_party + adviceRequested=true` creates a duplicate
+  // thread and destroys the very continuity this state is meant to observe.
+  if (requestsThreadResumption(event) && openThreads.length > 0) {
+    if (openThreads.length === 1) {
+      const resumed = openThreads[0];
+      resumedThreadId = resumed.id;
+      activeThreadId = resumed.id;
+      openThreads = openThreads.map((thread) =>
+        thread.id === resumed.id ? { ...thread, lastRelevantTurn: turnIndex } : thread,
+      );
+    } else {
+      ambiguousThreadResumption = true;
+    }
+    return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+  }
+
   if (opensThirdPartyThread(event)) {
     const active = prev.activeThreadId
       ? openThreads.find((thread) => thread.id === prev.activeThreadId)
@@ -151,17 +169,9 @@ function updateThreadState(
     return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
   }
 
+  // With no existing thread, a resumption request has nothing to bind to.
+  // Fail closed instead of manufacturing context.
   if (requestsThreadResumption(event)) {
-    if (openThreads.length === 1) {
-      const resumed = openThreads[0];
-      resumedThreadId = resumed.id;
-      activeThreadId = resumed.id;
-      openThreads = openThreads.map((thread) =>
-        thread.id === resumed.id ? { ...thread, lastRelevantTurn: turnIndex } : thread,
-      );
-    } else if (openThreads.length > 1) {
-      ambiguousThreadResumption = true;
-    }
     return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
   }
 
