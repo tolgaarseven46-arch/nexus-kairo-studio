@@ -49,7 +49,9 @@ const wordCount = (reply: string) =>
 
 const QUESTION_PUNCTUATION_RE = /[?？]/u;
 const DIRECT_INTERROGATIVE_START_RE =
-  /^\s*(?:neden|niye|kim|kime|kimi|hangi|hangisi|nerede|neresi|kaç)(?![\p{L}\p{N}_])/iu;
+  /^\s*(?:neden|niye|kim|kime|kimi|hangi|hangisi|nerede|neresi|nereye|nereden|kaç)(?![\p{L}\p{N}_])/iu;
+const EMBEDDED_DIRECT_INTERROGATIVE_RE =
+  /(?:[,.!…;:]\s*|(?<![\p{L}\p{N}_])(?:peki|tamam|güzel|iyi|ee|e|hmm|hımm|ya)\s+)(?:neden|niye|kim|kime|kimi|hangi|hangisi|nerede|neresi|nereye|nereden|kaç)(?![\p{L}\p{N}_])/iu;
 const DIRECT_SOCIAL_QUESTION_RE =
   /(?<![\p{L}\p{N}_])(?:nas[ıi]ls[ıi]n|senden\s+naber|sen\s+naber|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|nap[ıi]yon|iyi\s+misin)(?![\p{L}\p{N}_])/iu;
 const QUESTION_CLITIC_RE =
@@ -57,11 +59,12 @@ const QUESTION_CLITIC_RE =
 const REPORTED_QUESTION_RE =
   /\b(?:nas[ıi]ls[ıi]n|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|iyi\s+misin)\b.{0,40}\b(?:diye\s+(?:sordu|dedi)|sorduğunu|dediğini)\b/iu;
 
-function looksLikeQuestionAct(text: string): boolean {
+export function looksLikeKairaQuestionAct(text: string): boolean {
   if (QUESTION_PUNCTUATION_RE.test(text)) return true;
   if (REPORTED_QUESTION_RE.test(text)) return false;
   return (
     DIRECT_INTERROGATIVE_START_RE.test(text) ||
+    EMBEDDED_DIRECT_INTERROGATIVE_RE.test(text) ||
     DIRECT_SOCIAL_QUESTION_RE.test(text) ||
     QUESTION_CLITIC_RE.test(text)
   );
@@ -152,7 +155,19 @@ export function buildKairaResponsePlan(
 
   const hard = deriveHardConstraints(contract, dialogue);
   const soft = deriveSoftTendencies(contract, speech, dialogue);
-  const resolved = resolveKairaResponsePlan({ hard, soft, dialogue, speech, contract });
+  const semanticUncertainty = Number.isFinite(contract.semanticUncertainty)
+    ? Number(contract.semanticUncertainty)
+    : undefined;
+  const resolved = resolveKairaResponsePlan({
+    hard,
+    soft,
+    dialogue,
+    speech,
+    contract,
+    ...(semanticUncertainty === undefined
+      ? {}
+      : { uncertainty: { semantic: semanticUncertainty } }),
+  });
 
   return {
     ...basePlan,
@@ -214,7 +229,7 @@ export function findKairaResponsePlanIssues(
   if (!text) return ["response_plan_empty_reply"];
   const issues: string[] = [];
 
-  if (!plan.allowQuestion && looksLikeQuestionAct(text)) issues.push("response_plan_question_blocked");
+  if (!plan.allowQuestion && looksLikeKairaQuestionAct(text)) issues.push("response_plan_question_blocked");
   if (!plan.allowHumor && HUMOR_RE.test(text)) issues.push("response_plan_humor_blocked");
   if (!plan.allowAffection && AFFECTION_RE.test(text)) issues.push("response_plan_affection_blocked");
   if (plan.counterFlirtAllowed === false && COUNTER_FLIRT_RE.test(text))
