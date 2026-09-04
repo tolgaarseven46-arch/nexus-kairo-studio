@@ -76,8 +76,20 @@ jobs:
                       'history': history,
                   })
                   out.append({'turn': i, 'userMessage': text, **row(resp, sem)})
-                  history.append({'sender':'user','text':text,'participantName':'Mert'})
-                  history.append({'sender':'assistant','text':resp.get('reply','')})
+                  history.append({
+                      'sender':'user',
+                      'text':text,
+                      'participantId':uid,
+                      'participantName':'Mert',
+                      'semanticInterpretation':sem,
+                      'semanticSource':'semantic_provider',
+                  })
+                  history.append({
+                      'sender':'droit',
+                      'text':resp.get('reply',''),
+                      'replyToParticipantId':uid,
+                      'replyToParticipantName':'Mert',
+                  })
               return out
 
           s3 = run_sequence('s3', [
@@ -96,6 +108,6 @@ jobs:
               'neyse ben o çocukla ne yapcam şimdi?',
           ])
 
-          print('SCENARIO_AUTHORITY_FALSIFICATION_CHARACTERIZATION')
+          print('SCENARIO_AUTHORITY_FALSIFICATION_CHARACTERIZATION_V2')
           print(json.dumps({'S3': s3, 'S7': s7}, ensure_ascii=False, indent=2))
           PY
