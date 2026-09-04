@@ -1,0 +1,207 @@
+name: One-time Patch Claim Provenance
+on:
+  push:
+    branches:
+      - feat/claim-world-event-provenance
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/claim-world-event-provenance
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply provenance boundary patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          chaos = Path('src/services/kairoDialogueChaosEngine.ts')
+          s = chaos.read_text()
+          s = s.replace('import type { ConversationTurn } from "./kairoConversationGrounding";\n', 'import type { ConversationTurn } from "./kairoConversationGrounding";\nimport { effectivelySupportedClaims, type Claim, type DialogueClaim } from "./claimProvenance";\nexport type { DialogueClaim } from "./claimProvenance";\n')
+          old_iface = '''export interface DialogueClaim {
+  source: string;
+  subject: string;
+  text: string;
+  confidence: number;
+  status: "active" | "uncertain" | "denied" | "absurd";
+}
+
+'''
+          if old_iface not in s:
+              raise SystemExit('DialogueClaim interface seam not found')
+          s = s.replace(old_iface, '', 1)
+          start = s.index('export function buildDialogueClaimLedger(')
+          end = s.index('\nconst ACTION_TOPICS', start)
+          new_ledger = r'''function explicitPersonNames(text: string): string[] {
+  return Array.from(
+    new Set(
+      (text.match(/(?<![\\p{L}])[A-ZÇĞİÖŞÜ][a-zçğıöşü]{1,31}(?![\\p{L}])/gu) ?? [])
+        .filter((name) => !["Kaira", "Kairo"].includes(name)),
+    ),
+  );
+}
+
+function claimId(turnIndex: number, source: string, subject: string, ordinal: number): string {
+  const clean = (value: string) => value.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9çğıöşü]+/giu, "-").replace(/^-+|-+$/g, "");
+  return `claim-${turnIndex}-${clean(source)}-${clean(subject)}-${ordinal}`;
+}
+
+export function buildDialogueClaimLedger(
+  history: ConversationTurn[],
+  userMessage: string,
+  userName: string,
+  currentAnalysis?: DialogueTurnAnalysis,
+): DialogueClaim[] {
+  const userTurns: Array<{ speaker: string; text: string; analysis?: DialogueTurnAnalysis }> = history
+    .filter((turn) => turn.sender === "user")
+    .map((turn) => ({
+      speaker: turn.participantName || "Kullanıcı",
+      text: String(turn.text || ""),
+    }));
+  const turns = [...userTurns, { speaker: userName, text: userMessage, analysis: currentAnalysis }];
+  const knownPeople = new Set(
+    [...userTurns.map((turn) => turn.speaker), userName].filter((name) => name !== "Kullanıcı"),
+  );
+  for (const turn of turns) for (const name of explicitPersonNames(turn.text)) knownPeople.add(name);
+  const claims: Claim[] = [];
+
+  for (const [turnIndex, turn] of turns.entries()) {
+    const analysis = turn.analysis ?? analyzeDialogueTurn(turn.text);
+    const isCorrection = analysis.acts.includes("correction");
+
+    if (isCorrection) {
+      const explicitSelfDenial = /\\b(?:o\\s+)?ben değildim\\b/iu.test(turn.text);
+      const opposed = [...effectivelySupportedClaims(claims)]
+        .reverse()
+        .find((claim) => explicitSelfDenial ? claim.subject === turn.speaker : true);
+      if (opposed) {
+        claims.push({
+          id: claimId(turnIndex, turn.speaker, opposed.subject, claims.length),
+          source: turn.speaker,
+          subject: opposed.subject,
+          proposition: opposed.proposition,
+          confidence: analysis.factConfidence,
+          status: "denial",
+          opposesClaimId: opposed.id,
+        });
+      }
+    }
+
+    if (analysis.acts.includes("question") || analysis.acts.includes("noise")) continue;
+
+    for (const subject of knownPeople) {
+      if (!participantInText(turn.text, subject)) continue;
+      // A pure correction/denial is provenance about an earlier proposition, not a
+      // fresh positive assertion of the same surface text.
+      if (isCorrection && subject === turn.speaker && /\\b(?:o\\s+)?ben değildim\\b/iu.test(turn.text)) continue;
+      claims.push({
+        id: claimId(turnIndex, turn.speaker, subject, claims.length),
+        source: turn.speaker,
+        subject,
+        proposition: turn.text,
+        confidence: analysis.factConfidence,
+        status: analysis.isLikelyAbsurd
+          ? "absurd"
+          : analysis.acts.includes("uncertain")
+            ? "uncertain"
+            : "asserted",
+      });
+    }
+  }
+
+  return claims.slice(-12);
+}
+'''
+          s = s[:start] + new_ledger + s[end:]
+          s = s.replace('        claim.status !== "denied" &&\n        claim.status !== "absurd" &&\n        topic.pattern.test(claim.text),', '        effectivelySupportedClaims(ledger).includes(claim) &&\n        topic.pattern.test(claim.proposition),')
+          s = s.replace('        claim.status !== "denied" &&\n        claim.status !== "absurd" &&\n        topic.pattern.test(claim.text),', '        effectivelySupportedClaims(ledger).includes(claim) &&\n        topic.pattern.test(claim.proposition),')
+          s = s.replace('        claim.status === "denied" &&\n        topic.pattern.test(claim.text),', '        claim.status === "denial" &&\n        topic.pattern.test(claim.proposition),')
+          s = s.replace('        `- kaynak=${claim.source}; özne=${claim.subject}; durum=${claim.status}; güven=${claim.confidence.toFixed(2)}; söz="${claim.text}"`,', '        `- id=${claim.id}; kaynak=${claim.source}; özne=${claim.subject}; durum=${claim.status}; karşı-iddia=${claim.opposesClaimId || "yok"}; güven=${claim.confidence.toFixed(2)}; önerme="${claim.proposition}"`,')
+          s = s.replace('"denied" kaydı geçerli plan değildir.', '"denial" karşı-iddiasının bastırdığı önerme geçerli plan değildir; eski iddia geçmişten silinmez.')
+          chaos.write_text(s)
+
+          decision = Path('src/services/kairoDialogueDecisionEngine.ts')
+          s = decision.read_text()
+          s = s.replace('import {\n  buildDialogueClaimLedger,\n  type DialogueClaim,\n} from "./kairoDialogueChaosEngine";\n', 'import { buildDialogueClaimLedger } from "./kairoDialogueChaosEngine";\nimport { effectivelySupportedClaims, type DialogueClaim } from "./claimProvenance";\n')
+          old_supported = '''  return claims.filter(
+    (claim) =>
+      claim.subject === target &&
+      claim.status !== "denied" &&
+      claim.status !== "absurd",
+  );'''
+          new_supported = '''  return effectivelySupportedClaims(claims).filter((claim) => claim.subject === target);'''
+          if old_supported not in s:
+              raise SystemExit('supportedClaimsFor seam not found')
+          s = s.replace(old_supported, new_supported, 1)
+          s = s.replace('`${plan.target} hakkında “${supported.text}” denmişti ama bu kesin bir plan değildi.`', '`${plan.target} hakkında “${supported.proposition}” denmişti ama bu kesin bir plan değildi.`')
+          s = s.replace('`${plan.target} hakkında elimizdeki kayıt şu: “${supported.text}”`', '`${plan.target} hakkında elimizdeki kayıt şu: “${supported.proposition}”`')
+          s = s.replace('claim.subject === plan.target && claim.status === "denied",', 'claim.subject === plan.target && claim.status === "denial",')
+          s = s.replace('topic.pattern.test(denied.text)', 'topic.pattern.test(denied.proposition)')
+          decision.write_text(s)
+
+          world = Path('src/services/worldModelEventStore.ts')
+          s = world.read_text()
+          old = '  const persist = !isQuestionLike && event.certainty >= 0.45 && (meaningfulType || hasParticipant);'
+          new = '  const persist = !event.reportedSpeech && !isQuestionLike && event.certainty >= 0.45 && (meaningfulType || hasParticipant);'
+          if old not in s:
+              raise SystemExit('world persistence seam not found')
+          world.write_text(s.replace(old, new, 1))
+
+          tests = Path('src/services/kairoDialogueChaosEngine.test.ts')
+          s = tests.read_text()
+          old = '''    expect(ledger).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "Ali",
+          subject: "Mert",
+          status: "denied",
+        }),
+        expect.objectContaining({
+          source: "Mert",
+          subject: "Ali",
+          status: "uncertain",
+        }),
+      ]),
+    );'''
+          new = '''    const original = ledger.find(
+      (claim) => claim.source === "Ali" && claim.subject === "Mert" && claim.status === "asserted",
+    );
+    expect(original).toBeTruthy();
+    expect(ledger).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "Mert",
+          subject: "Mert",
+          status: "denial",
+          opposesClaimId: original?.id,
+        }),
+        expect.objectContaining({
+          source: "Mert",
+          subject: "Ali",
+          status: "uncertain",
+        }),
+      ]),
+    );'''
+          if old not in s:
+              raise SystemExit('old chaos claim expectation not found')
+          tests.write_text(s.replace(old, new, 1))
+          PY
+      - run: npx vitest run src/services/claimProvenance.test.ts src/services/kairaClaimProvenanceRegression.test.ts src/services/worldModelReportedClaimPersistence.test.ts src/services/kairoDialogueChaosEngine.test.ts src/services/kairoDialogueDecisionEngine.test.ts
+      - run: npx tsc --noEmit
+      - name: Commit patch
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/services/kairoDialogueChaosEngine.ts src/services/kairoDialogueDecisionEngine.ts src/services/worldModelEventStore.ts src/services/kairoDialogueChaosEngine.test.ts
+          git commit -m "feat(claim): separate immutable provenance from world truth"
+          git push origin HEAD:feat/claim-world-event-provenance
