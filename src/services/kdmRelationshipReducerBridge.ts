@@ -70,7 +70,14 @@ function buildTurnSignal(
   negativePattern: string | null,
 ): RelationshipTurnSignal {
   const thirdParty = event.relationshipScope === "third_party";
-  const dyadic = !thirdParty && event.relationshipScope !== "event" && interp.target === "kaira";
+  const questionOnlyStopAddressesInterlocutor =
+    interp.discourseFacets.stopQuestions === true &&
+    interp.discourseFacets.stopTalking === false &&
+    interp.stopRequest === false;
+  const dyadic =
+    !thirdParty &&
+    event.relationshipScope !== "event" &&
+    (interp.target === "kaira" || questionOnlyStopAddressesInterlocutor);
   return {
     valence: thirdParty ? "neutral" : interp.valence,
     targetsKaira: dyadic,
