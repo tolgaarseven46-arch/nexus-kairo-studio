@@ -10,7 +10,7 @@ describe("Kaira activity proposal recovery reclaim receipt", () => {
       schemaVersion: 1,
       ownerUserId: "knt_test_user_x_new",
       kairaInstanceId: "kaira-runtime",
-      instanceType: "persistent",
+      instanceType: "individual",
       proposalId: "planning:dynamic_state:chat_request:test:experience_archive",
       status: "completed",
       claimedAt: "2026-09-04T17:00:00.000Z",
