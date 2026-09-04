@@ -1379,3 +1379,15 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Return to higher-level product behavior validation. Use the now-observable canonical semantic snapshots in real multi-turn KNT sessions to measure end-to-end natural conversation quality, speech-identity consistency and long-session behavior. Patch only failures that are reproduced in the live canonical path; do not add speculative semantic rules.
+
+
+## 139. Canonical 20-turn final-delivery quality acceptance — PR #46 — 2026-09-04
+- PR #46 merged as commit `0507e1acee5013ddcb5e02a271df8e8f6b7d789f`.
+- Added a permanent canonical 20-turn mixed-session final-delivery quality regression spanning shared semantic snapshots -> KDM -> discourse -> BehaviorContract -> DialogueDecision -> SpeechIdentity -> KairaResponsePlan -> local/AI routing -> AI repair -> deterministic final enforcement.
+- The acceptance locks delivered-text quality rather than only state continuity: response-plan conformance, speech-identity rhythm stability, relationship-sensitive HOW after hurt/repair, generic-assistant/list drift rejection and meaningful recent-reply repetition resistance are all verified in one session.
+- The new acceptance exposed a real production bug in Turkish question detection: JavaScript `\b` could treat the `mi` letters inside words such as `geçmiş` as a standalone question clitic. Response-plan question detection now uses Unicode-safe letter/number boundaries and retains real punctuation-free questions such as `iyi misin` / `kaç kişi geliyor`.
+- ADR-0021 records the final-delivery acceptance boundary. Full architecture contracts, autonomous runtime contracts, beta runtime regression, beta conversation acceptance, full Vitest, TypeScript, production build, behavior/docs guards and Architecture Review passed before merge.
+- PR #30-#46 are now closed unless a new measured regression requires reopening a specific area.
+
+### Next verified development question
+- Run evidence-driven real multi-turn KNT conversation-quality characterization on the canonical live path. Inspect per-turn semantic snapshot, reaction/relationship state, response plan, provider route and final delivered text together. Prioritize naturalness/speech-identity/long-session failures that are reproducible; do not add speculative semantic rules or reopen the stabilized provider.
