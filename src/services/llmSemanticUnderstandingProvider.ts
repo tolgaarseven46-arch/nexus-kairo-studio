@@ -100,7 +100,7 @@ stopQuestions / stopTalking yalnız açık durdurma talebinde true
 stopRequest = YALNIZ tam konuşmayı durdurma isteği; discourseFacets.stopTalking ile birebir aynı olmalı. “soru sorma” gibi yalnız soru yasağı stopRequest değildir.
 
 DISCOURSE FACET OPERASYONEL EŞLEMELERİ:
-- "selam", "merhaba" gibi doğrudan selam = socialRoutine:greeting. "naber", "nasılsın" = socialRoutine:how_are_you. "ne yapıyorsun/napıyorsun" = socialRoutine:what_doing.
+- "selam", "merhaba" gibi doğrudan selam = primaryIntent:greeting + socialRoutine:greeting. "naber", "nasılsın" = primaryIntent:greeting + socialRoutine:how_are_you. "ne yapıyorsun/napıyorsun" = socialRoutine:what_doing.
 - "moralim bozuk", "modum yok", "canım sıkkın" gibi sebebi henüz açılmamış düşük-mod paylaşımı = primaryIntent:emotional_share + socialRoutine:emotional_opening. Açık tavsiye isteği de varsa adviceRequested:true; emotional_opening etiketi tavsiye talebini silmez.
 - "nasıl yani", "anlamadım" önceki Kaira içeriğinin açıklanmasını istiyorsa discourseAct:confusion_or_challenge + repairSignal:clarification_request.
 - "ne alaka", "bunun konuyla ne ilgisi var" önceki Kaira içeriğinin alakasını sorguluyorsa discourseAct:confusion_or_challenge + repairSignal:relevance_challenge.
@@ -162,9 +162,13 @@ function enforceProviderFieldInvariants(
   const secondarySocialActs = stopTalking
     ? interpretation.secondarySocialActs
     : interpretation.secondarySocialActs.filter((act) => act !== "stop_request");
+  const primaryIntent = interpretation.discourseFacets.socialRoutine === "how_are_you"
+    ? "greeting"
+    : interpretation.primaryIntent;
 
   return {
     ...interpretation,
+    primaryIntent,
     secondarySocialActs,
     stopRequest: stopTalking,
     discourseFacets: {
