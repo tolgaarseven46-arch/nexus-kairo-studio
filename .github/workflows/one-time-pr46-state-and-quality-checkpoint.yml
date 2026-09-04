@@ -1,0 +1,37 @@
+name: One-time PR46 state checkpoint
+
+on:
+  push:
+    branches:
+      - chatgpt/pr46-checkpoint-and-live-knt-quality
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: chatgpt/pr46-checkpoint-and-live-knt-quality
+          fetch-depth: 0
+      - name: Record PR46 checkpoint and remove helper
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text(encoding='utf-8')
+          marker = '## 139. Canonical 20-turn final-delivery quality acceptance — PR #46 — 2026-09-04'
+          if marker not in text:
+              text += '''\n\n## 139. Canonical 20-turn final-delivery quality acceptance — PR #46 — 2026-09-04\n- PR #46 merged as commit `0507e1acee5013ddcb5e02a271df8e8f6b7d789f`.\n- Added a permanent canonical 20-turn mixed-session final-delivery quality regression spanning shared semantic snapshots -> KDM -> discourse -> BehaviorContract -> DialogueDecision -> SpeechIdentity -> KairaResponsePlan -> local/AI routing -> AI repair -> deterministic final enforcement.\n- The acceptance locks delivered-text quality rather than only state continuity: response-plan conformance, speech-identity rhythm stability, relationship-sensitive HOW after hurt/repair, generic-assistant/list drift rejection and meaningful recent-reply repetition resistance are all verified in one session.\n- The new acceptance exposed a real production bug in Turkish question detection: JavaScript `\\b` could treat the `mi` letters inside words such as `geçmiş` as a standalone question clitic. Response-plan question detection now uses Unicode-safe letter/number boundaries and retains real punctuation-free questions such as `iyi misin` / `kaç kişi geliyor`.\n- ADR-0021 records the final-delivery acceptance boundary. Full architecture contracts, autonomous runtime contracts, beta runtime regression, beta conversation acceptance, full Vitest, TypeScript, production build, behavior/docs guards and Architecture Review passed before merge.\n- PR #30-#46 are now closed unless a new measured regression requires reopening a specific area.\n\n### Next verified development question\n- Run evidence-driven real multi-turn KNT conversation-quality characterization on the canonical live path. Inspect per-turn semantic snapshot, reaction/relationship state, response plan, provider route and final delivered text together. Prioritize naturalness/speech-identity/long-session failures that are reproducible; do not add speculative semantic rules or reopen the stabilized provider.\n'''
+              p.write_text(text, encoding='utf-8')
+          PY
+          rm .github/workflows/one-time-pr46-state-and-quality-checkpoint.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md .github/workflows/one-time-pr46-state-and-quality-checkpoint.yml
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(state): record PR46 final-delivery checkpoint"
+          git push origin HEAD:chatgpt/pr46-checkpoint-and-live-knt-quality
