@@ -15,7 +15,7 @@ import type { SemanticRelationshipScope } from "./languageUnderstandingService";
 import { applyRelationshipContext } from "./relationshipBehaviorService";
 import { reduceRelationshipTurn, type RelationshipReducerResult, type RelationshipReducerPrev, type RelationshipTurnSignal } from "./relationshipReducer";
 import { DEFAULT_RELATIONSHIP_REDUCER_CONFIG } from "./relationshipReducerConfig";
-import { isRelationshipNeutralQuestionOnlyStop, relationshipSeverityForInterpretation } from "./kairaQuestionOnlyStopRelationshipPolicy";
+import { isRelationshipNeutralTurn, relationshipSeverityForInterpretation } from "./kairaQuestionOnlyStopRelationshipPolicy";
 
 type GroundedSemanticEvent = SemanticEvent & { relationshipScope?: SemanticRelationshipScope };
 
@@ -112,7 +112,7 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
   const { state, semanticInterpretation, semanticEvent, baseBehaviorProfile, behaviorPolicy, applyIntegrated } = input;
   const nowIso = new Date().toISOString();
   const prevRel: RelationshipState = state.relationship ?? {};
-  const rawNegativePattern = isRelationshipNeutralQuestionOnlyStop(semanticInterpretation) ? null : semanticNegativePattern(semanticInterpretation);
+  const rawNegativePattern = isRelationshipNeutralTurn(semanticInterpretation) ? null : semanticNegativePattern(semanticInterpretation);
   const negativePattern = semanticEvent.relationshipScope === "third_party" ? null : rawNegativePattern;
   const samePattern = !!negativePattern && prevRel.lastNegativePattern === negativePattern;
   const repeatedProblem = samePattern && (prevRel.repeatedNegativeCount ?? 0) >= 1;
