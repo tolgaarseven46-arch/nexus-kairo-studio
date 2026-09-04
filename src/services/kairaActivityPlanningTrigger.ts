@@ -93,6 +93,40 @@ export function normalizeKairaActivityPlanningTrigger(
   return { ...trigger, triggerId, sourceId, occurredAt: new Date(occurredAtMs).toISOString() } as KairaActivityPlanningTrigger;
 }
 
+/**
+ * Semantic identity for a durable planning trigger. Firestore map property order
+ * is not part of trigger identity, so replay/idempotency checks must compare the
+ * typed canonical fields rather than serialized object insertion order.
+ */
+export function sameKairaActivityPlanningTrigger(
+  left: KairaActivityPlanningTrigger,
+  right: KairaActivityPlanningTrigger,
+): boolean {
+  const a = normalizeKairaActivityPlanningTrigger(left);
+  const b = normalizeKairaActivityPlanningTrigger(right);
+  if (
+    a.triggerId !== b.triggerId ||
+    a.kind !== b.kind ||
+    a.sourceId !== b.sourceId ||
+    a.occurredAt !== b.occurredAt
+  ) {
+    return false;
+  }
+
+  switch (a.kind) {
+    case "idle_transition":
+      return b.kind === "idle_transition" &&
+        a.previousBusy === b.previousBusy &&
+        a.currentBusy === b.currentBusy;
+    case "execution_terminal":
+      return b.kind === "execution_terminal" && a.terminalPhase === b.terminalPhase;
+    case "meaningful_world_change":
+      return b.kind === "meaningful_world_change" && a.materiality === b.materiality;
+    case "dynamic_state_change":
+      return b.kind === "dynamic_state_change" && a.magnitude === b.magnitude;
+  }
+}
+
 function nonMaterial(trigger: KairaActivityPlanningTrigger): boolean {
   if (trigger.kind === "idle_transition") return trigger.previousBusy !== true;
   if (trigger.kind === "meaningful_world_change") return trigger.materiality < 0.35;
