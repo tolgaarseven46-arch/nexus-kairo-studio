@@ -12,14 +12,37 @@ jobs:
   verify:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: 24
-      - name: Run fresh production autonomous-life tick
+      - name: Read or finish the same durable production run
         env:
-          KAIRA_AUTONOMOUS_LIFE_URL: https://nexus-kairo-studio.onrender.com
           KAIRA_INTERNAL_WORKER_SECRET: ${{ secrets.KAIRA_INTERNAL_WORKER_SECRET }}
-          KAIRA_AUTONOMOUS_LIFE_RUN_ID: final-acceptance-${{ github.run_id }}
-          KAIRA_AUTONOMOUS_LIFE_LIMIT: 25
-        run: node scripts/run-kaira-autonomous-life-wakeup.mjs
+        run: |
+          set -euo pipefail
+          HTTP_STATUS=$(curl --silent --show-error --max-time 300 \
+            -o response.json -w '%{http_code}' \
+            -X POST 'https://nexus-kairo-studio.onrender.com/internal/workers/kaira/autonomous-life' \
+            -H "Authorization: Bearer ${KAIRA_INTERNAL_WORKER_SECRET}" \
+            -H 'Accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H 'x-kaira-worker-run-id: final-acceptance-33902409919' \
+            --data '{"limit":25}')
+          cat response.json
+          echo
+          echo "HTTP_STATUS=${HTTP_STATUS}"
+          node - <<'NODE'
+          const fs = require('fs');
+          const body = JSON.parse(fs.readFileSync('response.json', 'utf8'));
+          const summary = body?.receipt?.summary;
+          console.log(JSON.stringify({
+            runId: body?.runId,
+            status: body?.status,
+            deliveryStatus: body?.deliveryStatus,
+            planning: summary?.planning,
+            recovery: summary?.recovery,
+            schedules: summary?.schedules,
+          }));
+          if (body?.runId !== 'final-acceptance-33902409919') throw new Error('run correlation mismatch');
+          if (!summary) throw new Error(`durable receipt unavailable: ${body?.status || 'unknown'}`);
+          if ((summary?.planning?.failed || 0) !== 0) throw new Error('planning still has failures');
+          if ((summary?.recovery?.failed || 0) !== 0) throw new Error('recovery still has failures');
+          if ((summary?.schedules?.failed || 0) !== 0) throw new Error('schedules still has failures');
+          NODE
