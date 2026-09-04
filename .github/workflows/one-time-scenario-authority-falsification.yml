@@ -1,0 +1,101 @@
+name: One-time scenario authority falsification
+on:
+  push:
+    branches:
+      - audit/scenario-authority-falsification
+permissions:
+  contents: read
+jobs:
+  characterize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run S3 and S7 against production
+        env:
+          BASE_URL: https://nexus-kairo-studio.onrender.com
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, urllib.request
+
+          base = os.environ['BASE_URL'].rstrip('/')
+          run_id = os.environ['RUN_ID']
+
+          def post(path, payload):
+              body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+              req = urllib.request.Request(base + path, data=body, headers={'Content-Type':'application/json'}, method='POST')
+              with urllib.request.urlopen(req, timeout=150) as r:
+                  return json.loads(r.read().decode('utf-8'))
+
+          def semantic(text, user='Mert'):
+              raw = post('/api/language-understanding', {
+                  'userMessage': text,
+                  'userName': user,
+                  'characterName': 'Kaira',
+                  'provider': 'openrouter',
+              })
+              return raw.get('interpretation') or raw.get('semanticInterpretation') or raw
+
+          def relation(resp):
+              kdm = resp.get('kdm') or {}
+              ds = kdm.get('dynamicState') or {}
+              return ds.get('relationship') or {}
+
+          def row(resp, sem):
+              kdm = resp.get('kdm') or {}
+              return {
+                  'semantic': sem,
+                  'reply': resp.get('reply'),
+                  'providerUsed': resp.get('providerUsed') or (resp.get('metadata') or {}).get('providerUsed'),
+                  'relationship': relation(resp),
+                  'responsePlan': kdm.get('responsePlan') or resp.get('responsePlan'),
+                  'retrievedMemories': kdm.get('retrievedMemories') or resp.get('retrievedMemories'),
+                  'selfMemoryRuntime': kdm.get('selfMemoryRuntime') or (resp.get('metadata') or {}).get('selfMemoryRuntime'),
+                  'worldMemoryGuard': kdm.get('worldMemoryGuard') or (resp.get('metadata') or {}).get('worldMemoryGuard'),
+                  'consistency': resp.get('consistency') or kdm.get('consistency'),
+                  'enforcement': resp.get('enforcement'),
+              }
+
+          def run_sequence(tag, messages):
+              uid = f'archfals_{tag}_{run_id}'
+              history = []
+              out = []
+              for i, text in enumerate(messages, 1):
+                  sem = semantic(text)
+                  resp = post('/api/chat', {
+                      'userId': uid,
+                      'userName': 'Mert',
+                      'character': {'name':'Kaira'},
+                      'provider': 'openrouter',
+                      'suppressRecentMemory': False,
+                      'kairaInstanceId': 'reference-kaira',
+                      'requestId': f'{run_id}-{tag}-{i}',
+                      'userMessage': text,
+                      'semanticInterpretation': sem,
+                      'history': history,
+                  })
+                  out.append({'turn': i, 'userMessage': text, **row(resp, sem)})
+                  history.append({'sender':'user','text':text,'participantName':'Mert'})
+                  history.append({'sender':'assistant','text':resp.get('reply','')})
+              return out
+
+          s3 = run_sequence('s3', [
+              'bugün Ahmetle tartıştık',
+              'çocuk benim yaptığım işi kendi yapmış gibi müdüre anlatmış',
+              'sonra özür diledi ama hala sinirliyim',
+              'sence abartıyor muyum?',
+          ])
+
+          s7 = run_sequence('s7', [
+              'Emreyle dün çok kötü tartıştık, sonra anlatırım',
+              'bugün hava baya sıcak',
+              'ben de biraz kahve içtim',
+              'bu arada yarın erken kalkıcam',
+              'neyse sen napıyosun',
+              'neyse ben o çocukla ne yapcam şimdi?',
+          ])
+
+          print('SCENARIO_AUTHORITY_FALSIFICATION_CHARACTERIZATION')
+          print(json.dumps({'S3': s3, 'S7': s7}, ensure_ascii=False, indent=2))
+          PY
