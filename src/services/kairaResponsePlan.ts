@@ -155,19 +155,7 @@ export function buildKairaResponsePlan(
 
   const hard = deriveHardConstraints(contract, dialogue);
   const soft = deriveSoftTendencies(contract, speech, dialogue);
-  const semanticUncertainty = Number.isFinite(contract.semanticUncertainty)
-    ? Number(contract.semanticUncertainty)
-    : undefined;
-  const resolved = resolveKairaResponsePlan({
-    hard,
-    soft,
-    dialogue,
-    speech,
-    contract,
-    ...(semanticUncertainty === undefined
-      ? {}
-      : { uncertainty: { semantic: semanticUncertainty } }),
-  });
+  const resolved = resolveKairaResponsePlan({ hard, soft, dialogue, speech, contract });
 
   return {
     ...basePlan,
