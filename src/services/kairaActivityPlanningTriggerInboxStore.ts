@@ -15,6 +15,7 @@ import {
 } from "./kairaInstanceContext";
 import {
   normalizeKairaActivityPlanningTrigger,
+  sameKairaActivityPlanningTrigger,
   type KairaActivityPlanningTrigger,
 } from "./kairaActivityPlanningTrigger";
 
@@ -140,7 +141,7 @@ function sameDelivery(
     left.ownerUserId === right.ownerUserId &&
     left.kairaInstanceId === right.kairaInstanceId &&
     left.instanceType === right.instanceType &&
-    JSON.stringify(left.trigger) === JSON.stringify(right.trigger)
+    sameKairaActivityPlanningTrigger(left.trigger, right.trigger)
   );
 }
 
