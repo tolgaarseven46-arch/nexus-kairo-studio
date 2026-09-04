@@ -56,6 +56,59 @@ describe("Kaira activity proposal store contracts", () => {
     await expect(createKairaActivityProposalAtomic(value)).resolves.toEqual({ status: "existing", record: value });
   });
 
+  it("treats Firestore map-key reordering as the same proposal correlation", async () => {
+    const value = record();
+    const candidate = value.selected.candidate;
+    const components = value.selected.components;
+    const reordered = {
+      ...value,
+      selected: {
+        components: {
+          repetition: components.repetition,
+          risk: components.risk,
+          interruptionCost: components.interruptionCost,
+          context: components.context,
+          novelty: components.novelty,
+          preference: components.preference,
+          motivation: components.motivation,
+        },
+        candidate: {
+          evidenceIds: [...candidate.evidenceIds],
+          notBefore: candidate.notBefore,
+          permissionPolicy: candidate.permissionPolicy,
+          availability: candidate.availability,
+          repetitionPressure: candidate.repetitionPressure,
+          risk: candidate.risk,
+          interruptionCost: candidate.interruptionCost,
+          contextualFit: candidate.contextualFit,
+          noveltyFit: candidate.noveltyFit,
+          learnedPreference: {
+            confidence: candidate.learnedPreference.confidence,
+            affinity: candidate.learnedPreference.affinity,
+          },
+          motivation: {
+            strength: candidate.motivation.strength,
+            kind: candidate.motivation.kind,
+          },
+          activityType: candidate.activityType,
+          proposalId: candidate.proposalId,
+        },
+        score: value.selected.score,
+        proposalId: value.selected.proposalId,
+      },
+    };
+    const set = vi.fn();
+    firestore.runTransaction.mockImplementationOnce(async (_db: unknown, callback: (tx: any) => unknown) =>
+      callback({ get: vi.fn().mockResolvedValue({ exists: () => true, data: () => reordered }), set }),
+    );
+
+    await expect(markKairaActivityProposalMaterializedAtomic({
+      record: value,
+      now: "2026-09-02T12:01:00.000Z",
+    })).resolves.toMatchObject({ status: "materialized" });
+    expect(set).toHaveBeenCalledTimes(1);
+  });
+
   it("fails closed when the same proposal id carries different planning semantics", async () => {
     const value = record();
     const drifted = {
