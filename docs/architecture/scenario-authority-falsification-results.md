@@ -116,6 +116,59 @@ This is direct evidence for the rule that authority claims must be precommitted 
 
 ---
 
+## S6a — Distinct-participant conflicting testimony
+
+Production run: `33881842162`.
+
+Sequence in one shared session/history with distinct `participantId` / `participantName` values:
+
+1. Mert: `dün Ayşe bana Burak'ın partiye gelmeyeceğini söyledi`
+2. Ayşe: `ben öyle bir şey demedim ki`
+3. Burak: `ben zaten Mert'e geleceğimi söylemiştim`
+4. Mert: `kaira hangimiz doğru söylüyoruz?`
+
+### S6-A — claim / provenance claim
+**Precommit:** the architecture must distinguish `Ayşe said X`, `Ayşe denies saying X`, and `Burak says Y` as claims with different sources; it must not collapse them into one certain event.
+
+**Observed structural failures:**
+
+- **T1 / Mert:** EntityResolution sees named people `Ayşe` and `Burak`, and WorldEvent marks `reportedSpeech=true`, but the proposition does not encode the nested claim `source=Ayşe -> proposition=(Burak will not attend) -> recipient=Mert`. Instead the generic event is targeted at Mert because of `bana`, with no typed source/proposition structure for Ayşe's reported claim.
+- **T2 / Ayşe:** SemanticInterpretation correctly exposes a `correction`, but WorldEvent models `ben öyle bir şey demedim` as a generic/repair-like event with actor/target centered on the current speaker; it does not type the correction as a denial/refutation linked to Mert's prior claim.
+- **T3 / Burak:** EntityResolution correctly knows the current speaker is Burak and that `Mert` is named, yet WorldEvent reverses the proposition roles: `actor=Mert`, `target=Burak/current_user` for `ben zaten Mert'e geleceğimi söylemiştim`. The natural reading requires speaker/actor Burak with recipient Mert.
+
+The final LLM response can still notice that three versions conflict, but that success is not evidence that the typed architecture preserved provenance correctly.
+
+**Verdict:** **FALSIFIED.** `reportedSpeech: boolean` plus one flattened `WorldEvent` is insufficient to preserve source, proposition, denial/refutation and testimony roles across this scenario.
+
+**Classification:** **Architecture feedback / representation-shape limitation.** This is stronger than a single actor-resolution bug because the current schema has no explicit `Claim` object that can own source/proposition/stance/link-to-prior-claim. Fixing T3 actor selection alone would leave T1/T2 structurally underrepresented.
+
+### S6-B — epistemic claim
+**Precommit:** without independent evidence, `hangimiz doğru söylüyoruz?` cannot be answered with certainty.
+
+**Observed T4:** final reply explicitly says it cannot decide because the participants remember/tell different versions and suggests resolving the versions together. No participant is asserted as certainly correct.
+
+**Verdict:** **HOLDS.** Final epistemic caution survives even though the typed claim/provenance representation is incomplete.
+
+### S6-C — final-authority claim
+**Precommit:** no downstream guard/memory subsystem may silently rewrite a correctly uncertainty-preserving candidate into a definite assertion.
+
+**Observed T4:** enforcement did not mutate the final uncertainty-preserving answer; world-memory guard did not change it.
+
+**Verdict:** **HOLDS for this turn.** This does not repair S6-A; a correct final sentence can coexist with a broken intermediate representation.
+
+### New architecture lesson from S6
+A good final answer is not an architecture oracle. S6 would look successful if judged only at the UI surface, while the typed intermediate truth is materially wrong. Future scenario falsification must inspect the authority-owned representation, not only the delivered reply.
+
+The evidence supports a **Claim ≠ Event** distinction:
+
+- `Claim`: who asserted/denied what, to whom, with what epistemic status and link to prior claims;
+- `Event`: what the system treats as a grounded or narrated occurrence;
+- a reported Claim must not be promoted to Event merely because it was parsed from a sentence.
+
+This does **not** by itself authorize a new top-level layer. The next design step must compare minimal alternatives: enrich Grounding with typed `claims[]`, enrich WorldEvent with nested provenance, or introduce a separate claim representation. No implementation is selected by this audit alone.
+
+---
+
 ## Final-authority audit finding surfaced by S3
 
 The canonical constraint pass has explicit observability (`changed`, `reasons`, `fallbackUsed`) and therefore the S3 mutation is **not silent**. This is better than the historical hidden-override failure class.
@@ -129,16 +182,24 @@ However, the pass currently owns a stronger power than the proposed authority gr
 
 ---
 
-## Evidence-backed architecture status after S3/S7
+## Evidence-backed architecture status after S3/S7/S6a
 
 | Concern | Result |
 |---|---|
 | Third-party relationship scoping | **SUPPORTED** by S3/S7 |
-| Semantic per-turn target safety | **SUPPORTED** for these probes |
+| Semantic per-turn target safety | **SUPPORTED** for tested probes |
 | Long-range open-thread continuity | **FALSIFIED / unsupported** |
+| Claim / reported-speech provenance | **FALSIFIED / representation insufficient** |
 | Memory silent override | **Not observed**; retrieval reliability still uncertain |
 | Final mutation observability | **SUPPORTED** for canonical constraint fallback |
 | Final fallback obligation preservation | **FALSIFIED** |
+| Final epistemic caution under conflicting testimony | **SUPPORTED** by S6a |
 | S7 original authority-claim quality | **FALSIFIED as a test design** (too permissive) |
 
-No product implementation follows automatically from these results. The next precommitted exercise is S6a (conflicting testimony) to test claim/provenance and final assertion authority before choosing a redesign.
+### Evidence-backed redesign candidates — not yet implementations
+
+1. **Final delivery:** preserve active DialogueDecision obligations through every fallback/replacement candidate; a guard/constraint path cannot deliver behaviorally empty generic text merely because it is structurally valid.
+2. **Conversation discourse:** extend the existing conversation-level discourse representation to carry open/unresolved threads; do not misuse world-memory recall as an S7 patch.
+3. **Narrative grounding:** represent reported claims/provenance separately enough that source, proposition and denial/refutation survive; do not promote unverified claims directly into grounded events.
+
+These are candidate redesign directions derived from falsified authority claims. Each requires its own precommitted acceptance claims, alternatives and removal/counter-scenario tests before code changes.
