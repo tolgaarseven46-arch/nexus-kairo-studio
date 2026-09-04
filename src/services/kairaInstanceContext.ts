@@ -25,6 +25,28 @@ const sanitize = (value?: string) =>
     .replace(/[^a-zA-Z0-9_-]/g, "_")
     .slice(0, 96);
 
+const LEGACY_OWNER_SCOPE_RE = /^[a-zA-Z0-9_-]{1,96}$/;
+const OWNER_SCOPE_V2_PREFIX = "u2_";
+
+/**
+ * Keep existing safe owner ids byte-compatible with legacy Firestore paths,
+ * while giving unsafe / overlong ids an injective, filesystem-safe namespace.
+ *
+ * `u2_` is reserved: a raw id beginning with the prefix is encoded again, so a
+ * fresh user cannot choose the literal encoded scope of another user and alias
+ * their relationship / memory / cache ownership key.
+ */
+function ownerUserScopeSegment(value?: string): string {
+  const raw = String(value || "").trim();
+  if (!raw) return "anonymous";
+  if (LEGACY_OWNER_SCOPE_RE.test(raw) && !raw.startsWith(OWNER_SCOPE_V2_PREFIX)) {
+    return raw;
+  }
+  return `${OWNER_SCOPE_V2_PREFIX}${Array.from(raw)
+    .map((char) => char.codePointAt(0)!.toString(16))
+    .join("_")}`;
+}
+
 export function resolveKairaInstanceContext(input?: {
   instanceId?: string;
   instanceType?: KairaInstanceType;
@@ -76,10 +98,11 @@ export function instancePolicy(type: KairaInstanceType): KairaInstancePolicy {
 /**
  * Shared partition key for all Kaira-owned persistent state.
  * The current reference Kaira intentionally stays on the legacy user path so
- * existing Firestore data remains readable without a migration.
+ * existing Firestore data remains readable without a migration for already-safe
+ * legacy owner ids. Unsafe / overlong ids use the reserved v2 owner namespace.
  */
 export function kairaOwnerScope(userId?: string, instanceId?: string): string {
-  const userScope = sanitize(userId) || "anonymous";
+  const userScope = ownerUserScopeSegment(userId);
   const instance = resolveKairaInstanceContext({ instanceId });
   if (instance.instanceId === DEFAULT_KAIRA_INSTANCE_ID) return userScope;
   return `${userScope}__${instance.instanceId}`;
