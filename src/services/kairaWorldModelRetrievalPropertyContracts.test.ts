@@ -42,6 +42,7 @@ function canonical(message: string) {
     characterName: "KAIRO",
   });
   return {
+    semantic,
     entities,
     event: buildCanonicalWorldEvent(message, semantic, entities),
   };
@@ -84,9 +85,9 @@ describe("Kaira world-model/retrieval property contracts", () => {
         `${name} bana ne dedi?`,
         `${name} hakkında ne biliyorsun?`,
       ]) {
-        const { event } = canonical(query);
+        const { event, semantic } = canonical(query);
         expect(classifyWorldEventObservation(event).persist, query).toBe(false);
-        expect(shouldRetrieveWorldEvents(query), query).toBe(true);
+        expect(shouldRetrieveWorldEvents(semantic), query).toBe(true);
       }
     }
   });
