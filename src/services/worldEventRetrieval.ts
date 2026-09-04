@@ -1,3 +1,4 @@
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import {
   observationKairaInstanceId,
   type WorldEventObservation,
@@ -36,18 +37,20 @@ const normalize = (value: string) =>
 const tokens = (value: string) =>
   normalize(value).split(/[^\p{L}\p{N}_]+/u).filter((token) => token.length >= 2);
 
-const RECALL_RE = /\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor musun|hatırladın mı|hakkında ne biliyorsun|kimdi|kime|kimi)\b/iu;
 const REPORTED_SPEECH_RE = /\b(?:ne demişti|ne dedi|demişti|dedi|söylemişti|söyledi)\b/iu;
-const COMPARISON_RECALL_RE = /\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
 const STORED_QUERY_RE = /[?？]\s*$|\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor musun|hatırladın mı|hakkında ne biliyorsun)\b|\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
 const LATEST_RECALL_RE = /\ben\s+son\b/iu;
 const CURRENT_STATE_RE = /\b(?:şu\s+an|şimdiki|şimdi\s+durum|durum\s+ne|hâlâ|hala|hakkında\s+ne\s+biliyorsun)\b/iu;
 
-export function shouldRetrieveWorldEvents(message: string): boolean {
-  if (detectTemporalDiscourseDirection(message)) return true;
-  const text = normalize(message);
-  if (RECALL_RE.test(text) || COMPARISON_RECALL_RE.test(text) || CURRENT_STATE_RE.test(text)) return true;
-  return /\b(?:dün|bugün|yarın|geçen|önceki|daha önce|hatırla|hatırlat|\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4})\b/iu.test(text);
+/**
+ * World-event retrieval is an authority decision, not a lexical inference.
+ * Canonical language understanding decides once whether the turn is a recall
+ * request; this seam must never reopen that decision from raw user text.
+ */
+export function shouldRetrieveWorldEvents(
+  interpretation: Pick<SemanticInterpretation, "discourseFacets">,
+): boolean {
+  return interpretation.discourseFacets.discourseAct === "recall_request";
 }
 
 function observationSignature(item: RetrievedWorldEvent): string {
