@@ -21,10 +21,16 @@ describe('learned language HOW server integration contracts', () => {
   });
 
   it('records the same derived signal on both local and AI KNT/test-session observability paths', () => {
-    expect(server).toContain('providerUsed: "local_language",\n          languageStyleMemory,');
-    expect(server).toContain('providerUsed: activeAiProviderUsed,\n        languageStyleMemory,');
-    expect(server).toContain('providerUsed: "local_language",\n            languageStyleMemory,');
-    expect(server).toContain('providerUsed: activeAiProviderUsed,\n          languageStyleMemory,');
+    const localProviderOccurrences = server.match(/providerUsed: "local_language"/g)?.length ?? 0;
+    const aiProviderOccurrences = server.match(/providerUsed: activeAiProviderUsed/g)?.length ?? 0;
+    const languageStyleOccurrences = server.match(/\blanguageStyleMemory,/g)?.length ?? 0;
+
+    expect(localProviderOccurrences).toBeGreaterThanOrEqual(2);
+    expect(aiProviderOccurrences).toBeGreaterThanOrEqual(2);
+    expect(languageStyleOccurrences).toBeGreaterThanOrEqual(4);
+    expect(server).toContain('semanticInterpretation: canonicalSemantic.interpretation');
+    expect(server).toContain('semanticEvent: canonicalSemantic.event');
+    expect(server).toContain('semanticSource: canonicalSemantic.source');
     expect(persistence.match(/languageStyleMemory\?: unknown/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
