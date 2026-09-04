@@ -128,10 +128,14 @@ function runOrderedPass(
     input.epistemicContext,
   );
 
+  // Mechanical enforcement may trim length/emoji/humor, but question permission
+  // is a social WHAT/WHETHER contract. Do not let the legacy enforcer rewrite a
+  // forbidden question into a canned acknowledgement; final plan/dialogue
+  // conformance below owns rejection and normal repair owns recovery.
   const planEnforcement = enforceKairoResponse(epistemicGuard.reply, input.trace, {
     continueConversation: input.plan.continueConversation,
     humorAllowed: input.plan.allowHumor,
-    askQuestion: input.plan.allowQuestion,
+    askQuestion: true,
     emojiBudget: input.plan.emojiBudget,
     maxSentences: input.plan.maxSentences,
     maxWords: input.plan.maxWords,
@@ -175,7 +179,7 @@ function runOrderedPass(
  *
  * Order is fixed and explicit:
  *   world truth -> autobiographical truth -> epistemic truth -> ResponsePlan
- *   deterministic enforcement -> externally-owned dialogue/grounding checks.
+ *   deterministic mechanical enforcement -> externally-owned dialogue/grounding checks.
  *
  * This boundary never writes a generic social reply. A caller-supplied legacy
  * dialogue fallback can be tried only if it independently passes the exact same
