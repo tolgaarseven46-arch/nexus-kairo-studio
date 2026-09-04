@@ -12,37 +12,88 @@ jobs:
   verify:
     runs-on: ubuntu-24.04
     steps:
-      - name: Read or finish the same durable production run
+      - name: Run full production acceptance with durable replay and health
         env:
           KAIRA_INTERNAL_WORKER_SECRET: ${{ secrets.KAIRA_INTERNAL_WORKER_SECRET }}
         run: |
           set -euo pipefail
-          HTTP_STATUS=$(curl --silent --show-error --max-time 300 \
-            -o response.json -w '%{http_code}' \
+          RUN_ID="final-acceptance-${GITHUB_RUN_ID}"
+          export RUN_ID
+
+          FIRST_HTTP=$(curl --silent --show-error --max-time 300 \
+            -o first.json -w '%{http_code}' \
             -X POST 'https://nexus-kairo-studio.onrender.com/internal/workers/kaira/autonomous-life' \
             -H "Authorization: Bearer ${KAIRA_INTERNAL_WORKER_SECRET}" \
             -H 'Accept: application/json' \
             -H 'Content-Type: application/json' \
-            -H 'x-kaira-worker-run-id: final-acceptance-33902409919' \
+            -H "x-kaira-worker-run-id: ${RUN_ID}" \
             --data '{"limit":25}')
-          cat response.json
-          echo
-          echo "HTTP_STATUS=${HTTP_STATUS}"
+          export FIRST_HTTP
+
           node - <<'NODE'
           const fs = require('fs');
-          const body = JSON.parse(fs.readFileSync('response.json', 'utf8'));
+          const runId = process.env.RUN_ID;
+          const http = Number(process.env.FIRST_HTTP);
+          const body = JSON.parse(fs.readFileSync('first.json', 'utf8'));
           const summary = body?.receipt?.summary;
           console.log(JSON.stringify({
-            runId: body?.runId,
-            status: body?.status,
+            phase: 'first', http, runId: body?.runId, status: body?.status,
             deliveryStatus: body?.deliveryStatus,
             planning: summary?.planning,
             recovery: summary?.recovery,
             schedules: summary?.schedules,
           }));
-          if (body?.runId !== 'final-acceptance-33902409919') throw new Error('run correlation mismatch');
-          if (!summary) throw new Error(`durable receipt unavailable: ${body?.status || 'unknown'}`);
-          if ((summary?.planning?.failed || 0) !== 0) throw new Error('planning still has failures');
-          if ((summary?.recovery?.failed || 0) !== 0) throw new Error('recovery still has failures');
-          if ((summary?.schedules?.failed || 0) !== 0) throw new Error('schedules still has failures');
+          if (![200, 202].includes(http)) throw new Error(`fresh tick HTTP ${http}: ${body?.error || body?.status || 'unknown'}`);
+          if (body?.runId !== runId) throw new Error('fresh tick run correlation mismatch');
+          if (!['completed', 'degraded'].includes(body?.status)) throw new Error(`unexpected fresh status: ${body?.status || 'missing'}`);
+          if (!summary) throw new Error('fresh durable summary missing');
+          if ((summary?.planning?.failed || 0) !== 0) throw new Error('planning has failures');
+          if ((summary?.recovery?.failed || 0) !== 0) throw new Error('recovery has failures');
+          if ((summary?.schedules?.failed || 0) !== 0) throw new Error('schedules has failures');
+          NODE
+
+          REPLAY_HTTP=$(curl --silent --show-error --max-time 90 \
+            -o replay.json -w '%{http_code}' \
+            -X POST 'https://nexus-kairo-studio.onrender.com/internal/workers/kaira/autonomous-life' \
+            -H "Authorization: Bearer ${KAIRA_INTERNAL_WORKER_SECRET}" \
+            -H 'Accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H "x-kaira-worker-run-id: ${RUN_ID}" \
+            --data '{"limit":25}')
+          export REPLAY_HTTP
+
+          HEALTH_HTTP=$(curl --silent --show-error --max-time 60 \
+            -o health.json -w '%{http_code}' \
+            'https://nexus-kairo-studio.onrender.com/internal/workers/kaira/autonomous-life/health' \
+            -H "Authorization: Bearer ${KAIRA_INTERNAL_WORKER_SECRET}" \
+            -H 'Accept: application/json')
+          export HEALTH_HTTP
+
+          node - <<'NODE'
+          const fs = require('fs');
+          const runId = process.env.RUN_ID;
+          const first = JSON.parse(fs.readFileSync('first.json', 'utf8'));
+          const replay = JSON.parse(fs.readFileSync('replay.json', 'utf8'));
+          const health = JSON.parse(fs.readFileSync('health.json', 'utf8'));
+          const replayHttp = Number(process.env.REPLAY_HTTP);
+          const healthHttp = Number(process.env.HEALTH_HTTP);
+          if (replayHttp !== 200) throw new Error(`replay HTTP ${replayHttp}`);
+          if (replay?.runId !== runId || replay?.deliveryStatus !== 'replayed') throw new Error('durable replay verification failed');
+          if (replay?.status !== first?.status) throw new Error('replay outcome drifted');
+          if (healthHttp !== 200) throw new Error(`health HTTP ${healthHttp}`);
+          if (!['healthy', 'degraded'].includes(health?.health?.status)) throw new Error(`unacceptable health: ${health?.health?.status || 'missing'}`);
+          if (health?.health?.latestRunId !== runId) throw new Error('health latestRunId mismatch');
+          const summary = first?.receipt?.summary;
+          console.log(JSON.stringify({
+            ok: true,
+            runId,
+            status: first.status,
+            deliveryStatus: first.deliveryStatus,
+            planning: summary?.planning,
+            recovery: summary?.recovery,
+            schedules: summary?.schedules,
+            replayVerified: true,
+            health: health.health.status,
+            healthLatestRunId: health.health.latestRunId,
+          }));
           NODE
