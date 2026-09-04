@@ -10,16 +10,25 @@ const positiveInteger = (value, fallback) => {
   return parsed;
 };
 
+const boundedTimeoutMs = (value, fallback) => {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 30_000 || parsed > 300_000) return fallback;
+  return parsed;
+};
+
 const baseUrl = new URL(required("KAIRA_AUTONOMOUS_LIFE_URL"));
 if (baseUrl.protocol !== "https:") throw new Error("KAIRA_AUTONOMOUS_LIFE_URL must use https");
 const secret = required("KAIRA_INTERNAL_WORKER_SECRET");
 const runId = required("KAIRA_AUTONOMOUS_LIFE_RUN_ID");
 if (!/^[A-Za-z0-9._:-]{1,160}$/.test(runId)) throw new Error("Invalid autonomous life run id");
 const limit = positiveInteger(process.env.KAIRA_AUTONOMOUS_LIFE_LIMIT, 25);
+const workerTimeoutMs = boundedTimeoutMs(process.env.KAIRA_AUTONOMOUS_LIFE_TIMEOUT_MS, 240_000);
+const replayTimeoutMs = Math.min(workerTimeoutMs, 90_000);
+const healthTimeoutMs = Math.min(workerTimeoutMs, 60_000);
 
-async function request(path, init = {}) {
+async function request(path, init = {}, timeoutMs = workerTimeoutMs) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(new URL(path, baseUrl), {
       ...init,
@@ -39,16 +48,38 @@ async function request(path, init = {}) {
       throw new Error(`Kaira worker returned non-JSON HTTP ${response.status}`);
     }
     return { response, body };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`Kaira worker request timed out after ${timeoutMs}ms: ${path}`);
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-const invoke = () => request("/internal/workers/kaira/autonomous-life", {
+const invoke = (timeoutMs = workerTimeoutMs) => request("/internal/workers/kaira/autonomous-life", {
   method: "POST",
   headers: { "x-kaira-worker-run-id": runId },
   body: JSON.stringify({ limit }),
+}, timeoutMs);
+
+const stageFailures = (summary) => ({
+  planning: Number(summary?.planning?.failed || 0),
+  recovery: Number(summary?.recovery?.failed || 0),
+  schedules: Number(summary?.schedules?.failed || 0),
 });
+
+function assertTerminalStageSuccess(body) {
+  const summary = body?.receipt?.summary;
+  if (!summary) throw new Error("Autonomous life terminal durable summary is missing");
+  const failures = stageFailures(summary);
+  const failedStages = Object.entries(failures).filter(([, failed]) => failed > 0);
+  if (failedStages.length) {
+    throw new Error(`Autonomous life stage failures: ${failedStages.map(([stage, failed]) => `${stage}=${failed}`).join(", ")}`);
+  }
+  return summary;
+}
 
 const first = await invoke();
 if (first.body?.runId !== runId) throw new Error("Autonomous life worker run correlation mismatch");
@@ -81,26 +112,27 @@ if (!["completed", "degraded", "busy"].includes(first.body?.status)) {
   throw new Error(`Unexpected autonomous life worker status: ${first.body?.status || "missing"}`);
 }
 
+const summary = first.body.status === "busy" ? undefined : assertTerminalStageSuccess(first.body);
+
 let replay = null;
 if (first.body.status !== "busy") {
-  replay = await invoke();
+  replay = await invoke(replayTimeoutMs);
   if (replay.response.status !== 200 || replay.body?.runId !== runId || replay.body?.deliveryStatus !== "replayed") {
     throw new Error("Autonomous life Firestore receipt replay verification failed");
   }
   if (replay.body?.status !== first.body?.status) {
     throw new Error("Autonomous life replay outcome drifted");
   }
+  assertTerminalStageSuccess(replay.body);
 }
 
-const health = await request("/internal/workers/kaira/autonomous-life/health");
+const health = await request("/internal/workers/kaira/autonomous-life/health", {}, healthTimeoutMs);
 if (health.response.status !== 200 || !["healthy", "degraded"].includes(health.body?.health?.status)) {
   throw new Error(`Autonomous life health verification failed: HTTP ${health.response.status} ${health.body?.health?.status || health.body?.error || "unknown"}`);
 }
 if (first.body.status !== "busy" && health.body?.health?.latestRunId !== runId) {
   throw new Error("Autonomous life health does not observe the persisted run receipt");
 }
-
-const summary = first.body?.receipt?.summary;
 
 console.log(JSON.stringify({
   ok: true,
