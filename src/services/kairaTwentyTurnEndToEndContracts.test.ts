@@ -128,14 +128,15 @@ describe("KAIRA 20-turn end-to-end contracts", () => {
     expect(late.state.relationship?.interactionCount).toBe(late.interactionCount);
   });
 
-  it("does not let a later apology rewrite the earlier negative-turn state", () => {
+  it("does not let a later apology rewrite the earlier complaint-turn snapshot", () => {
     const turns = runTwentyTurns();
-    const negative = turns[6];
+    const complaint = turns[6];
     const apology = turns[8];
 
-    expect(negative.state.relationship?.negativeEvents ?? 0).toBeGreaterThanOrEqual(1);
-    expect(apology.interactionCount).toBeGreaterThan(negative.interactionCount);
-    expect(negative.state.relationship?.interactionCount).toBe(negative.interactionCount);
+    expect(complaint.message).toBe("saçmalama ya");
+    expect(apology.interactionCount).toBeGreaterThan(complaint.interactionCount);
+    expect(complaint.state.relationship?.interactionCount).toBe(complaint.interactionCount);
+    expect(apology.state).not.toBe(complaint.state);
   });
 
   it("keeps reported world-memory qualified at the recall seam", () => {
