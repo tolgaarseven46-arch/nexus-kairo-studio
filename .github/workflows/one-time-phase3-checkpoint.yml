@@ -76,3 +76,4 @@ EOF
           git add PROJECT_STATE.md
           git commit -m "docs: checkpoint phase3 production acceptance"
           git push origin HEAD:docs/phase3-production-checkpoint
+# retrigger after workflow registration
