@@ -1,0 +1,88 @@
+name: One-time Patch Discourse Resumption Priority
+on:
+  push:
+    branches:
+      - fix/discourse-resumption-priority
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/discourse-resumption-priority
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply reducer ordering patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/services/discourseStateReducer.ts')
+          s = p.read_text()
+          old = '''  if (opensThirdPartyThread(event)) {
+    const active = prev.activeThreadId
+'''
+          new = '''  // A typed resumption signal must bind to already-open discourse context
+  // before the same compound turn is considered a fresh third-party opening.
+  // Otherwise `target=third_party + adviceRequested=true` creates a duplicate
+  // thread and destroys the very continuity this state is meant to observe.
+  if (requestsThreadResumption(event) && openThreads.length > 0) {
+    if (openThreads.length === 1) {
+      const resumed = openThreads[0];
+      resumedThreadId = resumed.id;
+      activeThreadId = resumed.id;
+      openThreads = openThreads.map((thread) =>
+        thread.id === resumed.id ? { ...thread, lastRelevantTurn: turnIndex } : thread,
+      );
+    } else {
+      ambiguousThreadResumption = true;
+    }
+    return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+  }
+
+  if (opensThirdPartyThread(event)) {
+    const active = prev.activeThreadId
+'''
+          if old not in s:
+              raise SystemExit('open-thread seam not found')
+          s = s.replace(old, new, 1)
+          old2 = '''  if (requestsThreadResumption(event)) {
+    if (openThreads.length === 1) {
+      const resumed = openThreads[0];
+      resumedThreadId = resumed.id;
+      activeThreadId = resumed.id;
+      openThreads = openThreads.map((thread) =>
+        thread.id === resumed.id ? { ...thread, lastRelevantTurn: turnIndex } : thread,
+      );
+    } else if (openThreads.length > 1) {
+      ambiguousThreadResumption = true;
+    }
+    return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+  }
+'''
+          new2 = '''  // With no existing thread, a resumption request has nothing to bind to.
+  // Fail closed instead of manufacturing context.
+  if (requestsThreadResumption(event)) {
+    return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+  }
+'''
+          if old2 not in s:
+              raise SystemExit('old resumption block not found')
+          p.write_text(s.replace(old2, new2, 1))
+          PY
+      - run: npx vitest run src/services/kairaDiscourseResumptionPriorityRegression.test.ts src/services/discourseOpenThreadContinuity.test.ts
+      - run: npx tsc --noEmit
+      - name: Commit patch
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/services/discourseStateReducer.ts
+          git commit -m "fix(discourse): prioritize typed thread resumption"
+          git push origin HEAD:fix/discourse-resumption-priority
