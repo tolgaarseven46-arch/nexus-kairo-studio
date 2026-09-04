@@ -7,7 +7,11 @@ import { projectSemanticEvent } from "./semanticInterpretationProjection";
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
 
 export type SemanticRelationshipScope = "kaira_user" | "third_party" | "event" | "unknown";
-export type AppraisalSemanticEvent = SemanticEvent & { relationshipScope?: SemanticRelationshipScope };
+export type AppraisalSemanticEvent = SemanticEvent & {
+  relationshipScope?: SemanticRelationshipScope;
+  /** Read-only projection of the canonical interpretation uncertainty. */
+  semanticUncertainty?: number;
+};
 
 export interface TurkishMorphToken {
   surface: string; normalized?: string; lemma?: string; pos?: string; morphemes?: string[]; confidence?: number;
@@ -81,7 +85,16 @@ function buildResult(
 ): LanguageUnderstandingResult {
   const projected = projectSemanticEvent(interpretation);
   const grounded = groundSemanticEventForAppraisal(message, projected, entityResolution);
-  return { interpretation, event: grounded.event, entityResolution, worldEvent: grounded.worldEvent, ...rest };
+  return {
+    interpretation,
+    event: {
+      ...grounded.event,
+      semanticUncertainty: interpretation.uncertainty.overall,
+    },
+    entityResolution,
+    worldEvent: grounded.worldEvent,
+    ...rest,
+  };
 }
 
 /**
