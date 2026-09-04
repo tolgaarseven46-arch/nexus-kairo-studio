@@ -51,6 +51,20 @@ function sameReceipt(receipt: KairaActivityProposalRecoveryReceipt, value: Retur
     && receipt.proposalId === value.proposalId;
 }
 
+export function buildReclaimedKairaActivityProposalRecoveryReceipt(input: {
+  existing: KairaActivityProposalRecoveryReceipt;
+  claimedAt: string;
+  leaseUntil: string;
+}): KairaActivityProposalRecoveryReceipt {
+  const { completedAt: _completedAt, outcome: _outcome, ...activeReceipt } = input.existing;
+  return {
+    ...activeReceipt,
+    status: "claimed",
+    claimedAt: input.claimedAt,
+    leaseUntil: input.leaseUntil,
+  };
+}
+
 export async function claimKairaActivityProposalRecovery(input: {
   ownerUserId: string;
   kairaInstanceId: string;
@@ -73,14 +87,11 @@ export async function claimKairaActivityProposalRecovery(input: {
       if (existing.status === "completed") return { status: "replayed", receipt: existing } as const;
       const leaseUntilMs = Date.parse(existing.leaseUntil);
       if (Number.isFinite(leaseUntilMs) && leaseUntilMs > nowMs) return { status: "busy", receipt: existing } as const;
-      const reclaimed: KairaActivityProposalRecoveryReceipt = {
-        ...existing,
-        status: "claimed",
+      const reclaimed = buildReclaimedKairaActivityProposalRecoveryReceipt({
+        existing,
         claimedAt: new Date(nowMs).toISOString(),
         leaseUntil: new Date(nowMs + leaseMinutes * 60_000).toISOString(),
-        completedAt: undefined,
-        outcome: undefined,
-      };
+      });
       transaction.set(ref, reclaimed);
       return { status: "reclaimed", receipt: reclaimed } as const;
     }
