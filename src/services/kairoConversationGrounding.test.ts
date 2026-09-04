@@ -171,6 +171,13 @@ describe("Kaira conversation grounding", () => {
     expect(
       sanitizeKairoReplyText("[Kairo → Ali]: Kanka son durum net değil."),
     ).toBe("Kanka son durum net değil.");
+    expect(
+      sanitizeKairoReplyText("[Kaira → Ali]: Kanka son durum net değil."),
+    ).toBe("Kanka son durum net değil.");
+    expect(
+      sanitizeKairoReplyText("[Kaİra → Ali]: Tamam, soru yok."),
+    ).toBe("Tamam, soru yok.");
     expect(sanitizeKairoReplyText("Kairo: Selam kanka.")).toBe("Selam kanka.");
+    expect(sanitizeKairoReplyText("Kaira: Selam kanka.")).toBe("Selam kanka.");
   });
 });

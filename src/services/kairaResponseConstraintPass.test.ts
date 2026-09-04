@@ -157,4 +157,32 @@ describe("Kaira unified response constraint pass", () => {
     expect(result.issues).toEqual([]);
     expect(result.consistency.accepted).toBe(true);
   });
+
+  it("treats lower-authority delivery-quality failures as pre-delivery fallback triggers", () => {
+    const result = runKairaResponseConstraintPass({
+      reply: "Hatırladığım kayda göre:",
+      trace: trace({
+        messageInterpretation: { intent: "duygusal_paylasim", sentiment: "nötr" } as any,
+      }),
+      plan: plan({
+        move: "invite_emotional_context",
+        allowQuestion: true,
+        maxWords: 3,
+      }),
+      worldItems: neutralWorld.items,
+      worldContext: neutralWorld.context,
+      selfMemoryRuntime: noSelfMemory,
+      epistemicContext: null,
+      additionalIssueFinder: (reply) =>
+        /^(?:hmm\s+)?(?:niye|neden|ne oldu|noldu|hayırdır)(?:\s+ya)?[?…]*$/iu.test(reply.trim())
+          ? []
+          : ["İlk duygusal açılış tek kısa merak tepkisinin dışına çıktı"],
+      fallbackFactory: () => "hmm niye",
+    });
+
+    expect(result.reply).toBe("hmm niye");
+    expect(result.fallbackUsed).toBe(true);
+    expect(result.issues).toEqual([]);
+    expect(result.consistency.accepted).toBe(true);
+  });
 });

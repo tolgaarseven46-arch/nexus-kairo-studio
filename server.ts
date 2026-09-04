@@ -1200,6 +1200,12 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           worldContext: worldReasoningContext,
           selfMemoryRuntime,
           epistemicContext: epistemicAccess,
+          additionalIssueFinder: (candidateReply) => [
+            ...findKairoGroundingIssues(candidateReply, cleanHistory, userMessage),
+            ...findDialogueAttributionIssues(candidateReply, cleanHistory, userMessage, userName, dialogueAnalysis),
+            ...findDialogueDecisionIssues(candidateReply, dialogueDecision, dialogueOutputStyle),
+            ...findKairoResponseRhythmIssues(candidateReply, cleanHistory, dialogueDecision.move, speech.relationshipLevel),
+          ],
           fallbackFactory: () =>
             buildGroundedDialogueFallback(
               dialogueDecision,
