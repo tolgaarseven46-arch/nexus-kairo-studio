@@ -1391,3 +1391,17 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Run evidence-driven real multi-turn KNT conversation-quality characterization on the canonical live path. Inspect per-turn semantic snapshot, reaction/relationship state, response plan, provider route and final delivered text together. Prioritize naturalness/speech-identity/long-session failures that are reproducible; do not add speculative semantic rules or reopen the stabilized provider.
+
+## 140. Question-stop relationship target and production acceptance — PR #53–#55 — 2026-09-04
+- PR #53 closed the pure question-only stop severity leak: live `soru sorma artık` no longer creates relationship injury while still enforcing `allowQuestion=false`.
+- PR #54 merged as `61c235771fcb88d17c84aa2f0d99043213d63430`. ADR-0029 and `kdmRelationshipReducerBridge.ts` now treat typed question-only stop facets (`stopQuestions=true`, `stopTalking=false`, `stopRequest=false`) as interlocutor/dyadic target evidence when grounded scope is neither `third_party` nor `event`. No raw-text reparse was added.
+- PR #55 merged as `69e4843cb7572116bf16988cc4dd0162060b9a94`. Permanent canonical runtime regressions now execute `analyzeKdmInteractionCanonicalTurn` and lock both sides of the boundary: pure question-only stop remains injury-free; combined insult + question-only stop with provider `target=unknown` and preserved disrespect creates relationship injury.
+- PR #55 passed architecture contracts, autonomous runtime contracts, beta runtime regression, beta conversation acceptance, full Vitest, TypeScript, production build, behavior/docs guards and Architecture Review before merge.
+- Render deploy `dep-dad8948ae00c73dkpik0` became live from exact feature merge `69e4843cb7572116bf16988cc4dd0162060b9a94`.
+- Final production canonical smoke passed on workflow run `33855735001`:
+  - pure `soru sorma artık`: `stopQuestions=true`, `stopTalking=false`, `stopRequest=false`, `reactionMode=neutral`, `conflictScore=0`, `hurtScore=0`, `negativeEvents=0`, `allowQuestion=false`;
+  - provider edge case `salak, soru sorma artık`: canonical language-understanding returned `target=unknown`, `primaryIntent=command`, `secondarySocialActs=[insult]`, `disrespect=0.4`, `coercion=0.4`, `aggression=0.3`, `stopQuestions=true`, `stopTalking=false`, `stopRequest=false`; feeding that exact typed snapshot into `/api/chat` produced `reactionMode=irritated`, `conflictScore=4`, `hurtScore=6`, `negativeEvents=1`, `allowQuestion=false`.
+- Conclusion: the measured question-stop edge case is closed in production. Semantic ingestion remains the single classification authority; the relationship bridge only projects typed discourse evidence plus grounded scope.
+
+### Next verified development question
+- Return to evidence-driven live multi-turn conversation-quality characterization. Inspect semantic snapshot, relationship/reaction state, response plan, provider route and final delivered text together; patch only newly reproduced failures. Do not reopen the question-stop target/severity chain without new production evidence.
