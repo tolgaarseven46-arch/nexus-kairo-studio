@@ -19,6 +19,7 @@ import {
 } from "./discourseSocialAct";
 import {
   EMPTY_DISCOURSE_STATE,
+  type DiscourseOpenThread,
   type DiscoursePendingQuestion,
   type DiscoursePreviousTurnDependency,
   type DiscourseSocialAct,
@@ -28,6 +29,7 @@ import {
 
 const REPEAT_WINDOW = 2; // consecutive-window for routine saturation
 const SELF_REPEAT_WINDOW = 6; // turnIndex span for Kaira self-repetition
+const MAX_OPEN_THREADS = 3;
 const TRACKED_SELF_REPEAT_ACTS = new Set<DiscourseSocialAct>([
   "greeting",
   "how_are_you",
@@ -76,6 +78,96 @@ function isShortIntent(event: SemanticEvent): boolean {
     event.intent === "general_chat" ||
     (event.socialRoutine ?? "none") !== "none"
   );
+}
+
+function opensThirdPartyThread(event: SemanticEvent): boolean {
+  if (event.target !== "third_party") return false;
+  if (event.discourseAct === "recall_request") return false;
+  return (
+    event.intent === "emotional_share" ||
+    event.intent === "complaint" ||
+    event.intent === "general_chat" ||
+    event.insult ||
+    event.frustration >= 0.2 ||
+    event.emotionalLoad >= 0.25 ||
+    event.valence !== "neutral"
+  );
+}
+
+function requestsThreadResumption(event: SemanticEvent): boolean {
+  if (event.target === "kaira") return false;
+  return Boolean(event.adviceRequested || event.discourseAct === "recall_request");
+}
+
+function appendAnchorEvidence(existing: string, next: string): string {
+  const current = existing.trim();
+  const incoming = next.trim();
+  if (!incoming || current === incoming) return current;
+  const combined = current ? `${current} | ${incoming}` : incoming;
+  return combined.length <= 420 ? combined : combined.slice(combined.length - 420);
+}
+
+function updateThreadState(
+  prev: DiscourseState,
+  event: SemanticEvent,
+  message: string,
+  turnIndex: number,
+): Pick<
+  DiscourseState,
+  "openThreads" | "activeThreadId" | "resumedThreadId" | "ambiguousThreadResumption"
+> {
+  let openThreads = prev.openThreads;
+  let activeThreadId: string | null = null;
+  let resumedThreadId: string | null = null;
+  let ambiguousThreadResumption = false;
+
+  if (opensThirdPartyThread(event)) {
+    const active = prev.activeThreadId
+      ? openThreads.find((thread) => thread.id === prev.activeThreadId)
+      : null;
+    if (active && event.discourseAct !== "topic_shift") {
+      openThreads = openThreads.map((thread) =>
+        thread.id === active.id
+          ? {
+              ...thread,
+              anchorText: appendAnchorEvidence(thread.anchorText, message),
+              lastRelevantTurn: turnIndex,
+            }
+          : thread,
+      );
+      activeThreadId = active.id;
+      return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+    }
+
+    const created: DiscourseOpenThread = {
+      id: `third-party-thread-${turnIndex}`,
+      kind: "third_party_topic",
+      anchorText: message.trim(),
+      openedAtTurn: turnIndex,
+      lastRelevantTurn: turnIndex,
+    };
+    openThreads = [...openThreads, created].slice(-MAX_OPEN_THREADS);
+    activeThreadId = created.id;
+    return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+  }
+
+  if (requestsThreadResumption(event)) {
+    if (openThreads.length === 1) {
+      const resumed = openThreads[0];
+      resumedThreadId = resumed.id;
+      activeThreadId = resumed.id;
+      openThreads = openThreads.map((thread) =>
+        thread.id === resumed.id ? { ...thread, lastRelevantTurn: turnIndex } : thread,
+      );
+    } else if (openThreads.length > 1) {
+      ambiguousThreadResumption = true;
+    }
+    return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+  }
+
+  // Unrelated user turns suspend the active topic without deleting unresolved
+  // thread evidence. A later typed resumption may make it active again.
+  return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
 }
 
 /**
@@ -179,12 +271,15 @@ export function reduceDiscourseState(
       pendingQuestion = { asker: "user", kind: act, askedAtTurn: turnIndex, answered: false };
     }
 
+    const threadState = updateThreadState(prev, turn.event, turn.message, turnIndex);
+
     return {
       ...prev,
       turnIndex,
       routines,
       pendingQuestion,
       previousTurnDependency,
+      ...threadState,
       lastUserAct: act,
     };
   }
@@ -220,6 +315,8 @@ export function reduceDiscourseState(
     // Kaira's own turn does not "depend on" anything for the next user turn;
     // clear so a stale dependency never leaks forward.
     previousTurnDependency: null,
+    resumedThreadId: null,
+    ambiguousThreadResumption: false,
     lastKairaAct: act,
   };
 }
@@ -231,7 +328,7 @@ export function reduceDiscourseState(
  * reply, so delivered Kaira turns still feed self-observation directly.
  */
 export function deriveDiscourseState(
-  history: Array<{ sender?: string; text?: string; semanticInterpretation?: SemanticInterpretation }>, 
+  history: Array<{ sender?: string; text?: string; semanticInterpretation?: SemanticInterpretation }>,
   current?: { message: string; event: SemanticEvent },
 ): DiscourseState {
   let state = EMPTY_DISCOURSE_STATE;
@@ -291,11 +388,23 @@ export function buildDiscourseObservationalInstruction(state: DiscourseState): s
       }. Bunu selamlama veya yeni konu sanma.`,
     );
   }
+  if (state.resumedThreadId) {
+    const thread = state.openThreads.find((item) => item.id === state.resumedThreadId);
+    if (thread) {
+      lines.push(
+        `- Kullanıcı daha önce açık bırakılmış bir üçüncü-kişi konusuna geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni olay, kimlik veya kesinlik uydurma.`,
+      );
+    }
+  } else if (state.ambiguousThreadResumption) {
+    lines.push(
+      `- Kullanıcının dönüş yapabileceği birden fazla açık üçüncü-kişi konusu var. Hangisini kastettiğini UYDURMA; gerekiyorsa kısa netleştirme iste.`,
+    );
+  }
   if (state.selfRepeat) {
     lines.push(
       `- Kaira son turlarda "${state.selfRepeat.act}" sosyal işini ${state.selfRepeat.count} kez tekrarladı. Kullanıcı bunu fark ederse kabul et / kısa özür / düzelt; kör "anladım/tamam" ile geçiştirme.`,
     );
   }
-  if (lines.length === 1) lines.push("- Belirgin rutin doygunluğu, bağımlılık veya tekrar yok.");
+  if (lines.length === 1) lines.push("- Belirgin rutin doygunluğu, bağımlılık, thread dönüşü veya tekrar yok.");
   return lines.join("\n");
 }
