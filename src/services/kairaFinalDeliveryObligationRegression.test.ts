@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { ReasoningTrace } from "../types/nexus";
 import type { KairaResponsePlan } from "./kairaResponsePlan";
 import {
-  buildKairaDialogueObligationFallback,
-  findKairaDialogueObligationIssues,
-} from "./kairaDialogueObligation";
+  findDialogueDecisionIssues,
+  planDialogueResponse,
+  type DialogueDecisionPlan,
+} from "./kairoDialogueDecisionEngine";
 import { runKairaResponseConstraintPass } from "./kairaResponseConstraintPass";
 
 const trace = {
@@ -21,7 +22,7 @@ const trace = {
   },
 } as ReasoningTrace;
 
-const plan = (overrides: Partial<KairaResponsePlan> = {}): KairaResponsePlan => ({
+const responsePlan = (overrides: Partial<KairaResponsePlan> = {}): KairaResponsePlan => ({
   move: "answer_or_clarify",
   stance: "open",
   register: "balanced",
@@ -51,68 +52,87 @@ const worldContext = {
   },
 } as any;
 
+const answerDecision = (): DialogueDecisionPlan =>
+  planDialogueResponse(
+    [],
+    "sence abartıyor muyum?",
+    "Mert",
+    {
+      intent: "question",
+      discourseAct: "none",
+      socialRoutine: "none",
+      repairSignal: "none",
+      adviceRequested: true,
+    } as any,
+  );
+
 describe("final delivery obligation preservation", () => {
-  it("rejects acknowledgement-only text for answer_or_clarify", () => {
-    for (const reply of ["tamam", "he anladım", "peki", "aynen"]) {
-      expect(findKairaDialogueObligationIssues(reply, plan())).not.toEqual([]);
+  it("makes fulfillment criteria an explicit DialogueDecision-owned output", () => {
+    const decision = answerDecision();
+    expect(decision.move).toBe("answer_or_clarify");
+    expect(decision.obligation).toEqual({
+      type: "answer_or_clarify",
+      satisfactionCriteria: {
+        forbiddenResponseClasses: ["acknowledgement_only"],
+        allowedResolutions: [
+          "fulfill_now",
+          "clarify",
+          "decline_explicit",
+          "defer_explicit",
+        ],
+      },
+    });
+  });
+
+  it("rejects acknowledgement-only delivery by consuming the decision-owned criterion", () => {
+    const decision = answerDecision();
+    for (const reply of ["tamam", "peki", "aynen", "anladım"]) {
+      expect(findDialogueDecisionIssues(reply, decision)).toContain(
+        "DialogueDecision obligation karşılanmadı: answer_or_clarify yalnız acknowledgement ile kapatılamaz",
+      );
     }
-  });
-
-  it("does not globally ban short acknowledgements on neighboring moves", () => {
-    expect(
-      findKairaDialogueObligationIssues("tamam", plan({ move: "natural_reaction" })),
-    ).toEqual([]);
-    expect(
-      findKairaDialogueObligationIssues("he doğru", plan({ move: "acknowledge_correction" })),
-    ).toEqual([]);
-  });
-
-  it("provides an explicit non-fabricating outcome for answer_or_clarify only", () => {
-    expect(buildKairaDialogueObligationFallback(plan())).toBe(
-      "buna şu an net cevap veremem",
+    expect(findDialogueDecisionIssues("bence abartmıyorsun", decision)).not.toContain(
+      "DialogueDecision obligation karşılanmadı: answer_or_clarify yalnız acknowledgement ile kapatılamaz",
     );
-    expect(
-      buildKairaDialogueObligationFallback(plan({ move: "natural_reaction" })),
-    ).toBeNull();
   });
 
-  it("does not let an acknowledgement fallback erase an active answer obligation", () => {
+  it("does not invent an obligation for neighboring social moves", () => {
+    const decision = planDialogueResponse(
+      [],
+      "naber",
+      "Mert",
+      {
+        intent: "general_chat",
+        discourseAct: "none",
+        socialRoutine: "how_are_you",
+        repairSignal: "none",
+        adviceRequested: false,
+      } as any,
+    );
+    expect(decision.move).toBe("natural_reaction");
+    expect(decision.obligation).toBeUndefined();
+    expect(findDialogueDecisionIssues("tamam", decision)).not.toContain(
+      "DialogueDecision obligation karşılanmadı: answer_or_clarify yalnız acknowledgement ile kapatılamaz",
+    );
+  });
+
+  it("final guard refuses an invalid acknowledgement fallback instead of authoring a replacement", () => {
+    const decision = answerDecision();
     const result = runKairaResponseConstraintPass({
-      // Invalid first candidate: asks a question while this concrete plan has
-      // questions disabled. This forces the canonical replacement path.
       reply: "sen ne düşünüyorsun?",
       trace,
-      plan: plan(),
+      plan: responsePlan(),
       worldItems: [],
       worldContext,
       selfMemoryRuntime: { status: "not_requested" } as any,
       epistemicContext: null,
-      // Deliberately behaviorally empty fallback; it must be rejected by the
-      // same obligation contract before delivery.
+      additionalIssueFinder: (reply) => findDialogueDecisionIssues(reply, decision),
       fallbackFactory: () => "tamam",
     });
 
-    expect(result.fallbackUsed).toBe(true);
-    expect(result.reply).toBe("buna şu an net cevap veremem");
-    expect(findKairaDialogueObligationIssues(result.reply, plan())).toEqual([]);
-    expect(result.issues).toEqual([]);
-    expect(result.consistency.accepted).toBe(true);
-  });
-
-  it("preserves the legacy generic fallback on a social move where acknowledgement is valid", () => {
-    const socialPlan = plan({ move: "natural_reaction" });
-    const result = runKairaResponseConstraintPass({
-      reply: "sen ne düşünüyorsun?",
-      trace,
-      plan: socialPlan,
-      worldItems: [],
-      worldContext,
-      selfMemoryRuntime: { status: "not_requested" } as any,
-      epistemicContext: null,
-    });
-
-    expect(result.reply).toBe("tamam");
-    expect(result.issues).toEqual([]);
-    expect(result.consistency.accepted).toBe(true);
+    expect(result.fallbackUsed).toBe(false);
+    expect(result.reply).toBe("sen ne düşünüyorsun?");
+    expect(result.issues.length).toBeGreaterThan(0);
+    expect(result.consistency.accepted).toBe(false);
   });
 });
