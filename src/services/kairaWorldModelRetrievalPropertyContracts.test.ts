@@ -95,14 +95,14 @@ describe("Kaira world-model/retrieval property contracts", () => {
     }
   });
 
-  it("keeps generated reported facts persistable and participant-grounded", () => {
+  it("keeps generated reported claims participant-grounded without promoting them to world truth", () => {
     for (const name of NAMES) {
       for (const claim of CLAIMS) {
         const message = `${name} bana ${claim.text}`;
         const { event } = canonical(message);
         const classification = classifyWorldEventObservation(event);
 
-        expect(classification.persist, message).toBe(true);
+        expect(classification.persist, message).toBe(false);
         expect(classification.kind, message).toBe("reported_claim");
         expect(event.actor?.name, message).toBe(name);
         expect(event.target?.name, message).toBe("Mert");
