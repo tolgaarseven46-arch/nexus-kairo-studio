@@ -109,3 +109,7 @@ If the decision-owned obligation is removed while all other code remains, `answe
 ## Stop condition
 
 If preserving this obligation requires changing relationship state, memory ownership, or adding a new top-level layer, stop and reclassify the finding before implementation. This phase is accepted only if the existing DialogueDecision → ResponsePlan → normal realization → final-delivery contract can own the fix cleanly.
+
+## Final-review note
+
+The Phase-1 merge gate is intentionally stricter than “CI green”: if any test still requires a guard-authored canned reply, a duplicate fulfillment criterion, or source-text spelling as a behavioral contract, Phase 1 is not complete even if the runtime example passes. The architecture claim and the test contract must agree before merge.
