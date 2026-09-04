@@ -1,0 +1,26 @@
+name: One-time relationship complaint production smoke
+on:
+  push:
+    branches:
+      - chatgpt/relationship-complaint-prod-smoke
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Characterize live complaint handling
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="https://nexus-kairo-studio.onrender.com"
+          USER_ID="prod_relationship_complaint_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          SESSION_ID="session_${USER_ID}"
+          body='{"userId":"'"${USER_ID}"'","userName":"Tolga","userMessage":"bişey anlatmadınki sohbet bile edemedik","character":{"name":"KAIRO"},"provider":"openrouter","sessionId":"'"${SESSION_ID}"'","kairaInstanceId":"default-kaira","requestId":"complaint-'"${GITHUB_RUN_ID}"'","history":[]}'
+          response="$(curl --fail-with-body --silent --show-error -X POST "${BASE_URL}/api/chat" -H 'Content-Type: application/json' --data-binary "${body}")"
+          echo "$response" | jq '{reply, semantic: .kdm.semanticEvent, relationship: .kdm.nextDynamicState.relationship, reactionMode: .kdm.nextDynamicState.reactionMode, reasoning: .kdm.reasoningTrace.messageInterpretation}'
+          intent="$(echo "$response" | jq -r '.kdm.semanticEvent.intent // ""')"
+          conflict="$(echo "$response" | jq -r '.kdm.nextDynamicState.relationship.conflictScore // 0')"
+          hurt="$(echo "$response" | jq -r '.kdm.nextDynamicState.relationship.hurtScore // 0')"
+          negative="$(echo "$response" | jq -r '.kdm.nextDynamicState.relationship.negativeEvents // 0')"
+          echo "OBSERVED intent=${intent} conflict=${conflict} hurt=${hurt} negativeEvents=${negative}"
