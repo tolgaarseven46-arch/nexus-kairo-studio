@@ -104,11 +104,12 @@ DISCOURSE FACET OPERASYONEL EŞLEMELERİ:
 - "moralim bozuk", "modum yok", "canım sıkkın" gibi sebebi henüz açılmamış düşük-mod paylaşımı = primaryIntent:emotional_share + socialRoutine:emotional_opening. Açık tavsiye isteği de varsa adviceRequested:true; emotional_opening etiketi tavsiye talebini silmez.
 - "nasıl yani", "anlamadım" önceki Kaira içeriğinin açıklanmasını istiyorsa discourseAct:confusion_or_challenge + repairSignal:clarification_request.
 - "ne alaka", "bunun konuyla ne ilgisi var" önceki Kaira içeriğinin alakasını sorguluyorsa discourseAct:confusion_or_challenge + repairSignal:relevance_challenge.
-- Genel şikâyet veya olumsuz değerlendirme tek başına repairSignal üretmez. repairSignal yalnız kullanıcının önceki Kaira içeriğini açıklatma/alaka düzeltme talebidir; davranış kararı değildir.
+- Genel şikâyet veya olumsuz değerlendirme tek başına repairSignal üretmez. Örnek: "bu cevap saçma olmuş" = primaryIntent:complaint + discourseAct:confusion_or_challenge + repairSignal:none. Bunu correction veya clarification_request olarak yükseltme. repairSignal yalnız kullanıcının önceki Kaira içeriğini AÇIKÇA açıklatma/alaka düzeltme talebidir; davranış kararı değildir.
+- repairSignal yalnız discourseAct:confusion_or_challenge ile birlikte kullanılabilir ve önceki bağlamda açıklanabilecek bir Kaira mesajı yoksa repairSignal:none olmalıdır.
 - "Mert yarın ne yapacaktı?", "Mert ne demişti?", "hatırlıyor musun ne olacaktı?" geçmiş konuşmadaki kişi/olay bilgisini geri çağırıyorsa discourseAct:recall_request. Yeni genel bilgi sorusu recall_request değildir.
-- "Mert bana salak dedi", "Ayşe ona kızmış" gibi üçüncü kişi hakkında bildirilen söz/olayda target:third_party kullan; alıntıdaki hakareti Kaira'ya yöneltilmiş saldırı sayma.
-- Yalnız "salak" gibi hedefi belirsiz tek hakaret sözcüğünde target:unknown, primaryIntent:other, secondarySocialActs içinde insult YOK, uncertainty yüksek ve severity temkinli olmalı; bu yalnız lexical candidate kanıtıdır. "sen salaksın" / "Kaira sen salaksın" gibi açık ikinci-şahıs hedefinde target:kaira ve gerçek hostility kanıtına uygun primaryIntent:insult / insult act / severity üret.
-- "soru sorma artık" = stopQuestions:true, stopTalking:false, stopRequest:false. "sus artık", "konuşma artık" = stopTalking:true + stopRequest:true; stopQuestions yalnız mesaj ayrıca soruları da durduruyorsa true.
+- "Mert bana salak dedi" gibi üçüncü kişinin bildirilmiş sözünde target:third_party kullan; bildirilen söz açık hakaret içeriyorsa secondarySocialActs içinde insult KORUNUR. Bu act bildirilen içeriği tarif eder, Kaira'ya yöneltilmiş saldırı anlamına gelmez. "Ayşe ona kızmış" gibi hakaret içermeyen üçüncü kişi olayı insult act üretmez.
+- Yalnız "salak" gibi hedefi belirsiz tek hakaret sözcüğünde target:unknown, primaryIntent:other, secondarySocialActs içinde insult YOK, uncertainty.overall EN AZ 0.70, uncertainty.target EN AZ 0.80 ve disrespect en fazla 0.30 olmalı; bu yalnız lexical candidate kanıtıdır. "sen salaksın" / "Kaira sen salaksın" gibi açık ikinci-şahıs hedefinde target:kaira ve gerçek hostility kanıtına uygun primaryIntent:insult / insult act / severity üret.
+- "soru sorma artık" = stopQuestions:true, stopTalking:false, stopRequest:false ve secondarySocialActs içinde stop_request YOK. "sus artık", "konuşma artık" = stopTalking:true + stopRequest:true; stop_request secondary act yalnız tam konuşmayı durdurma anlamı varsa kullanılabilir. stopQuestions yalnız mesaj ayrıca soruları da durduruyorsa true.
 - "moralim bozuk, ne yapmalıyım?", "sence ne yapayım?" gibi açık öneri/tavsiye talebi = adviceRequested:true. Düz duygu paylaşımı veya bilgi sorusu adviceRequested değildir.
 Bu örnekler karar/policy üretmez; yalnız canonical utterance semantiğini sabitler.
 
@@ -146,6 +147,33 @@ function extractJson(text: string): unknown {
   }
 }
 
+function enforceProviderFieldInvariants(
+  interpretation: SemanticInterpretation,
+  context?: LanguageUnderstandingContext,
+): SemanticInterpretation {
+  const hasPriorAssistantTurn = context?.recentMessages?.some((item) => item.role === "assistant") ?? false;
+  const repairAllowed =
+    hasPriorAssistantTurn &&
+    interpretation.discourseFacets.discourseAct === "confusion_or_challenge";
+  const repairSignal = repairAllowed
+    ? interpretation.discourseFacets.repairSignal
+    : "none";
+  const stopTalking = interpretation.discourseFacets.stopTalking;
+  const secondarySocialActs = stopTalking
+    ? interpretation.secondarySocialActs
+    : interpretation.secondarySocialActs.filter((act) => act !== "stop_request");
+
+  return {
+    ...interpretation,
+    secondarySocialActs,
+    stopRequest: stopTalking,
+    discourseFacets: {
+      ...interpretation.discourseFacets,
+      repairSignal,
+    },
+  };
+}
+
 export function createLlmSemanticUnderstandingProvider(options: LlmSemanticProviderOptions): SemanticUnderstandingProvider {
   return {
     name: options.name ?? "llm_semantic_parser_v2",
@@ -158,7 +186,10 @@ export function createLlmSemanticUnderstandingProvider(options: LlmSemanticProvi
       if (parsed.schemaVersion !== SEMANTIC_INTERPRETATION_SCHEMA_VERSION || !isSemanticInterpretation(parsed)) {
         throw new Error("LLM semantic parser incomplete/invalid SemanticInterpretation@2 returned.");
       }
-      const normalized = normalizeSemanticInterpretation(parsed, message);
+      const normalized = enforceProviderFieldInvariants(
+        normalizeSemanticInterpretation(parsed, message),
+        context,
+      );
       normalized.evidence = normalized.evidence.length
         ? normalized.evidence.map((e) => ({ ...e, source: "llm", provider: e.provider ?? options.name ?? "llm_semantic_parser_v2" }))
         : [{ source: "llm", provider: options.name ?? "llm_semantic_parser_v2", cues: [], confidence: Math.max(0, 1 - normalized.uncertainty.overall) }];
