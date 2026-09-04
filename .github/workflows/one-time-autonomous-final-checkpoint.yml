@@ -10,15 +10,16 @@ permissions:
 
 jobs:
   append:
-    if: ${{ !contains(github.event.head_commit.message, '[checkpoint-appended]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           ref: docs/autonomous-life-final-checkpoint
           fetch-depth: 0
-      - name: Append verified checkpoint
+      - name: Append verified checkpoint and self-remove
+        shell: bash
         run: |
+          set -euo pipefail
           cat >> PROJECT_STATE.md <<'EOF'
 
 
@@ -47,8 +48,9 @@ jobs:
 - Do not reopen planning-inbox idempotency, recovery reclaim, proposal correlation, or scheduler timeout/failure acceptance without a new measured production regression.
 - Next development work should be derived from the current `main` plus this checkpoint and should return to evidence-driven Kaira product behavior/quality work rather than repeating this production recovery chain.
 EOF
+          git rm .github/workflows/one-time-autonomous-final-checkpoint.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add PROJECT_STATE.md
-          git commit -m "docs: close autonomous-life production hardening [checkpoint-appended]"
+          git commit -m "docs: close autonomous-life production hardening"
           git push origin HEAD:docs/autonomous-life-final-checkpoint
