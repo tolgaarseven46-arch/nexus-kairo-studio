@@ -1,0 +1,26 @@
+name: One-time Recovery Item Error
+
+on:
+  push:
+    branches:
+      - diag/recovery-item-error
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Call proposal recovery worker and print item result
+        env:
+          KAIRA_AUTONOMOUS_LIFE_URL: https://nexus-kairo-studio.onrender.com
+          KAIRA_INTERNAL_WORKER_SECRET: ${{ secrets.KAIRA_INTERNAL_WORKER_SECRET }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -X POST "${KAIRA_AUTONOMOUS_LIFE_URL}/internal/workers/kaira/proposal-recovery" \
+            -H "Authorization: Bearer ${KAIRA_INTERNAL_WORKER_SECRET}" \
+            -H "Content-Type: application/json" \
+            -H "x-kaira-worker-run-id: diag-recovery-${GITHUB_RUN_ID}" \
+            --data '{"limit":25}'
