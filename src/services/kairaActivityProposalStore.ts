@@ -21,11 +21,30 @@ function proposalDocumentId(record: Pick<KairaActivityProposalRecord, "ownerUser
   return `${kairaOwnerScope(record.ownerUserId, record.kairaInstanceId)}__proposal__${record.proposalId}`.slice(0, 480);
 }
 
-const stableCandidate = (record: KairaActivityProposalRecord) => JSON.stringify({
+function canonicalJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJsonValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right, "en-US"))
+        .map(([key, nested]) => [key, canonicalJsonValue(nested)]),
+    );
+  }
+  return value;
+}
+
+const stableCandidate = (record: KairaActivityProposalRecord) => JSON.stringify(canonicalJsonValue({
   instanceType: record.instanceType,
   proposalId: record.proposalId,
   selected: record.selected,
-});
+}));
+
+export function sameKairaActivityProposalCorrelation(
+  left: KairaActivityProposalRecord,
+  right: KairaActivityProposalRecord,
+): boolean {
+  return stableCandidate(left) === stableCandidate(right);
+}
 
 export type KairaActivityProposalCreateResult =
   | { status: "created"; record: KairaActivityProposalRecord }
@@ -39,7 +58,7 @@ export async function createKairaActivityProposalAtomic(
     const snapshot = await transaction.get(ref);
     if (snapshot.exists()) {
       const existing = snapshot.data() as KairaActivityProposalRecord;
-      if (stableCandidate(existing) !== stableCandidate(record)) {
+      if (!sameKairaActivityProposalCorrelation(existing, record)) {
         throw new Error("Kaira activity proposal idempotency conflict");
       }
       return { status: "existing", record: existing } as const;
@@ -89,7 +108,7 @@ export async function markKairaActivityProposalMaterializedAtomic(input: {
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists()) throw new Error("Kaira activity proposal not found");
     const stored = snapshot.data() as KairaActivityProposalRecord;
-    if (stableCandidate(stored) !== stableCandidate(input.record)) {
+    if (!sameKairaActivityProposalCorrelation(stored, input.record)) {
       throw new Error("Kaira activity proposal correlation mismatch");
     }
     if (stored.status === "materialized") return stored;
