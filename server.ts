@@ -36,6 +36,7 @@ import {
   clearTestSession,
 } from "./src/services/kdmPersistenceService";
 import { validateMemoryAgainstMessage } from "./src/services/kairoMemoryConsistency";
+import { persistentMemoryFetchLimitForDialogueMove, FAST_RECENT_MEMORY_LIMIT } from "./src/services/kairaPersistentMemoryRetrievalPolicy";
 import {
   enforceKairoResponse,
   findKairoAffectiveResponseIssues,
@@ -277,7 +278,7 @@ async function getFastRecentMemory(userId: string, kairaInstanceId: string) {
   const c = memoryCache.get(cacheKey);
   if (c && c.expires > Date.now()) return c.items;
   const scopedUserId = stateOwnerScope(userId, kairaInstanceId);
-  const loader = loadRecentKdmMemory(6, scopedUserId)
+  const loader = loadRecentKdmMemory(FAST_RECENT_MEMORY_LIMIT, scopedUserId)
     .then(
       (items) => (
         memoryCache.set(cacheKey, { expires: Date.now() + MEMORY_TTL_MS, items }),
@@ -711,7 +712,14 @@ app.post("/api/chat", async (req, res) => {
     const memoryStart = now();
     const [persistedState, persistentMemory] = await Promise.all([
       kairaPolicy.persistentRelationship ? loadKdmState(stateUserId).catch(() => null) : Promise.resolve(null),
-      suppressRecentMemory || !kairaPolicy.persistentUserMemory ? Promise.resolve([]) : getFastRecentMemory(userId, kairaInstance.instanceId),
+      suppressRecentMemory || !kairaPolicy.persistentUserMemory
+        ? Promise.resolve([])
+        : persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move) === FAST_RECENT_MEMORY_LIMIT
+          ? getFastRecentMemory(userId, kairaInstance.instanceId)
+          : loadRecentKdmMemory(
+              persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move),
+              stateUserId,
+            ),
       kairaPolicy.persistentUserMemory ? hydrateLanguageMemory(stateUserId) : Promise.resolve(),
     ]);
     observeUserLanguageStyle(stateUserId, userMessage, kairaPolicy.persistentUserMemory);
