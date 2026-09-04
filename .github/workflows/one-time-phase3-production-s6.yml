@@ -34,15 +34,7 @@ jobs:
           import { interpretSemanticEvent } from '../src/services/semanticEventEngine';
           import type { ConversationTurn } from '../src/services/kairoConversationGrounding';
           import type { SemanticEvent } from '../src/services/semanticEventEngine';
-
-          const semantic = (overrides: Record<string, unknown> = {}) => ({
-            schemaVersion: 'semantic-interpretation@2', raw: '', normalized: '', primaryIntent: 'other', secondarySocialActs: [], target: 'unknown', valence: 'neutral',
-            severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 }, jokingConfidence: 0, sincerityConfidence: 0.9,
-            affection: 0, support: 0, compliment: 0, emotionalLoad: 0, apology: false, repairAttempt: false, stopRequest: false,
-            discourseFacets: { socialRoutine: 'none', discourseAct: 'none', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'none', relationalIntensity: 0, stopQuestions: false, stopTalking: false },
-            uncertainty: { overall: 0.1, intent: 0.1, target: 0.1, severity: 0.1 }, evidence: [], ...overrides,
-          }) as any;
-
+          const semantic = (overrides: Record<string, unknown> = {}) => ({ schemaVersion: 'semantic-interpretation@2', raw: '', normalized: '', primaryIntent: 'other', secondarySocialActs: [], target: 'unknown', valence: 'neutral', severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 }, jokingConfidence: 0, sincerityConfidence: 0.9, affection: 0, support: 0, compliment: 0, emotionalLoad: 0, apology: false, repairAttempt: false, stopRequest: false, discourseFacets: { socialRoutine: 'none', discourseAct: 'none', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'none', relationalIntensity: 0, stopQuestions: false, stopTalking: false }, uncertainty: { overall: 0.1, intent: 0.1, target: 0.1, severity: 0.1 }, evidence: [], ...overrides }) as any;
           const history: ConversationTurn[] = [
             { sender: 'user', text: 'Emre yarın işi bırakacakmış.', participantId: 'mert', participantName: 'Mert', semanticInterpretation: semantic({ raw: 'Emre yarın işi bırakacakmış.', normalized: 'Emre yarın işi bırakacakmış.', target: 'third_party' }) },
             { sender: 'droit', text: 'öyle mi', replyToParticipantName: 'Mert' },
@@ -57,36 +49,22 @@ jobs:
           if (!asserted || !denial) throw new Error('missing canonical asserted/denial claim');
           if (denial.opposesClaimId !== asserted.id) throw new Error('opposesClaimId mismatch');
           if (isClaimEffectivelySupported(asserted, ledger)) throw new Error('opposed claim still effectively supported');
-
-          const recallEvent: SemanticEvent = {
-            raw: userMessage, normalized: userMessage, intent: 'question', socialRoutine: 'none', discourseAct: 'recall_request', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null,
-            valence: 'neutral', target: 'third_party', relationalAct: 'none', relationalIntensity: 0, severity: 0, insult: false, redLine: false, disrespect: 0, coercion: 0,
-            manipulation: 0, privacyViolation: 0, apology: false, repairAttempt: false, stopQuestions: false, stopTalking: false, frustration: 0, emotionalLoad: 0, affection: 0, support: 0, compliment: 0,
-          };
+          const recallEvent: SemanticEvent = { raw: userMessage, normalized: userMessage, intent: 'question', socialRoutine: 'none', discourseAct: 'recall_request', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, valence: 'neutral', target: 'third_party', relationalAct: 'none', relationalIntensity: 0, severity: 0, insult: false, redLine: false, disrespect: 0, coercion: 0, manipulation: 0, privacyViolation: 0, apology: false, repairAttempt: false, stopQuestions: false, stopTalking: false, frustration: 0, emotionalLoad: 0, affection: 0, support: 0, compliment: 0 };
           const plan = planDialogueResponse(history, userMessage, 'Mert', recallEvent, analysis);
           const fallback = buildGroundedDialogueFallback(plan, history, userMessage, 'Mert', analysis);
           if (plan.target !== 'Emre' || plan.hasSupportedTargetClaim !== false) throw new Error(`bad recall plan: ${JSON.stringify(plan)}`);
           if (/Emre.*(?:işi bırakacak|istifa edecek)/i.test(fallback || '')) throw new Error(`fallback revived opposed claim: ${fallback}`);
-
           const reported = 'Emre yarın işi bırakacakmış.';
           const reportedEntities = resolveMessageEntities(reported, { userName: 'Mert', characterName: 'KAIRO' });
           const reportedEvent = buildCanonicalWorldEvent(reported, interpretSemanticEvent(reported), reportedEntities);
           const reportedClassification = classifyWorldEventObservation(reportedEvent);
           if (reportedClassification.persist !== false || reportedClassification.kind !== 'reported_claim') throw new Error(`reported speech promoted to world truth: ${JSON.stringify(reportedClassification)}`);
-
           const direct = 'Sen salaksın';
           const directEntities = resolveMessageEntities(direct, { userName: 'Mert', characterName: 'KAIRO' });
           const directEvent = buildCanonicalWorldEvent(direct, interpretSemanticEvent(direct), directEntities);
           const directClassification = classifyWorldEventObservation(directEvent);
           if (directClassification.persist !== true || directClassification.kind !== 'direct_interaction') throw new Error(`direct grounded event persistence regressed: ${JSON.stringify(directClassification)}`);
-
-          console.log('S6_TRACE=' + JSON.stringify({
-            claims: ledger.map(c => ({ id: c.id, source: c.source, subject: c.subject, proposition: c.proposition, status: c.status, opposesClaimId: c.opposesClaimId, effectiveSupported: isClaimEffectivelySupported(c, ledger) })),
-            recallPlan: { move: plan.move, target: plan.target, hasSupportedTargetClaim: plan.hasSupportedTargetClaim, reason: plan.reason },
-            fallback,
-            reportedWorldEvent: { actor: reportedEvent.actor?.name, target: reportedEvent.target?.name, reportedSpeech: reportedEvent.reportedSpeech, classification: reportedClassification },
-            directWorldEvent: { actor: directEvent.actor?.name, target: directEvent.target?.name, reportedSpeech: directEvent.reportedSpeech, classification: directClassification },
-          }));
+          console.log('S6_TRACE=' + JSON.stringify({ claims: ledger.map(c => ({ id: c.id, source: c.source, subject: c.subject, proposition: c.proposition, status: c.status, opposesClaimId: c.opposesClaimId, effectiveSupported: isClaimEffectivelySupported(c, ledger) })), recallPlan: { move: plan.move, target: plan.target, hasSupportedTargetClaim: plan.hasSupportedTargetClaim, reason: plan.reason }, fallback, reportedWorldEvent: { actor: reportedEvent.actor?.name, target: reportedEvent.target?.name, reportedSpeech: reportedEvent.reportedSpeech, classification: reportedClassification }, directWorldEvent: { actor: directEvent.actor?.name, target: directEvent.target?.name, reportedSpeech: directEvent.reportedSpeech, classification: directClassification } }));
           TS
           npx tsx scripts/.one-time-s6-trace.ts
           rm scripts/.one-time-s6-trace.ts
@@ -96,23 +74,8 @@ jobs:
           BASE='https://nexus-kairo-studio.onrender.com'
           curl --fail --silent --show-error "$BASE/api/health" | tee /tmp/health.json
           jq -e '.status == "ok"' /tmp/health.json >/dev/null
-
           cat > /tmp/payload.json <<'JSON'
-          {
-            "userId":"phase3_s6_prod",
-            "userName":"Mert",
-            "userMessage":"Emre yarın ne yapacak?",
-            "provider":"openrouter",
-            "suppressRecentMemory":true,
-            "requestId":"phase3-s6-prod-final-v1",
-            "history":[
-              {"sender":"user","text":"Emre yarın işi bırakacakmış.","participantId":"mert","participantName":"Mert","semanticInterpretation":{"schemaVersion":"semantic-interpretation@2","raw":"Emre yarın işi bırakacakmış.","normalized":"Emre yarın işi bırakacakmış.","primaryIntent":"other","secondarySocialActs":[],"target":"third_party","valence":"neutral","severity":{"disrespect":0,"coercion":0,"manipulation":0,"privacy":0,"aggression":0},"jokingConfidence":0,"sincerityConfidence":0.9,"affection":0,"support":0,"compliment":0,"emotionalLoad":0,"apology":false,"repairAttempt":false,"stopRequest":false,"discourseFacets":{"socialRoutine":"none","discourseAct":"none","repairSignal":"none","adviceRequested":false,"knowledgeQuery":null,"selfMemoryQuery":null,"relationalAct":"none","relationalIntensity":0,"stopQuestions":false,"stopTalking":false},"uncertainty":{"overall":0.1,"intent":0.1,"target":0.1,"severity":0.1},"evidence":[]}},
-              {"sender":"droit","text":"öyle mi","replyToParticipantName":"Mert"},
-              {"sender":"user","text":"yok öyle bir şey, ben kafadan attım.","participantId":"ali","participantName":"Ali","semanticInterpretation":{"schemaVersion":"semantic-interpretation@2","raw":"yok öyle bir şey, ben kafadan attım.","normalized":"yok öyle bir şey, ben kafadan attım.","primaryIntent":"other","secondarySocialActs":[],"target":"unknown","valence":"neutral","severity":{"disrespect":0,"coercion":0,"manipulation":0,"privacy":0,"aggression":0},"jokingConfidence":0,"sincerityConfidence":0.9,"affection":0,"support":0,"compliment":0,"emotionalLoad":0,"apology":false,"repairAttempt":false,"stopRequest":false,"discourseFacets":{"socialRoutine":"none","discourseAct":"correction","repairSignal":"none","adviceRequested":false,"knowledgeQuery":null,"selfMemoryQuery":null,"relationalAct":"none","relationalIntensity":0,"stopQuestions":false,"stopTalking":false},"uncertainty":{"overall":0.1,"intent":0.1,"target":0.1,"severity":0.1},"evidence":[]}},
-              {"sender":"droit","text":"he doğru","replyToParticipantName":"Ali"}
-            ],
-            "semanticInterpretation":{"schemaVersion":"semantic-interpretation@2","raw":"Emre yarın ne yapacak?","normalized":"Emre yarın ne yapacak?","primaryIntent":"question","secondarySocialActs":[],"target":"third_party","valence":"neutral","severity":{"disrespect":0,"coercion":0,"manipulation":0,"privacy":0,"aggression":0},"jokingConfidence":0,"sincerityConfidence":0.9,"affection":0,"support":0,"compliment":0,"emotionalLoad":0,"apology":false,"repairAttempt":false,"stopRequest":false,"discourseFacets":{"socialRoutine":"none","discourseAct":"recall_request","repairSignal":"none","adviceRequested":false,"knowledgeQuery":null,"selfMemoryQuery":null,"relationalAct":"none","relationalIntensity":0,"stopQuestions":false,"stopTalking":false},"uncertainty":{"overall":0.1,"intent":0.1,"target":0.1,"severity":0.1},"evidence":[]}
-          }
+          {"userId":"phase3_s6_prod","userName":"Mert","userMessage":"Emre yarın ne yapacak?","provider":"openrouter","suppressRecentMemory":true,"requestId":"phase3-s6-prod-final-v1","history":[{"sender":"user","text":"Emre yarın işi bırakacakmış.","participantId":"mert","participantName":"Mert","semanticInterpretation":{"schemaVersion":"semantic-interpretation@2","raw":"Emre yarın işi bırakacakmış.","normalized":"Emre yarın işi bırakacakmış.","primaryIntent":"other","secondarySocialActs":[],"target":"third_party","valence":"neutral","severity":{"disrespect":0,"coercion":0,"manipulation":0,"privacy":0,"aggression":0},"jokingConfidence":0,"sincerityConfidence":0.9,"affection":0,"support":0,"compliment":0,"emotionalLoad":0,"apology":false,"repairAttempt":false,"stopRequest":false,"discourseFacets":{"socialRoutine":"none","discourseAct":"none","repairSignal":"none","adviceRequested":false,"knowledgeQuery":null,"selfMemoryQuery":null,"relationalAct":"none","relationalIntensity":0,"stopQuestions":false,"stopTalking":false},"uncertainty":{"overall":0.1,"intent":0.1,"target":0.1,"severity":0.1},"evidence":[]}},{"sender":"droit","text":"öyle mi","replyToParticipantName":"Mert"},{"sender":"user","text":"yok öyle bir şey, ben kafadan attım.","participantId":"ali","participantName":"Ali","semanticInterpretation":{"schemaVersion":"semantic-interpretation@2","raw":"yok öyle bir şey, ben kafadan attım.","normalized":"yok öyle bir şey, ben kafadan attım.","primaryIntent":"other","secondarySocialActs":[],"target":"unknown","valence":"neutral","severity":{"disrespect":0,"coercion":0,"manipulation":0,"privacy":0,"aggression":0},"jokingConfidence":0,"sincerityConfidence":0.9,"affection":0,"support":0,"compliment":0,"emotionalLoad":0,"apology":false,"repairAttempt":false,"stopRequest":false,"discourseFacets":{"socialRoutine":"none","discourseAct":"correction","repairSignal":"none","adviceRequested":false,"knowledgeQuery":null,"selfMemoryQuery":null,"relationalAct":"none","relationalIntensity":0,"stopQuestions":false,"stopTalking":false},"uncertainty":{"overall":0.1,"intent":0.1,"target":0.1,"severity":0.1},"evidence":[]}},{"sender":"droit","text":"he doğru","replyToParticipantName":"Ali"}],"semanticInterpretation":{"schemaVersion":"semantic-interpretation@2","raw":"Emre yarın ne yapacak?","normalized":"Emre yarın ne yapacak?","primaryIntent":"question","secondarySocialActs":[],"target":"third_party","valence":"neutral","severity":{"disrespect":0,"coercion":0,"manipulation":0,"privacy":0,"aggression":0},"jokingConfidence":0,"sincerityConfidence":0.9,"affection":0,"support":0,"compliment":0,"emotionalLoad":0,"apology":false,"repairAttempt":false,"stopRequest":false,"discourseFacets":{"socialRoutine":"none","discourseAct":"recall_request","repairSignal":"none","adviceRequested":false,"knowledgeQuery":null,"selfMemoryQuery":null,"relationalAct":"none","relationalIntensity":0,"stopQuestions":false,"stopTalking":false},"uncertainty":{"overall":0.1,"intent":0.1,"target":0.1,"severity":0.1},"evidence":[]}}
           JSON
           curl --fail --silent --show-error -H 'Content-Type: application/json' -d @/tmp/payload.json "$BASE/api/chat" | tee /tmp/s6.json
           jq -e '.dialogueDecision.move == "grounded_recall"' /tmp/s6.json >/dev/null
@@ -120,8 +83,6 @@ jobs:
           jq -e '.dialogueDecision.hasSupportedTargetClaim == false' /tmp/s6.json >/dev/null
           jq -e '.consistency.accepted == true' /tmp/s6.json >/dev/null
           jq -e '.kdm.livedMemoryRuntime.status == "world_event_skipped" or .kdm.livedMemoryRuntime.status == "not_applicable"' /tmp/s6.json >/dev/null
-          if jq -r '.reply' /tmp/s6.json | grep -Eiq 'Emre.{0,40}(işi bırakacak|istifa edecek)'; then
-            echo 'Final reply revived opposed resignation claim' >&2
-            exit 1
-          fi
+          if jq -r '.reply' /tmp/s6.json | grep -Eiq 'Emre.{0,40}(işi bırakacak|istifa edecek)'; then echo 'Final reply revived opposed resignation claim' >&2; exit 1; fi
           echo 'S6_PRODUCTION='$(jq -c '{reply,dialogueDecision,consistency,livedMemoryRuntime:.kdm.livedMemoryRuntime,worldEvent:.kdm.worldEvent,entityResolution:.kdm.entityResolution}' /tmp/s6.json)
+# retrigger after workflow registration
