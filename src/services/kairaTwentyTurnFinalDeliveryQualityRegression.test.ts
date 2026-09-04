@@ -76,7 +76,8 @@ function deterministicAiDraft(message: string, turn: number): string {
 function deterministicAiRepair(message: string): string {
   if (message === "sen salaksın") return "böyle konuşman hoş değil";
   if (message === "selam tekrar") return "selam";
-  if (message === "kusura bakma" || message === "özür dilerim") return "duydum, biraz zaman lazım";
+  if (message === "kusura bakma") return "duydum, biraz zaman lazım";
+  if (message === "özür dilerim") return "anladım, biraz sakin kalalım";
   return "anladım";
 }
 
