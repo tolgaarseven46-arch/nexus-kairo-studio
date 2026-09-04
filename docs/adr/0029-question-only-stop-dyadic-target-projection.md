@@ -32,6 +32,9 @@ No raw-text parsing is added. The bridge consumes only immutable `SemanticInterp
 
 ## Verification
 
-- Wiring regression: `src/services/kairaQuestionOnlyStopDyadicTargetWiringRegression.test.ts`.
+- Structural wiring regression: `src/services/kairaQuestionOnlyStopDyadicTargetWiringRegression.test.ts`.
+- Canonical runtime regression: `src/services/kairaQuestionOnlyStopCanonicalRuntimeRegression.test.ts` executes the real `analyzeKdmInteractionCanonicalTurn` wiring with provider `target=unknown` and locks both sides of the boundary:
+  - pure `soru sorma artık` produces no relationship injury;
+  - `salak, soru sorma artık` with preserved disrespect produces relationship injury.
 - Existing policy regression continues to verify pure-stop neutralization and independent-harm preservation.
 - Required validation: architecture contracts, autonomous runtime contracts, beta gates, full tests, TypeScript, production build, Architecture Review, and live `/api/chat` smoke for both `soru sorma artık` and `salak, soru sorma artık`.
