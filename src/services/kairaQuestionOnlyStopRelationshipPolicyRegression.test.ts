@@ -14,7 +14,7 @@ function interpretation(overrides: Partial<SemanticInterpretation> = {}): Semant
     secondarySocialActs: [],
     target: "kaira",
     valence: "negative",
-    severity: { disrespect: 0.35, coercion: 0, manipulation: 0, privacy: 0, aggression: 0.1 },
+    severity: { disrespect: 0.1, coercion: 0, manipulation: 0, privacy: 0, aggression: 0.1 },
     jokingConfidence: 0,
     sincerityConfidence: 0.9,
     affection: 0,
@@ -43,7 +43,7 @@ function interpretation(overrides: Partial<SemanticInterpretation> = {}): Semant
 }
 
 describe("question-only stop relationship policy regression", () => {
-  it("removes provider severity from a pure question-only stop", () => {
+  it("removes low provider severity noise from a pure question-only stop", () => {
     const value = interpretation();
     expect(isRelationshipNeutralQuestionOnlyStop(value)).toBe(true);
     expect(relationshipSeverityForInterpretation(value)).toEqual({
@@ -62,6 +62,18 @@ describe("question-only stop relationship policy regression", () => {
       primaryIntent: "insult",
       secondarySocialActs: ["insult"],
       severity: { disrespect: 0.8, coercion: 0, manipulation: 0, privacy: 0, aggression: 0.35 },
+    });
+    expect(isRelationshipNeutralQuestionOnlyStop(value)).toBe(false);
+    expect(relationshipSeverityForInterpretation(value)).toEqual(value.severity);
+  });
+
+  it("preserves canonical severity-only harm even when the provider omits the insult label", () => {
+    const value = interpretation({
+      raw: "salak, soru sorma artık",
+      normalized: "salak soru sorma artık",
+      primaryIntent: "command",
+      secondarySocialActs: [],
+      severity: { disrespect: 0.3, coercion: 0, manipulation: 0, privacy: 0, aggression: 0.1 },
     });
     expect(isRelationshipNeutralQuestionOnlyStop(value)).toBe(false);
     expect(relationshipSeverityForInterpretation(value)).toEqual(value.severity);
