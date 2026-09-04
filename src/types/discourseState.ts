@@ -1,14 +1,13 @@
 /**
  * Minimal session-scoped DiscourseState (ADR-0006 foundation repair).
  *
- * This is CONTEXT, not a decision authority. It records only what the first real
- * 8-turn conversation proved is missing: routine saturation, a pending-question
- * ledger, Kaira's own recent social acts + self-repetition, and whether the
- * current user turn depends on Kaira's previous turn.
+ * This is CONTEXT, not a decision authority. It records routine saturation,
+ * pending conversational obligations, Kaira self-repetition, previous-turn
+ * dependency and bounded unresolved conversation threads.
  *
- * It is recomputed each turn by folding `reduceDiscourseState` over the request
- * history (the delivered reply is already part of history next turn), so it
- * needs no separate persistence. It never mutates relationship / mood.
+ * It is recomputed each turn by folding `reduceDiscourseState` over request
+ * history, so it needs no separate persistence and never mutates relationship
+ * or mood state.
  */
 
 export type DiscourseSocialAct =
@@ -49,6 +48,18 @@ export interface DiscoursePreviousTurnDependency {
   responseKind: "answer" | "answer_with_friction" | "clarification" | "correction";
 }
 
+/**
+ * Session-scoped unresolved conversation topic. `anchorText` is quoted evidence
+ * from the ingestion-time canonical turn, not a downstream reparse request.
+ */
+export interface DiscourseOpenThread {
+  id: string;
+  kind: "third_party_topic";
+  anchorText: string;
+  openedAtTurn: number;
+  lastRelevantTurn: number;
+}
+
 export interface DiscourseState {
   /** Number of turns folded in (user + kaira). */
   turnIndex: number;
@@ -64,6 +75,14 @@ export interface DiscourseState {
   selfRepeat: { act: DiscourseSocialAct; count: number } | null;
   /** Set when the current user turn is a response to Kaira's previous turn. */
   previousTurnDependency: DiscoursePreviousTurnDependency | null;
+  /** Bounded unresolved session topics. Memory does not own this ledger. */
+  openThreads: DiscourseOpenThread[];
+  /** Thread currently being discussed; null while conversation is elsewhere. */
+  activeThreadId: string | null;
+  /** Thread explicitly resumed by the current user turn, when unambiguous. */
+  resumedThreadId: string | null;
+  /** Current turn is compatible with multiple unresolved threads. */
+  ambiguousThreadResumption: boolean;
   lastUserAct: DiscourseSocialAct | null;
   lastKairaAct: DiscourseSocialAct | null;
 }
@@ -79,6 +98,10 @@ export const EMPTY_DISCOURSE_STATE: DiscourseState = {
   kairaRecentActs: [],
   selfRepeat: null,
   previousTurnDependency: null,
+  openThreads: [],
+  activeThreadId: null,
+  resumedThreadId: null,
+  ambiguousThreadResumption: false,
   lastUserAct: null,
   lastKairaAct: null,
 };
