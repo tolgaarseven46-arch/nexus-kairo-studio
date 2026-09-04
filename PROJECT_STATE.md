@@ -1460,3 +1460,52 @@ Yeni sohbet açıldığında:
 - Temporary PR61 production smoke branch/workflow was reset to the feature merge commit after acceptance.
 - Next planned 21-turn finding to re-verify before changing code: self-identity / immutable character identity vs autobiographical self-memory authority. Do not reopen completed world-memory, complaint-accountability, question-stop, or ResponsePlan content/HOW work unless a fresh regression reproduces them.
 
+
+
+## 2026-09-04 — Phase 3 Claim / Event / provenance separation — CLOSED
+
+### Architecture result
+- Canonical Claim provenance owner moved to `src/services/claimProvenance.ts`.
+- Claim source and subject are distinct typed fields.
+- Denial/correction appends a new opposing Claim; the original assertion remains immutable.
+- Effective support is a derived view (`isClaimEffectivelySupported` / `effectivelySupportedClaims`).
+- Raw reported speech is not automatically persisted as WorldEvent truth.
+- Direct grounded WorldEvent persistence remains enabled.
+- Claim → WorldEvent promotion requires an explicit grounded seam.
+- ADR: `docs/adr/0037-claim-world-event-provenance.md`.
+
+### PR / merge / CI
+- PR #68: `feat(kaira): separate claim provenance from world events`.
+- Final PR head: `94747a53a942dc78f09d71954eda157966c3ad13`.
+- Full CI PASS, including architecture contracts, full tests, TypeScript, production build and guards.
+- Architecture Review PASS for exact head SHA.
+- Merge commit: `e929e693e5b62dfc2b7cfce095d6ae863484a7e3`.
+
+### Production acceptance
+- Render service `nexus-kairo-studio` verified exact merge commit `e929e693e5b62dfc2b7cfce095d6ae863484a7e3` LIVE.
+- Production S6 smoke: GitHub Actions run `33895702987` PASS.
+- Distinct participant identities used in canonical history: Mert (`participantId=mert`) and Ali (`participantId=ali`).
+- Intermediate Claim trace PASS:
+  - Mert → Emre assertion remained `asserted` and immutable.
+  - Ali → Emre denial was a separate Claim.
+  - denial `opposesClaimId` linked to the original Claim.
+  - original effective support became `false`.
+- Recall plan PASS:
+  - `move=grounded_recall`
+  - `target=Emre`
+  - `hasSupportedTargetClaim=false`
+  - opposed resignation claim was not revived.
+- Claim/Event boundary PASS:
+  - canonical reported claim classification: `persist=false`, `kind=reported_claim`.
+  - canonical direct grounded interaction classification: `persist=true`, `kind=direct_interaction`.
+- LIVE final response: `Emre için yarına dair net bir plan yok. İstifa iddiasını reddetti.`
+- LIVE consistency: accepted, score 100.
+- LIVE recall turn world-event persistence: `world_event_skipped`.
+
+### Diagnostic note
+- First S6 diagnostic harness incorrectly assumed `interpretSemanticEvent("Emre yarın hişi bırakacağım.")` itself would set `reportedSpeech=true`; that was classified as a harness failure, not used to relax the Phase 3 contract. The corrected harness exercised the precommitted canonical `reportedSpeech=true` boundary and passed.
+- Temporary Phase 3 patch/finalizer workflows were removed before PR #68.
+- Temporary production S6 workflow was removed from the diagnostic branch after PASS.
+
+### Phase status
+PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new independent regression falsifies the architecture.
