@@ -20,27 +20,22 @@ jobs:
           post_chat() {
             local message="$1"
             local request_id="$2"
-            curl --fail-with-body --silent --show-error \
-              -X POST "${BASE_URL}/api/chat" \
-              -H 'Content-Type: application/json' \
-              --data-binary @- <<JSON
-{"userId":"${USER_ID}","userName":"Tolga","userMessage":"${message}","character":{"name":"KAIRO"},"provider":"openrouter","sessionId":"${SESSION_ID}","kairaInstanceId":"default-kaira","requestId":"${request_id}","history":[]}
-JSON
+            local body
+            body="$(jq -nc --arg userId "$USER_ID" --arg sessionId "$SESSION_ID" --arg message "$message" --arg requestId "$request_id" '{userId:$userId,userName:"Tolga",userMessage:$message,character:{name:"KAIRO"},provider:"openrouter",sessionId:$sessionId,kairaInstanceId:"default-kaira",requestId:$requestId,history:[]}')"
+            curl --fail-with-body --silent --show-error -X POST "${BASE_URL}/api/chat" -H 'Content-Type: application/json' --data-binary "$body"
           }
 
-          echo '--- complaint turn 1 ---'
           first="$(post_chat 'bişey anlatmadınki sohbet bile edemedik' "complaint-1-${GITHUB_RUN_ID}")"
-          echo "$first" | jq '{reply, semantic: .kdm.semanticEvent, relationship: .kdm.dynamicState.relationship, reactionMode: .kdm.dynamicState.reactionMode, reasoning: .kdm.trace.messageInterpretation}'
-
-          echo '--- complaint turn 2 same persisted relationship ---'
           second="$(post_chat 'bişey anlatmadınki sohbet bile edemedik' "complaint-2-${GITHUB_RUN_ID}")"
-          echo "$second" | jq '{reply, semantic: .kdm.semanticEvent, relationship: .kdm.dynamicState.relationship, reactionMode: .kdm.dynamicState.reactionMode, reasoning: .kdm.trace.messageInterpretation}'
-
-          echo '--- direct insult control ---'
           insult="$(post_chat 'sen salaksın' "insult-${GITHUB_RUN_ID}")"
+
+          echo '--- complaint turn 1 ---'
+          echo "$first" | jq '{reply, semantic: .kdm.semanticEvent, relationship: .kdm.dynamicState.relationship, reactionMode: .kdm.dynamicState.reactionMode, reasoning: .kdm.trace.messageInterpretation}'
+          echo '--- complaint turn 2 ---'
+          echo "$second" | jq '{reply, semantic: .kdm.semanticEvent, relationship: .kdm.dynamicState.relationship, reactionMode: .kdm.dynamicState.reactionMode, reasoning: .kdm.trace.messageInterpretation}'
+          echo '--- insult control ---'
           echo "$insult" | jq '{reply, semantic: .kdm.semanticEvent, relationship: .kdm.dynamicState.relationship, reactionMode: .kdm.dynamicState.reactionMode, reasoning: .kdm.trace.messageInterpretation}'
 
-          for item in first second insult; do
-            value="${!item}"
-            echo "$item intent=$(echo "$value" | jq -r '.kdm.semanticEvent.intent // ""') conflict=$(echo "$value" | jq -r '.kdm.dynamicState.relationship.conflictScore // 0') hurt=$(echo "$value" | jq -r '.kdm.dynamicState.relationship.hurtScore // 0') negative=$(echo "$value" | jq -r '.kdm.dynamicState.relationship.negativeEvents // 0') repeated=$(echo "$value" | jq -r '.kdm.dynamicState.relationship.repeatedNegativeCount // 0') pattern=$(echo "$value" | jq -r '.kdm.dynamicState.relationship.lastNegativePattern // ""')"
-          done
+          echo "first conflict=$(echo "$first" | jq -r '.kdm.dynamicState.relationship.conflictScore // 0') hurt=$(echo "$first" | jq -r '.kdm.dynamicState.relationship.hurtScore // 0') negative=$(echo "$first" | jq -r '.kdm.dynamicState.relationship.negativeEvents // 0') repeated=$(echo "$first" | jq -r '.kdm.dynamicState.relationship.repeatedNegativeCount // 0') pattern=$(echo "$first" | jq -r '.kdm.dynamicState.relationship.lastNegativePattern // ""')"
+          echo "second conflict=$(echo "$second" | jq -r '.kdm.dynamicState.relationship.conflictScore // 0') hurt=$(echo "$second" | jq -r '.kdm.dynamicState.relationship.hurtScore // 0') negative=$(echo "$second" | jq -r '.kdm.dynamicState.relationship.negativeEvents // 0') repeated=$(echo "$second" | jq -r '.kdm.dynamicState.relationship.repeatedNegativeCount // 0') pattern=$(echo "$second" | jq -r '.kdm.dynamicState.relationship.lastNegativePattern // ""')"
+          echo "insult conflict=$(echo "$insult" | jq -r '.kdm.dynamicState.relationship.conflictScore // 0') hurt=$(echo "$insult" | jq -r '.kdm.dynamicState.relationship.hurtScore // 0') negative=$(echo "$insult" | jq -r '.kdm.dynamicState.relationship.negativeEvents // 0') repeated=$(echo "$insult" | jq -r '.kdm.dynamicState.relationship.repeatedNegativeCount // 0') pattern=$(echo "$insult" | jq -r '.kdm.dynamicState.relationship.lastNegativePattern // ""')"
