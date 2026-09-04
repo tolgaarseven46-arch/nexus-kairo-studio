@@ -1,0 +1,62 @@
+name: One-time Phase2 Production Smoke V2
+on:
+  push:
+    branches:
+      - diag/phase2-production-smoke-v2
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run S7 canonical production sequence
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://nexus-kairo-studio.onrender.com'
+          user="phase2_v2_${GITHUB_RUN_ID}"
+          session="session_${user}"
+          history='[]'
+
+          send_turn() {
+            local msg="$1"
+            local lu_payload lu semantic source chat_payload resp reply
+            lu_payload=$(jq -n --arg msg "$msg" --argjson history "$history" '{userMessage:$msg,userName:"Mert",characterName:"KAIRO",provider:"openrouter",history:($history | map({role:(if .sender=="user" then "user" else "assistant" end),content:.text}))}')
+            lu=$(curl --fail-with-body --silent --show-error -H 'content-type: application/json' -d "$lu_payload" "$base/api/language-understanding")
+            semantic=$(echo "$lu" | jq '.interpretation')
+            source=$(echo "$lu" | jq -r '.semanticSource // "unknown"')
+            test "$semantic" != "null"
+
+            chat_payload=$(jq -n --arg userId "$user" --arg sessionId "$session" --arg msg "$msg" --argjson semantic "$semantic" --argjson history "$history" '{userId:$userId,userName:"Mert",userMessage:$msg,sessionId:$sessionId,provider:"openrouter",suppressRecentMemory:true,semanticInterpretation:$semantic,history:$history}')
+            resp=$(curl --fail-with-body --silent --show-error -H 'content-type: application/json' -d "$chat_payload" "$base/api/chat")
+            reply=$(echo "$resp" | jq -r '.reply // empty')
+            test -n "$reply"
+            echo "USER: $msg"
+            echo "$resp" | jq '{reply,providerUsed,responsePlan:.kdm.responsePlan,semanticEvent:.kdm.semanticEvent}'
+
+            history=$(jq -n --argjson h "$history" --arg msg "$msg" --arg reply "$reply" --arg source "$source" --argjson semantic "$semantic" '$h + [{sender:"user",text:$msg,participantId:"mert",participantName:"Mert",semanticInterpretation:$semantic,semanticSource:$source},{sender:"droit",text:$reply,participantId:"kaira",participantName:"Kaira",replyToParticipantId:"mert",replyToParticipantName:"Mert"}]')
+            LAST_RESPONSE="$resp"
+          }
+
+          send_turn 'Emreyle dün çok kötü tartıştık, sonra anlatırım'
+          send_turn 'neyse bugün kahve aldım'
+          send_turn 'hava da baya sıcakmış'
+          send_turn 'yarın erken kalkıcam zaten'
+          send_turn 'neyse ben o çocukla ne yapcam şimdi?'
+
+          final_reply=$(echo "$LAST_RESPONSE" | jq -r '.reply // ""' | tr '[:upper:]' '[:lower:]')
+          final_move=$(echo "$LAST_RESPONSE" | jq -r '.kdm.responsePlan.move // "unknown"')
+          echo "FINAL_REPLY=$final_reply"
+          echo "FINAL_MOVE=$final_move"
+
+          if [ "$final_move" != "answer_or_clarify" ]; then
+            echo "FAIL: expected answer_or_clarify, got $final_move" >&2
+            exit 1
+          fi
+          if echo "$final_reply" | grep -Eqi '^(he|hee|hmm|tamam|he tamam|aynen|anladım)[.!? ]*$'; then
+            echo 'FAIL: advice obligation collapsed to acknowledgement' >&2
+            exit 1
+          fi
+          if echo "$final_reply" | grep -Eqi '(hangi çocuk|hangi kiş|kimden bahsed|kimi kast|hatırlat|mevzu neydi)'; then
+            echo 'FAIL: single unresolved open thread was not resumed' >&2
+            exit 1
+          fi
+          echo 'PASS: S7 open thread resumed and explicit advice obligation survived to production delivery.'
