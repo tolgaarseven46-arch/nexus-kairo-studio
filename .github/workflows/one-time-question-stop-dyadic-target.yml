@@ -1,0 +1,38 @@
+name: One-time question-stop dyadic target patcher
+
+on:
+  push:
+    branches:
+      - chatgpt/question-stop-dyadic-target
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: chatgpt/question-stop-dyadic-target
+          fetch-depth: 0
+      - name: Patch typed dyadic target projection
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          p=Path('src/services/kdmRelationshipReducerBridge.ts')
+          s=p.read_text(encoding='utf-8')
+          old='''  const thirdParty = event.relationshipScope === "third_party";\n  const dyadic = !thirdParty && event.relationshipScope !== "event" && interp.target === "kaira";'''
+          new='''  const thirdParty = event.relationshipScope === "third_party";\n  const questionOnlyStopAddressesInterlocutor =\n    interp.discourseFacets.stopQuestions === true &&\n    interp.discourseFacets.stopTalking === false &&\n    interp.stopRequest === false;\n  const dyadic =\n    !thirdParty &&\n    event.relationshipScope !== "event" &&\n    (interp.target === "kaira" || questionOnlyStopAddressesInterlocutor);'''
+          if old not in s:
+              raise SystemExit('target seam not found')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+          rm .github/workflows/one-time-question-stop-dyadic-target.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kdmRelationshipReducerBridge.ts .github/workflows/one-time-question-stop-dyadic-target.yml
+          git commit -m "fix(kaira): treat question-only stop as dyadic target evidence"
+          git push origin HEAD:chatgpt/question-stop-dyadic-target
