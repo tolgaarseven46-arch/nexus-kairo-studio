@@ -88,3 +88,4 @@ jobs:
           git add src/services/kairoDialogueChaosEngine.ts src/services/kairoDialogueDecisionEngine.ts src/services/worldModelEventStore.ts src/services/kairoDialogueChaosEngine.test.ts
           git commit -m "fix(kaira): enforce immutable claim provenance"
           git push origin HEAD:feat/claim-world-event-provenance
+# retrigger after workflow registration
