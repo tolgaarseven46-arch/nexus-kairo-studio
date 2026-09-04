@@ -78,6 +78,12 @@ export interface KairaPlanUncertainty {
   relational: number;
 }
 
+export type KairaExpressionMode =
+  | "natural_social"
+  | "firm_boundary"
+  | "natural_repair"
+  | "careful_repair";
+
 /**
  * Non-authoritative. Legacy consumers and the prompt builder read these for
  * style hints only. Nothing downstream may re-derive a behavior decision from
@@ -88,4 +94,6 @@ export interface KairaPlanProjections {
   register: KairoSpeechIdentity["register"];
   stance: BehaviorContract["stance"];
   relationshipLevel: KairoSpeechIdentity["relationshipLevel"];
+  /** HOW-only projection. It cannot open/close any behavioral gate. */
+  expressionMode?: KairaExpressionMode;
 }

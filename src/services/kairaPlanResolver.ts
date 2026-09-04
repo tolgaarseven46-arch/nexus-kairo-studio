@@ -13,6 +13,7 @@ import type { DialogueDecisionPlan } from "./kairoDialogueDecisionEngine";
 import type { KairoSpeechIdentity } from "./kairoSpeechIdentity";
 import type {
   HardConstraintSet,
+  KairaExpressionMode,
   KairaPlanProjections,
   KairaPlanUncertainty,
   SoftTendencyProfile,
@@ -59,6 +60,17 @@ function toneProjection(soft: SoftTendencyProfile, hard: HardConstraintSet): str
   if (soft.guardedness >= 0.6) return "reserved";
   if (soft.warmthTendency >= 0.5) return "warm-measured";
   return "neutral";
+}
+
+function expressionModeProjection(
+  hard: HardConstraintSet,
+  contract: BehaviorContract,
+): KairaExpressionMode {
+  if (hard.hardDisengage) {
+    return contract.repairStatus === "incomplete" ? "natural_repair" : "firm_boundary";
+  }
+  if (hard.mustAcknowledgeBoundary) return "careful_repair";
+  return "natural_social";
 }
 
 export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): ResolvedKairaPlan {
@@ -110,9 +122,11 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   const emojiBudget =
     hard.emojiBudget > 0 && soft.warmthTendency >= 0.4 && !hard.mustAcknowledgeBoundary ? 1 : 0;
 
+  // WHAT only. These labels say which semantic obligations must be preserved;
+  // they never prescribe a sentence shape, state narration, or turn-closing style.
   const requiredContent: string[] = [];
-  if (hard.hardDisengage) requiredContent.push("state_boundary_and_close");
-  else if (hard.mustAcknowledgeBoundary) requiredContent.push("acknowledge_boundary");
+  if (hard.hardDisengage) requiredContent.push("boundary_maintained");
+  else if (hard.mustAcknowledgeBoundary) requiredContent.push("boundary_acknowledged");
   if (!counterFlirtAllowed) requiredContent.push("no_counter_flirt");
 
   if (cautious >= 0.6) rationale.push(`uncertainty_damping applied (cautious=${cautious.toFixed(2)})`);
@@ -142,6 +156,7 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
       register: speech.register,
       stance: contract.stance,
       relationshipLevel: speech.relationshipLevel,
+      expressionMode: expressionModeProjection(hard, contract),
     },
     resolverRationale: rationale,
   };
