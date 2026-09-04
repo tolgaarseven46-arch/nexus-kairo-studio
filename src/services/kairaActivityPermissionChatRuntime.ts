@@ -18,16 +18,23 @@ export type KairaActivityPermissionChatResolution =
   | { status: "none" | "uncorrelated" }
   | { status: "unmatched" | "execution_rejected" | "applied"; result: KairaActivityPermissionDialogueApplyResult };
 
+const INTERNAL_ACTIVITY_KEY_RE =
+  /(?:planning_dynamic_state|dynamic_state_chat|chat_request|permission_request|activity_execution|planning_trigger|trigger_inbox|worker|runtime|kaira)/iu;
+
 /**
- * activityType/activityId are process-owned canonical keys, not presentation
- * strings. A single plain token can be shown conservatively; structured keys
- * must fall back to generic copy instead of being prettified into leaked IDs.
+ * Canonical activity types may use machine separators (e.g. `museum_visit`) and
+ * can be rendered conservatively. Orchestration/correlation keys are not labels
+ * and must degrade to generic copy instead of being prettified for the user.
  */
 const activityLabel = (value?: string) => {
   const raw = String(value || "").trim();
-  if (!raw || raw.length > 48 || /[_:-]/u.test(raw)) return "";
-  if (!/^[\p{L}\p{N}]+$/u.test(raw)) return "";
-  return raw;
+  if (!raw || raw.length > 64 || INTERNAL_ACTIVITY_KEY_RE.test(raw)) return "";
+  const normalized = raw
+    .replace(/[_:-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized || normalized.split(/\s+/u).length > 5) return "";
+  return normalized.slice(0, 120);
 };
 
 export function buildKairaActivityPermissionChatPrompt(input: {
