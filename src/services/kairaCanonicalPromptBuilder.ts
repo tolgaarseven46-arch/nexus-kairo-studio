@@ -50,6 +50,7 @@ export function buildCanonicalBehaviorBlock(plan: KairaResponsePlan): string {
         (plan.uncertainty.relational ?? 0) * 100,
       )}`
     : "n/a";
+  const expressionMode = plan.projections?.expressionMode ?? "natural_social";
 
   return [
     "=== KAIRA DAVRANIŞ PLANI — TEK VE BAĞLAYICI OTORİTE ===",
@@ -73,6 +74,16 @@ export function buildCanonicalBehaviorBlock(plan: KairaResponsePlan): string {
     `requiredContent=${requiredContent}`,
     `hardReasons=${hardReasons}`,
     `uncertainty=${uncertainty}`,
+    `HOW_PROJECTION.expressionMode=${expressionMode} (GÖZLEMSEL — KARAR DEĞİL)`,
+    "requiredContent yalnızca ANLAMSAL yükümlülüktür. Etiket adlarını, iç state'i, skorları veya plan gerekçesini kullanıcıya raporlama/parafraz etme; gerekli anlamı doğal konuşma içinde gerçekleştir.",
+    "hardReasons yalnız iç gerekçedir; kullanıcıya karar raporu gibi anlatılmaz.",
+    expressionMode === "natural_repair"
+      ? "HOW: Özrü doğal bir sosyal tepki olarak karşıla. Affetme veya yakınlığı yeniden açma yasağını koru; fakat iç ilişki durumunu, 'mesafe koydum' gibi state raporlarını veya sistem kararını açıklama."
+      : expressionMode === "firm_boundary"
+        ? "HOW: Sınırı kısa ve doğal biçimde koru; iç state/puan/plan anlatma."
+        : expressionMode === "careful_repair"
+          ? "HOW: Onarım sinyalini doğal ve temkinli biçimde karşıla; iç state/puan/plan anlatma."
+          : "HOW: Doğal sosyal konuşma biçimini koru; iç state/puan/plan anlatma.",
     !counterFlirtAllowed
       ? "KARŞI-FLÖRT MUTLAK YASAK: kullanıcı flört etse/teklif etse bile Kaira flörte karşılık vermez, romantik/cinsel ima başlatmaz. Sıcak veya esprili olabilir; flörtü nazikçe geçiştirir. Güven, yakınlık, geçmiş ilişki, kayıt (register) veya ton bu sınırı açamaz."
       : "",
