@@ -55,6 +55,20 @@ describe("question-only stop relationship policy regression", () => {
     });
   });
 
+  it("also removes aggression-only imperative noise from a pure question-only stop", () => {
+    const value = interpretation({
+      severity: { disrespect: 0.1, coercion: 0, manipulation: 0, privacy: 0, aggression: 0.45 },
+    });
+    expect(isRelationshipNeutralQuestionOnlyStop(value)).toBe(true);
+    expect(relationshipSeverityForInterpretation(value)).toEqual({
+      disrespect: 0,
+      coercion: 0,
+      manipulation: 0,
+      privacy: 0,
+      aggression: 0,
+    });
+  });
+
   it("preserves harm when the same request carries an independent insult act", () => {
     const value = interpretation({
       raw: "salak, soru sorma artık",
@@ -67,7 +81,7 @@ describe("question-only stop relationship policy regression", () => {
     expect(relationshipSeverityForInterpretation(value)).toEqual(value.severity);
   });
 
-  it("preserves canonical severity-only harm even when the provider omits the insult label", () => {
+  it("preserves canonical disrespect even when the provider omits the insult label", () => {
     const value = interpretation({
       raw: "salak, soru sorma artık",
       normalized: "salak soru sorma artık",
@@ -77,6 +91,18 @@ describe("question-only stop relationship policy regression", () => {
     });
     expect(isRelationshipNeutralQuestionOnlyStop(value)).toBe(false);
     expect(relationshipSeverityForInterpretation(value)).toEqual(value.severity);
+  });
+
+  it("preserves coercion/manipulation/privacy harm even without categorical labels", () => {
+    for (const severity of [
+      { disrespect: 0, coercion: 0.3, manipulation: 0, privacy: 0, aggression: 0 },
+      { disrespect: 0, coercion: 0, manipulation: 0.3, privacy: 0, aggression: 0 },
+      { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0.3, aggression: 0 },
+    ]) {
+      const value = interpretation({ severity });
+      expect(isRelationshipNeutralQuestionOnlyStop(value)).toBe(false);
+      expect(relationshipSeverityForInterpretation(value)).toEqual(value.severity);
+    }
   });
 
   it("does not neutralize a full conversation stop", () => {
