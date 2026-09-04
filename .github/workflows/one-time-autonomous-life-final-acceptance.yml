@@ -1,0 +1,25 @@
+name: One-time Autonomous Life Final Acceptance
+
+on:
+  push:
+    branches:
+      - diag/autonomous-life-final-acceptance
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+      - name: Run fresh production autonomous-life tick
+        env:
+          KAIRA_AUTONOMOUS_LIFE_URL: https://nexus-kairo-studio.onrender.com
+          KAIRA_INTERNAL_WORKER_SECRET: ${{ secrets.KAIRA_INTERNAL_WORKER_SECRET }}
+          KAIRA_AUTONOMOUS_LIFE_RUN_ID: final-acceptance-${{ github.run_id }}
+          KAIRA_AUTONOMOUS_LIFE_LIMIT: 25
+        run: node scripts/run-kaira-autonomous-life-wakeup.mjs
