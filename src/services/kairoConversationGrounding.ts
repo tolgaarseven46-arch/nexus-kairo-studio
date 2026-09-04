@@ -54,7 +54,7 @@ export function formatKairoHistoryForModel(
 export function sanitizeKairoReplyText(reply: string): string {
   return String(reply || "")
     .replace(
-      /^\s*(?:\[\s*Kairo(?:\s*→\s*[^\]]+)?\s*\]|Kairo(?:\s*→\s*[^:]+)?):\s*/iu,
+      /^\s*(?:\[\s*Ka[iİıI]r[ao](?:\s*→\s*[^\]]+)?\s*\]|Ka[iİıI]r[ao](?:\s*→\s*[^:]+)?):\s*/iu,
       "",
     )
     .trim();
