@@ -1360,3 +1360,22 @@ Yeni sohbet açıldığında:
 ### Next verified development question
 - Audit **semantic-provider quality at the canonical ingestion boundary** separately from downstream behavior authority: build a deterministic recorded-output / fixture matrix for natural Turkish turns (social routine, emotional opening, complaint/confusion, repair signal, recall, third-party report, insult ambiguity, explicit stop, advice request) and measure whether provider-produced `SemanticInterpretation@2` preserves the field semantics now relied on by the canonical-only runtime. Do not loosen downstream policy to compensate for provider misclassification; fix producer/schema/prompt evidence only when a measured case proves it.
 
+
+
+## 138. Canonical semantic-provider production quality stabilization — PR #41–#44 — 2026-09-04
+- PR #41 merged as commit `1e8c53a9c0269a4160b4643ab4adb55957fd30f1`. A permanent nine-family recorded semantic-provider matrix now locks natural Turkish field semantics at the canonical ingestion boundary: social routine, emotional opening, generic complaint without repair, typed clarification repair, conversation recall, third-party reported insult, lone target-ambiguous insult, question-only stop and explicit advice request.
+- PR #42 merged as commit `2f4595677ed41a8fab7f9308a6e045be3835ea4a`. KNT persistence/UI now expose the exact canonical `SemanticInterpretation@2` snapshot plus semantic source/provider per turn, so live provider drift can be diagnosed without downstream reparsing.
+- First deployed production smoke against `/api/language-understanding` measured 6/9 families passing and isolated producer-side drift only. No downstream KDM/relationship/dialogue policy workaround was added.
+- PR #43 merged as commit `ede6e6c8662cea44dd0efffece83a9c762b9ede5`. Provider-boundary invariants now require prior assistant context + confusion/challenge semantics for repair, keep `stopRequest` identical to `stopTalking`, and remove stray `stop_request` social acts when full conversation stop is false. Prompt counterexamples also preserve third-party reported insult, widen lone-insult uncertainty and keep generic complaints from manufacturing repair. Full CI + Architecture Review passed.
+- After PR #43 deployed, the same live production smoke improved to 8/9. The only remaining measured drift was `naber kaira`: `target:kaira` and `socialRoutine:how_are_you` were correct while the model sometimes emitted `primaryIntent:smalltalk` instead of the recorded canonical `greeting`.
+- PR #44 merged as commit `f4594cc689b2e05a78c87959776642568562334f`. The provider prompt now explicitly maps `naber` / `nasılsın` to `primaryIntent:greeting + socialRoutine:how_are_you`; provider-boundary field consistency normalizes a typed `how_are_you` routine to `greeting` without reparsing raw text. Full tests, TypeScript, production build, behavior/docs guards and Architecture Review passed.
+- Render deploy `dep-dad4k515efls73eucde0` became live from the exact PR #44 merge commit. The final one-time production smoke then passed **9/9** families with `semanticSource:semantic_provider` / `semanticProvider:llm_semantic_openrouter`; failed case list was empty.
+- Temporary live-smoke workflow/branch content was reset to `main`; no one-time smoke workflow remains in the branch state. Semantic-provider stabilization is therefore closed unless a new measured production regression appears.
+
+### Current verified checkpoint
+- PR #30–#44 are complete and merged. Do not reopen C1/C2, repetition, emotional-load or semantic-provider stabilization without a new measured regression.
+- Canonical runtime still has one semantic authority: provider-produced `SemanticInterpretation@2` plus deterministic grounded projection. Downstream policy is not allowed to compensate for provider classification drift by reparsing raw text.
+- Production semantic ingestion is live on Render at commit `f4594cc689b2e05a78c87959776642568562334f` and the verified nine-family smoke is 9/9.
+
+### Next verified development question
+- Return to higher-level product behavior validation. Use the now-observable canonical semantic snapshots in real multi-turn KNT sessions to measure end-to-end natural conversation quality, speech-identity consistency and long-session behavior. Patch only failures that are reproduced in the live canonical path; do not add speculative semantic rules.
