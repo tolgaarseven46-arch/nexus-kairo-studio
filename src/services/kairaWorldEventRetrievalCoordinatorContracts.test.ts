@@ -9,6 +9,14 @@ import {
   shouldRetrieveWorldEvents,
 } from "./worldEventRetrieval";
 
+function retrievalSemantics(
+  discourseAct: "recall_request" | "none",
+): Parameters<typeof shouldRetrieveWorldEvents>[0] {
+  return {
+    discourseFacets: { discourseAct },
+  } as unknown as Parameters<typeof shouldRetrieveWorldEvents>[0];
+}
+
 function observation(input: {
   id: string;
   createdAt: string;
@@ -65,11 +73,14 @@ function observation(input: {
 }
 
 describe("Kaira world event retrieval coordinator contracts", () => {
-  it("activates retrieval for temporal discourse markers", () => {
-    expect(shouldCoordinateWorldEventRetrieval("peki sonra ne oldu?")).toBe(true);
-    expect(shouldRetrieveWorldEvents("peki sonra ne oldu?")).toBe(true);
-    expect(shouldCoordinateWorldEventRetrieval("Ayşe en son ne dedi?")).toBe(true);
-    expect(shouldCoordinateWorldEventRetrieval("naber")).toBe(false);
+  it("lets canonical recall semantics authorize retrieval, never temporal words alone", () => {
+    expect(shouldCoordinateWorldEventRetrieval(retrievalSemantics("recall_request"))).toBe(true);
+    expect(shouldRetrieveWorldEvents(retrievalSemantics("recall_request"))).toBe(true);
+    // Regression: a benign statement such as "bugün çok enerjik hissediyorum"
+    // may contain a temporal word, but canonical semantics says it is not recall.
+    expect(shouldRetrieveWorldEvents(retrievalSemantics("none"))).toBe(false);
+    expect(shouldCoordinateWorldEventRetrieval(retrievalSemantics("recall_request"))).toBe(true);
+    expect(shouldCoordinateWorldEventRetrieval(retrievalSemantics("none"))).toBe(false);
   });
 
   it("uses temporal graph mode and never lexical fallback for discourse queries", () => {
@@ -78,6 +89,7 @@ describe("Kaira world event retrieval coordinator contracts", () => {
 
     const result = coordinateWorldEventRetrieval({
       message: "peki sonra ne oldu?",
+      interpretation: retrievalSemantics("recall_request"),
       sessionId: "session-1",
       observations: [latest, unrelatedLexical],
     });
@@ -93,6 +105,7 @@ describe("Kaira world event retrieval coordinator contracts", () => {
 
     const result = coordinateWorldEventRetrieval({
       message: "ondan önce ne oldu?",
+      interpretation: retrievalSemantics("recall_request"),
       sessionId: "session-1",
       observations: [second, first],
     });
@@ -131,6 +144,7 @@ describe("Kaira world event retrieval coordinator contracts", () => {
 
     const result = coordinateWorldEventRetrieval({
       message: "Ayşe bana salak dedikten sonra ne oldu?",
+      interpretation: retrievalSemantics("recall_request"),
       sessionId: "session-1",
       observations: [child, toKaira, toUser],
     });
@@ -165,6 +179,7 @@ describe("Kaira world event retrieval coordinator contracts", () => {
 
     const result = coordinateWorldEventRetrieval({
       message: "Ayşe ne dedi?",
+      interpretation: retrievalSemantics("recall_request"),
       sessionId: "session-1",
       observations: [item],
       queryAnchorAt: "2026-08-30T10:00:00.000Z",

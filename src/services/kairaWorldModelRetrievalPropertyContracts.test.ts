@@ -15,6 +15,10 @@ import {
 } from "./worldEventRetrieval";
 import { validateRetrievalContract } from "./kairaArchitectureContracts";
 
+const recallSemantics = {
+  discourseFacets: { discourseAct: "recall_request" },
+} as Parameters<typeof shouldRetrieveWorldEvents>[0];
+
 const NAMES = [
   "Ayşe", "Merve", "Selin", "Burak", "Deniz", "Cem", "Ece", "Kerem",
   "Zeynep", "Emre", "Derya", "Can", "Elif", "Onur", "Seda", "Baran",
@@ -86,7 +90,7 @@ describe("Kaira world-model/retrieval property contracts", () => {
       ]) {
         const { event } = canonical(query);
         expect(classifyWorldEventObservation(event).persist, query).toBe(false);
-        expect(shouldRetrieveWorldEvents(query), query).toBe(true);
+        expect(shouldRetrieveWorldEvents(recallSemantics), query).toBe(true);
       }
     }
   });

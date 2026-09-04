@@ -7,6 +7,10 @@ import {
 import { resolvePlanOutcomeRecall } from "./worldEventOutcomeRecallPolicy";
 import { coordinateWorldEventRetrieval } from "./worldEventRetrievalCoordinator";
 
+const recallSemantics = {
+  discourseFacets: { discourseAct: "recall_request" },
+} as Parameters<typeof coordinateWorldEventRetrieval>[0]["interpretation"];
+
 function observation(input: {
   id: string;
   createdAt: string;
@@ -151,6 +155,7 @@ describe("Kaira plan lifecycle contracts", () => {
     const executed = observation({ id: "executed-2", createdAt: "2026-08-23T10:00:00.000Z", lifecycle: "executed" });
     const result = coordinateWorldEventRetrieval({
       message: "Mert istifa etti mi?",
+      interpretation: recallSemantics,
       sessionId: "session-1",
       observations: [executed, secondPlan, cancelled, firstPlan],
     });

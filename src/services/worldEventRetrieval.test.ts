@@ -6,6 +6,14 @@ import {
 } from "./worldEventRetrieval";
 import type { WorldEventObservation } from "./worldModelEventStore";
 
+const recallSemantics = {
+  discourseFacets: { discourseAct: "recall_request" },
+} as Parameters<typeof shouldRetrieveWorldEvents>[0];
+
+const nonRecallSemantics = {
+  discourseFacets: { discourseAct: "none" },
+} as Parameters<typeof shouldRetrieveWorldEvents>[0];
+
 const observation = (overrides: Partial<WorldEventObservation> = {}): WorldEventObservation => ({
   userId: "mert",
   sessionId: "s1",
@@ -27,10 +35,9 @@ const observation = (overrides: Partial<WorldEventObservation> = {}): WorldEvent
 });
 
 describe("world event retrieval", () => {
-  it("only activates for recall-like queries", () => {
-    expect(shouldRetrieveWorldEvents("Ayşe dün bana ne demişti?")).toBe(true);
-    expect(shouldRetrieveWorldEvents("Ayşe mi Merve mi bana salak demişti?")).toBe(true);
-    expect(shouldRetrieveWorldEvents("naber")).toBe(false);
+  it("only activates when canonical semantics authorizes recall", () => {
+    expect(shouldRetrieveWorldEvents(recallSemantics)).toBe(true);
+    expect(shouldRetrieveWorldEvents(nonRecallSemantics)).toBe(false);
   });
 
   it("ranks named relevant events above unrelated events", () => {

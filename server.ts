@@ -616,19 +616,6 @@ app.post("/api/chat", async (req, res) => {
       });
     };
     const cleanHistory = sanitizeKairoChatHistory(history);
-    const retrievedWorldEvents = kairaPolicy.persistentWorldModel && shouldRetrieveWorldEvents(userMessage)
-      ? rankWorldEventObservations(
-          userMessage,
-          await loadRecentWorldEventObservations(userId, 30, kairaInstance.instanceId).catch(() => []),
-          5,
-        )
-      : [];
-    const worldEventMemoryInstruction = buildWorldEventMemoryInstruction(retrievedWorldEvents);
-    const worldStateAppraisal = appraiseRetrievedWorldState(retrievedWorldEvents);
-    const worldStateAppraisalInstruction = buildWorldStateAppraisalInstruction(worldStateAppraisal);
-    const worldReasoningPolicy = deriveWorldReasoningPolicy(worldStateAppraisal);
-    const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy };
-    const worldReasoningPolicyInstruction = buildWorldReasoningPolicyInstruction(worldReasoningPolicy);
     const languageUnderstanding = await resolveServerLanguageUnderstanding({
       message: userMessage,
       incomingSemanticInterpretation,
@@ -651,6 +638,19 @@ app.post("/api/chat", async (req, res) => {
       event: languageUnderstanding.event,
       source: languageUnderstanding.semanticSource,
     };
+    const retrievedWorldEvents = kairaPolicy.persistentWorldModel && shouldRetrieveWorldEvents(canonicalSemantic.interpretation)
+      ? rankWorldEventObservations(
+          userMessage,
+          await loadRecentWorldEventObservations(userId, 30, kairaInstance.instanceId).catch(() => []),
+          5,
+        )
+      : [];
+    const worldEventMemoryInstruction = buildWorldEventMemoryInstruction(retrievedWorldEvents);
+    const worldStateAppraisal = appraiseRetrievedWorldState(retrievedWorldEvents);
+    const worldStateAppraisalInstruction = buildWorldStateAppraisalInstruction(worldStateAppraisal);
+    const worldReasoningPolicy = deriveWorldReasoningPolicy(worldStateAppraisal);
+    const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy };
+    const worldReasoningPolicyInstruction = buildWorldReasoningPolicyInstruction(worldReasoningPolicy);
     const knowledgeQuery =
       canonicalSemantic.event.knowledgeQuery && canonicalSemantic.event.knowledgeQuery.confidence >= 0.72
         ? canonicalSemantic.event.knowledgeQuery

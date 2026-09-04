@@ -1,3 +1,4 @@
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import type { WorldEventObservation } from "./worldModelEventStore";
 import {
   rankWorldEventObservations,
@@ -39,12 +40,12 @@ export interface CoordinatedWorldEventRetrieval {
   planLifecycleResolution?: PlanLifecycleResolution;
 }
 
-export function shouldCoordinateWorldEventRetrieval(message: string): boolean {
-  return Boolean(detectExplicitTemporalRelationDirection(message)) ||
-    Boolean(detectTemporalDiscourseDirection(message)) ||
-    isPlanOutcomeRecallQuery(message) ||
-    isPlanRecallQuery(message) ||
-    shouldRetrieveWorldEvents(message);
+type RetrievalSemantics = Pick<SemanticInterpretation, "discourseFacets">;
+
+export function shouldCoordinateWorldEventRetrieval(
+  interpretation: RetrievalSemantics,
+): boolean {
+  return shouldRetrieveWorldEvents(interpretation);
 }
 
 function graphItems(
@@ -87,18 +88,27 @@ function lifecycleItems(
 }
 
 /**
- * Single policy seam for world-model retrieval. Temporal event questions are
- * graph-only. Full proposition anchors have highest priority, followed by the
- * coarser named/event anchor, then conservative discourse resolution. Plan
- * outcome recall is lifecycle-only and never falls back to lexical guessing.
+ * Single policy seam for world-model retrieval. Canonical language understanding
+ * authorizes recall once; raw message text may only choose the retrieval mode
+ * and rank evidence after that authorization.
+ *
+ * Temporal event questions are graph-only. Full proposition anchors have highest
+ * priority, followed by the coarser named/event anchor, then conservative discourse
+ * resolution. Plan outcome recall is lifecycle-only and never falls back to lexical
+ * guessing.
  */
 export function coordinateWorldEventRetrieval(input: {
   message: string;
+  interpretation: RetrievalSemantics;
   sessionId: string;
   observations: WorldEventObservation[];
   maxItems?: number;
   queryAnchorAt?: string;
 }): CoordinatedWorldEventRetrieval {
+  if (!shouldRetrieveWorldEvents(input.interpretation)) {
+    return { mode: "none", items: [] };
+  }
+
   const maxItems = Math.max(1, Math.min(input.maxItems ?? 5, 10));
   const explicitDirection = detectExplicitTemporalRelationDirection(input.message);
   if (explicitDirection) {
@@ -182,10 +192,6 @@ export function coordinateWorldEventRetrieval(input: {
         maxItems,
       }),
     };
-  }
-
-  if (!shouldRetrieveWorldEvents(input.message)) {
-    return { mode: "none", items: [] };
   }
 
   return {
