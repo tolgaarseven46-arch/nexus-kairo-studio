@@ -1,0 +1,90 @@
+name: One-time Finalize Claim Provenance
+on:
+  push:
+    branches:
+      - feat/claim-world-event-provenance
+permissions:
+  contents: write
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/claim-world-event-provenance
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply canonical provenance patch and recall-target seam fix
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, re, subprocess
+
+          workflow = Path('.github/workflows/one-time-patch-claim-provenance.yml').read_text()
+          match = re.search(r"echo '([A-Za-z0-9+/=]+)' \| base64 -d > /tmp/patch_claim.py", workflow)
+          if not match:
+              raise SystemExit('existing provenance patch payload not found')
+          Path('/tmp/patch_claim.py').write_bytes(base64.b64decode(match.group(1)))
+          subprocess.run(['python', '/tmp/patch_claim.py'], check=True)
+
+          decision = Path('src/services/kairoDialogueDecisionEngine.ts')
+          s = decision.read_text()
+          old_fn = '''function recallTarget(
+            history: ConversationTurn[],
+            userMessage: string,
+            userName: string,
+          ): string | undefined {
+            return dialogueParticipants(history, userName).find((name) =>
+              containsName(userMessage, name),
+            );
+          }
+          '''
+          new_fn = '''function recallTarget(
+            history: ConversationTurn[],
+            userMessage: string,
+            userName: string,
+            claims: DialogueClaim[] = [],
+          ): string | undefined {
+            const candidates = Array.from(
+              new Set([
+                ...dialogueParticipants(history, userName),
+                ...claims.map((claim) => claim.subject),
+              ]),
+            );
+            return candidates.find((name) => containsName(userMessage, name));
+          }
+          '''
+          if old_fn not in s:
+              raise SystemExit('recallTarget seam shape changed')
+          s = s.replace(old_fn, new_fn, 1)
+          old_order = '''  const target = recallTarget(history, userMessage, userName);
+            const claims = buildDialogueClaimLedger(history, userMessage, userName, dialogueAnalysis);
+            const supportedClaims = supportedClaimsFor(claims, target);
+          '''
+          new_order = '''  const claims = buildDialogueClaimLedger(history, userMessage, userName, dialogueAnalysis);
+            const target = recallTarget(history, userMessage, userName, claims);
+            const supportedClaims = supportedClaimsFor(claims, target);
+          '''
+          if old_order not in s:
+              raise SystemExit('plan target/claim ordering shape changed')
+          decision.write_text(s.replace(old_order, new_order, 1))
+          PY
+      - name: Focused provenance regression
+        run: npx vitest run src/services/claimProvenance.test.ts src/services/kairaClaimProvenanceRegression.test.ts src/services/worldModelReportedClaimPersistence.test.ts src/services/kairoDialogueChaosEngine.test.ts src/services/kairoDialogueDecisionEngine.test.ts
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Commit validated product patch and clean diagnostics
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/one-time-patch-claim-provenance.yml .github/workflows/one-time-finalize-claim-provenance.yml
+          git add src/services/kairoDialogueChaosEngine.ts src/services/kairoDialogueDecisionEngine.ts src/services/worldModelEventStore.ts src/services/kairoDialogueChaosEngine.test.ts
+          git commit -m "fix(kaira): enforce immutable claim provenance"
+          git push origin HEAD:feat/claim-world-event-provenance
