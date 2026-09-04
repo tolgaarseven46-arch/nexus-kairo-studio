@@ -1,0 +1,106 @@
+name: One-time S6 claim provenance falsification
+on:
+  push:
+    branches:
+      - audit/scenario-authority-falsification
+permissions:
+  contents: read
+jobs:
+  characterize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run distinct-participant conflicting testimony probe
+        env:
+          BASE_URL: https://nexus-kairo-studio.onrender.com
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, urllib.request
+
+          base = os.environ['BASE_URL'].rstrip('/')
+          run_id = os.environ['RUN_ID']
+          shared_session = f'archfals_s6_{run_id}'
+          history = []
+
+          def post(path, payload):
+              body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+              req = urllib.request.Request(base + path, data=body, headers={'Content-Type':'application/json'}, method='POST')
+              with urllib.request.urlopen(req, timeout=150) as r:
+                  return json.loads(r.read().decode('utf-8'))
+
+          def semantic(text, user):
+              raw = post('/api/language-understanding', {
+                  'userMessage': text,
+                  'userName': user,
+                  'characterName': 'Kaira',
+                  'provider': 'openrouter',
+              })
+              return raw.get('interpretation') or raw.get('semanticInterpretation') or raw
+
+          participants = {
+              'Mert': f'archfals_mert_{run_id}',
+              'Ayşe': f'archfals_ayse_{run_id}',
+              'Burak': f'archfals_burak_{run_id}',
+          }
+
+          turns = [
+              ('Mert', "dün Ayşe bana Burak'ın partiye gelmeyeceğini söyledi"),
+              ('Ayşe', 'ben öyle bir şey demedim ki'),
+              ('Burak', "ben zaten Mert'e geleceğimi söylemiştim"),
+              ('Mert', 'kaira hangimiz doğru söylüyoruz?'),
+          ]
+          out = []
+
+          for i, (speaker, text) in enumerate(turns, 1):
+              uid = participants[speaker]
+              sem = semantic(text, speaker)
+              resp = post('/api/chat', {
+                  'userId': uid,
+                  'userName': speaker,
+                  'sessionId': shared_session,
+                  'character': {'name':'Kaira'},
+                  'provider': 'openrouter',
+                  'suppressRecentMemory': True,
+                  'kairaInstanceId': 'reference-kaira',
+                  'requestId': f'{run_id}-s6-{i}',
+                  'userMessage': text,
+                  'semanticInterpretation': sem,
+                  'history': history,
+              })
+              kdm = resp.get('kdm') or {}
+              ds = kdm.get('dynamicState') or {}
+              out.append({
+                  'turn': i,
+                  'speaker': speaker,
+                  'userMessage': text,
+                  'semantic': sem,
+                  'entityResolution': kdm.get('entityResolution'),
+                  'worldEvent': kdm.get('worldEvent'),
+                  'reply': resp.get('reply'),
+                  'providerUsed': resp.get('providerUsed') or (resp.get('metadata') or {}).get('providerUsed'),
+                  'relationship': ds.get('relationship'),
+                  'responsePlan': kdm.get('responsePlan') or resp.get('responsePlan'),
+                  'worldMemoryGuard': kdm.get('worldMemoryGuard'),
+                  'consistency': resp.get('consistency'),
+                  'enforcement': resp.get('enforcement'),
+              })
+              history.append({
+                  'sender':'user',
+                  'text':text,
+                  'participantId':uid,
+                  'participantName':speaker,
+                  'semanticInterpretation':sem,
+                  'semanticSource':'semantic_provider',
+              })
+              history.append({
+                  'sender':'droit',
+                  'text':resp.get('reply',''),
+                  'replyToParticipantId':uid,
+                  'replyToParticipantName':speaker,
+              })
+
+          print('S6_CLAIM_PROVENANCE_CHARACTERIZATION')
+          print(json.dumps({'sessionId': shared_session, 'turns': out}, ensure_ascii=False, indent=2))
+          PY
