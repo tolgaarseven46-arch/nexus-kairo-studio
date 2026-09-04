@@ -21,6 +21,7 @@ describe('learned language HOW server integration contracts', () => {
   });
 
   it('records the same derived signal on both local and AI KNT/test-session observability paths', () => {
+    // Observability fields may grow over time, so assert path coverage instead of brittle adjacency/order.
     const localProviderOccurrences = server.match(/providerUsed: "local_language"/g)?.length ?? 0;
     const aiProviderOccurrences = server.match(/providerUsed: activeAiProviderUsed/g)?.length ?? 0;
     const languageStyleOccurrences = server.match(/\blanguageStyleMemory,/g)?.length ?? 0;
