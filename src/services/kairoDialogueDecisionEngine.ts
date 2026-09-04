@@ -392,6 +392,22 @@ function planDialogueResponseBase(
         "Düzeltmeyi kabul et; eski iddiayı savunma veya yeni ayrıntı ekleme.",
     };
   }
+  // A typed advice request is a user-facing conversational obligation. A
+// simultaneous topic-shift facet describes the transition, but cannot erase
+// the request. Keep recall/correction/repair authorities above this seam;
+// otherwise advice owns the move and receives the normal answer obligation.
+if (event.adviceRequested) {
+  return {
+    move: "answer_or_clarify",
+    allowFollowUpQuestion: true,
+    allowSpeculation: false,
+    maxSentences: 3,
+    hasSupportedTargetClaim: false,
+    reason:
+      "Kullanıcı açıkça görüş/tavsiye istiyor. Konu değişimi sinyali bu cevap yükümlülüğünü silemez; önce isteği yanıtla, yalnız gerçekten gerekli ise tek netleştirme sorusu sor.",
+  };
+}
+
   if (event.discourseAct === "topic_shift") {
     return {
       move: "follow_topic_shift",
