@@ -1,0 +1,31 @@
+name: One-time PR61 checkpoint
+on:
+  push:
+    branches:
+      - docs/pr61-production-checkpoint
+permissions:
+  contents: write
+jobs:
+  checkpoint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Append production checkpoint and remove workflow
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          text = p.read_text(encoding='utf-8')
+          block = '''\n\n## 142) ResponsePlan content/expression boundary production acceptance (2026-09-04)\n\n- PR #61 (`fix(kaira): separate response-plan content from expression`) merged to `main`.\n- Feature merge commit: `5969617db29ca374c9ee3155564c576bff3335cd`.\n- Full CI passed: architecture contracts, autonomous runtime contracts, beta regression, beta conversation acceptance, full tests, TypeScript, production build, behavior/docs guards, and SHA-bound Architecture Review.\n- ADR-0032 records the boundary: `requiredContent` is WHAT-only; HOW is a non-authoritative `projections.expressionMode`.\n- `state_boundary_and_close` is no longer a canonical semantic obligation. Hard disengage now projects `boundary_maintained`; incomplete repair projects HOW=`natural_repair`.\n- Render deploy `dep-dadb0iijnfac73eclcrg` served the exact merge commit live at the production URL.\n- Production smoke run `33869885109` passed on the canonical path using `sus orospu` -> `özür` with a fresh isolated user.\n- Hard relationship invariants remained intact on the apology turn: `conversationState=disengaged`, `continueConversation=false`, question/humor/affection/forgiveness/reopening all forbidden, `repairStatus=incomplete`.\n- Canonical plan on the apology turn: `requiredContent=[boundary_maintained,no_counter_flirt]`, `projections.expressionMode=natural_repair`; legacy `state_boundary_and_close` absent.\n- Delivered apology reply was `kabul etmiyorum`; no internal state/score/plan narration was emitted.\n- Temporary PR61 production smoke branch/workflow was reset to the feature merge commit after acceptance.\n- Next planned 21-turn finding to re-verify before changing code: self-identity / immutable character identity vs autobiographical self-memory authority. Do not reopen completed world-memory, complaint-accountability, question-stop, or ResponsePlan content/HOW work unless a fresh regression reproduces them.\n'''
+          if '## 142) ResponsePlan content/expression boundary production acceptance' not in text:
+              p.write_text(text.rstrip() + block + '\n', encoding='utf-8')
+          PY
+          git rm .github/workflows/one-time-pr61-checkpoint.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          git commit -m "docs(state): close response-plan content-expression acceptance"
+          git push
