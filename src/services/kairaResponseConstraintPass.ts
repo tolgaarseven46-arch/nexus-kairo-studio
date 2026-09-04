@@ -4,10 +4,6 @@ import {
   findKairaResponsePlanIssues,
 } from "./kairaResponsePlan";
 import {
-  buildKairaDialogueObligationFallback,
-  findKairaDialogueObligationIssues,
-} from "./kairaDialogueObligation";
-import {
   enforceKairoResponse,
   validateKairoResponse,
   type KairoResponseEnforcementResult,
@@ -43,15 +39,16 @@ export interface KairaResponseConstraintPassInput {
   epistemicContext?: KairaConstraintEpistemicContext;
   /**
    * Lower-authority delivery-quality checks (grounding / attribution / dialogue
-   * move / rhythm) that must also hold on the final delivered text. Keeping
-   * them inside this pass prevents a candidate from being marked invalid only
-   * after the fallback decision has already finished.
+   * move / rhythm) that must also hold on the final delivered text. The
+   * DialogueDecision-owned obligation criteria arrive through this validator;
+   * this final boundary does not invent its own fulfillment semantics.
    */
   additionalIssueFinder?: (reply: string) => string[];
   /**
-   * Optional grounded/dialogue-aware fallback. It is never trusted directly:
-   * the same ordered truth + plan + obligation + delivery-quality pass is
-   * applied to it before delivery.
+   * Legacy dialogue-owned deterministic fallback hook for non-obligation moves.
+   * The final boundary may validate it, but never manufactures a replacement of
+   * its own. For answer/clarify obligations the dialogue fallback is null, so
+   * recovery remains in the normal generation/repair pipeline.
    */
   fallbackFactory?: () => string | null;
 }
@@ -78,9 +75,6 @@ const structuralConsistency = (
   trace: ReasoningTrace,
   finalIssues: string[],
 ): KairaCanonicalConsistencyResult => {
-  // Reuse the established structural parsing only. The legacy validator's
-  // intent/sentiment/chosenTone keyword checks are intentionally NOT canonical
-  // acceptance authorities; the resolved KairaResponsePlan is.
   const legacy = validateKairoResponse(delivered, trace);
   const structuralIssues: string[] = [];
   if (!legacy.checks.nonEmpty) structuralIssues.push("Boş yanıt");
@@ -104,8 +98,6 @@ const structuralConsistency = (
     checks: {
       nonEmpty: legacy.checks.nonEmpty,
       length: legacy.checks.length,
-      // Retired as acceptance authorities on the canonical path. They stay
-      // present only to preserve the existing telemetry shape.
       intentTone: true,
       sentimentTone: true,
       decisionTone: true,
@@ -136,8 +128,6 @@ function runOrderedPass(
     input.epistemicContext,
   );
 
-  // Plan is the only social WHAT/WHETHER authority here. Do not pass the old
-  // BehaviorContract or conversationState back into the deterministic gate.
   const planEnforcement = enforceKairoResponse(epistemicGuard.reply, input.trace, {
     continueConversation: input.plan.continueConversation,
     humorAllowed: input.plan.allowHumor,
@@ -150,7 +140,6 @@ function runOrderedPass(
 
   const issues = [
     ...findKairaResponsePlanIssues(delivered, input.plan),
-    ...findKairaDialogueObligationIssues(delivered, input.plan),
     ...findWorldModelResponseIssues(delivered, input.worldItems, input.worldContext).map(
       (issue) => issue.message,
     ),
@@ -182,18 +171,17 @@ function runOrderedPass(
 }
 
 /**
- * PR4 / ADR-0006 canonical final-delivery boundary.
+ * Canonical final-delivery boundary.
  *
  * Order is fixed and explicit:
  *   world truth -> autobiographical truth -> epistemic truth -> ResponsePlan
- *   deterministic enforcement -> dialogue-obligation conformance -> final
- *   conformance on the delivered text.
+ *   deterministic enforcement -> externally-owned dialogue/grounding checks.
  *
- * Any fallback goes through the exact same pass. A DialogueDecision-owned
- * obligation fallback is attempted before the legacy generic acknowledgement,
- * preventing a structurally-clean fallback from silently erasing an active
- * answer/clarify obligation. Consistency is computed only after the final
- * delivered candidate is known.
+ * This boundary never writes a generic social reply. A caller-supplied legacy
+ * dialogue fallback can be tried only if it independently passes the exact same
+ * ordered constraints. Otherwise the original candidate and its issues are kept
+ * visible so a normal DialogueDecision -> ResponsePlan -> Realizer repair can
+ * own recovery instead of a hidden guard author.
  */
 export function runKairaResponseConstraintPass(
   input: KairaResponseConstraintPassInput,
@@ -203,21 +191,13 @@ export function runKairaResponseConstraintPass(
   let fallbackUsed = false;
 
   if (first.issues.length > 0) {
-    fallbackUsed = true;
     const preferredFallback = String(input.fallbackFactory?.() ?? "").trim();
-    const obligationFallback = String(
-      buildKairaDialogueObligationFallback(input.plan) ?? "",
-    ).trim();
-    const candidates = [...new Set([
-      preferredFallback,
-      obligationFallback,
-      "tamam",
-    ].filter(Boolean))];
-
-    for (const fallback of candidates) {
-      const candidate = runOrderedPass(fallback, input);
-      final = candidate;
-      if (candidate.issues.length === 0) break;
+    if (preferredFallback) {
+      const candidate = runOrderedPass(preferredFallback, input);
+      if (candidate.issues.length === 0) {
+        final = candidate;
+        fallbackUsed = true;
+      }
     }
   }
 
