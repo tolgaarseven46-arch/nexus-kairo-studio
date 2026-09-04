@@ -40,6 +40,13 @@ const plan = (o: Partial<KairaResponsePlan> = {}): KairaResponsePlan => ({
   requiredContent: ["no_counter_flirt"],
   hardReasons: ["flirtation_forbidden_by_character_policy"],
   uncertainty: { semantic: 0.4, relational: 0.35 },
+  projections: {
+    toneProjection: "warm-open",
+    register: "casual",
+    stance: "open",
+    relationshipLevel: "familiar",
+    expressionMode: "natural_social",
+  },
   ...o,
 });
 
@@ -100,6 +107,25 @@ describe("canonical behavior block", () => {
     expect(block).toContain("allowAffection=yasak");
   });
 
+  it("keeps semantic obligations separate from non-authoritative HOW projection", () => {
+    const block = buildCanonicalBehaviorBlock(plan({
+      requiredContent: ["boundary_maintained", "no_counter_flirt"],
+      projections: {
+        toneProjection: "closed",
+        register: "hurt",
+        stance: "closed",
+        relationshipLevel: "new",
+        expressionMode: "natural_repair",
+      },
+    }));
+    expect(block).toContain("requiredContent=boundary_maintained, no_counter_flirt");
+    expect(block).not.toContain("state_boundary_and_close");
+    expect(block).toContain("HOW_PROJECTION.expressionMode=natural_repair (GÖZLEMSEL — KARAR DEĞİL)");
+    expect(block).toMatch(/requiredContent yalnızca ANLAMSAL yükümlülüktür/);
+    expect(block).toMatch(/iç state'i, skorları veya plan gerekçesini kullanıcıya raporlama/);
+    expect(block).toMatch(/Özrü doğal bir sosyal tepki olarak karşıla/);
+  });
+
   it("emits the absolute counter-flirt ban whenever counterFlirtAllowed is not true", () => {
     const banned = buildCanonicalBehaviorBlock(plan({ counterFlirtAllowed: false }));
     expect(banned).toContain("counterFlirtAllowed=hayır");
@@ -122,11 +148,13 @@ describe("canonical behavior block", () => {
       requiredContent: undefined,
       hardReasons: undefined,
       uncertainty: undefined,
+      projections: undefined,
     });
     const block = buildCanonicalBehaviorBlock(legacyShaped);
     expect(block).toContain("flirtationAllowed=hayır");
     expect(block).toContain("counterFlirtAllowed=hayır");
     expect(block).toContain("opennessAxis=n/a");
+    expect(block).toContain("HOW_PROJECTION.expressionMode=natural_social");
     expect(block).toMatch(/KARŞI-FLÖRT MUTLAK YASAK/);
   });
 });
