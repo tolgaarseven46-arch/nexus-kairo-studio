@@ -1444,3 +1444,19 @@ Yeni sohbet açıldığında:
 
 ### Next verified development question
 - Continue the remaining evidence-driven 21-turn findings in order. Re-run/inspect the next unresolved turn-level failure using semantic snapshot + relationship/reaction state + response plan + provider route + final delivered text together. Patch only a failure reproduced on the live canonical path; do not reopen world-memory or complaint-accountability work without new production evidence.
+
+## 142) ResponsePlan content/expression boundary production acceptance (2026-09-04)
+
+- PR #61 (`fix(kaira): separate response-plan content from expression`) merged to `main`.
+- Feature merge commit: `5969617db29ca374c9ee3155564c576bff3335cd`.
+- Full CI passed: architecture contracts, autonomous runtime contracts, beta regression, beta conversation acceptance, full tests, TypeScript, production build, behavior/docs guards, and SHA-bound Architecture Review.
+- ADR-0032 records the boundary: `requiredContent` is WHAT-only; HOW is a non-authoritative `projections.expressionMode`.
+- `state_boundary_and_close` is no longer a canonical semantic obligation. Hard disengage now projects `boundary_maintained`; incomplete repair projects HOW=`natural_repair`.
+- Render deploy `dep-dadb0iijnfac73eclcrg` served the exact merge commit live at the production URL.
+- Production smoke run `33869885109` passed on the canonical path using `sus orospu` -> `özür` with a fresh isolated user.
+- Hard relationship invariants remained intact on the apology turn: `conversationState=disengaged`, `continueConversation=false`, question/humor/affection/forgiveness/reopening all forbidden, `repairStatus=incomplete`.
+- Canonical plan on the apology turn: `requiredContent=[boundary_maintained,no_counter_flirt]`, `projections.expressionMode=natural_repair`; legacy `state_boundary_and_close` absent.
+- Delivered apology reply was `kabul etmiyorum`; no internal state/score/plan narration was emitted.
+- Temporary PR61 production smoke branch/workflow was reset to the feature merge commit after acceptance.
+- Next planned 21-turn finding to re-verify before changing code: self-identity / immutable character identity vs autobiographical self-memory authority. Do not reopen completed world-memory, complaint-accountability, question-stop, or ResponsePlan content/HOW work unless a fresh regression reproduces them.
+
