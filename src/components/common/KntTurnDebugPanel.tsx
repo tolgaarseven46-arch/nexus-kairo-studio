@@ -21,6 +21,23 @@ const stateLine = (trace: any) => {
   ].join(' · ');
 };
 
+const semanticLine = (trace: any) => {
+  const semantic = trace?.semanticInterpretation || {};
+  const facets = semantic?.discourseFacets || {};
+  const uncertainty = semantic?.uncertainty || {};
+  return [
+    `intent=${semantic.primaryIntent ?? '-'}`,
+    `target=${semantic.target ?? '-'}`,
+    `routine=${facets.socialRoutine ?? '-'}`,
+    `act=${facets.discourseAct ?? '-'}`,
+    `repair=${facets.repairSignal ?? '-'}`,
+    `advice=${facets.adviceRequested ?? '-'}`,
+    `stopQ=${facets.stopQuestions ?? '-'}`,
+    `stopTalk=${facets.stopTalking ?? '-'}`,
+    `uncertainty=${typeof uncertainty.overall === 'number' ? uncertainty.overall.toFixed(2) : '-'}`,
+  ].join(' · ');
+};
+
 const turnText = (trace: any, index: number) => [
   `TUR ${index + 1}`,
   `Mesaj: ${trace?.userMessage ?? ''}`,
@@ -30,6 +47,8 @@ const turnText = (trace: any, index: number) => [
   `ReactionMode: ${trace?.dynamicState?.reactionMode ?? trace?.reasoningTrace?.currentMood?.reactionMode ?? 'neutral'}`,
   `Durum: ${stateLine(trace)}`,
   `Provider: ${trace?.providerUsed ?? '-'}`,
+  `SemanticSource: ${trace?.semanticSource ?? '-'}`,
+  `Canonical: ${semanticLine(trace)}`,
 ].join('\n');
 
 async function copyText(text: string) {
@@ -126,10 +145,11 @@ export const KntTurnDebugPanel: React.FC<KntTurnDebugPanelProps> = ({ userId = '
               <span className="shrink-0 rounded border border-zinc-700 px-1.5 py-0.5 text-[9px] font-mono text-zinc-300">{reactionMode}</span>
             </div>
 
-            <div className="mt-2 grid grid-cols-2 gap-1.5 text-[9px] font-mono sm:grid-cols-3">
+            <div className="mt-2 grid grid-cols-2 gap-1.5 text-[9px] font-mono sm:grid-cols-4">
               <div className="rounded border border-zinc-800 px-2 py-1"><span className="text-zinc-500">Niyet </span><span className="text-zinc-200">{intent}</span></div>
               <div className="rounded border border-zinc-800 px-2 py-1"><span className="text-zinc-500">Duygu </span><span className="text-zinc-200">{sentiment}</span></div>
               <div className="rounded border border-zinc-800 px-2 py-1"><span className="text-zinc-500">Provider </span><span className="text-zinc-200">{current?.providerUsed ?? '-'}</span></div>
+              <div className="rounded border border-zinc-800 px-2 py-1"><span className="text-zinc-500">Semantic </span><span className="text-zinc-200">{current?.semanticSource ?? '-'}</span></div>
             </div>
 
             <div className="mt-2 text-[9px] font-mono text-zinc-500 break-words">{stateLine(current)}</div>
@@ -149,6 +169,9 @@ export const KntTurnDebugPanel: React.FC<KntTurnDebugPanelProps> = ({ userId = '
             {detailsOpen && (
               <pre className="mt-2 max-h-64 overflow-auto rounded border border-zinc-800 bg-black/30 p-2 text-[9px] leading-relaxed text-zinc-400 whitespace-pre-wrap break-words">
                 {JSON.stringify({
+                  semanticSource: current?.semanticSource,
+                  semanticInterpretation: current?.semanticInterpretation,
+                  semanticEvent: current?.semanticEvent,
                   timings: current?.timings,
                   speechIdentity: current?.speechIdentity,
                   controlledSpontaneity: current?.controlledSpontaneity,
