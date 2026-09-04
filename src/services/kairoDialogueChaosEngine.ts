@@ -1,4 +1,6 @@
 import type { ConversationTurn } from "./kairoConversationGrounding";
+import { effectivelySupportedClaims, type Claim, type DialogueClaim } from "./claimProvenance";
+export type { DialogueClaim } from "./claimProvenance";
 
 export type DialogueAct =
   | "statement"
@@ -18,14 +20,6 @@ export interface DialogueTurnAnalysis {
   memoryScope: DialogueMemoryScope;
   isLikelyAbsurd: boolean;
   topicTokens: string[];
-}
-
-export interface DialogueClaim {
-  source: string;
-  subject: string;
-  text: string;
-  confidence: number;
-  status: "active" | "uncertain" | "denied" | "absurd";
 }
 
 const CORRECTION_RE =
@@ -158,6 +152,20 @@ function participantInText(text: string, participant: string): boolean {
   ).test(normalizedText);
 }
 
+function explicitPersonNames(text: string): string[] {
+  return Array.from(
+    new Set(
+      (text.match(/(?<![\p{L}])[A-ZÇĞİÖŞÜ][a-zçğıöşü]{1,31}(?![\p{L}])/gu) ?? [])
+        .filter((name) => !["Kaira", "Kairo"].includes(name)),
+    ),
+  );
+}
+
+function claimId(turnIndex: number, source: string, subject: string, ordinal: number): string {
+  const clean = (value: string) => value.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9çğıöşü]+/giu, "-").replace(/^-+|-+$/g, "");
+  return `claim-${turnIndex}-${clean(source)}-${clean(subject)}-${ordinal}`;
+}
+
 export function buildDialogueClaimLedger(
   history: ConversationTurn[],
   userMessage: string,
@@ -171,46 +179,55 @@ export function buildDialogueClaimLedger(
       text: String(turn.text || ""),
     }));
   const turns = [...userTurns, { speaker: userName, text: userMessage, analysis: currentAnalysis }];
-  const participants = Array.from(
-    new Set([...userTurns.map((turn) => turn.speaker), userName]),
-  ).filter((name) => name !== "Kullanıcı");
-  const claims: DialogueClaim[] = [];
+  const knownPeople = new Set(
+    [...userTurns.map((turn) => turn.speaker), userName].filter((name) => name !== "Kullanıcı"),
+  );
+  for (const turn of turns) for (const name of explicitPersonNames(turn.text)) knownPeople.add(name);
+  const claims: Claim[] = [];
 
-  for (const turn of turns) {
+  for (const [turnIndex, turn] of turns.entries()) {
     const analysis = turn.analysis ?? analyzeDialogueTurn(turn.text);
-    if (
-      analysis.acts.includes("correction") &&
-      /\b(?:o\s+)?ben değildim\b/i.test(turn.text)
-    ) {
-      const previous = [...claims]
+    const isCorrection = analysis.acts.includes("correction");
+
+    if (isCorrection) {
+      const explicitSelfDenial = /\b(?:o\s+)?ben değildim\b/iu.test(turn.text);
+      const opposed = [...effectivelySupportedClaims(claims)]
         .reverse()
-        .find(
-          (claim) =>
-            claim.subject === turn.speaker && claim.status !== "denied",
-        );
-      if (previous) previous.status = "denied";
+        .find((claim) => explicitSelfDenial ? claim.subject === turn.speaker : true);
+      if (opposed) {
+        claims.push({
+          id: claimId(turnIndex, turn.speaker, opposed.subject, claims.length),
+          source: turn.speaker,
+          subject: opposed.subject,
+          proposition: opposed.proposition,
+          confidence: analysis.factConfidence,
+          status: "denial",
+          opposesClaimId: opposed.id,
+        });
+      }
     }
 
-    if (analysis.acts.includes("question") || analysis.acts.includes("noise"))
-      continue;
+    if (analysis.acts.includes("question") || analysis.acts.includes("noise")) continue;
 
-    for (const subject of participants) {
+    for (const subject of knownPeople) {
       if (!participantInText(turn.text, subject)) continue;
+      if (isCorrection && subject === turn.speaker && /\b(?:o\s+)?ben değildim\b/iu.test(turn.text)) continue;
       claims.push({
+        id: claimId(turnIndex, turn.speaker, subject, claims.length),
         source: turn.speaker,
         subject,
-        text: turn.text,
+        proposition: turn.text,
         confidence: analysis.factConfidence,
         status: analysis.isLikelyAbsurd
           ? "absurd"
           : analysis.acts.includes("uncertain")
             ? "uncertain"
-            : "active",
+            : "asserted",
       });
     }
   }
 
-  return claims.slice(-8);
+  return claims.slice(-12);
 }
 
 const ACTION_TOPICS = [
@@ -249,22 +266,20 @@ export function findDialogueAttributionIssues(
     const targetHasTopic = ledger.some(
       (claim) =>
         claim.subject === target &&
-        claim.status !== "denied" &&
-        claim.status !== "absurd" &&
-        topic.pattern.test(claim.text),
+        effectivelySupportedClaims(ledger).includes(claim) &&
+        topic.pattern.test(claim.proposition),
     );
     const otherHasTopic = ledger.some(
       (claim) =>
         claim.subject !== target &&
-        claim.status !== "denied" &&
-        claim.status !== "absurd" &&
-        topic.pattern.test(claim.text),
+        effectivelySupportedClaims(ledger).includes(claim) &&
+        topic.pattern.test(claim.proposition),
     );
     const targetDeniedTopic = ledger.some(
       (claim) =>
         claim.subject === target &&
-        claim.status === "denied" &&
-        topic.pattern.test(claim.text),
+        claim.status === "denial" &&
+        topic.pattern.test(claim.proposition),
     );
     const revivesDeniedTopic =
       targetDeniedTopic &&
@@ -323,7 +338,7 @@ export function buildDialogueBoardInstruction(
   const claims = claimLedger
     .map(
       (claim) =>
-        `- kaynak=${claim.source}; özne=${claim.subject}; durum=${claim.status}; güven=${claim.confidence.toFixed(2)}; söz="${claim.text}"`,
+        `- id=${claim.id}; kaynak=${claim.source}; özne=${claim.subject}; durum=${claim.status}; karşı-iddia=${claim.opposesClaimId || "yok"}; güven=${claim.confidence.toFixed(2)}; önerme="${claim.proposition}"`,
     )
     .join("\n");
 
@@ -334,7 +349,7 @@ export function buildDialogueBoardInstruction(
 KURALLAR:
 - Sohbetin tek ve düzgün bir konu izlemesi gerekmez. Birden fazla konu dalı açık kalabilir.
 - Düzeltmeyi, şakayı, aktarılan sözü ve belirsiz ifadeyi kesin gerçek gibi birleştirme.
-- İddia defterinde kaynak yalnızca sözü söyleyendir; eylemi yapan kişi "özne"dir. Kaynak ile özneyi ASLA birbirine çevirme. "denied" kaydı geçerli plan değildir.
+- İddia defterinde kaynak yalnızca sözü söyleyendir; eylemi yapan kişi "özne"dir. Kaynak ile özneyi ASLA birbirine çevirme. "denial" karşı-iddiasının bastırdığı önerme geçerli plan değildir; eski iddia geçmişten silinmez.
 - Geçmişi hatırlama sorusunda özneye ait etkin iddia kalmadıysa "net bilgi yok" de. Reddedilmiş veya desteksiz bir planı mizah, tahmin ya da "büyük ihtimalle" kalıbıyla yeniden UYDURMA.
 - "session" işaretli absürt/gürültülü mesajları kalıcı gerçek sayma; akış içinde şakaya katılabilirsin.
 - Her ayrıntıya cevap vermek zorunda değilsin. En doğal tek sosyal hareketi seç: tepki, soru, görüş, şaka, düzeltme veya kısa sessiz kabul.

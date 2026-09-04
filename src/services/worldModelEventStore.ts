@@ -129,7 +129,7 @@ export function classifyWorldEventObservation(
   const isQuestionLike = QUESTION_LIKE_RE.test(event.raw || "");
   const hasParticipant = Boolean(event.actor || event.target);
   const meaningfulType = event.eventType !== "general";
-  const persist = !isQuestionLike && event.certainty >= 0.45 && (meaningfulType || hasParticipant);
+  const persist = !event.reportedSpeech && !isQuestionLike && event.certainty >= 0.45 && (meaningfulType || hasParticipant);
 
   return { persist, kind, status };
 }
