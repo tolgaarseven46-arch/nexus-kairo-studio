@@ -49,11 +49,11 @@ const wordCount = (reply: string) =>
 
 const QUESTION_PUNCTUATION_RE = /[?？]/u;
 const DIRECT_INTERROGATIVE_START_RE =
-  /^\s*(?:neden|niye|kim|kime|kimi|hangi|hangisi|nerede|neresi|kaç)\b/iu;
+  /^\s*(?:neden|niye|kim|kime|kimi|hangi|hangisi|nerede|neresi|kaç)(?![\p{L}\p{N}_])/iu;
 const DIRECT_SOCIAL_QUESTION_RE =
-  /\b(?:nas[ıi]ls[ıi]n|senden\s+naber|sen\s+naber|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|nap[ıi]yon|iyi\s+misin)\b/iu;
+  /(?<![\p{L}\p{N}_])(?:nas[ıi]ls[ıi]n|senden\s+naber|sen\s+naber|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|nap[ıi]yon|iyi\s+misin)(?![\p{L}\p{N}_])/iu;
 const QUESTION_CLITIC_RE =
-  /\b(?:m[ıiuü]|misin|m[ıi]s[ıi]n|musun|m[üu]s[üu]n|m[ıi]y[ıi]m|muyum|m[üu]y[üu]m|m[ıi]yd[ıi]|m[ıi]yd[ıi]n|m[ıi]yd[ıi]k|m[ıi]yd[ıi]lar)\b/iu;
+  /(?<![\p{L}\p{N}_])(?:m[ıiuü]|misin|m[ıi]s[ıi]n|musun|m[üu]s[üu]n|m[ıi]y[ıi]m|muyum|m[üu]y[üu]m|m[ıi]yd[ıi]|m[ıi]yd[ıi]n|m[ıi]yd[ıi]k|m[ıi]yd[ıi]lar)(?![\p{L}\p{N}_])/iu;
 const REPORTED_QUESTION_RE =
   /\b(?:nas[ıi]ls[ıi]n|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|iyi\s+misin)\b.{0,40}\b(?:diye\s+(?:sordu|dedi)|sorduğunu|dediğini)\b/iu;
 
