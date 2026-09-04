@@ -38,8 +38,16 @@ export interface KairaResponseConstraintPassInput {
   selfMemoryRuntime: KairaConstraintSelfMemoryRuntime;
   epistemicContext?: KairaConstraintEpistemicContext;
   /**
+   * Lower-authority delivery-quality checks (grounding / attribution / dialogue
+   * move / rhythm) that must also hold on the final delivered text. Keeping
+   * them inside this pass prevents a candidate from being marked invalid only
+   * after the fallback decision has already finished.
+   */
+  additionalIssueFinder?: (reply: string) => string[];
+  /**
    * Optional grounded/dialogue-aware fallback. It is never trusted directly:
-   * the same ordered truth + plan pass is applied to it before delivery.
+   * the same ordered truth + plan + delivery-quality pass is applied to it
+   * before delivery.
    */
   fallbackFactory?: () => string;
 }
@@ -142,6 +150,7 @@ function runOrderedPass(
       (issue) => issue.message,
     ),
     ...findKairaEpistemicResponseIssues(delivered, input.epistemicContext),
+    ...(input.additionalIssueFinder?.(delivered) ?? []),
   ];
   const reasons = [
     ...(worldGuard.reason ? [worldGuard.reason] : []),
