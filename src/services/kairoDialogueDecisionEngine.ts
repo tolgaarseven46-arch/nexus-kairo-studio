@@ -26,6 +26,20 @@ export type DialogueMove =
   | "complete_social_routine"
   | "natural_reaction";
 
+export type DialogueObligationResolution =
+  | "fulfill_now"
+  | "clarify"
+  | "decline_explicit"
+  | "defer_explicit";
+
+export interface DialogueObligation {
+  type: "answer_or_clarify";
+  satisfactionCriteria: {
+    forbiddenResponseClasses: Array<"acknowledgement_only">;
+    allowedResolutions: DialogueObligationResolution[];
+  };
+}
+
 export interface DialogueDecisionPlan {
   move: DialogueMove;
   target?: string;
@@ -33,6 +47,11 @@ export interface DialogueDecisionPlan {
   repairSignal?: SemanticRepairSignal;
   /** Observed Kaira social act that must not be emitted again on this turn. */
   repeatGuard?: { act: DiscourseSocialAct; count: number };
+  /**
+   * DialogueDecision-owned fulfillment contract. Downstream validators may only
+   * consume these criteria; they must not invent independent obligation rules.
+   */
+  obligation?: DialogueObligation;
   allowFollowUpQuestion: boolean;
   allowSpeculation: boolean;
   maxSentences: number;
@@ -79,7 +98,7 @@ const PROCRASTINATION_BANTER_RE =
   /\b(son dakikaya bırak\w*|ertele\w*|geciktir\w*|üşen\w*|yapmayıp bekle\w*)\b/i;
 const SHORT_CONTEXTUAL_ANSWER_RE =
   /^(?:hiç\s*biri|hiçbiri|ikisi\s+de|hepsi|hiçbiri\s+değil|yok|hayır|evet|aynen|tamam|tamamdır|peki|olur|olmadı|bilmiyorum|fark\s+etmez|sen\s+seç|öbürü|diğeri|ilki|ikincisi)(?:\s+(?:ya|işte|kanka))?[.!?…]*$/i;
-const KAIRA_SHORT_ACK_RE = /^(?:tamam|tamamdır|peki|olur|evet|aynen|hmm|he|hee)[.!?…]*$/i;
+const KAIRA_SHORT_ACK_RE = /^(?:tamam|tamamdır|peki|olur|evet|aynen|hmm|he|hee|anladım)[.!?…]*$/i;
 const PREVIOUS_CONTEXT_INVITE_RE =
   /[?？]|\b(?:hangisi|hangisini|seç|mı|mi|mu|mü|ne dersin|sence|istersen|ister misin|ister miydin)\b/i;
 
@@ -194,9 +213,6 @@ function planDialogueResponseBase(
   const claims = buildDialogueClaimLedger(history, userMessage, userName, dialogueAnalysis);
   const supportedClaims = supportedClaimsFor(claims, target);
 
-  // --- DiscourseState-driven overrides (context, not a new authority) --------
-  // The current user turn is a response to Kaira's previous turn, not a fresh
-  // topic or a greeting. Handles "Kaira: nasılsın? / User: iyi dedim ya".
   if (
     discourse?.previousTurnDependency &&
     event.discourseAct !== "recall_request" &&
@@ -246,8 +262,6 @@ function planDialogueResponseBase(
     };
   }
 
-  // A social routine that has already saturated this conversation must not be
-  // completed with a fresh greeting / re-asked "sen nasılsın".
   if (event.socialRoutine === "greeting" && (discourse?.routines.greeting.count ?? 0) >= 2) {
     return {
       move: "natural_reaction",
@@ -428,15 +442,31 @@ function applyRepetitionPolicy(
   discourse?: DiscourseState,
 ): DialogueDecisionPlan {
   const repeated = discourse?.selfRepeat;
-  // Farewell is intentionally exempt: if the user is ending the conversation,
-  // completing the farewell remains the correct social obligation even when
-  // Kaira has recently said goodbye more than once.
   if (!repeated || repeated.act === "farewell") return plan;
   return {
     ...plan,
     repeatGuard: { act: repeated.act, count: repeated.count },
     reason:
       `${plan.reason} Kaira son turlarda "${repeated.act}" sosyal işini ${repeated.count} kez yaptı; bu tur aynı sosyal işi tekrar üretme. Mevcut semantik hareketi koru, yalnız tekrar eden yüzeyi değiştir.`,
+  };
+}
+
+function attachDecisionOwnedObligation(plan: DialogueDecisionPlan): DialogueDecisionPlan {
+  if (plan.move !== "answer_or_clarify") return plan;
+  return {
+    ...plan,
+    obligation: {
+      type: "answer_or_clarify",
+      satisfactionCriteria: {
+        forbiddenResponseClasses: ["acknowledgement_only"],
+        allowedResolutions: [
+          "fulfill_now",
+          "clarify",
+          "decline_explicit",
+          "defer_explicit",
+        ],
+      },
+    },
   };
 }
 
@@ -457,7 +487,7 @@ export function planDialogueResponse(
     currentAnalysis,
     discourse,
   );
-  return applyRepetitionPolicy(basePlan, discourse);
+  return applyRepetitionPolicy(attachDecisionOwnedObligation(basePlan), discourse);
 }
 
 export function buildDialogueDecisionInstruction(
@@ -478,6 +508,7 @@ export function buildDialogueDecisionInstruction(
 - Uzunluk bütçesi: en fazla ${effectiveMaxSentences} kısa cümle
 - Kelime bütçesi: ${effectiveMaxWords ? `en fazla ${effectiveMaxWords} kelime` : "özel sınır yok"}
 - Tekrar koruması: ${plan.repeatGuard ? `"${plan.repeatGuard.act}" sosyal işini yeniden üretme` : "yok"}
+- Obligation: ${plan.obligation ? `${plan.obligation.type}; yalnız acknowledgement ile kapanamaz` : "yok"}
 - Gerekçe: ${effectiveReason}
 Doğru cevabı verdikten sonra ikinci bir tahmin, seçenek listesi, yeni şaka veya otomatik soru ekleyerek cevabın mantığını BOZMA.`;
 }
@@ -502,6 +533,14 @@ export function findDialogueDecisionIssues(
   );
   const effectiveMaxSentences = style?.maxSentences ?? plan.maxSentences;
   const effectiveMaxWords = style?.maxWords ?? plan.maxWords;
+  if (
+    plan.obligation?.satisfactionCriteria.forbiddenResponseClasses.includes("acknowledgement_only") &&
+    KAIRA_SHORT_ACK_RE.test(reply.trim())
+  ) {
+    issues.push(
+      "DialogueDecision obligation karşılanmadı: answer_or_clarify yalnız acknowledgement ile kapatılamaz",
+    );
+  }
   if (plan.repeatGuard && classifyKairaReplyAct(reply) === plan.repeatGuard.act) {
     issues.push(`Kaira son turlarda tekrarladığı "${plan.repeatGuard.act}" sosyal işini yeniden üretti`);
   }

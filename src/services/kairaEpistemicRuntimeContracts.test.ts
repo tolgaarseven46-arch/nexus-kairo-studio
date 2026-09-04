@@ -75,12 +75,12 @@ describe("Kaira epistemic runtime contracts", () => {
     expect(epistemic).toBeLessThan(social);
   });
 
-  it("keeps every post-plan fallback behind the same truth and social final authority", () => {
+  it("keeps caller-supplied fallback behind the same truth and social final authority without a generic guard-authored reply", () => {
     const server = serverSource();
     expect(server).toContain('fallbackFactory: () =>');
     const pass = unifiedPassSource();
     expect(pass).toContain('const candidate = runOrderedPass(preferredFallback, input)');
-    expect(pass).toContain('runOrderedPass("tamam", input)');
+    expect(pass).not.toContain('runOrderedPass("tamam", input)');
     expect(pass).toContain('findKairaResponsePlanIssues(delivered, input.plan)');
     expect(pass).toContain('findKairaEpistemicResponseIssues(delivered, input.epistemicContext)');
   });

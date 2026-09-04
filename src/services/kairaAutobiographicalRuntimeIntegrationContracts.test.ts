@@ -23,7 +23,7 @@ describe("Kaira autobiographical runtime integration contracts", () => {
     expect(dialogueIndex).toBeGreaterThan(selfMemoryIndex);
   });
 
-  it("guards generated and fallback replies against unsupported autobiography through the canonical pass", () => {
+  it("guards generated and caller-supplied fallback replies against unsupported autobiography through the canonical pass", () => {
     expect(server).not.toContain('isCanonicalBehaviorFlagEnabled("UNIFIED_GUARD_PASS")');
     expect(server).toContain("runKairaResponseConstraintPass({");
     expect(server).toContain("selfMemoryRuntime,");
@@ -38,7 +38,7 @@ describe("Kaira autobiographical runtime integration contracts", () => {
     expect(selfMemoryIndex).toBeGreaterThan(worldIndex);
     expect(epistemicIndex).toBeGreaterThan(selfMemoryIndex);
     expect(planIndex).toBeGreaterThan(epistemicIndex);
-    expect(unifiedPass).toContain("const candidate = runOrderedPass(preferredFallback, input)");
+    expect(unifiedPass).not.toContain('runOrderedPass("tamam", input)');
   });
 
   it("exposes the typed recall decision in session metadata and API KDM output", () => {

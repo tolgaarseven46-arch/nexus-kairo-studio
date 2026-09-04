@@ -120,24 +120,26 @@ describe("Kaira unified response constraint pass", () => {
     expect(result.consistency.issues).toEqual([]);
   });
 
-  it("catches punctuation-free question acts through final plan conformance and falls back safely", () => {
+  it("catches punctuation-free question acts without rewriting them into a canned acknowledgement", () => {
+    const responsePlan = plan({ allowQuestion: false });
     const result = runKairaResponseConstraintPass({
       reply: "sen bugün nasılsın",
       trace: trace(),
-      plan: plan({ allowQuestion: false }),
+      plan: responsePlan,
       worldItems: neutralWorld.items,
       worldContext: neutralWorld.context,
       selfMemoryRuntime: noSelfMemory,
       epistemicContext: null,
     });
 
-    expect(result.reply).toBe("tamam");
-    expect(result.fallbackUsed).toBe(true);
-    expect(result.issues).toEqual([]);
-    expect(result.consistency.accepted).toBe(true);
+    expect(result.reply).toBe("sen bugün nasılsın");
+    expect(result.fallbackUsed).toBe(false);
+    expect(findKairaResponsePlanIssues(result.reply, responsePlan).length).toBeGreaterThan(0);
+    expect(result.issues.length).toBeGreaterThan(0);
+    expect(result.consistency.accepted).toBe(false);
   });
 
-  it("never trusts a supplied fallback; the fallback is passed through the same ordered constraints", () => {
+  it("never trusts an unsafe supplied fallback and does not manufacture a replacement", () => {
     const responsePlan = plan({ allowQuestion: false });
     const unsafeFallback = "iyi misin bugün";
     const result = runKairaResponseConstraintPass({
@@ -151,14 +153,14 @@ describe("Kaira unified response constraint pass", () => {
       fallbackFactory: () => unsafeFallback,
     });
 
+    expect(result.reply).toBe("sen bugün nasılsın");
     expect(result.reply).not.toBe(unsafeFallback);
-    expect(result.fallbackUsed).toBe(true);
-    expect(findKairaResponsePlanIssues(result.reply, responsePlan)).toEqual([]);
-    expect(result.issues).toEqual([]);
-    expect(result.consistency.accepted).toBe(true);
+    expect(result.fallbackUsed).toBe(false);
+    expect(result.issues.length).toBeGreaterThan(0);
+    expect(result.consistency.accepted).toBe(false);
   });
 
-  it("treats lower-authority delivery-quality failures as pre-delivery fallback triggers", () => {
+  it("treats lower-authority delivery-quality failures as pre-delivery fallback triggers when the caller supplies a valid fallback", () => {
     const result = runKairaResponseConstraintPass({
       reply: "Hatırladığım kayda göre:",
       trace: trace({

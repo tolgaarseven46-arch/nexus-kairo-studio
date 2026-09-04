@@ -36,7 +36,7 @@ describe("canonical KairaResponsePlan runtime integration", () => {
     expect(server).toContain("...canonicalExternalIssues, ...finalPlanIssues");
     expect(server).toContain("...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues");
     expect(unifiedPass).toContain("findKairaResponsePlanIssues(delivered, input.plan)");
-    expect(unifiedPass).toContain("const candidate = runOrderedPass(preferredFallback, input)");
+    expect(unifiedPass).not.toContain('runOrderedPass("tamam", input)');
   });
 
   it("persists response-plan observability in both local and AI paths", () => {

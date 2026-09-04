@@ -88,7 +88,7 @@ describe("Kaira unified guard final-delivery regression", () => {
     expect(result.consistency.accepted).toBe(true);
   });
 
-  it("revalidates an unsafe fallback instead of letting it bypass a no-question plan", () => {
+  it("revalidates an unsafe fallback and leaves the violation visible instead of authoring a replacement", () => {
     const responsePlan = plan({ allowQuestion: false });
     const unsafeFallback = "iyi misin bugün";
 
@@ -103,10 +103,11 @@ describe("Kaira unified guard final-delivery regression", () => {
       fallbackFactory: () => unsafeFallback,
     });
 
-    expect(result.fallbackUsed).toBe(true);
+    expect(result.fallbackUsed).toBe(false);
+    expect(result.reply).toBe("sen bugün nasılsın");
     expect(result.reply).not.toBe(unsafeFallback);
-    expect(findKairaResponsePlanIssues(result.reply, responsePlan)).toEqual([]);
-    expect(result.consistency.accepted).toBe(true);
+    expect(findKairaResponsePlanIssues(result.reply, responsePlan).length).toBeGreaterThan(0);
+    expect(result.consistency.accepted).toBe(false);
   });
 
   it("keeps epistemic unknown truth authoritative over a confident unsupported draft", () => {
