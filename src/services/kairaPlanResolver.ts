@@ -77,8 +77,11 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   const { hard, soft, dialogue, speech, contract } = input;
   const rationale: string[] = [];
 
+  const contractSemanticUncertainty = Number.isFinite(contract.semanticUncertainty)
+    ? Number(contract.semanticUncertainty)
+    : undefined;
   const uncertainty: KairaPlanUncertainty = {
-    semantic: clamp01(input.uncertainty?.semantic ?? 0.4),
+    semantic: clamp01(input.uncertainty?.semantic ?? contractSemanticUncertainty ?? 0.4),
     relational: clamp01(input.uncertainty?.relational ?? 0.35),
   };
   const cautious = Math.max(uncertainty.semantic, uncertainty.relational);
