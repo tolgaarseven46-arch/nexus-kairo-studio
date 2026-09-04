@@ -18,7 +18,7 @@ jobs:
           KAIRA_INTERNAL_WORKER_SECRET: ${{ secrets.KAIRA_INTERNAL_WORKER_SECRET }}
         run: |
           set -euo pipefail
-          echo "diagnostic-after-reclaim-fix"
+          echo "post-lease-recovery-acceptance"
           curl --fail-with-body --silent --show-error \
             -X POST "${KAIRA_AUTONOMOUS_LIFE_URL}/internal/workers/kaira/proposal-recovery" \
             -H "Authorization: Bearer ${KAIRA_INTERNAL_WORKER_SECRET}" \
