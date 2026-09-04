@@ -18,19 +18,25 @@ export type KairaActivityPermissionChatResolution =
   | { status: "none" | "uncorrelated" }
   | { status: "unmatched" | "execution_rejected" | "applied"; result: KairaActivityPermissionDialogueApplyResult };
 
-const activityLabel = (value: string) =>
-  String(value || "")
-    .trim()
-    .replace(/[_:-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .slice(0, 120);
+/**
+ * activityType/activityId are process-owned canonical keys, not presentation
+ * strings. A single plain token can be shown conservatively; structured keys
+ * must fall back to generic copy instead of being prettified into leaked IDs.
+ */
+const activityLabel = (value?: string) => {
+  const raw = String(value || "").trim();
+  if (!raw || raw.length > 48 || /[_:-]/u.test(raw)) return "";
+  if (!/^[\p{L}\p{N}]+$/u.test(raw)) return "";
+  return raw;
+};
 
 export function buildKairaActivityPermissionChatPrompt(input: {
   requestId: string;
   activityId: string;
   activityType?: string;
 }): KairaActivityPermissionChatPrompt {
-  const label = activityLabel(input.activityType || input.activityId) || "planladığım aktivite";
+  // Never fall back to activityId: it is an internal correlation identifier.
+  const label = activityLabel(input.activityType) || "planladığım aktivite";
   return {
     requestId: input.requestId,
     activityId: input.activityId,
