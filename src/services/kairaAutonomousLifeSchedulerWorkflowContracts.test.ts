@@ -5,11 +5,12 @@ const workflow = fs.readFileSync(".github/workflows/kaira-autonomous-life.yml", 
 const runner = fs.readFileSync("scripts/run-kaira-autonomous-life-wakeup.mjs", "utf8");
 
 describe("Kaira autonomous life production scheduler contracts", () => {
-  it("owns a bounded non-overlapping five-minute production wakeup", () => {
+  it("owns a bounded non-overlapping five-minute production wakeup with enough completion headroom", () => {
     expect(workflow).toContain('cron: "*/5 * * * *"');
     expect(workflow).toContain("group: kaira-autonomous-life-production");
     expect(workflow).toContain("cancel-in-progress: false");
-    expect(workflow).toContain("timeout-minutes: 5");
+    expect(workflow).toContain("timeout-minutes: 7");
+    expect(workflow).toContain('KAIRA_AUTONOMOUS_LIFE_TIMEOUT_MS: "240000"');
     expect(workflow).toContain("vars.KAIRA_AUTONOMOUS_LIFE_URL != ''");
     expect(workflow).toContain("actions/checkout@v5");
     expect(workflow).toContain("actions/setup-node@v5");
@@ -29,8 +30,28 @@ describe("Kaira autonomous life production scheduler contracts", () => {
     expect(runner).not.toMatch(/console\.log\([^)]*secret/);
   });
 
+  it("uses a production-sized first-call timeout while bounding replay and health probes", () => {
+    expect(runner).toContain("KAIRA_AUTONOMOUS_LIFE_TIMEOUT_MS");
+    expect(runner).toContain("240_000");
+    expect(runner).toContain("const replayTimeoutMs = Math.min(workerTimeoutMs, 90_000)");
+    expect(runner).toContain("const healthTimeoutMs = Math.min(workerTimeoutMs, 60_000)");
+    expect(runner).toContain("Kaira worker request timed out after ${timeoutMs}ms");
+  });
+
+  it("fails the scheduled job when any terminal autonomous stage reports failures", () => {
+    expect(runner).toContain("function assertTerminalStageSuccess(body)");
+    expect(runner).toContain('planning: Number(summary?.planning?.failed || 0)');
+    expect(runner).toContain('recovery: Number(summary?.recovery?.failed || 0)');
+    expect(runner).toContain('schedules: Number(summary?.schedules?.failed || 0)');
+    expect(runner).toContain("if (failedStages.length)");
+    expect(runner).toContain("Autonomous life stage failures:");
+    expect(runner).toContain("const summary = first.body.status === \"busy\" ? undefined : assertTerminalStageSuccess(first.body)");
+    expect(runner).toContain("assertTerminalStageSuccess(replay.body)");
+  });
+
   it("verifies durable receipt replay and holistic health after the wakeup", () => {
-    expect(runner.match(/await invoke\(\)/g)).toHaveLength(2);
+    expect(runner).toContain("const first = await invoke()");
+    expect(runner).toContain("replay = await invoke(replayTimeoutMs)");
     expect(runner).toContain('replay.body?.deliveryStatus !== "replayed"');
     expect(runner).toContain('"/internal/workers/kaira/autonomous-life/health"');
     expect(runner).toContain("health.body?.health?.latestRunId !== runId");
@@ -44,7 +65,6 @@ describe("Kaira autonomous life production scheduler contracts", () => {
     expect(runner).toContain("failedPlanningItems");
     expect(runner).toContain(".slice(0, 5)");
     expect(runner).toContain(".slice(0, 500)");
-    expect(runner).toContain("const summary = first.body?.receipt?.summary");
     expect(runner).not.toMatch(/console\.error\([^)]*secret/);
   });
 });
