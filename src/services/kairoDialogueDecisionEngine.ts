@@ -1,8 +1,6 @@
 import type { ConversationTurn } from "./kairoConversationGrounding";
-import {
-  buildDialogueClaimLedger,
-  type DialogueClaim,
-} from "./kairoDialogueChaosEngine";
+import { buildDialogueClaimLedger } from "./kairoDialogueChaosEngine";
+import { effectivelySupportedClaims, type DialogueClaim } from "./claimProvenance";
 import {
   interpretSemanticEvent,
   type SemanticEvent,
@@ -130,10 +128,15 @@ function recallTarget(
   history: ConversationTurn[],
   userMessage: string,
   userName: string,
+  claims: DialogueClaim[] = [],
 ): string | undefined {
-  return dialogueParticipants(history, userName).find((name) =>
-    containsName(userMessage, name),
+  const candidates = Array.from(
+    new Set([
+      ...dialogueParticipants(history, userName),
+      ...claims.map((claim) => claim.subject),
+    ]),
   );
+  return candidates.find((name) => containsName(userMessage, name));
 }
 
 function supportedClaimsFor(
@@ -141,12 +144,7 @@ function supportedClaimsFor(
   target?: string,
 ): DialogueClaim[] {
   if (!target) return [];
-  return claims.filter(
-    (claim) =>
-      claim.subject === target &&
-      claim.status !== "denied" &&
-      claim.status !== "absurd",
-  );
+  return effectivelySupportedClaims(claims).filter((claim) => claim.subject === target);
 }
 
 function isFirstEmotionalOpening(
@@ -209,8 +207,8 @@ function planDialogueResponseBase(
 ): DialogueDecisionPlan {
   const event = semanticEvent ?? interpretSemanticEvent(userMessage);
   const dialogueAnalysis = currentAnalysis ?? projectSemanticEventToDialogueAnalysis(event);
-  const target = recallTarget(history, userMessage, userName);
   const claims = buildDialogueClaimLedger(history, userMessage, userName, dialogueAnalysis);
+  const target = recallTarget(history, userMessage, userName, claims);
   const supportedClaims = supportedClaimsFor(claims, target);
 
   if (
@@ -672,17 +670,17 @@ export function buildGroundedDialogueFallback(
   const supported = supportedClaimsFor(claims, plan.target).at(-1);
   if (supported) {
     return supported.status === "uncertain"
-      ? `${plan.target} hakkında “${supported.text}” denmişti ama bu kesin bir plan değildi.`
-      : `${plan.target} hakkında elimizdeki kayıt şu: “${supported.text}”`;
+      ? `${plan.target} hakkında “${supported.proposition}” denmişti ama bu kesin bir plan değildi.`
+      : `${plan.target} hakkında elimizdeki kayıt şu: “${supported.proposition}”`;
   }
 
   const denied = [...claims]
     .reverse()
     .find(
-      (claim) => claim.subject === plan.target && claim.status === "denied",
+      (claim) => claim.subject === plan.target && claim.status === "denial",
     );
   const deniedTopic = denied
-    ? CLAIM_TOPICS.find((topic) => topic.pattern.test(denied.text))?.label
+    ? CLAIM_TOPICS.find((topic) => topic.pattern.test(denied.proposition))?.label
     : undefined;
   return deniedTopic
     ? `${plan.target} için yarına dair net bir plan yok. ${deniedTopic[0].toLocaleUpperCase("tr-TR")}${deniedTopic.slice(1)} iddiasını reddetti.`

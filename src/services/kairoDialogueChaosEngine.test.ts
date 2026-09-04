@@ -106,12 +106,17 @@ describe("Kaira complex dialogue engine", () => {
       "neyse Mert yarın ne yapacaktı?",
       "Ali",
     );
+    const original = ledger.find(
+      (claim) => claim.source === "Ali" && claim.subject === "Mert" && claim.status === "asserted",
+    );
+    expect(original).toBeTruthy();
     expect(ledger).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          source: "Ali",
+          source: "Mert",
           subject: "Mert",
-          status: "denied",
+          status: "denial",
+          opposesClaimId: original?.id,
         }),
         expect.objectContaining({
           source: "Mert",

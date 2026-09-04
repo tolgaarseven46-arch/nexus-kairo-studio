@@ -23,19 +23,19 @@ describe("classifyWorldEventObservation", () => {
     });
   });
 
-  it("stores reported speech as a claim, not as direct lived truth", () => {
+  it("classifies grounded reported speech as a claim without persisting world truth", () => {
     expect(
       classifyWorldEventObservation(
         makeEvent({ reportedSpeech: true, certainty: 0.9 }),
       ),
     ).toEqual({
-      persist: true,
+      persist: false,
       kind: "reported_claim",
       status: "grounded",
     });
   });
 
-  it("keeps ambiguous claims marked ambiguous", () => {
+  it("keeps ambiguous reported claims marked ambiguous without persisting world truth", () => {
     expect(
       classifyWorldEventObservation(
         makeEvent({
@@ -46,7 +46,7 @@ describe("classifyWorldEventObservation", () => {
         }),
       ),
     ).toEqual({
-      persist: true,
+      persist: false,
       kind: "reported_claim",
       status: "ambiguous",
     });
