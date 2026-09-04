@@ -1,0 +1,55 @@
+name: one-time-deep-recall-v2
+on:
+  push:
+    branches: [chatgpt/deep-persistent-recall-window]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/deep-persistent-recall-window
+          fetch-depth: 0
+      - name: Patch files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          server = Path('server.ts')
+          s = server.read_text(encoding='utf-8')
+          anchor = 'import { validateMemoryAgainstMessage } from "./src/services/kairoMemoryConsistency";\n'
+          imp = 'import { persistentMemoryFetchLimitForDialogueMove, FAST_RECENT_MEMORY_LIMIT } from "./src/services/kairaPersistentMemoryRetrievalPolicy";\n'
+          if imp not in s:
+              s = s.replace(anchor, anchor + imp)
+          s = s.replace('loadRecentKdmMemory(6, scopedUserId)', 'loadRecentKdmMemory(FAST_RECENT_MEMORY_LIMIT, scopedUserId)')
+          old = 'suppressRecentMemory || !kairaPolicy.persistentUserMemory ? Promise.resolve([]) : getFastRecentMemory(userId, kairaInstance.instanceId),'
+          new = '''suppressRecentMemory || !kairaPolicy.persistentUserMemory
+        ? Promise.resolve([])
+        : persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move) === FAST_RECENT_MEMORY_LIMIT
+          ? getFastRecentMemory(userId, kairaInstance.instanceId)
+          : loadRecentKdmMemory(
+              persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move),
+              stateUserId,
+            ),'''
+          if old in s:
+              s = s.replace(old, new)
+          elif 'persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move)' not in s:
+              raise SystemExit('server memory anchor missing')
+          server.write_text(s, encoding='utf-8')
+
+          p = Path('src/services/kdmPersistenceService.ts')
+          t = p.read_text(encoding='utf-8')
+          old_cap = 'const safeLimit = Math.max(1, Math.min(maxItems, 20));'
+          if old_cap in t:
+              t = t.replace(old_cap, 'const safeLimit = Math.max(1, Math.min(maxItems, 100));', 1)
+          elif 'Math.min(maxItems, 100)' not in t:
+              raise SystemExit('persistence cap anchor missing')
+          p.write_text(t, encoding='utf-8')
+          PY
+          rm .github/workflows/one-time-deep-recall-v2.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add server.ts src/services/kdmPersistenceService.ts .github/workflows/one-time-deep-recall-v2.yml
+          git commit -m 'fix(kaira): deepen persisted recall only for grounded recall'
+          git push origin HEAD:chatgpt/deep-persistent-recall-window
