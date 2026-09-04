@@ -9,6 +9,14 @@ import {
   shouldRetrieveWorldEvents,
 } from "./worldEventRetrieval";
 
+function retrievalSemantics(
+  discourseAct: "recall_request" | "none",
+): Parameters<typeof shouldRetrieveWorldEvents>[0] {
+  return {
+    discourseFacets: { discourseAct },
+  } as unknown as Parameters<typeof shouldRetrieveWorldEvents>[0];
+}
+
 function observation(input: {
   id: string;
   createdAt: string;
@@ -65,9 +73,12 @@ function observation(input: {
 }
 
 describe("Kaira world event retrieval coordinator contracts", () => {
-  it("activates retrieval for temporal discourse markers", () => {
+  it("lets canonical recall semantics authorize retrieval, never temporal words alone", () => {
     expect(shouldCoordinateWorldEventRetrieval("peki sonra ne oldu?")).toBe(true);
-    expect(shouldRetrieveWorldEvents("peki sonra ne oldu?")).toBe(true);
+    expect(shouldRetrieveWorldEvents(retrievalSemantics("recall_request"))).toBe(true);
+    // Regression: a benign statement such as "bugün çok enerjik hissediyorum"
+    // may contain a temporal word, but canonical semantics says it is not recall.
+    expect(shouldRetrieveWorldEvents(retrievalSemantics("none"))).toBe(false);
     expect(shouldCoordinateWorldEventRetrieval("Ayşe en son ne dedi?")).toBe(true);
     expect(shouldCoordinateWorldEventRetrieval("naber")).toBe(false);
   });
