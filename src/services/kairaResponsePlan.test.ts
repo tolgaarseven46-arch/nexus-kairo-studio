@@ -202,6 +202,32 @@ describe("KairaResponsePlan", () => {
     expect(plan.allowReopeningCloseness).toBe(false);
   });
 
+  it("blocks real-chat punctuationless Turkish question acts when questions are forbidden", () => {
+    const contract = buildBehaviorContract(state("distancing", { hurtScore: 35 }));
+    const plan = buildKairaResponsePlan(contract, dialogue(), speech());
+
+    for (const reply of [
+      "oo keyifli akşam kime karşı oynuyorlar, skor ne durumda şimdi",
+      "he, sen de baya dengesiz yazıyorsun şu an neyden bu kadar gerildin böyle",
+      "tamam da ne oldu şimdi",
+    ]) {
+      expect(findKairaResponsePlanIssues(reply, plan), reply).toContain(
+        "response_plan_question_blocked",
+      );
+    }
+  });
+
+  it("does not turn ordinary non-question uses into question acts", () => {
+    const contract = buildBehaviorContract(state("distancing", { hurtScore: 35 }));
+    const plan = buildKairaResponsePlan(contract, dialogue(), speech());
+    expect(findKairaResponsePlanIssues("skor iyi durumda şimdi", plan)).not.toContain(
+      "response_plan_question_blocked",
+    );
+    expect(findKairaResponsePlanIssues("olan oldu şimdi", plan)).not.toContain(
+      "response_plan_question_blocked",
+    );
+  });
+
   it("validator uses the same plan for question, forgiveness and emoji limits", () => {
     const contract = buildBehaviorContract(state("distancing", { hurtScore: 35 }));
     const plan = buildKairaResponsePlan(contract, dialogue(), speech());
