@@ -1,0 +1,43 @@
+name: One-time Topic Closure Postfix
+
+on:
+  push:
+    branches:
+      - diag/topic-closure-postfix
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: diag/topic-closure-postfix
+          fetch-depth: 0
+      - name: Verify production semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://nexus-kairo-studio.onrender.com/api/language-understanding'
+          curl --fail-with-body --silent --show-error --max-time 120 -H 'Content-Type: application/json' --data '{"userMessage":"boşver kapatalım konuyu","userName":"Mert","characterName":"Kaira","history":[],"provider":"openrouter"}' "$URL" > /tmp/topic.json
+          curl --fail-with-body --silent --show-error --max-time 120 -H 'Content-Type: application/json' --data '{"userMessage":"sus artık","userName":"Mert","characterName":"Kaira","history":[],"provider":"openrouter"}' "$URL" > /tmp/fullstop.json
+          echo '===== TOPIC ====='; cat /tmp/topic.json; echo
+          echo '===== FULLSTOP ====='; cat /tmp/fullstop.json; echo
+          node <<'NODE'
+          const fs = require('fs');
+          const topic = JSON.parse(fs.readFileSync('/tmp/topic.json','utf8')).interpretation;
+          const full = JSON.parse(fs.readFileSync('/tmp/fullstop.json','utf8')).interpretation;
+          if (topic.stopRequest || topic.discourseFacets.stopTalking || topic.discourseFacets.stopQuestions) throw new Error('topic closure leaked into full stop');
+          if (topic.discourseFacets.discourseAct !== 'topic_shift') throw new Error(`topic closure discourseAct=${topic.discourseFacets.discourseAct}`);
+          if (!full.stopRequest || !full.discourseFacets.stopTalking) throw new Error('actual full stop was lost');
+          console.log('PRODUCTION_TOPIC_CLOSURE_PASS');
+          NODE
+      - name: Self-remove
+        run: |
+          git rm .github/workflows/one-time-topic-closure-postfix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: remove topic closure postfix diagnostic'
+          git push origin HEAD:diag/topic-closure-postfix
