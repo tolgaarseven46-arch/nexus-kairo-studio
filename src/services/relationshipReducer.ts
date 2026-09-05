@@ -27,6 +27,7 @@
  */
 
 import type { AffectiveReactionMode, ConversationRelationshipState } from "../types/nexus";
+import { normalizeKairaAffectBaseline, type KairaAffectBaseline } from "./kairaAffectBaseline";
 import {
   DEFAULT_RELATIONSHIP_REDUCER_CONFIG,
   type RelationshipReducerConfig,
@@ -107,6 +108,7 @@ export interface RelationshipReducerInput {
   signal: RelationshipTurnSignal;
   timing: RelationshipReducerTiming;
   config?: RelationshipReducerConfig;
+  affectBaseline?: Partial<KairaAffectBaseline> | null;
 }
 
 export interface RelationshipReducerResult {
@@ -264,8 +266,6 @@ export function computeRecovery(
   return { time, interaction, strength, rationale };
 }
 
-const NEUTRAL_AFFECT_BASELINE: RelationshipAffect = { anger: 10, stress: 20, happiness: 70, calmness: 70 };
-
 function towardBaseline(value: number, baseline: number, step: number): number {
   if (value === baseline) return 0;
   return value > baseline ? -Math.min(step, value - baseline) : Math.min(step, baseline - value);
@@ -273,6 +273,7 @@ function towardBaseline(value: number, baseline: number, step: number): number {
 
 export function reduceRelationshipTurn(input: RelationshipReducerInput): RelationshipReducerResult {
   const config = input.config ?? DEFAULT_RELATIONSHIP_REDUCER_CONFIG;
+  const affectBaseline = normalizeKairaAffectBaseline(input.affectBaseline);
   const { prev, signal, timing } = input;
   const rationale: string[] = [];
 
@@ -460,10 +461,10 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   const af = config.affect;
   const step = af.towardBaselineStep;
   const affectDelta: RelationshipAffect = {
-    anger: towardBaseline(prev.affect.anger, NEUTRAL_AFFECT_BASELINE.anger, step),
-    stress: towardBaseline(prev.affect.stress, NEUTRAL_AFFECT_BASELINE.stress, step),
-    happiness: towardBaseline(prev.affect.happiness, NEUTRAL_AFFECT_BASELINE.happiness, step),
-    calmness: towardBaseline(prev.affect.calmness, NEUTRAL_AFFECT_BASELINE.calmness, step),
+    anger: towardBaseline(prev.affect.anger, affectBaseline.anger, step),
+    stress: towardBaseline(prev.affect.stress, affectBaseline.stress, step),
+    happiness: towardBaseline(prev.affect.happiness, affectBaseline.happiness, step),
+    calmness: towardBaseline(prev.affect.calmness, affectBaseline.calmness, step),
   };
   const turnMagnitude = kind === "negative" ? Math.max(sevLoad, signal.severity.disrespect) : 0;
   if ((reactionMode === "withdrawn" || reactionMode === "hurt" || reactionMode === "irritated") && turnMagnitude > 0) {
