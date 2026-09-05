@@ -1,0 +1,54 @@
+name: One-time Topic Stop Compound Postfix
+
+on:
+  push:
+    branches:
+      - diag/topic-stop-compound-postfix
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: diag/topic-stop-compound-postfix
+          fetch-depth: 0
+      - name: Verify production semantic cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://nexus-kairo-studio.onrender.com/api/language-understanding'
+          call() {
+            local name="$1"; local msg="$2"
+            curl --fail-with-body --silent --show-error --max-time 120 \
+              -H 'Content-Type: application/json' \
+              --data "{\"userMessage\":\"${msg}\",\"userName\":\"Mert\",\"characterName\":\"Kaira\",\"history\":[],\"provider\":\"openrouter\"}" \
+              "$URL" > "/tmp/${name}.json"
+            echo "===== ${name} ====="; cat "/tmp/${name}.json"; echo
+          }
+          call topic 'boşver bu konuyu kapatalım'
+          call full 'sus artık konuşma'
+          call mixed 'bu konuyu da kapat konuşmayı da bitir'
+          node <<'NODE'
+          const fs = require('fs');
+          const topic = JSON.parse(fs.readFileSync('/tmp/topic.json','utf8')).interpretation;
+          const full = JSON.parse(fs.readFileSync('/tmp/full.json','utf8')).interpretation;
+          const mixed = JSON.parse(fs.readFileSync('/tmp/mixed.json','utf8')).interpretation;
+          if (topic.discourseFacets?.discourseAct !== 'topic_shift') throw new Error('topic closure not topic_shift');
+          if (topic.discourseFacets?.stopTalking !== false || topic.stopRequest !== false) throw new Error('topic closure incorrectly full-stop');
+          if (full.discourseFacets?.stopTalking !== true || full.stopRequest !== true) throw new Error('explicit full-stop lost');
+          if (mixed.discourseFacets?.discourseAct !== 'topic_shift') throw new Error('mixed lost topic_shift');
+          if (mixed.discourseFacets?.stopTalking !== true || mixed.stopRequest !== true) throw new Error('mixed lost full-stop');
+          console.log('PRODUCTION_TOPIC_STOP_COMPOUND_PASS');
+          NODE
+      - name: Self-remove
+        shell: bash
+        run: |
+          git rm .github/workflows/one-time-topic-stop-compound-postfix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: remove topic-stop compound postfix diagnostic'
+          git push origin HEAD:diag/topic-stop-compound-postfix
