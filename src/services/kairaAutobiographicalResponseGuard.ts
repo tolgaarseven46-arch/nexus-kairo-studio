@@ -33,6 +33,60 @@ const relatedEvidenceToken = (left: string, right: string) => {
   return left.slice(0, prefixLength) === right.slice(0, prefixLength);
 };
 
+const AUTOBIOGRAPHICAL_FRAME_TOKENS = new Set([
+  "evet",
+  "aynen",
+  "bunu",
+  "şunu",
+  "şöyle",
+  "böyle",
+  "hatırlıyorum",
+  "hatirliyorum",
+  "hatırladım",
+  "hatirladim",
+  "dair",
+  "kaydım",
+  "kaydımda",
+]);
+
+const splitAutobiographicalClauses = (value: string) =>
+  String(value ?? "")
+    .split(/[.!?;:\n]+|\s+(?:ve|ama|fakat|ancak|çünkü|sonra|ardından)\s+/giu)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+const clauseHasCanonicalAnchor = (clause: string, canonicalEvidence: string[]) => {
+  const clauseTokens = evidenceTokens(clause).filter(
+    (token) => !AUTOBIOGRAPHICAL_FRAME_TOKENS.has(token),
+  );
+  if (clauseTokens.length === 0) return true;
+  return clauseTokens.some((replyToken) =>
+    canonicalEvidence.some((evidenceToken) =>
+      relatedEvidenceToken(replyToken, evidenceToken),
+    ),
+  );
+};
+
+const hasUnsupportedStructuredDetail = (
+  reply: string,
+  canonicalEvidence: string[],
+) => {
+  const candidates = [
+    ...(reply.match(/\b[\p{Lu}][\p{L}\p{N}_'-]{2,}\b/gu) ?? []),
+    ...(reply.match(/\b\d+(?:[.,]\d+)?\b/g) ?? []),
+  ]
+    .map(normalizeComparable)
+    .filter(Boolean)
+    .filter((token) => !AUTOBIOGRAPHICAL_FRAME_TOKENS.has(token));
+
+  return candidates.some(
+    (candidate) =>
+      !canonicalEvidence.some((evidenceToken) =>
+        relatedEvidenceToken(candidate, evidenceToken),
+      ),
+  );
+};
+
 function enforceResolvedSelfFact(
   reply: string,
   runtime: KairaAutobiographicalRecallRuntimeResult,
@@ -103,17 +157,37 @@ function enforceResolvedAutobiographicalMemoryAnchor(
       relatedEvidenceToken(replyToken, evidenceToken),
     ),
   );
-  if (hasCanonicalAnchor) return null;
 
   const canonicalSummary = strongest.facts.join("; ");
   const fallback = canonicalSummary
     ? `Buna dair net kaydım şu: ${canonicalSummary}.`
     : "Buna dair net bir anım yok.";
-  return {
-    reply: fallback,
-    changed: reply.trim() !== fallback,
-    reason: "self_memory_resolved_memory_anchor_missing",
-  };
+
+  if (!hasCanonicalAnchor) {
+    return {
+      reply: fallback,
+      changed: reply.trim() !== fallback,
+      reason: "self_memory_resolved_memory_anchor_missing",
+    };
+  }
+
+  const unsupportedClause = splitAutobiographicalClauses(reply).some(
+    (clause) => !clauseHasCanonicalAnchor(clause, canonicalEvidence),
+  );
+  const unsupportedStructuredDetail = hasUnsupportedStructuredDetail(
+    reply,
+    canonicalEvidence,
+  );
+
+  if (unsupportedClause || unsupportedStructuredDetail) {
+    return {
+      reply: fallback,
+      changed: reply.trim() !== fallback,
+      reason: "self_memory_resolved_memory_clause_unsupported",
+    };
+  }
+
+  return null;
 }
 
 export function enforceKairaAutobiographicalResponse(

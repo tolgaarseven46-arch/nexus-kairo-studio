@@ -56,7 +56,30 @@ describe("autobiographical canonical evidence anchor regression", () => {
     expect(guarded.reply).not.toMatch(/Paris|Ali/i);
   });
 
-  it("keeps natural realization when it is anchored in the resolved memory", () => {
+  it("rejects an unsupported second autobiographical clause even when the first clause is canonical", () => {
+    const guarded = enforceKairaAutobiographicalResponse(
+      "Şiddetli yağmura yakalanmıştım. Sonra Ali'yle Paris'te çocukken kaybolmuştum.",
+      runtime,
+    );
+
+    expect(guarded.changed).toBe(true);
+    expect(guarded.reason).toBe("self_memory_resolved_memory_clause_unsupported");
+    expect(guarded.reply).toContain("şiddetli yağmura yakalandılar");
+    expect(guarded.reply).not.toMatch(/Paris|Ali|çocukken/i);
+  });
+
+  it("rejects unsupported named details inside an otherwise anchored clause", () => {
+    const guarded = enforceKairaAutobiographicalResponse(
+      "Paris'te şiddetli yağmura yakalanmıştım.",
+      runtime,
+    );
+
+    expect(guarded.changed).toBe(true);
+    expect(guarded.reason).toBe("self_memory_resolved_memory_clause_unsupported");
+    expect(guarded.reply).not.toMatch(/Paris/i);
+  });
+
+  it("keeps natural realization when each autobiographical clause is anchored in the resolved memory", () => {
     expect(
       enforceKairaAutobiographicalResponse(
         "Şiddetli yağmura yakalanmıştık, sonra sığınak bulmuştuk.",
