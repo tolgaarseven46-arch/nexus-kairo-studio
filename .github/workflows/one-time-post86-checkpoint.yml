@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   checkpoint:
-    if: ${{ !contains(github.event.head_commit.message, '[post86-checkpoint-cleaned]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -20,6 +19,9 @@ jobs:
       - name: Append verified checkpoint
         shell: bash
         run: |
+          if git log -1 --pretty=%B | grep -q '\[post86-checkpoint-cleaned\]'; then
+            exit 0
+          fi
           cat >> PROJECT_STATE.md <<'EOF'
 
 
@@ -41,6 +43,9 @@ EOF
       - name: Self-remove workflow and commit checkpoint
         shell: bash
         run: |
+          if git log -1 --pretty=%B | grep -q '\[post86-checkpoint-cleaned\]'; then
+            exit 0
+          fi
           git rm .github/workflows/one-time-post86-checkpoint.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
