@@ -1,0 +1,38 @@
+name: One-time Conversation Quality Patch
+
+on:
+  push:
+    branches:
+      - fix/conversation-quality-social-moves
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[quality-patch-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/conversation-quality-social-moves
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Apply patch
+        run: python .github/scripts/one_time_conversation_quality_patch.py
+      - name: Verify focused quality regressions
+        run: |
+          npm test -- --run src/services/conversationQualityMechanismRegression.test.ts
+          npx tsc --noEmit
+      - name: Commit verified patch and remove harness
+        run: |
+          git rm .github/workflows/one-time-conversation-quality-patch.yml
+          git rm .github/scripts/one_time_conversation_quality_patch.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(chat): resolve conversation-quality social moves [quality-patch-applied]'
+          git push origin HEAD:fix/conversation-quality-social-moves
