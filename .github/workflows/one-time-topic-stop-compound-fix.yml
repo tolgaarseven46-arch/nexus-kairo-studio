@@ -1,0 +1,68 @@
+name: One-time Topic Stop Compound Fix
+
+on:
+  push:
+    branches:
+      - fix/topic-stop-compound-signal
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[compound-stop-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/topic-stop-compound-signal
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Patch compound topic/full-stop semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/services/llmSemanticUnderstandingProvider.ts')
+          s = p.read_text()
+          old_prompt = '- Konu/başlık kapatma yalnız mevcut konuyu sonlandırır: "boşver bu konuyu", "konuyu kapatalım", "bunu geçelim" gibi topic-local closure = discourseAct:topic_shift + stopQuestions:false + stopTalking:false + stopRequest:false. Kullanıcı ayrıca "başka şey konuşalım" demese bile bunu tüm sohbeti durdurma olarak yükseltme. Full conversation stop yalnız Kaira’nın konuşmasını/sohbetin tamamını açıkça durduruyorsa kullanılır.\n'
+          new_prompt = '- Konu/başlık kapatma yalnız mevcut konuyu sonlandırır: "boşver bu konuyu", "konuyu kapatalım", "bunu geçelim" gibi topic-local closure = discourseAct:topic_shift + stopQuestions:false + stopTalking:false + stopRequest:false. Kullanıcı ayrıca "başka şey konuşalım" demese bile bunu tüm sohbeti durdurma olarak yükseltme. ANCAK aynı mesaj ayrıca açık bir tam-konuşma durdurma isteği içeriyorsa topic_shift ve stopTalking BİRLİKTE true olabilir; topic_shift açık full-stop sinyalini bastırmaz. Örnek: "bu konuyu da kapat konuşmayı da bitir" = discourseAct:topic_shift + stopTalking:true + stopRequest:true + secondarySocialActs içinde stop_request.\n'
+          assert old_prompt in s
+          s = s.replace(old_prompt, new_prompt, 1)
+
+          old = '  const topicLocalClosure = interpretation.discourseFacets.discourseAct === "topic_shift";\n  const stopTalking = topicLocalClosure ? false : interpretation.discourseFacets.stopTalking;\n  const stopQuestions = topicLocalClosure ? false : interpretation.discourseFacets.stopQuestions;\n'
+          new = '  const stopTalking = interpretation.discourseFacets.stopTalking;\n  const stopQuestions = interpretation.discourseFacets.stopQuestions;\n'
+          assert old in s
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          p = Path('src/services/llmSemanticTopicClosure.test.ts')
+          s = p.read_text()
+          s = s.replace("it('topic_shift cannot become a full conversation stop', async () => {", "it('keeps pure topic-local closure out of full conversation stop', async () => {")
+          old_case = '''    const generated = base({\n      raw: 'konuyu kapatalım', normalized: 'konuyu kapatalım', primaryIntent: 'command', target: 'event', secondarySocialActs: ['stop_request'], stopRequest: true,\n      discourseFacets: { socialRoutine: 'none', discourseAct: 'topic_shift', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'none', relationalIntensity: 0.1, stopQuestions: true, stopTalking: true },\n    });'''
+          new_case = '''    const generated = base({\n      raw: 'konuyu kapatalım', normalized: 'konuyu kapatalım', primaryIntent: 'command', target: 'event', secondarySocialActs: [], stopRequest: false,\n      discourseFacets: { socialRoutine: 'none', discourseAct: 'topic_shift', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'none', relationalIntensity: 0.1, stopQuestions: false, stopTalking: false },\n    });'''
+          assert old_case in s
+          s = s.replace(old_case, new_case, 1)
+          insert = '''\n\n  it('preserves an explicit full-stop when it appears together with topic closure', async () => {\n    const generated = base({\n      raw: 'bu konuyu da kapat konuşmayı da bitir', normalized: 'bu konuyu da kapat konuşmayı da bitir', primaryIntent: 'command', target: 'kaira', secondarySocialActs: ['stop_request'], stopRequest: true,\n      discourseFacets: { socialRoutine: 'none', discourseAct: 'topic_shift', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'none', relationalIntensity: 0.3, stopQuestions: false, stopTalking: true },\n    });\n    const generate = vi.fn().mockResolvedValue(JSON.stringify(generated));\n    const result = await createLlmSemanticUnderstandingProvider({ generate }).interpret({ message: 'bu konuyu da kapat konuşmayı da bitir' });\n    expect(result.discourseFacets.discourseAct).toBe('topic_shift');\n    expect(result.discourseFacets.stopTalking).toBe(true);\n    expect(result.stopRequest).toBe(true);\n    expect(result.secondarySocialActs).toContain('stop_request');\n  });\n'''
+          marker = "\n  it('preserves an actual full stop request', async () => {"
+          assert marker in s
+          s = s.replace(marker, insert + marker, 1)
+          p.write_text(s)
+
+          Path('src/services/topicStopCompoundSignalRegression.test.ts').write_text('''import { describe, expect, it, vi } from "vitest";\nimport type { SemanticInterpretation } from "../types/semanticInterpretation";\nimport { createLlmSemanticUnderstandingProvider } from "./llmSemanticUnderstandingProvider";\n\nfunction base(overrides: Partial<SemanticInterpretation> = {}): SemanticInterpretation {\n  return {\n    schemaVersion: "semantic-interpretation@2", raw: "x", normalized: "x", primaryIntent: "other", secondarySocialActs: [], target: "unknown", valence: "neutral",\n    severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 }, jokingConfidence: 0, sincerityConfidence: 0.9, affection: 0, support: 0, compliment: 0, emotionalLoad: 0, apology: false, repairAttempt: false, stopRequest: false,\n    discourseFacets: { socialRoutine: "none", discourseAct: "none", repairSignal: "none", adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: "none", relationalIntensity: 0, stopQuestions: false, stopTalking: false },\n    uncertainty: { overall: 0.2, intent: 0.2, target: 0.2, severity: 0.2 }, evidence: [], ...overrides,\n  };\n}\n\ndescribe("compound topic/full-stop regression", () => {\n  it("allows topic_shift and stopTalking to coexist when the user explicitly asks for both", async () => {\n    const generated = base({ raw: "bu konuyu da kapat konuşmayı da bitir", normalized: "bu konuyu da kapat konuşmayı da bitir", primaryIntent: "command", target: "kaira", secondarySocialActs: ["stop_request"], stopRequest: true, discourseFacets: { socialRoutine: "none", discourseAct: "topic_shift", repairSignal: "none", adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: "none", relationalIntensity: 0.3, stopQuestions: false, stopTalking: true } });\n    const generate = vi.fn().mockResolvedValue(JSON.stringify(generated));\n    const result = await createLlmSemanticUnderstandingProvider({ generate }).interpret({ message: generated.raw });\n    expect(result.discourseFacets.discourseAct).toBe("topic_shift");\n    expect(result.discourseFacets.stopTalking).toBe(true);\n    expect(result.stopRequest).toBe(true);\n    expect(result.secondarySocialActs).toContain("stop_request");\n  });\n});\n''')
+
+          Path('docs/adr/0018-topic-shift-and-full-stop-are-independent-signals.md').write_text('''# ADR-0018: Topic shift and conversation stop are independent semantic signals\n\n## Status\nAccepted\n\n## Context\nADR-0016 correctly prevented pure topic closure from being promoted to a full conversation stop, but its normalization rule made `topic_shift` and `stopTalking` mutually exclusive. Natural language can explicitly request both, e.g. `bu konuyu da kapat konuşmayı da bitir`.\n\n## Decision\n`discourseAct: topic_shift` and `discourseFacets.stopTalking` are independent semantic outputs. Pure topic-local closure remains `topic_shift + stopTalking:false`. Explicit full-stop remains `stopTalking:true`. A compound utterance may carry both `topic_shift:true` and `stopTalking:true`; topic shift must not erase explicit conversation-stop evidence.\n\nNo new stop-scope authority is introduced. The canonical semantic provider remains the sole utterance-level authority.\n\n## Acceptance\n- `boşver bu konuyu kapatalım` -> topic_shift=true, stopTalking=false\n- `sus artık konuşma` -> stopTalking=true\n- `bu konuyu da kapat konuşmayı da bitir` -> topic_shift=true, stopTalking=true\n''')
+          PY
+          npm test -- --run src/services/llmSemanticTopicClosure.test.ts src/services/topicStopCompoundSignalRegression.test.ts
+          npx tsc --noEmit
+          git rm .github/workflows/one-time-topic-stop-compound-fix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(semantic): preserve compound topic/full-stop signals [compound-stop-applied]'
+          git push origin HEAD:fix/topic-stop-compound-signal
