@@ -1,0 +1,238 @@
+name: One-time Relationship Repair Matrix
+
+on:
+  push:
+    branches:
+      - diag/relationship-repair-matrix
+
+permissions:
+  contents: write
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: diag/relationship-repair-matrix
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Run pure reducer adversarial matrix
+        shell: bash
+        run: |
+          cat > /tmp/repair-matrix.ts <<'TS'
+          import {
+            reduceRelationshipTurn,
+            type RelationshipReducerPrev,
+            type RelationshipReducerResult,
+            type RelationshipTurnSignal,
+          } from process.cwd() + '/src/services/relationshipReducer.ts';
+
+          const baseNow = new Date('2026-09-05T12:00:00.000Z');
+          const severityLevels = {
+            mild: { disrespect: 0.25, coercion: 0.05, manipulation: 0, privacy: 0, aggression: 0.1 },
+            medium: { disrespect: 0.55, coercion: 0.35, manipulation: 0.1, privacy: 0, aggression: 0.25 },
+            severe: { disrespect: 0.85, coercion: 0.75, manipulation: 0.25, privacy: 0, aggression: 0.65 },
+          } as const;
+          const familiarityProfiles = {
+            new: { ageDays: 1, interactions: 2 },
+            medium: { ageDays: 30, interactions: 25 },
+            high: { ageDays: 180, interactions: 100 },
+          } as const;
+          const apologyQualities = {
+            generic: 0.3,
+            accountable: 0.7,
+            accountable_with_commitment: 1.0,
+          } as const;
+
+          type Key = keyof typeof severityLevels;
+          type Fam = keyof typeof familiarityProfiles;
+          type Quality = keyof typeof apologyQualities;
+
+          function plusMinutes(date: Date, minutes: number) {
+            return new Date(date.getTime() + minutes * 60_000);
+          }
+
+          function initialPrev(fam: Fam): RelationshipReducerPrev {
+            const f = familiarityProfiles[fam];
+            return {
+              scores: {
+                warmth: 70,
+                trust: 75,
+                conflict: 0,
+                hurt: 0,
+                repairProgress: 0,
+                positiveEvents: 10,
+                negativeEvents: 0,
+                repeatedNegativeCount: 0,
+              },
+              conversationState: 'active',
+              reactionMode: 'neutral',
+              affect: { anger: 10, stress: 20, happiness: 70, calmness: 70 },
+              firstSeenAt: new Date(baseNow.getTime() - f.ageDays * 86_400_000).toISOString(),
+              lastInteractionAt: plusMinutes(baseNow, -5).toISOString(),
+              interactionCount: f.interactions,
+              repairAttempts: 0,
+              boundarySetByKaira: false,
+            };
+          }
+
+          function nextPrev(prev: RelationshipReducerPrev, result: RelationshipReducerResult, nowIso: string): RelationshipReducerPrev {
+            return {
+              scores: result.scores,
+              conversationState: result.conversationState,
+              reactionMode: result.reactionMode,
+              affect: {
+                anger: (prev.affect?.anger ?? 10) + result.affectDelta.anger,
+                stress: (prev.affect?.stress ?? 20) + result.affectDelta.stress,
+                happiness: (prev.affect?.happiness ?? 70) + result.affectDelta.happiness,
+                calmness: (prev.affect?.calmness ?? 70) + result.affectDelta.calmness,
+              },
+              firstSeenAt: prev.firstSeenAt,
+              lastInteractionAt: nowIso,
+              lastConflictAt: result.lastConflictAt,
+              lastNegativePattern: result.lastNegativePattern,
+              disengagedAt: result.disengagedAt,
+              disengageReason: result.disengageReason,
+              repairAttempts: result.repairAttempts,
+              interactionCount: result.interactionCount,
+              boundarySetByKaira: result.boundarySetByKaira,
+            };
+          }
+
+          function harmSignal(level: Key): RelationshipTurnSignal {
+            return {
+              valence: 'negative', targetsKaira: true, severity: severityLevels[level], jokingConfidence: 0,
+              sincerityConfidence: 0.9, apology: false, repairAttempt: false, support: 0, compliment: 0, affection: 0,
+              userStop: false, uncertainty: 0.05, negativePattern: 'hakaret',
+            };
+          }
+          function apologySignal(quality: Quality): RelationshipTurnSignal {
+            return {
+              valence: 'neutral', targetsKaira: true,
+              severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 },
+              jokingConfidence: 0, sincerityConfidence: apologyQualities[quality], apology: true, repairAttempt: true,
+              support: 0, compliment: 0, affection: 0, userStop: false, uncertainty: 0.05, negativePattern: null,
+            };
+          }
+          const calmSignal: RelationshipTurnSignal = {
+            valence: 'neutral', targetsKaira: true,
+            severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 },
+            jokingConfidence: 0, sincerityConfidence: 0.9, apology: false, repairAttempt: false,
+            support: 0, compliment: 0, affection: 0, userStop: false, uncertainty: 0.05, negativePattern: null,
+          };
+
+          type Row = {
+            severity: Key; familiarity: Fam; apologyQuality: Quality; repeats: number;
+            stateBeforeApology: string; stateAfterApology: string; turnsToActive: number | null;
+            hurtBefore: number; hurtAfter: number; conflictBefore: number; conflictAfter: number;
+            repairBefore: number; repairAfter: number; trustBefore: number; trustAfter: number;
+            familiarityScore: number; hardBefore: boolean;
+          };
+          const rows: Row[] = [];
+
+          for (const severity of Object.keys(severityLevels) as Key[]) {
+            for (const familiarity of Object.keys(familiarityProfiles) as Fam[]) {
+              for (const apologyQuality of Object.keys(apologyQualities) as Quality[]) {
+                for (const repeats of [1,2,3]) {
+                  let prev = initialPrev(familiarity);
+                  let now = baseNow;
+                  let lastResult: RelationshipReducerResult | null = null;
+                  for (let n=0; n<repeats; n++) {
+                    now = plusMinutes(now, 1);
+                    lastResult = reduceRelationshipTurn({ prev, signal: harmSignal(severity), timing: { elapsedMinutesSincePrev: 1, nowIso: now.toISOString() } });
+                    prev = nextPrev(prev, lastResult, now.toISOString());
+                  }
+                  if (!lastResult) throw new Error('missing harm result');
+                  const before = lastResult;
+                  now = plusMinutes(now, 2);
+                  const apology = reduceRelationshipTurn({ prev, signal: apologySignal(apologyQuality), timing: { elapsedMinutesSincePrev: 2, nowIso: now.toISOString() } });
+                  prev = nextPrev(prev, apology, now.toISOString());
+                  let turnsToActive: number | null = apology.conversationState === 'active' ? 0 : null;
+                  if (turnsToActive === null) {
+                    for (let t=1; t<=8; t++) {
+                      now = plusMinutes(now, 5);
+                      const r = reduceRelationshipTurn({ prev, signal: calmSignal, timing: { elapsedMinutesSincePrev: 5, nowIso: now.toISOString() } });
+                      prev = nextPrev(prev, r, now.toISOString());
+                      if (r.conversationState === 'active') { turnsToActive = t; break; }
+                    }
+                  }
+                  rows.push({
+                    severity, familiarity, apologyQuality, repeats,
+                    stateBeforeApology: before.conversationState, stateAfterApology: apology.conversationState, turnsToActive,
+                    hurtBefore: before.scores.hurt, hurtAfter: apology.scores.hurt,
+                    conflictBefore: before.scores.conflict, conflictAfter: apology.scores.conflict,
+                    repairBefore: before.scores.repairProgress, repairAfter: apology.scores.repairProgress,
+                    trustBefore: before.scores.trust, trustAfter: apology.scores.trust,
+                    familiarityScore: before.scores.familiarity, hardBefore: before.hard.disengage,
+                  });
+                }
+              }
+            }
+          }
+
+          const failures: string[] = [];
+          const sevOrder: Key[] = ['mild','medium','severe'];
+          const famOrder: Fam[] = ['new','medium','high'];
+          const qualOrder: Quality[] = ['generic','accountable','accountable_with_commitment'];
+          const get = (severity:Key,familiarity:Fam,quality:Quality,repeats:number) => rows.find(r => r.severity===severity && r.familiarity===familiarity && r.apologyQuality===quality && r.repeats===repeats)!;
+          const burden = (r:Row) => r.hurtAfter + r.conflictAfter - 0.2*r.repairAfter;
+          const turnsRank = (r:Row) => r.turnsToActive === null ? 99 : r.turnsToActive;
+
+          for (const fam of famOrder) for (const q of qualOrder) for (const rep of [1,2,3]) {
+            for (let i=1;i<sevOrder.length;i++) {
+              const a=get(sevOrder[i-1],fam,q,rep), b=get(sevOrder[i],fam,q,rep);
+              if (burden(b)+0.5 < burden(a)) failures.push(`severity_nonmonotonic ${fam}/${q}/r${rep}: ${sevOrder[i-1]}=${burden(a).toFixed(1)} > ${sevOrder[i]}=${burden(b).toFixed(1)}`);
+              if (turnsRank(b) < turnsRank(a)) failures.push(`severity_recovery_faster ${fam}/${q}/r${rep}: ${sevOrder[i-1]}=${turnsRank(a)} > ${sevOrder[i]}=${turnsRank(b)}`);
+            }
+          }
+          for (const sev of sevOrder) for (const fam of famOrder) for (const q of qualOrder) {
+            for (const rep of [2,3]) {
+              const a=get(sev,fam,q,rep-1), b=get(sev,fam,q,rep);
+              if (burden(b)+0.5 < burden(a)) failures.push(`repeat_nonmonotonic ${sev}/${fam}/${q}: r${rep-1}=${burden(a).toFixed(1)} > r${rep}=${burden(b).toFixed(1)}`);
+              if (turnsRank(b) < turnsRank(a)) failures.push(`repeat_recovery_faster ${sev}/${fam}/${q}: r${rep-1}=${turnsRank(a)} > r${rep}=${turnsRank(b)}`);
+            }
+          }
+          for (const sev of sevOrder) for (const fam of famOrder) for (const rep of [1,2,3]) {
+            for (let i=1;i<qualOrder.length;i++) {
+              const a=get(sev,fam,qualOrder[i-1],rep), b=get(sev,fam,qualOrder[i],rep);
+              if (b.repairAfter + 0.01 < a.repairAfter) failures.push(`quality_repair_nonmonotonic ${sev}/${fam}/r${rep}`);
+              if (turnsRank(b) > turnsRank(a)) failures.push(`better_apology_slower ${sev}/${fam}/r${rep}: ${qualOrder[i-1]}=${turnsRank(a)} < ${qualOrder[i]}=${turnsRank(b)}`);
+            }
+          }
+          for (const sev of sevOrder) for (const q of qualOrder) {
+            const n=get(sev,'new',q,1), h=get(sev,'high',q,1);
+            if (h.hurtBefore > n.hurtBefore + 0.5 || h.conflictBefore > n.conflictBefore + 0.5) failures.push(`familiarity_not_resilient ${sev}/${q}: new=${n.hurtBefore+n.conflictBefore} high=${h.hurtBefore+h.conflictBefore}`);
+          }
+
+          const sampleKeys = [
+            ['mild','new','generic',1], ['medium','new','generic',1], ['severe','new','generic',1],
+            ['severe','high','generic',1], ['severe','high','generic',3], ['severe','high','accountable_with_commitment',3],
+            ['medium','medium','generic',2], ['medium','medium','accountable_with_commitment',2],
+          ] as const;
+          const samples = sampleKeys.map(([s,f,q,r])=>get(s,f,q,r));
+          console.log(JSON.stringify({
+            cases: rows.length,
+            apologyRepresentation: 'quality is only proxied by sincerityConfidence; reducer has no explicit accountability/commitment field',
+            failures,
+            sampleRows: samples,
+          }, null, 2));
+          if (failures.length) process.exitCode = 2;
+          TS
+          set +e
+          npx tsx /tmp/repair-matrix.ts
+          code=$?
+          set -e
+          echo "MATRIX_EXIT=${code}"
+          # This is characterization, not a CI acceptance gate. Preserve output even on invariant failures.
+      - name: Self-remove
+        shell: bash
+        run: |
+          git rm .github/workflows/one-time-relationship-repair-matrix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: remove relationship repair matrix diagnostic'
+          git push origin HEAD:diag/relationship-repair-matrix
