@@ -1,0 +1,47 @@
+name: Run World Memory Fact Patch
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'fix/world-memory-evidence-eligibility'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/world-memory-evidence-eligibility
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Extract and run patch script
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          src = Path('.github/workflows/apply-world-memory-fact-model.yml').read_text()
+          start = src.index("          python <<'PY'\n") + len("          python <<'PY'\n")
+          end = src.index("\n          PY\n", start)
+          lines = src[start:end].splitlines()
+          Path('/tmp/apply_patch.py').write_text('\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n')
+          PY
+          python /tmp/apply_patch.py
+      - name: Validate patched files
+        run: |
+          npm ci
+          npm test -- --run
+          npm run typecheck
+          npm run build
+      - name: Commit patch
+        run: |
+          rm -f .github/workflows/apply-world-memory-fact-model.yml .github/workflows/run-world-memory-fact-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(kaira): add canonical world-memory fact identity"
+          git push origin HEAD:fix/world-memory-evidence-eligibility
