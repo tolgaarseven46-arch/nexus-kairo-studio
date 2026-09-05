@@ -112,11 +112,11 @@ function buildResult(
   entityResolution: EntityResolutionResult,
   rest: Omit<LanguageUnderstandingResult, "interpretation" | "event" | "entityResolution" | "worldEvent">,
 ): LanguageUnderstandingResult {
-  const reconciledInterpretation = reconcileSemanticTargetWithEntityResolution(interpretation, entityResolution);
-  const projected = projectSemanticEvent(reconciledInterpretation);
+  interpretation = reconcileSemanticTargetWithEntityResolution(interpretation, entityResolution);
+  const projected = projectSemanticEvent(interpretation);
   const grounded = groundSemanticEventForAppraisal(message, projected, entityResolution);
   return {
-    interpretation: reconciledInterpretation,
+    interpretation,
     event: {
       ...grounded.event,
       semanticUncertainty: interpretation.uncertainty.overall,
