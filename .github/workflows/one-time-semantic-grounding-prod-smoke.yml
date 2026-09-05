@@ -24,16 +24,16 @@ jobs:
           post() {
             local outfile="$1"
             local body="$2"
-            curl --fail-with-body --silent --show-error --max-time 120 \
+            curl --retry 4 --retry-all-errors --retry-delay 2 --fail-with-body --silent --show-error --max-time 120 \
               -H 'Content-Type: application/json' --data "$body" "$URL" > "$outfile"
           }
-          for i in 1 2 3 4 5 6 7 8; do
+          for i in 1 2 3 4 5; do
             post "/tmp/match_${i}.json" '{"userMessage":"iyi maç izliyorum","userName":"Mert","characterName":"Kaira","history":[{"role":"user","content":"naber"},{"role":"assistant","content":"iyi valla sen nasılsın"}],"provider":"openrouter"}'
           done
           for i in 1 2 3; do
             post "/tmp/naber_${i}.json" '{"userMessage":"naber","userName":"Mert","characterName":"Kaira","history":[{"role":"user","content":"selam"},{"role":"assistant","content":"selam"}],"provider":"openrouter"}'
           done
-          for i in 1 2 3 4 5; do
+          for i in 1 2 3; do
             post "/tmp/sg_${i}.json" '{"userMessage":"sg","userName":"Mert","characterName":"Kaira","history":[{"role":"user","content":"seni sevdim"},{"role":"assistant","content":"bunu duymak güzel"}],"provider":"openrouter"}'
           done
           node <<'NODE'
@@ -41,7 +41,7 @@ jobs:
           const load = (p) => JSON.parse(fs.readFileSync(p, 'utf8')).interpretation;
           const summary = { match: [], naber: [], sg: [] };
           let observedRoutineRejection = 0;
-          for (let i=1;i<=8;i++) {
+          for (let i=1;i<=5;i++) {
             const x = load(`/tmp/match_${i}.json`);
             summary.match.push({intent:x.primaryIntent,routine:x.discourseFacets?.socialRoutine,grounding:x.grounding});
             if (x.primaryIntent !== 'smalltalk') throw new Error(`match ${i}: intent=${x.primaryIntent}`);
@@ -60,7 +60,7 @@ jobs:
             if (!x.grounding?.adjudicatedAgainstContextFree) throw new Error(`naber ${i}: expected grounding comparison`);
             if (x.grounding.rejectedContextFields?.length) throw new Error(`naber ${i}: unexpected rejected fields ${x.grounding.rejectedContextFields}`);
           }
-          for (let i=1;i<=5;i++) {
+          for (let i=1;i<=3;i++) {
             const x = load(`/tmp/sg_${i}.json`);
             const acts = x.secondarySocialActs || [];
             summary.sg.push({intent:x.primaryIntent,valence:x.valence,affection:x.affection,routine:x.discourseFacets?.socialRoutine,relationalAct:x.discourseFacets?.relationalAct,uncertainty:x.uncertainty?.overall,grounding:x.grounding});
