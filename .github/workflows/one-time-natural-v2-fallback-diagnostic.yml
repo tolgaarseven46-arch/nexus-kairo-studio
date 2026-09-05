@@ -1,0 +1,56 @@
+name: one-time natural v2 fallback diagnostic
+'on':
+  push:
+    branches:
+      - diag/natural-v2-fallback-root-cause
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Inspect live fallback and semantic metadata
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, urllib.request, uuid, time
+          base='https://nexus-kairo-studio.onrender.com'
+          cases=[
+            'az önce kahveyi döktüm masaya',
+            'yarın toplantım var',
+            'bu arada Mert yine geç kaldı',
+            'herif zaman kavramıyla kavgalı resmen hahah',
+            'yok kızmadım komik geldi sadece',
+            'kızdım ya',
+            'moralim bozuk'
+          ]
+          for i,msg in enumerate(cases,1):
+            uid='diag_v2_root_'+uuid.uuid4().hex[:10]
+            payload={
+              'userId':uid,'userName':'Tolga','userMessage':msg,'history':[],
+              'provider':'openrouter','kairaInstanceId':'reference','kairaInstanceType':'reference',
+              'sessionId':'session_'+uid,'requestId':'v2-root-'+uuid.uuid4().hex[:10]
+            }
+            for attempt in range(1,4):
+              try:
+                req=urllib.request.Request(base+'/api/chat',data=json.dumps(payload).encode(),headers={'Content-Type':'application/json'},method='POST')
+                with urllib.request.urlopen(req,timeout=90) as r: out=json.loads(r.read().decode())
+                break
+              except Exception as e:
+                if attempt==3: raise
+                time.sleep(3)
+            kdm=out.get('kdm') or {}
+            print('--- CASE',i,'---')
+            print('USER=',msg)
+            print('REPLY=',str(out.get('reply') or '').replace('\n',' '))
+            print('PROVIDER=',out.get('providerUsed'))
+            print('ENFORCEMENT=',json.dumps(out.get('enforcement'),ensure_ascii=False))
+            print('CONSISTENCY=',json.dumps(out.get('consistency'),ensure_ascii=False))
+            print('DIALOGUE_DECISION=',json.dumps(out.get('dialogueDecision'),ensure_ascii=False))
+            print('SEMANTIC_EVENT=',json.dumps(kdm.get('semanticEvent'),ensure_ascii=False))
+            print('SEMANTIC_SOURCE=',json.dumps(kdm.get('semanticSource'),ensure_ascii=False))
+            print('RESPONSE_PLAN=',json.dumps(kdm.get('responsePlan'),ensure_ascii=False))
+            print('TRACE_INTERPRETATION=',json.dumps((kdm.get('trace') or {}).get('messageInterpretation'),ensure_ascii=False))
+          print('V2_FALLBACK_DIAGNOSTIC_COMPLETE')
+          PY
