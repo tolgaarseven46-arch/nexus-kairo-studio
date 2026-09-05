@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { understandTurkishMessage } from "./languageUnderstandingService";
 import { resolveKairaResponsePlan } from "./kairaPlanResolver";
 import { findKairaResponsePlanIssues, type KairaResponsePlan } from "./kairaResponsePlan";
+import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
 import { SEMANTIC_INTERPRETATION_SCHEMA_VERSION, type SemanticInterpretation } from "../types/semanticInterpretation";
 
 function semantic(overrides: Partial<SemanticInterpretation> = {}): SemanticInterpretation {
@@ -105,6 +106,34 @@ function resolvedPlan(
   });
 }
 
+function reciprocalEvent(socialRoutine: "how_are_you" | "what_doing") {
+  return {
+    intent: "smalltalk",
+    valence: "neutral",
+    target: "event",
+    disrespect: 0,
+    coercion: 0,
+    manipulation: 0,
+    privacyViolation: 0,
+    jokingConfidence: 0,
+    affection: 0,
+    support: 0,
+    compliment: 0,
+    emotionalLoad: 0,
+    apology: false,
+    repairAttempt: false,
+    stopRequest: false,
+    socialRoutine,
+    discourseAct: "none",
+    repairSignal: "none",
+    adviceRequested: false,
+    relationalAct: "none",
+    relationalIntensity: 0,
+    stopQuestions: false,
+    stopTalking: false,
+  } as any;
+}
+
 describe("natural conversation v2 quality authority", () => {
   it("reconciles a neutral low-load third-party event away from emotional_share", async () => {
     const result = await understandTurkishMessage("Mert yine geç kaldı", {
@@ -164,5 +193,14 @@ describe("natural conversation v2 quality authority", () => {
   it("does not force content engagement on explicit question-stop control turns", () => {
     const resolved = resolvedPlan(0.2, { questionStopRequested: true });
     expect(resolved.requiredContent).not.toContain("engage_user_content");
+  });
+
+  it("preserves reciprocal socialRoutine through DialogueDecision", () => {
+    const first = planDialogueResponse([], "naber", "Tolga", reciprocalEvent("how_are_you"));
+    const doing = planDialogueResponse([], "napıyosun", "Tolga", reciprocalEvent("what_doing"));
+    expect(first.move).toBe("natural_reaction");
+    expect(first.socialRoutine).toBe("how_are_you");
+    expect(doing.move).toBe("natural_reaction");
+    expect(doing.socialRoutine).toBe("what_doing");
   });
 });
