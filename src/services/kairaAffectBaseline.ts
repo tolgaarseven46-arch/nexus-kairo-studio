@@ -12,6 +12,13 @@ export const DEFAULT_KAIRA_AFFECT_BASELINE: KairaAffectBaseline = Object.freeze(
   calmness: 70,
 });
 
+export const KAIRA_AFFECT_BASELINE_FINE_TUNE_KEYS = Object.freeze({
+  anger: "temperament.affectBaseline.anger",
+  stress: "temperament.affectBaseline.stress",
+  happiness: "temperament.affectBaseline.happiness",
+  calmness: "temperament.affectBaseline.calmness",
+} as const);
+
 const clamp100 = (value: unknown, fallback: number) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
@@ -19,10 +26,8 @@ const clamp100 = (value: unknown, fallback: number) => {
 };
 
 /**
- * Canonical normalization seam for the four affect channels currently owned by
- * RelationshipReducer homeostasis. Missing input preserves the shipped neutral
- * baseline exactly; callers may later supply an instance-owned baseline without
- * adding another recovery authority inside the reducer.
+ * Canonical normalization seam for Kaira's resting affect target. Missing input
+ * preserves the shipped baseline exactly.
  */
 export function normalizeKairaAffectBaseline(
   input?: Partial<KairaAffectBaseline> | null,
@@ -33,4 +38,20 @@ export function normalizeKairaAffectBaseline(
     happiness: clamp100(input?.happiness, DEFAULT_KAIRA_AFFECT_BASELINE.happiness),
     calmness: clamp100(input?.calmness, DEFAULT_KAIRA_AFFECT_BASELINE.calmness),
   };
+}
+
+/**
+ * Stable character/fine-tune config owns resting affect. `temperament.arousal.baseline`
+ * deliberately remains a distinct event-arousal parameter and is never reused here.
+ */
+export function kairaAffectBaselineFromFineTune(
+  fineTune?: Record<string, number> | null,
+): KairaAffectBaseline {
+  const profile = fineTune ?? {};
+  return normalizeKairaAffectBaseline({
+    anger: profile[KAIRA_AFFECT_BASELINE_FINE_TUNE_KEYS.anger],
+    stress: profile[KAIRA_AFFECT_BASELINE_FINE_TUNE_KEYS.stress],
+    happiness: profile[KAIRA_AFFECT_BASELINE_FINE_TUNE_KEYS.happiness],
+    calmness: profile[KAIRA_AFFECT_BASELINE_FINE_TUNE_KEYS.calmness],
+  });
 }
