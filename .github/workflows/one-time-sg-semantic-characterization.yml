@@ -1,0 +1,44 @@
+name: One-time SG Semantic Characterization
+
+on:
+  push:
+    branches:
+      - diag/sg-semantic-characterization
+
+permissions:
+  contents: write
+
+jobs:
+  characterize:
+    if: ${{ !contains(github.event.head_commit.message, '[sg-characterized]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: diag/sg-semantic-characterization
+          fetch-depth: 0
+      - name: Call production canonical language-understanding endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://nexus-kairo-studio.onrender.com/api/language-understanding'
+          call_case() {
+            local name="$1"
+            local body="$2"
+            echo "===== ${name} ====="
+            curl --fail-with-body --silent --show-error --max-time 90 \
+              -H 'Content-Type: application/json' \
+              --data "$body" "$URL" | tee "/tmp/${name}.json"
+            echo
+          }
+          call_case standalone '{"userMessage":"sg","userName":"Mert","characterName":"Kaira","history":[],"provider":"openrouter"}'
+          call_case after_closeness '{"userMessage":"sg","userName":"Mert","characterName":"Kaira","history":[{"role":"user","content":"seni sevdim"},{"role":"assistant","content":"bunu duymak güzel"},{"role":"user","content":"gel sarıl"},{"role":"assistant","content":"burdayım"}],"provider":"openrouter"}'
+          call_case after_conflict '{"userMessage":"sg","userName":"Mert","characterName":"Kaira","history":[{"role":"user","content":"sen benim kölemsin"},{"role":"assistant","content":"değilim ve böyle konuşmanı kabul etmiyorum"},{"role":"user","content":"tamam kızma"},{"role":"assistant","content":"tamam"}],"provider":"openrouter"}'
+      - name: Self-remove diagnostic workflow
+        shell: bash
+        run: |
+          git rm .github/workflows/one-time-sg-semantic-characterization.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: remove sg semantic diagnostic [sg-characterized]'
+          git push origin HEAD:diag/sg-semantic-characterization
