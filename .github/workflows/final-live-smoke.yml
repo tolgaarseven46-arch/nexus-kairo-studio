@@ -1,0 +1,54 @@
+name: Final Live Smoke
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  post106-final-live-smoke:
+    if: github.head_ref == 'audit/post106-final-live-smoke'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify inflected Turkish question delivery on production
+        shell: bash
+        run: |
+          node <<'NODE'
+          const base = 'https://nexus-kairo-studio.onrender.com';
+          const userId = `post106_${Date.now()}`;
+          const instanceId = `post106_welcome_${Date.now()}`;
+          const response = await fetch(`${base}/api/chat`, {
+            method: 'POST',
+            headers: {'content-type':'application/json'},
+            body: JSON.stringify({
+              userId,
+              userName: 'Tolga',
+              userMessage: 'yarın erken kalkıcam',
+              history: [],
+              provider: 'openrouter',
+              kairaInstanceId: instanceId,
+              kairaInstanceType: 'welcome',
+              suppressRecentMemory: true,
+              requestId: `${userId}_1`
+            })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
+          const row = {
+            reply: String(data.reply ?? ''),
+            allowQuestion: data?.kdm?.responsePlan?.allowQuestion,
+            accepted: data?.consistency?.accepted,
+            issues: data?.consistency?.issues ?? []
+          };
+          console.log('POST106_FINAL_SMOKE ' + JSON.stringify(row));
+          const forbiddenInflectedQuestion = /\b(?:kaçta|kaça|kaçtan)\b/iu.test(row.reply);
+          const failures = [];
+          if (row.allowQuestion === false && forbiddenInflectedQuestion) failures.push('inflected_question_survived');
+          if (!row.accepted) failures.push('response_not_accepted');
+          if (row.issues.includes('response_plan_question_blocked')) failures.push('question_block_issue_survived');
+          if (failures.length) {
+            console.error('POST106_FINAL_SMOKE_FAILURE ' + JSON.stringify({failures,row}));
+            process.exit(1);
+          }
+          console.log('POST106_FINAL_SMOKE_OK');
+          NODE
