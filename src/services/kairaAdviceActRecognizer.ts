@@ -1,6 +1,6 @@
 const EXPLICIT_ADVICE_RE =
-  /\b(?:bence\s+)?(?:erken\s+yat|biraz\s+dinlen|dinlensen\s+iyi\s+olur|uyusan\s+iyi\s+olur|şunu\s+yap|bunu\s+yap|yapmalısın|yapmalisin|etmelisin|denemelisin|denemelisin|gitmelisin|kalmalısın|kalmali?sın|iyi\s+gelir|faydalı\s+olur|mantıklı\s+olur)\b/iu;
-const ADVICE_SUFFIX_RE = /\b[\p{L}]+m[ae]lısın\b|\b[\p{L}]+melisin\b/iu;
+  /\b(?:bence\s+)?(?:erken\s+yat|biraz\s+dinlen|dinlensen\s+iyi\s+olur|uyusan\s+iyi\s+olur|şunu\s+yap|bunu\s+yap|yapmalısın|yapmalisin|etmelisin|denemelisin|gitmelisin|kalmalısın|kalmalisin|iyi\s+gelir|faydalı\s+olur|mantıklı\s+olur)\b/iu;
+const ADVICE_SUFFIX_RE = /\b[\p{L}]+(?:malısın|melisin|malisin|melisin)\b/iu;
 
 /**
  * Structural delivered-text recognizer only. It does not decide whether advice
