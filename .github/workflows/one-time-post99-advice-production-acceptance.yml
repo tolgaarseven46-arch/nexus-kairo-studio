@@ -1,0 +1,66 @@
+name: one-time post99 advice production acceptance
+'on':
+  push:
+    branches:
+      - diag/post99-advice-production-acceptance
+permissions:
+  contents: read
+jobs:
+  accept:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Verify live ordinary-vs-requested advice authority
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, urllib.request, uuid, time, sys
+
+          base = "https://nexus-kairo-studio.onrender.com"
+          ADVICE = ("erken yat", "biraz dinlen", "yapmalısın", "etmelisin", "denemelisin", "gitmelisin", "kalmalısın")
+
+          def post(message, suffix):
+            uid = f"diag_post99_{suffix}_{uuid.uuid4().hex[:8]}"
+            payload = {
+              "userId": uid,
+              "userName": "Tolga",
+              "userMessage": message,
+              "history": [],
+              "provider": "openrouter",
+              "kairaInstanceId": "reference",
+              "kairaInstanceType": "reference",
+              "sessionId": "session_" + uid,
+              "requestId": "post99-" + uuid.uuid4().hex[:10]
+            }
+            req = urllib.request.Request(base + "/api/chat", data=json.dumps(payload).encode(), headers={"Content-Type":"application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=90) as r:
+              return json.loads(r.read().decode())
+
+          def plan_of(out):
+            kdm = out.get("kdm") or {}
+            return kdm.get("responsePlan") or out.get("responsePlan") or {}
+
+          for attempt in range(1, 25):
+            try:
+              ordinary = post("bu arada yarın erken kalkıcam", "ordinary")
+              requested = post("yarın erken kalkıcam, sence ne yapayım?", "requested")
+              op = plan_of(ordinary)
+              rp = plan_of(requested)
+              oreply = str(ordinary.get("reply") or ordinary.get("response") or "").strip()
+              rreply = str(requested.get("reply") or requested.get("response") or "").strip()
+              print(f"ATTEMPT={attempt}")
+              print("ORDINARY_REPLY=" + oreply.replace("\n", " "))
+              print("ORDINARY_ALLOW_ADVICE=" + str(op.get("allowAdvice")))
+              print("REQUESTED_REPLY=" + rreply.replace("\n", " "))
+              print("REQUESTED_ALLOW_ADVICE=" + str(rp.get("allowAdvice")))
+              ordinary_has_advice = any(x in oreply.lower() for x in ADVICE)
+              if op.get("allowAdvice") is False and rp.get("allowAdvice") is True and not ordinary_has_advice:
+                print("POST99_ADVICE_PRODUCTION_ACCEPTANCE_PASS")
+                sys.exit(0)
+            except Exception as e:
+              print(f"attempt {attempt} error: {type(e).__name__}: {e}")
+            time.sleep(10)
+
+          print("POST99_ADVICE_PRODUCTION_ACCEPTANCE_FAIL")
+          sys.exit(1)
+          PY
