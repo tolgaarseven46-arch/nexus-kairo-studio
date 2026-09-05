@@ -1,0 +1,40 @@
+name: One-time Topic Closure Semantic Characterization
+
+on:
+  push:
+    branches:
+      - diag/topic-closure-semantic
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: diag/topic-closure-semantic
+          fetch-depth: 0
+      - name: Characterize production semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://nexus-kairo-studio.onrender.com/api/language-understanding'
+          for item in \
+            'boşver kapatalım konuyu' \
+            'konuyu kapatalım başka şey konuşalım' \
+            'sus artık'; do
+            echo "===== $item ====="
+            curl --fail-with-body --silent --show-error --max-time 120 \
+              -H 'Content-Type: application/json' \
+              --data "{\"userMessage\":\"$item\",\"userName\":\"Mert\",\"characterName\":\"Kaira\",\"history\":[],\"provider\":\"openrouter\"}" "$URL"
+            echo
+          done
+      - name: Self-remove diagnostic workflow
+        run: |
+          git rm .github/workflows/one-time-topic-closure-semantic.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: remove topic closure semantic diagnostic'
+          git push origin HEAD:diag/topic-closure-semantic
