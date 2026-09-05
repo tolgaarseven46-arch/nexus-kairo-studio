@@ -22,8 +22,11 @@ describe("world-model response guard runtime integration contract", () => {
     expect(server).toContain("reply: local.reply");
   });
 
-  it("shares one canonical appraisal/policy authority with deterministic enforcement", () => {
-    expect(server).toContain("const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy }");
+  it("shares one canonical appraisal/policy/query authority with deterministic enforcement", () => {
+    expect(server).toContain("const worldReasoningContext = {");
+    expect(server).toContain("appraisal: worldStateAppraisal");
+    expect(server).toContain("policy: worldReasoningPolicy");
+    expect(server).toContain("memoryQuery: canonicalSemantic.interpretation.worldMemory?.query ?? null");
     expect(server).toContain("findWorldModelResponseIssues(repairedReply, retrievedWorldEvents, worldReasoningContext)");
     expect(server).toContain("worldContext: worldReasoningContext");
     expect(guard).toContain("context: WorldModelReasoningContext");

@@ -86,6 +86,28 @@ export interface SemanticSelfMemoryQuery {
   confidence: number;
 }
 
+export type SemanticWorldMemoryValue = string | number | boolean;
+
+/** Canonical attribute-value claim contained in the current utterance. */
+export interface SemanticWorldMemoryClaim {
+  subjectId: string;
+  attributeKey: string;
+  value: SemanticWorldMemoryValue;
+  confidence: number;
+}
+
+/** Canonical attribute lookup requested from persistent world memory. */
+export interface SemanticWorldMemoryQuery {
+  subjectId: string;
+  attributeKey: string;
+  confidence: number;
+}
+
+export interface SemanticWorldMemorySemantics {
+  claims: SemanticWorldMemoryClaim[];
+  query: SemanticWorldMemoryQuery | null;
+}
+
 /**
  * Canonical discourse-facing facets that are still utterance semantics.
  * These are produced once at ingestion. DiscourseState may consume them, but it
@@ -147,6 +169,7 @@ export type SemanticGroundingField =
   | "adviceRequested"
   | "knowledgeQuery"
   | "selfMemoryQuery"
+  | "worldMemory"
   | "relationalAct"
   | "stopQuestions"
   | "stopTalking";
@@ -193,6 +216,8 @@ export interface SemanticInterpretation {
   stopRequest: boolean;
 
   discourseFacets: SemanticDiscourseFacets;
+  /** Structured world-memory semantics; optional for legacy/fallback producers. */
+  worldMemory?: SemanticWorldMemorySemantics;
   uncertainty: InterpretationUncertainty;
   evidence: InterpretationEvidence[];
   grounding?: SemanticGroundingTrace;

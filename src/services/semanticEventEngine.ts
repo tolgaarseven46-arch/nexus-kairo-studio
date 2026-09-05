@@ -1,3 +1,5 @@
+import type { SemanticWorldMemorySemantics } from "../types/semanticInterpretation";
+
 export type SemanticValence = "positive" | "negative" | "neutral";
 export type SemanticTarget = "kaira" | "third_party" | "event" | "unknown";
 export type SemanticSocialRoutine =
@@ -59,6 +61,7 @@ export interface SemanticEvent {
   repairSignal?: SemanticRepairSignal;
   adviceRequested?: boolean;
   knowledgeQuery?: SemanticKnowledgeQuery | null;
+  worldMemory?: SemanticWorldMemorySemantics;
   valence: SemanticValence;
   target: SemanticTarget;
   relationalAct: RelationalAct;

@@ -646,13 +646,19 @@ app.post("/api/chat", async (req, res) => {
           userMessage,
           await loadRecentWorldEventObservations(userId, 30, kairaInstance.instanceId).catch(() => []),
           5,
+          undefined,
+          canonicalSemantic.interpretation.worldMemory?.query ?? null,
         )
       : [];
     const worldEventMemoryInstruction = buildWorldEventMemoryInstruction(retrievedWorldEvents);
     const worldStateAppraisal = appraiseRetrievedWorldState(retrievedWorldEvents);
     const worldStateAppraisalInstruction = buildWorldStateAppraisalInstruction(worldStateAppraisal);
     const worldReasoningPolicy = deriveWorldReasoningPolicy(worldStateAppraisal);
-    const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy };
+    const worldReasoningContext = {
+      appraisal: worldStateAppraisal,
+      policy: worldReasoningPolicy,
+      memoryQuery: canonicalSemantic.interpretation.worldMemory?.query ?? null,
+    };
     const worldReasoningPolicyInstruction = buildWorldReasoningPolicyInstruction(worldReasoningPolicy);
     const knowledgeQuery =
       canonicalSemantic.event.knowledgeQuery && canonicalSemantic.event.knowledgeQuery.confidence >= 0.72

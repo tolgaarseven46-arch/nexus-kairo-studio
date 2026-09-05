@@ -72,6 +72,7 @@ export function projectSemanticEvent(interp: SemanticInterpretation): SemanticEv
     adviceRequested: interp.discourseFacets.adviceRequested,
     knowledgeQuery: interp.discourseFacets.knowledgeQuery,
     selfMemoryQuery: interp.discourseFacets.selfMemoryQuery,
+    ...(interp.worldMemory ? { worldMemory: interp.worldMemory } : {}),
     valence: interp.valence,
     target,
     relationalAct: relationalAct(interp),

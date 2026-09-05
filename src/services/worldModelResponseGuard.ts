@@ -1,13 +1,15 @@
 import type { RetrievedWorldEvent } from "./worldEventRetrieval";
 import type { WorldStateAppraisal } from "./worldStateAppraisal";
 import type { WorldReasoningPolicy } from "./worldReasoningPolicy";
+import type { SemanticWorldMemoryQuery } from "../types/semanticInterpretation";
 
 export interface WorldModelResponseIssue {
   code:
     | "memory_evidence_denied"
     | "conflict_collapsed"
     | "reported_attribution_lost"
-    | "epistemic_qualifier_lost";
+    | "epistemic_qualifier_lost"
+    | "memory_fact_value_missing";
   message: string;
 }
 
@@ -21,6 +23,7 @@ export interface WorldModelResponseGuardResult {
 export interface WorldModelReasoningContext {
   appraisal: WorldStateAppraisal;
   policy: WorldReasoningPolicy;
+  memoryQuery?: SemanticWorldMemoryQuery | null;
 }
 
 const normalize = (value: string) =>
@@ -34,6 +37,16 @@ const EPISTEMIC_QUALIFIER_RE = /(?:hatırladığım\s+kadarıyla|bildiğim\s+kad
 
 function grounded(items: RetrievedWorldEvent[]) {
   return items.filter((item) => item.observation.status === "grounded");
+}
+
+function matchedFactValues(items: RetrievedWorldEvent[], query?: SemanticWorldMemoryQuery | null) {
+  if (!query || query.confidence < 0.72) return [];
+  const key = (value: string) => value.toLocaleLowerCase("en-US").trim();
+  return grounded(items).flatMap((item) =>
+    (item.observation.event.memoryFacts ?? [])
+      .filter((fact) => fact.confidence >= 0.72 && key(fact.subjectId) === key(query.subjectId) && key(fact.attributeKey) === key(query.attributeKey))
+      .map((fact) => fact.value)
+  );
 }
 
 /**
@@ -98,6 +111,14 @@ export function findWorldModelResponseIssues(
     });
   }
 
+  const factValues = matchedFactValues(items, context.memoryQuery);
+  if (factValues.length && !factValues.some((value) => text.includes(normalize(String(value))))) {
+    issues.push({
+      code: "memory_fact_value_missing",
+      message: "Canonical world-memory query belirli bir typed fact ile eşleşti; cevap eşleşen fact değerini korumalı.",
+    });
+  }
+
   return issues;
 }
 
@@ -114,6 +135,13 @@ export function buildWorldModelRecallFallback(
   if (!evidence.length) return "";
 
   const { policy } = context;
+  const factValues = Array.from(new Set(matchedFactValues(items, context.memoryQuery).map(String)));
+  if (factValues.length) {
+    const value = factValues.join(" / ");
+    return policy.mustPreserveReportedAttribution
+      ? `Bana daha önce bunu ${value} olarak aktarmıştın.`
+      : `Hatırladığım kayda göre: ${value}.`;
+  }
   if (policy.mustPreserveConflict) {
     const distinct = Array.from(
       new Set(evidence.map(compactEvidenceText).filter(Boolean)),
