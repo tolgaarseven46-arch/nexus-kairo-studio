@@ -20,11 +20,11 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - name: Capture typecheck
+      - name: Capture TypeScript check
         shell: bash
         run: |
           set +e
-          npm run typecheck > type-debug.txt 2>&1
+          npm run lint > type-debug.txt 2>&1
           CODE=$?
           echo "EXIT_CODE=$CODE" >> type-debug.txt
           git config user.name "github-actions[bot]"
