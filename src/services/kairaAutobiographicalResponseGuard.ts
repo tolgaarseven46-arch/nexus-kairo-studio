@@ -14,6 +14,51 @@ function hasResolvedEvidence(runtime: KairaAutobiographicalRecallRuntimeResult):
   );
 }
 
+const normalizeComparable = (value: unknown) =>
+  String(value ?? "")
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+function enforceResolvedSelfFact(
+  reply: string,
+  runtime: KairaAutobiographicalRecallRuntimeResult,
+): KairaAutobiographicalResponseGuardResult | null {
+  const recall = runtime.recall;
+  if (
+    runtime.status !== "resolved" ||
+    !recall ||
+    recall.query.scope !== "self_fact" ||
+    recall.selfFacts.length === 0
+  ) {
+    return null;
+  }
+
+  const strongest = recall.selfFacts[0]?.fact;
+  if (!strongest) return null;
+  const canonicalValue = normalizeComparable(strongest.value);
+  if (!canonicalValue) return null;
+
+  const normalizedReply = normalizeComparable(reply);
+  const affirmsCanonicalValue = normalizedReply.includes(canonicalValue);
+  const explicitlyNegatesCanonicalValue = new RegExp(
+    `(?:^|\\s)${canonicalValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\p{L}*)?\\s+(?:değil|degil)(?:\\s|$)`,
+    "u",
+  ).test(normalizedReply);
+
+  if (affirmsCanonicalValue && !explicitlyNegatesCanonicalValue) {
+    return null;
+  }
+
+  const fallback = `Buna dair net kaydım: ${String(strongest.value)}.`;
+  return {
+    reply: fallback,
+    changed: reply.trim() !== fallback,
+    reason: "self_memory_resolved_fact_conformance",
+  };
+}
+
 export function enforceKairaAutobiographicalResponse(
   reply: string,
   runtime: KairaAutobiographicalRecallRuntimeResult,
@@ -21,6 +66,10 @@ export function enforceKairaAutobiographicalResponse(
   if (runtime.status === "not_requested" || runtime.status === "low_confidence") {
     return { reply, changed: false };
   }
+
+  const resolvedSelfFact = enforceResolvedSelfFact(reply, runtime);
+  if (resolvedSelfFact) return resolvedSelfFact;
+
   if (hasResolvedEvidence(runtime)) {
     return { reply, changed: false };
   }
