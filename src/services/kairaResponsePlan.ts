@@ -6,6 +6,7 @@ import { deriveHardConstraints } from "./kairaHardConstraints";
 import { deriveSoftTendencies } from "./kairaSoftTendencies";
 import { resolveKairaResponsePlan } from "./kairaPlanResolver";
 import { isTurkishQuestionAct } from "./kairaQuestionActRecognizer";
+import { isTurkishAdviceAct } from "./kairaAdviceActRecognizer";
 
 export interface KairaResponsePlan {
   move: DialogueDecisionPlan["move"];
@@ -16,6 +17,8 @@ export interface KairaResponsePlan {
   allowQuestion: boolean;
   allowHumor: boolean;
   allowAffection: boolean;
+  /** Runtime canonical plan always supplies this; optional only for old projections. */
+  allowAdvice?: boolean;
   allowForgiveness: boolean;
   allowReopeningCloseness: boolean;
   maxSentences: number;
@@ -51,6 +54,10 @@ const wordCount = (reply: string) =>
 
 export function looksLikeKairaQuestionAct(text: string): boolean {
   return isTurkishQuestionAct(text);
+}
+
+export function looksLikeKairaAdviceAct(text: string): boolean {
+  return isTurkishAdviceAct(text);
 }
 
 const HUMOR_RE = /(hahaha|hehe|şaka|takılıyorum|dalga|😂|🤣|😏)/iu;
@@ -93,6 +100,7 @@ export function buildKairaResponsePlan(
     continueConversation &&
     contract.affection === "allowed" &&
     !dialogueFocused;
+  const allowAdvice = continueConversation && contract.advice === "allowed";
   const allowForgiveness = contract.forgivenessGranted && !dialogueFocused;
   const allowReopeningCloseness =
     continueConversation &&
@@ -125,6 +133,7 @@ export function buildKairaResponsePlan(
     allowQuestion,
     allowHumor,
     allowAffection,
+    allowAdvice,
     allowForgiveness,
     allowReopeningCloseness,
     maxSentences,
@@ -147,6 +156,7 @@ export function buildKairaResponsePlan(
     allowQuestion: resolved.allowQuestion,
     allowHumor: resolved.allowHumor,
     allowAffection: resolved.allowAffection,
+    allowAdvice: resolved.allowAdvice,
     allowForgiveness: resolved.allowForgiveness,
     allowReopeningCloseness: resolved.allowReopeningCloseness,
     maxSentences: resolved.maxSentences,
@@ -179,6 +189,7 @@ export function kairaResponsePlanInstruction(plan: KairaResponsePlan): string {
     `allowQuestion=${plan.allowQuestion}`,
     `allowHumor=${plan.allowHumor}`,
     `allowAffection=${plan.allowAffection}`,
+    `allowAdvice=${plan.allowAdvice === true}`,
     `allowForgiveness=${plan.allowForgiveness}`,
     `allowReopeningCloseness=${plan.allowReopeningCloseness}`,
     `counterFlirt=${plan.counterFlirtAllowed === true ? "allowed" : "forbidden"}`,
@@ -186,6 +197,9 @@ export function kairaResponsePlanInstruction(plan: KairaResponsePlan): string {
     `maxSentences=${plan.maxSentences}`,
     `maxWords=${plan.maxWords}`,
     `emojiBudget=${plan.emojiBudget}`,
+    plan.allowAdvice === true
+      ? ""
+      : "İSTENMEMİŞ TAVSİYE YASAK: kullanıcı açıkça öneri/tavsiye istemediyse ne yapması gerektiğini söyleme; doğal sosyal tepki ver.",
     plan.counterFlirtAllowed === true
       ? ""
       : "Karşı-flört YASAK: kullanıcı flört etse/teklif etse bile Kaira flörte karşılık vermez, romantik/cinsel ima başlatmaz. Sıcak veya esprili olabilir; flörtü nazikçe geçiştirir. Bu sınır güven/yakınlık/geçmiş ilişki/tona bakılmaksızın mutlaktır.",
@@ -210,6 +224,7 @@ export function findKairaResponsePlanIssues(
   const issues: string[] = [];
 
   if (!plan.allowQuestion && looksLikeKairaQuestionAct(text)) issues.push("response_plan_question_blocked");
+  if (plan.allowAdvice !== true && looksLikeKairaAdviceAct(text)) issues.push("response_plan_unsolicited_advice_blocked");
   if (plan.socialMove && plan.socialMove !== "none" && SOCIAL_ACK_ONLY_RE.test(text)) issues.push("response_plan_social_move_missing");
   if (!plan.allowHumor && HUMOR_RE.test(text)) issues.push("response_plan_humor_blocked");
   if (!plan.allowAffection && AFFECTION_RE.test(text)) issues.push("response_plan_affection_blocked");
