@@ -8,7 +8,7 @@ A natural 15-turn quality session exposed five related failures after the harden
 
 ## Decision
 1. DialogueDecision owns a typed `respond_to_relational_bid` move. PlanResolver resolves that move into one explicit plan-owned social action (`accept_repair`, non-romantic reciprocity, warm deflection, boundary, or boundary maintenance). Final validators may reject acknowledgement-only realization but may not choose a different action.
-2. Local rendering remains a verbalizer only and is ineligible for knowledge/causal queries, typed relational acts, or emotionally loaded third-party turns.
+2. Local rendering remains a verbalizer only and is ineligible for knowledge/causal queries, typed relational acts, or emotionally loaded third-party turns. Existing dyadic HOW-style selection, relationship-level projection, learned-language memory, and trivial `how_are_you`/routine behavior remain unchanged; the quality change is only a semantic-richness eligibility gate before the accepted verbalizer.
 3. Entity resolution recognizes ordinary Turkish comitative pronoun forms and the language-understanding gateway reconciles a conflicting third-party target only when high-confidence explicit Kaira reference exists and no explicit third party exists.
 4. Accountability complaints are not insult-pattern events without an explicit typed insult/mockery signal. Real insults remain injury-bearing.
 5. Activity permission presentation fixes generic copy without changing planner identity or dialogue authority.
