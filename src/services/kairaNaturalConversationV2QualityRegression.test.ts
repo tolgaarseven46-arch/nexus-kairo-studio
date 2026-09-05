@@ -41,7 +41,10 @@ function semantic(overrides: Partial<SemanticInterpretation> = {}): SemanticInte
   };
 }
 
-function resolvedPlan(semanticUncertainty: number) {
+function resolvedPlan(
+  semanticUncertainty: number,
+  options: { socialRoutine?: string; questionStopRequested?: boolean } = {},
+) {
   return resolveKairaResponsePlan({
     hard: {
       hardDisengage: false,
@@ -80,7 +83,8 @@ function resolvedPlan(semanticUncertainty: number) {
       maxSentences: 2,
       hasSupportedTargetClaim: false,
       reason: "natural",
-    },
+      socialRoutine: options.socialRoutine ?? "none",
+    } as any,
     speech: { register: "balanced", relationshipLevel: "new" } as any,
     contract: {
       conversationState: "active",
@@ -89,6 +93,7 @@ function resolvedPlan(semanticUncertainty: number) {
       affection: "allowed",
       questions: "forbidden",
       advice: "forbidden",
+      questionStopRequested: options.questionStopRequested ?? false,
       forgivenessGranted: true,
       repairStatus: "repaired",
       reopeningCloseness: "allowed",
@@ -123,7 +128,7 @@ describe("natural conversation v2 quality authority", () => {
     expect(result.event.intent).toBe("emotional_share");
   });
 
-  it("requires content engagement on grounded natural reactions", () => {
+  it("requires content engagement on grounded ordinary natural reactions", () => {
     const resolved = resolvedPlan(0.2);
     expect(resolved.requiredContent).toContain("engage_user_content");
     expect(resolved.requiredContent).not.toContain("preserve_ambiguity");
@@ -148,6 +153,16 @@ describe("natural conversation v2 quality authority", () => {
   it("keeps ambiguity preservation exclusive of content engagement", () => {
     const resolved = resolvedPlan(0.85);
     expect(resolved.requiredContent).toContain("preserve_ambiguity");
+    expect(resolved.requiredContent).not.toContain("engage_user_content");
+  });
+
+  it("does not force content engagement on social routines", () => {
+    const resolved = resolvedPlan(0.2, { socialRoutine: "how_are_you" });
+    expect(resolved.requiredContent).not.toContain("engage_user_content");
+  });
+
+  it("does not force content engagement on explicit question-stop control turns", () => {
+    const resolved = resolvedPlan(0.2, { questionStopRequested: true });
     expect(resolved.requiredContent).not.toContain("engage_user_content");
   });
 });
