@@ -1,0 +1,55 @@
+name: One-time Fabricated Premise SG Trace
+
+on:
+  push:
+    branches:
+      - diag/fabricated-premise-sg-trace
+
+permissions:
+  contents: write
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: diag/fabricated-premise-sg-trace
+          fetch-depth: 0
+      - name: Trace production chat seam
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://nexus-kairo-studio.onrender.com/api/chat'
+          for i in 1 2 3 4 5; do
+            body=$(cat <<JSON
+          {"userId":"premise_trace_${i}","userName":"Mert","userMessage":"sg","character":{"name":"Kaira"},"personality":{},"history":[{"sender":"user","text":"seni sevdim","participantName":"Mert"},{"sender":"droit","text":"bunu duymak güzel","replyToParticipantName":"Mert"},{"sender":"user","text":"gel sarıl","participantName":"Mert"},{"sender":"droit","text":"burdayım","replyToParticipantName":"Mert"}],"provider":"openrouter","suppressRecentMemory":true,"kairaInstanceId":"kaira_premise_trace_${i}","kairaInstanceType":"welcome","requestId":"premise-trace-${i}"}
+          JSON
+            )
+            curl --fail-with-body --silent --show-error --max-time 180 \
+              -H 'Content-Type: application/json' --data "$body" "$URL" > "/tmp/chat_${i}.json"
+            node - "$i" <<'NODE'
+          const fs = require('fs');
+          const i = process.argv[2];
+          const x = JSON.parse(fs.readFileSync(`/tmp/chat_${i}.json`, 'utf8'));
+          const out = {
+            run: Number(i),
+            reply: x.reply,
+            providerUsed: x.providerUsed,
+            semanticEvent: x.kdm?.semanticEvent,
+            dialogueDecision: x.dialogueDecision,
+            responsePlan: x.kdm?.responsePlan,
+            consistency: x.consistency,
+            enforcement: x.enforcement,
+          };
+          console.log(JSON.stringify(out, null, 2));
+          NODE
+          done
+      - name: Self-remove
+        shell: bash
+        run: |
+          git rm .github/workflows/one-time-fabricated-premise-sg-trace.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: remove fabricated premise sg trace'
+          git push origin HEAD:diag/fabricated-premise-sg-trace
