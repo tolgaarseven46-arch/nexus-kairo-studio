@@ -34,6 +34,7 @@ export interface ResolvedKairaPlan {
   allowQuestion: boolean;
   allowHumor: boolean;
   allowAffection: boolean;
+  allowAdvice: boolean;
   allowForgiveness: boolean;
   allowReopeningCloseness: boolean;
   flirtationAllowed: boolean;
@@ -95,10 +96,12 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     hard.questionAllowed && dialogue.allowFollowUpQuestion && damp(soft.questionDrive) >= 0.3;
 
   const allowHumor = hard.humorAllowed;
+  const allowAdvice = hard.adviceAllowed === true;
 
   const flirtationAllowed = hard.flirtingAllowed === true;
   const counterFlirtAllowed = hard.counterFlirtAllowed === true;
   if (!flirtationAllowed) rationale.push("flirtation:hard-forbidden (character policy)");
+  if (!allowAdvice) rationale.push("advice:hard-forbidden (not requested)");
 
   const intimacyCeiling = clamp01(Math.min(hard.intimacyCeiling, soft.intimacyInclination));
 
@@ -162,6 +165,7 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     allowQuestion,
     allowHumor,
     allowAffection,
+    allowAdvice,
     allowForgiveness,
     allowReopeningCloseness,
     flirtationAllowed,
