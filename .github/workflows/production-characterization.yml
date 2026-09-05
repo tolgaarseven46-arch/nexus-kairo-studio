@@ -6,24 +6,68 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 9
     steps:
-      - name: Capture live semantic variance
+      - name: Final post-PR101 production acceptance
         shell: bash
+        env:
+          BASE_URL: https://nexus-kairo-studio.onrender.com
         run: |
           set -euo pipefail
+          curl --connect-timeout 10 --max-time 30 -fsS "$BASE_URL/api/health"
+          curl --connect-timeout 10 --max-time 30 -fsS "$BASE_URL/api/runtime-info"
           python - <<'PY'
-          import json, subprocess, time
+          import json, subprocess, re, time, uuid
           base='https://nexus-kairo-studio.onrender.com'
-          def post(msg):
-            payload={'userMessage':msg,'userName':'Tolga','characterName':'Kaira','provider':'openrouter'}
+          def post(path,payload,limit=70):
             last=''
-            for attempt in range(3):
-              p=subprocess.run(['curl','--connect-timeout','10','--max-time','50','-fsS','--retry','2','--retry-all-errors','--retry-delay','1','-H','Content-Type: application/json','-d',json.dumps(payload,ensure_ascii=False),base+'/api/language-understanding'],capture_output=True,text=True,timeout=60)
+            for _ in range(3):
+              p=subprocess.run(['curl','--connect-timeout','10','--max-time',str(limit),'-fsS','--retry','2','--retry-all-errors','--retry-delay','1','-H','Content-Type: application/json','-d',json.dumps(payload,ensure_ascii=False),base+path],capture_output=True,text=True,timeout=limit+10)
               if p.returncode==0: return json.loads(p.stdout)
               last=p.stderr; time.sleep(1)
-            raise SystemExit(last)
-          for idx,msg in enumerate(['Mert yine geç kaldı','Mert yine geç kaldı','Mert yine geç kaldı','Mert yüzünden çok üzgünüm']):
-            d=post(msg); i=d.get('interpretation') or {}; e=d.get('event') or {}
-            print('SNAPSHOT',idx,json.dumps({'message':msg,'intent':i.get('primaryIntent'),'target':i.get('target'),'valence':i.get('valence'),'emotionalLoad':i.get('emotionalLoad'),'support':i.get('support'),'affection':i.get('affection'),'compliment':i.get('compliment'),'socialRoutine':(i.get('discourseFacets') or {}).get('socialRoutine'),'discourseAct':(i.get('discourseFacets') or {}).get('discourseAct'),'relationalAct':(i.get('discourseFacets') or {}).get('relationalAct'),'uncertainty':i.get('uncertainty'),'eventIntent':e.get('intent'),'eventRoutine':e.get('socialRoutine'),'evidence':i.get('evidence')},ensure_ascii=False),flush=True)
+            raise SystemExit(path+' failed: '+last)
+          def understand(msg,history=[]):
+            recent=[{'role':'assistant' if x.get('sender')=='droit' else 'user','content':x.get('text','')} for x in history[-8:]]
+            d=post('/api/language-understanding',{'userMessage':msg,'userName':'Tolga','characterName':'Kaira','history':recent,'provider':'openrouter'},55)
+            if not d.get('interpretation'): raise SystemExit('missing interpretation: '+msg)
+            return d
+          # Provider-variance acceptance: same event must stay non-emotional even if valence drifts.
+          for idx in range(5):
+            d=understand('Mert yine geç kaldı'); i=d['interpretation']; e=d.get('event') or {}
+            print('THIRD_PARTY',idx,i.get('primaryIntent'),i.get('valence'),i.get('emotionalLoad'),e.get('intent'))
+            if e.get('intent')=='emotional_share': raise SystemExit('third-party overread survived reconciliation')
+          genuine=understand('Mert yüzünden çok üzgünüm'); ge=genuine.get('event') or {}
+          print('GENUINE',ge.get('intent'),ge.get('socialRoutine'),ge.get('relationalAct'))
+          if ge.get('intent')!='emotional_share': raise SystemExit('genuine emotional share lost')
+
+          # Client-faithful multi-turn path: preflight semantics are persisted in request history.
+          history=[]; dynamic={}; rows=[]
+          for idx,msg in enumerate(['bugün bütün kahveyi masaya döktüm','soru sorma artık','bugün iş çok yoğundu']):
+            lu=understand(msg,history)
+            payload={
+              'userId':'prod_final_pr101','userName':'Tolga','userMessage':msg,
+              'semanticInterpretation':lu['interpretation'],
+              'character':{'name':'Kaira'},'personality':{},'dynamicState':dynamic,
+              'history':history,'provider':'openrouter','suppressRecentMemory':True,
+              'kairaInstanceId':'prod-final-pr101','kairaInstanceType':'free_trial',
+              'sessionId':'prod-final-pr101','requestId':f'pr101-final-{idx}-{uuid.uuid4()}'
+            }
+            d=post('/api/chat',payload,90); kdm=d.get('kdm') or {}; reply=str(d.get('reply','')).strip()
+            if not reply: raise SystemExit('empty chat reply')
+            plan=kdm.get('responsePlan') or {}; contract=kdm.get('behaviorContract') or {}
+            row={'message':msg,'reply':reply,'allowQuestion':plan.get('allowQuestion'),'questionStopRequested':contract.get('questionStopRequested'),'event':kdm.get('semanticEvent'),'consistency':d.get('consistency')}
+            rows.append(row); print('CHAT',json.dumps(row,ensure_ascii=False,default=str))
+            dynamic=kdm.get('dynamicState') or dynamic
+            history += [
+              {'sender':'user','text':msg,'participantId':'prod-user','participantName':'Tolga','semanticInterpretation':lu['interpretation'],'semanticSource':lu.get('semanticSource')},
+              {'sender':'droit','text':reply,'participantId':'kaira','participantName':'Kaira'}
+            ]
+          generic=re.compile(r'^(?:he|hee|hmm|tamam|anladım|he anladım)[.!…]*$',re.I)
+          if generic.match(rows[0]['reply']): raise SystemExit('contentful ordinary turn collapsed to generic ACK')
+          if rows[1]['allowQuestion'] is not False or rows[1]['questionStopRequested'] is not True:
+            raise SystemExit('explicit question-stop turn contract failed')
+          if rows[1].get('consistency') and rows[1]['consistency'].get('accepted') is False:
+            raise SystemExit('question-stop delivered reply failed consistency')
+          print('FOLLOWING_TURN_CHARACTERIZATION',json.dumps({'reply':rows[2]['reply'],'allowQuestion':rows[2]['allowQuestion'],'questionStopRequested':rows[2]['questionStopRequested']},ensure_ascii=False))
+          print('FINAL_POST_PR101_ACCEPTANCE_PASS')
           PY
