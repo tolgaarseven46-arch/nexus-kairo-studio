@@ -1,0 +1,89 @@
+name: Post-101 Natural Conversation Characterization
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/post101-natural-characterization.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  characterize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Run fresh live conversation characterization
+        shell: bash
+        run: |
+          node <<'NODE'
+          const base = 'https://nexus-kairo-studio.onrender.com';
+          const userId = `post101_${Date.now()}`;
+          const instanceId = `post101_welcome_${Date.now()}`;
+          const turns = [
+            'naber',
+            'iyi ben de kahveyi döktüm masaya az önce',
+            'yarın erken kalkıcam',
+            'bu arada Mert yine geç kaldı',
+            'Mert yüzünden çok üzgünüm',
+            'neyse boşver',
+            'gel sarılalım',
+            'senle konuşmak iyi geldi',
+            'bugün çok yoruldum',
+            'neyse ben kaçtım'
+          ];
+          let history = [];
+          const rows = [];
+          const ackOnly = /^(?:he|hee|hmm|anladım|tamam|peki)[.!…]*$/i;
+          for (let i = 0; i < turns.length; i++) {
+            const userMessage = turns[i];
+            const response = await fetch(`${base}/api/chat`, {
+              method: 'POST',
+              headers: {'content-type': 'application/json'},
+              body: JSON.stringify({
+                userId,
+                userName: 'Tolga',
+                userMessage,
+                history,
+                provider: 'openrouter',
+                kairaInstanceId: instanceId,
+                kairaInstanceType: 'welcome',
+                suppressRecentMemory: true,
+                requestId: `${userId}_${i}`
+              })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(`turn ${i+1} HTTP ${response.status}: ${JSON.stringify(data)}`);
+            const semantic = data?.kdm?.semanticEvent ?? {};
+            const plan = data?.kdm?.responsePlan ?? {};
+            const decision = data?.dialogueDecision ?? {};
+            const reply = String(data?.reply ?? '');
+            const row = {
+              turn: i + 1,
+              user: userMessage,
+              reply,
+              intent: semantic.intent,
+              target: semantic.target,
+              socialRoutine: semantic.socialRoutine,
+              relationalAct: semantic.relationalAct,
+              emotionalLoad: semantic.emotionalLoad,
+              dialogueMove: decision.move,
+              allowQuestion: plan.allowQuestion,
+              allowAdvice: plan.allowAdvice,
+              socialMove: plan.socialMove,
+              requiredContent: plan.requiredContent,
+              providerUsed: data.providerUsed,
+              accepted: data?.consistency?.accepted,
+              issues: data?.consistency?.issues ?? [],
+              ackOnly: ackOnly.test(reply.trim())
+            };
+            rows.push(row);
+            history.push({sender: 'user', participantName: 'Tolga', text: userMessage});
+            history.push({sender: 'droit', participantName: 'Kaira', text: reply});
+            console.log('CHARACTERIZATION_ROW ' + JSON.stringify(row));
+          }
+          const hardFailures = rows.filter(r => !r.accepted || (r.dialogueMove === 'respond_to_relational_bid' && r.ackOnly));
+          console.log('CHARACTERIZATION_SUMMARY ' + JSON.stringify({userId, instanceId, hardFailures: hardFailures.length, rows}));
+          if (hardFailures.length) process.exit(1);
+          NODE
