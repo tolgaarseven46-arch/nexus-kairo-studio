@@ -47,6 +47,7 @@ import {
   buildActiveParticipantInstruction,
   buildKairoGroundingInstruction,
   findKairoGroundingIssues,
+  findKairoTranscriptEchoIssues,
   formatKairoHistoryForModel,
   sanitizeKairoReplyText,
   sanitizeKairoChatHistory,
@@ -1138,6 +1139,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         if (!repairedGeneration?.text.trim()) throw new Error("KDM onarım zaman aşımı");
         const repairedReply = sanitizeKairoReplyText(repairedGeneration.text);
         const repairedIssues = [
+          ...findKairoTranscriptEchoIssues(repairedReply),
           ...findKairoGroundingIssues(repairedReply, cleanHistory, userMessage),
           ...findDialogueAttributionIssues(
             repairedReply,
@@ -1210,6 +1212,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           selfMemoryRuntime,
           epistemicContext: epistemicAccess,
           additionalIssueFinder: (candidateReply) => [
+            ...findKairoTranscriptEchoIssues(candidateReply),
             ...findKairoGroundingIssues(candidateReply, cleanHistory, userMessage),
             ...findDialogueAttributionIssues(candidateReply, cleanHistory, userMessage, userName, dialogueAnalysis),
             ...findDialogueDecisionIssues(candidateReply, dialogueDecision, dialogueOutputStyle),

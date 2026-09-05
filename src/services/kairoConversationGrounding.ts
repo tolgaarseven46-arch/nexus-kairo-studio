@@ -60,6 +60,26 @@ export function sanitizeKairoReplyText(reply: string): string {
     .trim();
 }
 
+const INTERNAL_TRANSCRIPT_PREFIX_RE = /^\s*\[[^\]\n]{1,80}\]\s*:\s*/u;
+const INTERNAL_KAIRA_TRANSCRIPT_RE = /\[\s*Ka[iİıI]r[ao]\s*→\s*[^\]\n]{1,80}\]\s*:/iu;
+
+/**
+ * Detects model echoes of the internal history-board serialization.
+ *
+ * The bracketed speaker labels are prompt scaffolding, not user-facing prose.
+ * This checker does not decide WHAT Kaira should say; it only rejects leakage
+ * of the formatter's own transport syntax so normal generation repair can own
+ * recovery.
+ */
+export function findKairoTranscriptEchoIssues(reply: string): string[] {
+  const text = String(reply ?? "").trim();
+  if (!text) return [];
+  if (INTERNAL_TRANSCRIPT_PREFIX_RE.test(text) || INTERNAL_KAIRA_TRANSCRIPT_RE.test(text)) {
+    return ["internal_transcript_wrapper_echo"];
+  }
+  return [];
+}
+
 export function buildActiveParticipantInstruction(
   participantName: string,
   participantId: string,
