@@ -20,6 +20,9 @@ const INTERROGATIVE_PREDICATE_RE =
 const SUBJECT_NE_NOW_RE =
   /(?<![\p{L}\p{N}_])[\p{L}\p{N}_-]+\s+ne(?:\s+(?:şu\s+an|şimdi))?\s*[.!…]*\s*$/iu;
 
+const REPORTED_SPEECH_SUFFIX_RE =
+  /(?<![\p{L}\p{N}_])diye\s+(?:sordu|dedi|anlatt[ıi]|söyledi)(?![\p{L}\p{N}_])\s*[.!…]*\s*$/iu;
+
 const REPORTED_DIRECT_QUESTION_RE =
   /(?<![\p{L}\p{N}_])(?:neden|niye|nas[ıi]l|kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|neresi|nereye|nereden|kaç|ne(?:\s+(?:durumda|oldu|oluyor|olacak|zaman|kadar))?)(?![\p{L}\p{N}_]).{0,60}(?<![\p{L}\p{N}_])(?:diye\s+(?:sordu|dedi|anlatt[ıi]|söyledi)|sorduğunu|dediğini|anlattığını|söylediğini)(?![\p{L}\p{N}_])/iu;
 
@@ -36,8 +39,12 @@ const REPORTED_INDIRECT_QUESTION_RE =
 export function isTurkishQuestionAct(text: string): boolean {
   const value = String(text ?? "").trim();
   if (!value) return false;
+  if (
+    REPORTED_SPEECH_SUFFIX_RE.test(value) ||
+    REPORTED_DIRECT_QUESTION_RE.test(value) ||
+    REPORTED_INDIRECT_QUESTION_RE.test(value)
+  ) return false;
   if (QUESTION_PUNCTUATION_RE.test(value)) return true;
-  if (REPORTED_DIRECT_QUESTION_RE.test(value) || REPORTED_INDIRECT_QUESTION_RE.test(value)) return false;
 
   return (
     QUESTION_CLITIC_RE.test(value) ||
