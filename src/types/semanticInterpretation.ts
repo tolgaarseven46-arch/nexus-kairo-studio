@@ -128,6 +128,40 @@ export interface InterpretationEvidence {
   confidence: number;
 }
 
+export type SemanticGroundingField =
+  | "primaryIntent"
+  | "secondarySocialActs"
+  | "target"
+  | "valence"
+  | "severity"
+  | "affection"
+  | "support"
+  | "compliment"
+  | "emotionalLoad"
+  | "apology"
+  | "repairAttempt"
+  | "stopRequest"
+  | "socialRoutine"
+  | "discourseAct"
+  | "repairSignal"
+  | "adviceRequested"
+  | "knowledgeQuery"
+  | "selfMemoryQuery"
+  | "relationalAct"
+  | "stopQuestions"
+  | "stopTalking";
+
+/**
+ * Provider-computed context provenance. This is observational metadata, not a
+ * second semantic authority: it records which canonical fields changed when
+ * the same current turn was adjudicated without conversational history.
+ */
+export interface SemanticGroundingTrace {
+  adjudicatedAgainstContextFree: boolean;
+  contextInfluencedFields: SemanticGroundingField[];
+  rejectedContextFields: SemanticGroundingField[];
+}
+
 /**
  * Canonical immutable per-turn semantic truth (ADR-0006).
  *
@@ -161,6 +195,7 @@ export interface SemanticInterpretation {
   discourseFacets: SemanticDiscourseFacets;
   uncertainty: InterpretationUncertainty;
   evidence: InterpretationEvidence[];
+  grounding?: SemanticGroundingTrace;
 }
 
 export const EMPTY_SEVERITY_VECTOR: Readonly<SeverityVector> = Object.freeze({

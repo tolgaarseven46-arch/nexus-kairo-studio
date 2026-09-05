@@ -7,6 +7,8 @@ import {
   type SemanticDiscourseAct,
   type SemanticDiscourseFacets,
   type SemanticInterpretation,
+  type SemanticGroundingField,
+  type SemanticGroundingTrace,
   type SemanticPrimaryIntent,
   type SemanticRelationalAct,
   type SemanticRepairSignal,
@@ -42,6 +44,13 @@ const REPAIR_SIGNALS = new Set<SemanticRepairSignal>([
 const RELATIONAL_ACTS = new Set<SemanticRelationalAct>([
   "none", "reassurance_seek", "repair_probe", "reconciliation_attempt", "challenge",
   "mockery", "closeness_bid",
+]);
+const GROUNDING_FIELDS = new Set<SemanticGroundingField>([
+  "primaryIntent", "secondarySocialActs", "target", "valence", "severity",
+  "affection", "support", "compliment", "emotionalLoad", "apology",
+  "repairAttempt", "stopRequest", "socialRoutine", "discourseAct", "repairSignal",
+  "adviceRequested", "knowledgeQuery", "selfMemoryQuery", "relationalAct",
+  "stopQuestions", "stopTalking",
 ]);
 
 const clamp01 = (value: unknown): number => {
@@ -85,6 +94,18 @@ function normalizeEvidence(value: unknown): InterpretationEvidence[] {
       confidence: clamp01(e.confidence),
     }];
   }).slice(0, 8);
+}
+function normalizeGrounding(value: unknown): SemanticGroundingTrace | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const v = value as Record<string, unknown>;
+  const fields = (raw: unknown): SemanticGroundingField[] => Array.isArray(raw)
+    ? Array.from(new Set(raw.filter((x): x is SemanticGroundingField => GROUNDING_FIELDS.has(x as SemanticGroundingField))))
+    : [];
+  return {
+    adjudicatedAgainstContextFree: asBool(v.adjudicatedAgainstContextFree),
+    contextInfluencedFields: fields(v.contextInfluencedFields),
+    rejectedContextFields: fields(v.rejectedContextFields),
+  };
 }
 function normalizeQuery(value: unknown): SemanticDiscourseFacets["knowledgeQuery"] {
   if (!value || typeof value !== "object") return null;
@@ -165,5 +186,6 @@ export function normalizeSemanticInterpretation(value: unknown, message = ""): S
     apology: asBool(v.apology), repairAttempt: asBool(v.repairAttempt), stopRequest: discourseFacets.stopTalking,
     discourseFacets,
     uncertainty: normalizeUncertainty(v.uncertainty), evidence: normalizeEvidence(v.evidence),
+    ...(normalizeGrounding(v.grounding) ? { grounding: normalizeGrounding(v.grounding) } : {}),
   };
 }
