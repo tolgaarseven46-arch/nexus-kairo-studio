@@ -1,0 +1,119 @@
+
+> react-example@0.0.0 test:contracts
+> vitest run src/services/kairaAutonomousLifeEndToEndContracts.test.ts src/services/kairaArchitectureContracts.test.ts src/services/kairaCanonicalWorldEventV3Contracts.test.ts src/services/kairaModalityCommitmentContracts.test.ts src/services/kairaPlanLifecycleContracts.test.ts src/services/kairaInstanceFoundationContracts.test.ts src/services/kairaProvisioningContracts.test.ts src/services/kairaProvisioningArtifactsContracts.test.ts src/services/kairaSelfMemoryQueryContracts.test.ts src/services/kairaAutobiographicalRecallContracts.test.ts src/services/kairaAutobiographicalRecallRuntimeContracts.test.ts src/services/kairaAutobiographicalResponseGuardContracts.test.ts src/services/kairaAutobiographicalRuntimeIntegrationContracts.test.ts src/services/kairaAutobiographicalRetention.test.ts src/services/kairaLivedMemoryConsolidationContracts.test.ts src/services/kairaLivedMemoryRuntime.test.ts src/services/kairaLivedMemoryRuntimeIntegrationContracts.test.ts src/services/kairaPersistedObservationConsolidationContracts.test.ts src/services/kairaActivityExecutionContracts.test.ts src/services/kairaActivityExecutionStoreContracts.test.ts src/services/kairaActivityExecutionCoordinatorContracts.test.ts src/services/kairaActivityPermissionDialogueContracts.test.ts src/services/kairaActivityPermissionDialogueStoreContracts.test.ts src/services/kairaActivityPermissionDialogueCoordinatorContracts.test.ts src/services/kairaActivityPermissionSessionPointerContracts.test.ts src/services/kairaActivityPermissionSessionPointerStoreContracts.test.ts src/services/kairaActivityPlanningPolicyContracts.test.ts src/services/kairaActivityMotivationContracts.test.ts src/services/kairaActivityCandidateGeneratorContracts.test.ts src/services/kairaActivityCandidateRuntimeContracts.test.ts src/services/kairaActivityCatalogAuthorityContracts.test.ts src/services/kairaActivityRuntimeFactsContracts.test.ts src/services/kairaActivityCanonicalRuntimeFactsIntegrationContracts.test.ts src/services/kairaActivityEnvironmentAuthorityContracts.test.ts src/services/kairaActivityEnvironmentRuntimeIntegrationContracts.test.ts src/services/kairaActivityEnvironmentStoreContracts.test.ts src/services/kairaActivityProposalContracts.test.ts src/services/kairaActivityProposalStoreContracts.test.ts src/services/kairaActivityProposalCoordinatorContracts.test.ts src/services/kairaActivityScheduleContracts.test.ts src/services/kairaActivityScheduleStoreContracts.test.ts src/services/kairaActivitySchedulerCoordinatorContracts.test.ts src/services/kairaActivityExperienceReceiptContracts.test.ts src/services/kairaActivityAutobiographicalProjectionContracts.test.ts src/services/kairaActivityAutobiographyWithoutPreferenceContracts.test.ts src/services/kairaActivityExperienceCoordinatorContracts.test.ts src/services/kairaActivityWorldPersistenceContracts.test.ts src/services/kairaExperiencePreferenceAppraisalContracts.test.ts src/services/kairaSelfFactRevisionContracts.test.ts src/services/kairaSelfFactRevisionStoreContracts.test.ts src/services/kairaHandoffContracts.test.ts src/services/kairaWorldModelProjectionContracts.test.ts src/services/kairaWorldModelProjectionResponseSeamContracts.test.ts src/services/kairaProjectionAwareRetrievalContracts.test.ts src/services/kairaWorldModelResponseGuardContracts.test.ts src/services/kairaWorldModelResponseGuardIntegrationContracts.test.ts src/services/kairaWorldStateAppraisalContracts.test.ts src/services/kairaWorldStateAppraisalIntegrationContracts.test.ts src/services/kairaWorldReasoningPolicyContracts.test.ts src/services/kairaWorldReasoningPolicyIntegrationContracts.test.ts src/services/kairaStateBehaviorContracts.test.ts src/services/kairaStateSequenceContracts.test.ts src/services/kairaPropertyContracts.test.ts src/services/kairaWorldModelRetrievalPropertyContracts.test.ts src/services/kairaTemporalEvidenceContracts.test.ts src/services/kairaTemporalReferenceResolutionContracts.test.ts src/services/kairaTemporalRetrievalContracts.test.ts src/services/kairaRelativeTemporalContracts.test.ts src/services/kairaTemporalProvenanceContracts.test.ts src/services/kairaTemporalGraphContracts.test.ts src/services/kairaDiscourseTemporalAnchorContracts.test.ts src/services/kairaExplicitTemporalAnchorContracts.test.ts src/services/kairaPropositionTemporalAnchorContracts.test.ts src/services/kairaWorldEventRetrievalCoordinatorContracts.test.ts src/services/kairaContradictionContracts.test.ts src/services/kairaContradictionPropertyContracts.test.ts src/services/kairaContradictionResponseSeamContracts.test.ts src/services/kairaWorldModelOwnershipContracts.test.ts src/services/kairaLearnedPolicyBoundaryContracts.test.ts src/services/kairaResponsePlan.test.ts src/services/kairaResponsePlanIntegrationContracts.test.ts src/services/kairaResponsePlanFinalAuthorityContracts.test.ts src/services/kairaSpeechIdentityAuthorityContracts.test.ts src/services/kairaSemanticConsumerAuthorityContracts.test.ts src/services/kairaSemanticInterpretationV2AuthorityContracts.test.ts src/services/kairaKdmCanonicalSemanticAuthorityContracts.test.ts src/services/kairaTurnTakingSocialRoutineContracts.test.ts src/services/kairaTypedRepairSignalContracts.test.ts src/services/kairaDyadicUserStyleContracts.test.ts src/services/kairaCurrentTurnDialogueAuthorityContracts.test.ts src/services/kairaDialogueTurnProjection.test.ts src/services/kairaBehaviorProfileAuthorityContracts.test.ts src/services/kairaTemperamentBeforeKdmContracts.test.ts src/services/kairaBehaviorPolicyBoundaryContracts.test.ts src/services/kairaBasePersonalityOwnershipContracts.test.ts src/services/kairaLegacyRuntimeFlagRemovalContracts.test.ts src/services/kairaLegacyLongTermMemoryRemovalContracts.test.ts src/services/kairaConversationAuthorityNonMutationContracts.test.ts src/services/kairaConversationStateLockContracts.test.ts src/services/kairaResponseSeamContracts.test.ts src/services/kairaContractRegistry.test.ts src/services/kairaEpistemicGateContracts.test.ts src/services/kairaEpistemicRuntimeContracts.test.ts src/services/kairaCanonicalSemanticHistoryAuthorityContracts.test.ts
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90m/home/runner/work/nexus-kairo-studio/nexus-kairo-studio[39m
+
+ [32m✓[39m src/services/kairaActivityExecutionStoreContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityExecutionCoordinatorContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/services/kairaPersistedObservationConsolidationContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/services/kairaAutonomousLifeEndToEndContracts.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/services/kairaTemporalGraphContracts.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/services/kairaResponsePlan.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 90[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityEnvironmentStoreContracts.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m src/services/kairaPlanLifecycleContracts.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/services/kairaWorldModelResponseGuardContracts.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m src/services/kairaWorldEventRetrievalCoordinatorContracts.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 65[2mms[22m[39m
+ [32m✓[39m src/services/kairaContractRegistry.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/services/kairaPropositionTemporalAnchorContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityAutobiographicalProjectionContracts.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/services/kairaWorldModelRetrievalPropertyContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 414[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityScheduleStoreContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivitySchedulerCoordinatorContracts.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/services/kairaSelfFactRevisionContracts.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityPermissionDialogueCoordinatorContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityRuntimeFactsContracts.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/services/kairaLivedMemoryRuntime.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityCandidateGeneratorContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/services/kairaLivedMemoryConsolidationContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityProposalStoreContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m src/services/kairaStateSequenceContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 157[2mms[22m[39m
+ [32m✓[39m src/services/kairaAutobiographicalRecallContracts.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityExperienceCoordinatorContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/services/kairaWorldStateAppraisalContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityExecutionContracts.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/services/kairaRelativeTemporalContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/services/kairaAutobiographicalResponseGuardContracts.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/services/kairaExplicitTemporalAnchorContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityCatalogAuthorityContracts.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/services/kairaTemporalEvidenceContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 60[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityPermissionDialogueContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/services/kairaExperiencePreferenceAppraisalContracts.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/services/kairaDiscourseTemporalAnchorContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityPermissionSessionPointerStoreContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityProposalCoordinatorContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/services/kairaEpistemicRuntimeContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 62[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityPermissionDialogueStoreContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/services/kairaResponsePlanIntegrationContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/services/kairaArchitectureContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 114[2mms[22m[39m
+ [32m✓[39m src/services/kairaInstanceFoundationContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/services/kairaPropertyContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 3923[2mms[22m[39m
+   [33m[2m✓[22m[39m Kaira property-style architecture contracts[2m > [22mkeeps core state invariants across 100 deterministic generated sequences [33m 3916[2mms[22m[39m
+ [32m✓[39m src/services/kairaSelfMemoryQueryContracts.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m src/services/kairaWorldModelProjectionContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/services/kairaContradictionPropertyContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 248[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityCanonicalRuntimeFactsIntegrationContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityPlanningPolicyContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/services/kairaKdmCanonicalSemanticAuthorityContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/services/kairaModalityCommitmentContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/services/kairaProjectionAwareRetrievalContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityEnvironmentAuthorityContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/services/kairaContradictionContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 72[2mms[22m[39m
+ [32m✓[39m src/services/kairaLivedMemoryRuntimeIntegrationContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityExperienceReceiptContracts.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/services/kairaCanonicalWorldEventV3Contracts.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityCandidateRuntimeContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/services/kairaLearnedPolicyBoundaryContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityEnvironmentRuntimeIntegrationContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/services/kairaTemporalRetrievalContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/services/kairaAutobiographicalRecallRuntimeContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/services/kairaTemporalReferenceResolutionContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 75[2mms[22m[39m
+ [32m✓[39m src/services/kairaWorldModelResponseGuardIntegrationContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaDyadicUserStyleContracts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/services/kairaWorldReasoningPolicyContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/services/kairaResponseSeamContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/services/kairaWorldModelOwnershipContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m src/services/kairaSelfFactRevisionStoreContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/services/kairaAutobiographicalRuntimeIntegrationContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/services/kairaSemanticConsumerAuthorityContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityScheduleContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/services/kairaStateBehaviorContracts.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/services/kairaBehaviorPolicyBoundaryContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityProposalContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/services/kairaTurnTakingSocialRoutineContracts.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32m✓[39m src/services/kairaAutobiographicalRetention.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/services/kairaWorldReasoningPolicyIntegrationContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/services/kairaTemporalProvenanceContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/services/kairaContradictionResponseSeamContracts.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaSemanticInterpretationV2AuthorityContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/services/kairaBasePersonalityOwnershipContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaWorldModelProjectionResponseSeamContracts.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityAutobiographyWithoutPreferenceContracts.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaConversationStateLockContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityWorldPersistenceContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/services/kairaCanonicalSemanticHistoryAuthorityContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m src/services/kairaProvisioningContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/services/kairaTemperamentBeforeKdmContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaTypedRepairSignalContracts.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m src/services/kairaEpistemicGateContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/services/kairaCurrentTurnDialogueAuthorityContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityPermissionSessionPointerContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/services/kairaLegacyRuntimeFlagRemovalContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/services/kairaHandoffContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaSpeechIdentityAuthorityContracts.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/services/kairaActivityMotivationContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaWorldStateAppraisalIntegrationContracts.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/services/kairaResponsePlanFinalAuthorityContracts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/services/kairaProvisioningArtifactsContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/services/kairaConversationAuthorityNonMutationContracts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/services/kairaLegacyLongTermMemoryRemovalContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/services/kairaBehaviorProfileAuthorityContracts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/services/kairaDialogueTurnProjection.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m104 passed[39m[22m[90m (104)[39m
+[2m      Tests [22m [1m[32m593 passed[39m[22m[90m (593)[39m
+[2m   Start at [22m 15:09:34
+[2m   Duration [22m 14.55s[2m (transform 2.09s, setup 0ms, collect 10.44s, tests 6.60s, environment 25ms, prepare 9.81s)[22m
+
+EXIT_CODE=0
