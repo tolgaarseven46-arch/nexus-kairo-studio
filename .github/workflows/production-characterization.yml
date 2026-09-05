@@ -6,6 +6,7 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     steps:
       - name: Characterize live production
         shell: bash
@@ -13,54 +14,43 @@ jobs:
           BASE_URL: https://nexus-kairo-studio.onrender.com
         run: |
           set -euo pipefail
-          curl -fsS --retry 3 --retry-delay 2 "$BASE_URL/api/health" | tee /tmp/health.json
-          curl -fsS --retry 3 --retry-delay 2 "$BASE_URL/api/runtime-info" | tee /tmp/runtime.json
+          echo 'DNS:' && getent ahosts nexus-kairo-studio.onrender.com | head
+          curl --connect-timeout 10 --max-time 30 -fsS "$BASE_URL/api/health" | tee /tmp/health.json
+          curl --connect-timeout 10 --max-time 30 -fsS "$BASE_URL/api/runtime-info" | tee /tmp/runtime.json
           python - <<'PY'
           import json, subprocess, re, uuid
           base='https://nexus-kairo-studio.onrender.com'
-          history=[]
-          dynamic={}
-          cases=[
-            'naber şimdi',
-            'bugün bütün kahveyi masaya döktüm',
-            'Mert yine geç kaldı',
-            'Mert yüzünden çok üzgünüm',
-            'soru sorma artık',
-            'bugün iş çok yoğundu',
-          ]
-          outputs=[]
-          for i,msg in enumerate(cases):
-            payload={
-              'userId':'prod_characterization_pr100',
-              'userName':'Tolga',
-              'userMessage':msg,
-              'character':{'name':'Kaira'},
-              'personality':{},
-              'dynamicState':dynamic,
-              'history':history,
-              'provider':'openrouter',
-              'suppressRecentMemory':True,
-              'kairaInstanceId':'prod-char-pr100',
-              'kairaInstanceType':'free_trial',
-              'sessionId':'prod-char-pr100',
-              'requestId':f'pr100-{i}-{uuid.uuid4()}',
-            }
-            p=subprocess.run(['curl','-fsS','--retry','2','--retry-delay','2','-H','Content-Type: application/json','-d',json.dumps(payload,ensure_ascii=False),base+'/api/chat'],capture_output=True,text=True)
+          def post(path,payload,limit=60):
+            p=subprocess.run(['curl','--connect-timeout','10','--max-time',str(limit),'-fsS','-H','Content-Type: application/json','-d',json.dumps(payload,ensure_ascii=False),base+path],capture_output=True,text=True,timeout=limit+10)
             if p.returncode:
-              raise SystemExit(f'chat request failed for {msg}: {p.stderr}')
-            data=json.loads(p.stdout)
-            reply=str(data.get('reply','')).strip()
-            if not reply:
-              raise SystemExit(f'empty reply for {msg}: {data}')
-            outputs.append({'message':msg,'reply':reply,'semantic':data.get('semantic'),'decision':data.get('decision')})
-            dynamic=data.get('dynamicState') or dynamic
-            history.extend([{'sender':'user','text':msg,'participantId':'prod-user','participantName':'Tolga'}, {'sender':'droit','text':reply,'participantId':'kaira','participantName':'Kaira'}])
+              raise SystemExit(f'{path} failed: {p.stderr}')
+            return json.loads(p.stdout)
+          semantic_cases=[
+            ('naber şimdi','how_are_you',None),
+            ('Mert yine geç kaldı',None,'not_emotional'),
+            ('Mert yüzünden çok üzgünüm',None,'emotional'),
+          ]
+          for msg,routine,kind in semantic_cases:
+            d=post('/api/language-understanding',{'userMessage':msg,'userName':'Tolga','characterName':'Kaira','provider':'openrouter'},45)
+            event=d.get('event') or {}
+            if routine and event.get('socialRoutine') != routine:
+              raise SystemExit(f'{msg}: expected routine {routine}, got {event}')
+            if kind=='not_emotional' and event.get('intent')=='emotional_share':
+              raise SystemExit(f'{msg}: neutral third-party event overread as emotional_share')
+            if kind=='emotional' and event.get('intent')!='emotional_share':
+              raise SystemExit(f'{msg}: genuine emotional share lost')
+            print('SEMANTIC',msg,event.get('intent'),event.get('socialRoutine'))
+          history=[]; dynamic={}; outputs=[]
+          for i,msg in enumerate(['bugün bütün kahveyi masaya döktüm','soru sorma artık','bugün iş çok yoğundu']):
+            payload={'userId':'prod_characterization_pr100','userName':'Tolga','userMessage':msg,'character':{'name':'Kaira'},'personality':{},'dynamicState':dynamic,'history':history,'provider':'openrouter','suppressRecentMemory':True,'kairaInstanceId':'prod-char-pr100','kairaInstanceType':'free_trial','sessionId':'prod-char-pr100','requestId':f'pr100-v2-{i}-{uuid.uuid4()}'}
+            d=post('/api/chat',payload,75)
+            reply=str(d.get('reply','')).strip()
+            if not reply: raise SystemExit(f'empty reply: {d}')
+            outputs.append((msg,reply,d.get('semantic'),d.get('decision')))
+            dynamic=d.get('dynamicState') or dynamic
+            history += [{'sender':'user','text':msg,'participantId':'prod-user','participantName':'Tolga'},{'sender':'droit','text':reply,'participantId':'kaira','participantName':'Kaira'}]
           generic=re.compile(r'^(?:he|hee|hmm|tamam|anladım|he anladım)[.!…]*$',re.I)
-          ordinary=outputs[1]['reply']
-          if generic.match(ordinary):
-            raise SystemExit(f'contentful ordinary turn collapsed to generic ACK: {ordinary}')
-          stop_reply=outputs[5]['reply']
-          if '?' in stop_reply:
-            raise SystemExit(f'question-stop contract violated: {stop_reply}')
-          print(json.dumps(outputs,ensure_ascii=False,indent=2))
+          if generic.match(outputs[0][1]): raise SystemExit('ordinary content collapsed to generic ACK: '+outputs[0][1])
+          if '?' in outputs[2][1]: raise SystemExit('question-stop contract violated: '+outputs[2][1])
+          for row in outputs: print('CHAT',json.dumps(row,ensure_ascii=False,default=str))
           PY
