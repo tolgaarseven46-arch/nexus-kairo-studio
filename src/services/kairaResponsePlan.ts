@@ -54,6 +54,8 @@ const EMBEDDED_DIRECT_INTERROGATIVE_RE =
   /(?:[,.!…;:]\s*|(?<![\p{L}\p{N}_])(?:peki|tamam|güzel|iyi|ee|e|hmm|hımm|ya)\s+)(?:neden|niye|kim|kime|kimi|hangi|hangisi|nerede|neresi|nereye|nereden|kaç)(?![\p{L}\p{N}_])/iu;
 const DIRECT_SOCIAL_QUESTION_RE =
   /(?<![\p{L}\p{N}_])(?:nas[ıi]ls[ıi]n|senden\s+naber|sen\s+naber|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|nap[ıi]yon|iyi\s+misin)(?![\p{L}\p{N}_])/iu;
+const PUNCTUATIONLESS_INTERROGATIVE_PREDICATE_RE =
+  /(?<![\p{L}\p{N}_])(?:ne\s+durumda|neyden(?:\s+bu\s+kadar)?|neye\s+göre|neyi\s+kast(?:ediyorsun|ettin)|ne\s+oldu|ne\s+oluyor)(?![\p{L}\p{N}_])/iu;
 const QUESTION_CLITIC_RE =
   /(?<![\p{L}\p{N}_])(?:m[ıiuü]|misin|m[ıi]s[ıi]n|musun|m[üu]s[üu]n|m[ıi]y[ıi]m|muyum|m[üu]y[üu]m|m[ıi]yd[ıi]|m[ıi]yd[ıi]n|m[ıi]yd[ıi]k|m[ıi]yd[ıi]lar)(?![\p{L}\p{N}_])/iu;
 const REPORTED_QUESTION_RE =
@@ -66,6 +68,7 @@ export function looksLikeKairaQuestionAct(text: string): boolean {
     DIRECT_INTERROGATIVE_START_RE.test(text) ||
     EMBEDDED_DIRECT_INTERROGATIVE_RE.test(text) ||
     DIRECT_SOCIAL_QUESTION_RE.test(text) ||
+    PUNCTUATIONLESS_INTERROGATIVE_PREDICATE_RE.test(text) ||
     QUESTION_CLITIC_RE.test(text)
   );
 }
