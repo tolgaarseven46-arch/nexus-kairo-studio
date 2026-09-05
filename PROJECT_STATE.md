@@ -1550,3 +1550,16 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 - The measured transcript-leak + forbidden-question + persistent-relationship blocker chain is closed in live production.
 - Do not reopen PR #84–#86 or the welcome-instance persistence policy without new measured production evidence.
 - Next product work should start from a new evidence-driven live conversation-quality characterization, not from speculative semantic/regex expansion.
+
+
+## 2026-09-05 Conversation Quality checkpoint — PR #88
+- Conversation Quality / Identity Validation sonrası kalan beş mechanism-quality finding tek authority çizgisinde kapatıldı.
+- PR #88 `fix(chat): resolve conversation-quality social moves and grounding` full CI, TypeScript, production build ve Architecture Review PASS sonrası merge edildi. Merge commit: `d11d621733616824e09ee0c5bbae82d939bc46c1`.
+- Render exact merge commit LIVE olarak doğrulandı.
+- Direct relational bids (`beni öp`, `gel sarılalım`) artık generic `he anladım` acknowledgement'a düşmüyor; PlanResolver `respond_to_relational_bid` ve typed `socialMove` (ör. `warm_deflect`, `accept_repair`) seçiyor. Final validator yalnız plan-owned move conformance'ını doğruluyor.
+- `senle/benle` gibi gündelik second/first-person entity biçimleri canonical entity resolution'a dahil edildi; EntityResolution ile semantic target çelişkisi explicit Kaira evidence altında canonical language-understanding gateway'de reconciled ediliyor. Production `gel senle barışalım` => target `kaira`, relationalAct `reconciliation_attempt`.
+- Local Language Engine yalnız semantically trivial social routines için verbalizer olarak kalıyor. Typed knowledge veya emotionally-loaded third-party içerik full generation path'e gidiyor; surface interrogative tek başına richness sayılmıyor. Production `neden ayrılmış benden` => OpenRouter/full path; `nasıl gidiyor` => local `how_are_you`.
+- Legitimate complaint ile insult injury ayrımı korundu. Production `sıktın ama artık` => `intent=complaint`, `insult=false`, `lastNegativePattern` hakaret değil; hafif relationship etkisi tamamen yasaklanmadı.
+- Generic activity permission copy'deki `aktivite aktivitesini` tekrarı düzeltildi.
+- Post-merge production acceptance PASS: relational bid meaningful social move, dyadic grounding, rich third-party routing, complaint mapping ve trivial local routine birlikte doğrulandı. Diagnostic workflow self-remove oldu.
+- Bu checkpoint ile Conversation Quality mechanism-hardening turu tamamlandı. Sonraki faz eski blocker'lara dönmek değil; yeni doğal sohbet characterization kanıtıyla Kaira Identity/Self Model fazına geçiş sınırını değerlendirmektir. Structured-memory ontology, baseline affect vs situational appraisal ve explicit apology/accountability quality hâlâ design backlog'dadır; yeni kanıt olmadan RelationshipReducer'a dokunulmayacaktır.
