@@ -4,7 +4,7 @@ import type {
   TurkishMorphologyResult,
 } from "./languageUnderstandingService";
 import { isSemanticInterpretation, normalizeSemanticInterpretation } from "./semanticInterpretationSchema";
-import { SEMANTIC_INTERPRETATION_SCHEMA_VERSION, type SemanticInterpretation } from "../types/semanticInterpretation";
+import { SEMANTIC_INTERPRETATION_SCHEMA_VERSION, type SemanticGroundingField, type SemanticInterpretation } from "../types/semanticInterpretation";
 
 export type SemanticTextGenerator = (input: { system: string; prompt: string; temperature: number }) => Promise<string>;
 export interface LlmSemanticProviderOptions { generate: SemanticTextGenerator; name?: string; }
@@ -188,6 +188,10 @@ function isShortContextAdjudicationCandidate(message: string, context?: Language
   return Boolean(context?.recentMessages?.length) && /^[\p{L}\p{N}]{2,3}$/u.test(token);
 }
 
+function hasRecentContext(context?: LanguageUnderstandingContext): boolean {
+  return Boolean(context?.recentMessages?.length);
+}
+
 function isSemanticallyOpaqueWithoutContext(interpretation: SemanticInterpretation): boolean {
   const severityPeak = Math.max(
     interpretation.severity.disrespect,
@@ -272,6 +276,104 @@ function preserveOnlyContextualReferent(
   };
 }
 
+function fieldValue(interpretation: SemanticInterpretation, field: SemanticGroundingField): unknown {
+  switch (field) {
+    case "socialRoutine": return interpretation.discourseFacets.socialRoutine;
+    case "discourseAct": return interpretation.discourseFacets.discourseAct;
+    case "repairSignal": return interpretation.discourseFacets.repairSignal;
+    case "adviceRequested": return interpretation.discourseFacets.adviceRequested;
+    case "knowledgeQuery": return interpretation.discourseFacets.knowledgeQuery;
+    case "selfMemoryQuery": return interpretation.discourseFacets.selfMemoryQuery;
+    case "relationalAct": return interpretation.discourseFacets.relationalAct;
+    case "stopQuestions": return interpretation.discourseFacets.stopQuestions;
+    case "stopTalking": return interpretation.discourseFacets.stopTalking;
+    default: return interpretation[field];
+  }
+}
+
+const GROUNDING_FIELDS: SemanticGroundingField[] = [
+  "primaryIntent", "secondarySocialActs", "target", "valence", "severity",
+  "affection", "support", "compliment", "emotionalLoad", "apology", "repairAttempt",
+  "stopRequest", "socialRoutine", "discourseAct", "repairSignal", "adviceRequested",
+  "knowledgeQuery", "selfMemoryQuery", "relationalAct", "stopQuestions", "stopTalking",
+];
+
+function sameSemanticValue(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function collectContextInfluencedFields(
+  baseline: SemanticInterpretation,
+  contextual: SemanticInterpretation,
+): SemanticGroundingField[] {
+  return GROUNDING_FIELDS.filter((field) => !sameSemanticValue(fieldValue(baseline, field), fieldValue(contextual, field)));
+}
+
+function withGrounding(
+  interpretation: SemanticInterpretation,
+  contextInfluencedFields: SemanticGroundingField[],
+  rejectedContextFields: SemanticGroundingField[],
+): SemanticInterpretation {
+  return {
+    ...interpretation,
+    grounding: {
+      adjudicatedAgainstContextFree: true,
+      contextInfluencedFields,
+      rejectedContextFields,
+    },
+  };
+}
+
+function shouldAdjudicateContextGrounding(
+  message: string,
+  context: LanguageUnderstandingContext | undefined,
+  contextual: SemanticInterpretation,
+): boolean {
+  if (!hasRecentContext(context)) return false;
+  return isShortContextAdjudicationCandidate(message, context)
+    || contextual.discourseFacets.socialRoutine !== "none";
+}
+
+function reconcileContextGrounding(
+  message: string,
+  contextFree: SemanticInterpretation,
+  contextual: SemanticInterpretation,
+): SemanticInterpretation {
+  const influenced = collectContextInfluencedFields(contextFree, contextual);
+
+  if (
+    isShortContextAdjudicationCandidate(message, { recentMessages: [{ role: "user", content: "context" }] })
+    && isSemanticallyOpaqueWithoutContext(contextFree)
+    && contextInventsLexicalMeaning(contextFree, contextual)
+  ) {
+    const result = preserveOnlyContextualReferent(contextFree, contextual);
+    const rejected = influenced.filter((field) => field !== "target");
+    return withGrounding(result, influenced, rejected);
+  }
+
+  const contextFreeRoutineIsGrounded =
+    contextFree.uncertainty.overall <= 0.35
+    && contextFree.uncertainty.intent <= 0.35;
+  const routineDrift =
+    contextual.discourseFacets.socialRoutine !== contextFree.discourseFacets.socialRoutine;
+
+  if (routineDrift && contextFreeRoutineIsGrounded) {
+    const rejected: SemanticGroundingField[] = ["socialRoutine"];
+    const primaryIntentDrift = contextual.primaryIntent !== contextFree.primaryIntent;
+    if (primaryIntentDrift) rejected.push("primaryIntent");
+    return withGrounding({
+      ...contextual,
+      ...(primaryIntentDrift ? { primaryIntent: contextFree.primaryIntent } : {}),
+      discourseFacets: {
+        ...contextual.discourseFacets,
+        socialRoutine: contextFree.discourseFacets.socialRoutine,
+      },
+    }, influenced, rejected);
+  }
+
+  return withGrounding(contextual, influenced, []);
+}
+
 export function createLlmSemanticUnderstandingProvider(options: LlmSemanticProviderOptions): SemanticUnderstandingProvider {
   const interpretOnce = async (
     message: string,
@@ -299,11 +401,9 @@ export function createLlmSemanticUnderstandingProvider(options: LlmSemanticProvi
     name: options.name ?? "llm_semantic_parser_v2",
     async interpret({ message, morphology, context }): Promise<SemanticInterpretation> {
       const contextual = await interpretOnce(message, morphology, context);
-      if (!isShortContextAdjudicationCandidate(message, context)) return contextual;
+      if (!shouldAdjudicateContextGrounding(message, context, contextual)) return contextual;
       const contextFree = await interpretOnce(message, morphology, { ...context, recentMessages: [] });
-      if (!isSemanticallyOpaqueWithoutContext(contextFree)) return contextual;
-      if (!contextInventsLexicalMeaning(contextFree, contextual)) return contextual;
-      return preserveOnlyContextualReferent(contextFree, contextual);
+      return reconcileContextGrounding(message, contextFree, contextual);
     },
   };
 }
