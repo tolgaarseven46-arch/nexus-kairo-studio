@@ -1,4 +1,4 @@
-import type { SemanticInterpretation } from "../types/semanticInterpretation";
+import type { SemanticInterpretation, SemanticWorldMemoryQuery } from "../types/semanticInterpretation";
 import {
   observationKairaInstanceId,
   type WorldEventObservation,
@@ -36,6 +36,15 @@ const normalize = (value: string) =>
 
 const tokens = (value: string) =>
   normalize(value).split(/[^\p{L}\p{N}_]+/u).filter((token) => token.length >= 2);
+
+const memoryKey = (value: string) => value.toLocaleLowerCase("en-US").trim();
+function matchingMemoryFacts(observation: WorldEventObservation, query: SemanticWorldMemoryQuery) {
+  return (observation.event.memoryFacts ?? []).filter((fact) =>
+    fact.confidence >= 0.72 &&
+    memoryKey(fact.subjectId) === memoryKey(query.subjectId) &&
+    memoryKey(fact.attributeKey) === memoryKey(query.attributeKey)
+  );
+}
 
 const REPORTED_SPEECH_RE = /\b(?:ne demişti|ne dedi|demişti|dedi|söylemişti|söyledi)\b/iu;
 const STORED_QUERY_RE = /[?？]\s*$|\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor musun|hatırladın mı|hakkında ne biliyorsun)\b|\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
@@ -141,6 +150,7 @@ export function rankWorldEventObservations(
   observations: WorldEventObservation[],
   maxItems = 5,
   queryAnchorAt = new Date().toISOString(),
+  memoryQuery?: SemanticWorldMemoryQuery | null,
 ): RetrievedWorldEvent[] {
   const discourseResults = temporalDiscourseResults(message, observations, maxItems);
   if (discourseResults !== undefined) return discourseResults;
@@ -151,6 +161,7 @@ export function rankWorldEventObservations(
   const asksLatest = LATEST_RECALL_RE.test(normalizedMessage);
   const asksCurrentState = CURRENT_STATE_RE.test(normalizedMessage);
   const temporalCandidates = temporalQueryCandidates(message, observations, queryAnchorAt);
+  const canonicalMemoryQuery = memoryQuery && memoryQuery.confidence >= 0.72 ? memoryQuery : null;
   const projection = asksCurrentState ? projectWorldModel(temporalCandidates.observations) : [];
   const projectionByKey = new Map(
     projection.map((state) => [
@@ -161,6 +172,7 @@ export function rankWorldEventObservations(
 
   const ranked = temporalCandidates.observations
     .filter((observation) => !STORED_QUERY_RE.test(normalize(observation.event.raw || "")))
+    .filter((observation) => !canonicalMemoryQuery || matchingMemoryFacts(observation, canonicalMemoryQuery).length > 0)
     .map((observation) => {
       const reasons: string[] = [];
       let score = 0;
@@ -168,6 +180,11 @@ export function rankWorldEventObservations(
       const projectedState = asksCurrentState
         ? projectionByKey.get(projectionKey(observation))
         : undefined;
+      const structuredFactMatches = canonicalMemoryQuery ? matchingMemoryFacts(observation, canonicalMemoryQuery) : [];
+      if (structuredFactMatches.length) {
+        score += 8;
+        reasons.push(`memory_fact:${canonicalMemoryQuery!.subjectId}:${canonicalMemoryQuery!.attributeKey}`);
+      }
       const names = [event.actor?.name, event.target?.name, observation.speakerName]
         .filter((value): value is string => Boolean(value))
         .map(normalize);
@@ -329,7 +346,12 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
     const temporal = event.temporal?.resolved
       ? `; zaman=${event.temporal.resolved.startAt}..${event.temporal.resolved.endAt}`
       : "";
-    return `- #${index + 1} [${epistemic}; ${certainty}${polarity}${stateLabel}${temporal}${conflictLabel}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
+    const facts = (event.memoryFacts ?? [])
+      .filter((fact) => fact.confidence >= 0.72)
+      .map((fact) => `${fact.subjectId}.${fact.attributeKey}=${String(fact.value)}`)
+      .join(", ");
+    const factText = facts ? `; facts=${facts}` : "";
+    return `- #${index + 1} [${epistemic}; ${certainty}${polarity}${stateLabel}${temporal}${conflictLabel}; güven=${Number(event.certainty ?? 0).toFixed(2)}${factText}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;
   });
 
   return `WORLD MODEL HAFIZASI (retrieval sırasına göre):\n${lines.join("\n")}\nKURALLAR:\n- state ve lifecycle alanları immutable kanıtlardan türetilmiş CANONICAL READ-MODEL özetidir; ham kanıtı silmez veya yeni olay yaratmaz.\n- Retrieval sonucu projectedState taşıyorsa bu state top-N seçimi ÖNCESİ tam aday kanıt kümesinden hesaplanmıştır; seçilen alt kümeden yeniden yorumlama yapma.\n- state=conflicting ise en yeni polarity ne olursa olsun proposition'ı doğrulanmış gerçek gibi anlatma.\n- lifecycle=planned/executed/cancelled/postponed/failed yalnızca aynı canonical proposition'ın mevcut plan generation kanıtından gelir; eski generation sonucunu yeni plana taşıma.\n- Kullanıcı geçmişte kimin ne dediğini soruyorsa ve burada matching grounded reported_claim varsa, bu kayıt kullanıcının daha önce aktardığı şeyi hatırlamak için YETERLİ KANITTIR. Böyle bir kayıt varken \"kaydım yok\" veya \"emin değilim\" deme. Cevabı epistemik olarak doğru kur: \"bana daha önce X'in Y dediğini söylemiştin\" gibi.\n- Çözümlenmiş zaman aralığı varsa kullanıcıdaki temporal ifadeyle eşleşen kanıtlar retrieval tarafından önceden sınırlandırılmıştır; bu zamanı yeniden ham metinden tahmin etme.\n- temporal_graph_neighbor reason'lı kanıtlar yalnızca persisted provenance ile bağlı olaylardır; graph dışında yeni bir önce/sonra ilişkisi UYDURMA.\n- \"En son\" sorularında aynı kişiyle eşleşen retrieval sırasındaki ilk kayıt en güncel kanıttır; bu seçim timestamp ile belirlenir, lexical score eski kaydı öne geçiremez.\n- Birden fazla açık isimli karşılaştırmalı soruda her isim için getirilen kanıtı ayrı değerlendir; bir kişinin kaydı diğer kişinin yerine geçmez.\n- ÇELİŞEN KANIT etiketi varsa aynı canonical proposition için zıt polarity kayıtları vardır. En yeni kaydı güncel kanıt olarak kullanabilirsin ama onu otomatik doğrulanmış gerçek sayma; gerektiğinde önceki ve sonraki iddiayı ayrı belirt.\n- reported_claim kayıtlarını doğrulanmış dünya gerçeği gibi anlatma. ambiguous kayıtlarda kişi/olay ayrıntısı uydurma. direct_interaction ile kullanıcının aktardığı iddiayı birbirine karıştırma. Birbiriyle çelişen veya zaman içinde değişen kayıtlar varsa tek bir gerçeğe zorla birleştirme; kayıtları ayrı kanıtlar olarak koru.`;

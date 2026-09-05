@@ -49,7 +49,7 @@ const GROUNDING_FIELDS = new Set<SemanticGroundingField>([
   "primaryIntent", "secondarySocialActs", "target", "valence", "severity",
   "affection", "support", "compliment", "emotionalLoad", "apology",
   "repairAttempt", "stopRequest", "socialRoutine", "discourseAct", "repairSignal",
-  "adviceRequested", "knowledgeQuery", "selfMemoryQuery", "relationalAct",
+  "adviceRequested", "knowledgeQuery", "selfMemoryQuery", "worldMemory", "relationalAct",
   "stopQuestions", "stopTalking",
 ]);
 
@@ -117,6 +117,34 @@ function normalizeQuery(value: unknown): SemanticDiscourseFacets["knowledgeQuery
     confidence: clamp01(v.confidence),
   };
 }
+function canonicalMemoryKey(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.trim().toLocaleLowerCase("en-US").replace(/[^a-z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96);
+}
+function normalizeWorldMemory(value: unknown): SemanticInterpretation["worldMemory"] {
+  if (!value || typeof value !== "object") return undefined;
+  const v = value as Record<string, unknown>;
+  const claims = Array.isArray(v.claims) ? v.claims.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const c = raw as Record<string, unknown>;
+    const subjectId = canonicalMemoryKey(c.subjectId);
+    const attributeKey = canonicalMemoryKey(c.attributeKey);
+    const validValue = typeof c.value === "string" || typeof c.value === "boolean" || (typeof c.value === "number" && Number.isFinite(c.value));
+    if (!subjectId || !attributeKey || !validValue) return [];
+    const normalizedValue = typeof c.value === "string" ? c.value.trim().replace(/\s+/g, " ").slice(0, 160) : c.value;
+    if (normalizedValue === "") return [];
+    return [{ subjectId, attributeKey, value: normalizedValue, confidence: clamp01(c.confidence) }];
+  }).slice(0, 12) : [];
+  let query = null;
+  if (v.query && typeof v.query === "object") {
+    const q = v.query as Record<string, unknown>;
+    const subjectId = canonicalMemoryKey(q.subjectId);
+    const attributeKey = canonicalMemoryKey(q.attributeKey);
+    if (subjectId && attributeKey) query = { subjectId, attributeKey, confidence: clamp01(q.confidence) };
+  }
+  return { claims, query };
+}
+
 function normalizeSelfMemoryQuery(value: unknown): SemanticDiscourseFacets["selfMemoryQuery"] {
   if (!value || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
@@ -171,6 +199,7 @@ export function normalizeSemanticInterpretation(value: unknown, message = ""): S
     ? Array.from(new Set((v.secondarySocialActs as unknown[]).filter((a): a is SemanticSocialAct => SOCIAL_ACTS.has(a as SemanticSocialAct))))
     : [];
   const discourseFacets = normalizeDiscourseFacets(v.discourseFacets);
+  const worldMemory = normalizeWorldMemory(v.worldMemory);
   return {
     schemaVersion: SEMANTIC_INTERPRETATION_SCHEMA_VERSION,
     raw,
@@ -185,6 +214,7 @@ export function normalizeSemanticInterpretation(value: unknown, message = ""): S
     affection: clamp01(v.affection), support: clamp01(v.support), compliment: clamp01(v.compliment), emotionalLoad: clamp01(v.emotionalLoad),
     apology: asBool(v.apology), repairAttempt: asBool(v.repairAttempt), stopRequest: discourseFacets.stopTalking,
     discourseFacets,
+    ...(worldMemory ? { worldMemory } : {}),
     uncertainty: normalizeUncertainty(v.uncertainty), evidence: normalizeEvidence(v.evidence),
     ...(normalizeGrounding(v.grounding) ? { grounding: normalizeGrounding(v.grounding) } : {}),
   };

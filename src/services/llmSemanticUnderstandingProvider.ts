@@ -39,6 +39,7 @@ const schemaExample: SemanticInterpretation = {
     stopQuestions: false,
     stopTalking: false,
   },
+  worldMemory: { claims: [], query: null },
   uncertainty: { overall: 0.25, intent: 0.2, target: 0.3, severity: 0.25 },
   evidence: [{ source: "llm", provider: "semantic-parser", cues: [], confidence: 0.75 }],
 };
@@ -95,6 +96,18 @@ repairSignal = none | clarification_request | relevance_challenge
 adviceRequested = yalnız açık tavsiye/öneri isteniyorsa true
 knowledgeQuery = null veya {surface, conceptId?, confidence}; yalnız genel kavram/bilgi erişim sorusu
 selfMemoryQuery = null veya {surface, scope:self_fact|autobiographical_memory|any, factKey?, retrievalMode:targeted|broad, confidence}; yalnız Kaira'nın kendi özelliği/geçmişi/anısı soruluyorsa
+
+WORLD MEMORY SEMANTICS:
+worldMemory = {claims, query}. Bu alan yalnız persistent dış-dünya/kişi bilgisinin typed fact kimliğini taşır; cevap/policy değildir.
+- claims: kullanıcının BU mesajda açıkça verdiği attribute-value gerçekleri. Her claim {subjectId, attributeKey, value, confidence}.
+- query: geçmişten istenen belirli attribute için {subjectId, attributeKey, confidence}; attribute belli değilse null.
+- subjectId bağlam boyunca stabil canonical kimlik olmalı. Kullanıcının romantik partneri için current_user.partner; Kaira için kaira; adı açık kişiler için person:<normalize_ad>.
+- attributeKey kısa İngilizce snake_case kavram anahtarıdır: eye_color, hair_color, age, origin, favorite_feature gibi. Aynı kavram claim ve query'de AYNI key'i kullanmalı.
+- Bağlam yalnız özne/referans çözmek için kullanılabilir. Örnek: önce “benim manit var”, sonra “sarışın mavi gözlü” => current_user.partner için hair_color=sarışın ve eye_color=mavi claimleri.
+- “benim manitin gözleri ne renkti?” => query {subjectId:"current_user.partner", attributeKey:"eye_color", confidence yüksek}.
+- “onda en çok hangi özelliğini seviyordum?” => query {subjectId:"current_user.partner", attributeKey:"favorite_feature", confidence uygun}.
+- Mesaj açık attribute-value vermiyorsa claim UYDURMA. Belirsiz attribute lookup'ta query üretme.
+
 relationalAct = none | reassurance_seek | repair_probe | reconciliation_attempt | challenge | mockery | closeness_bid
 relationalIntensity 0..1
 stopQuestions / stopTalking yalnız açık durdurma talebinde true
@@ -219,6 +232,8 @@ function isSemanticallyOpaqueWithoutContext(interpretation: SemanticInterpretati
     && !facets.adviceRequested
     && facets.knowledgeQuery === null
     && facets.selfMemoryQuery === null
+    && (interpretation.worldMemory?.claims.length ?? 0) === 0
+    && interpretation.worldMemory?.query == null
     && facets.relationalAct === "none"
     && !facets.stopQuestions
     && !facets.stopTalking
@@ -256,6 +271,7 @@ function contextInventsLexicalMeaning(
     || contextualFacets.adviceRequested !== baselineFacets.adviceRequested
     || contextualFacets.knowledgeQuery !== null
     || contextualFacets.selfMemoryQuery !== null
+    || !sameSemanticValue(contextual.worldMemory ?? null, baseline.worldMemory ?? null)
     || contextualFacets.relationalAct !== baselineFacets.relationalAct
     || contextualFacets.stopQuestions !== baselineFacets.stopQuestions
     || contextualFacets.stopTalking !== baselineFacets.stopTalking;
@@ -284,6 +300,7 @@ function fieldValue(interpretation: SemanticInterpretation, field: SemanticGroun
     case "adviceRequested": return interpretation.discourseFacets.adviceRequested;
     case "knowledgeQuery": return interpretation.discourseFacets.knowledgeQuery;
     case "selfMemoryQuery": return interpretation.discourseFacets.selfMemoryQuery;
+    case "worldMemory": return interpretation.worldMemory ?? null;
     case "relationalAct": return interpretation.discourseFacets.relationalAct;
     case "stopQuestions": return interpretation.discourseFacets.stopQuestions;
     case "stopTalking": return interpretation.discourseFacets.stopTalking;
@@ -295,7 +312,7 @@ const GROUNDING_FIELDS: SemanticGroundingField[] = [
   "primaryIntent", "secondarySocialActs", "target", "valence", "severity",
   "affection", "support", "compliment", "emotionalLoad", "apology", "repairAttempt",
   "stopRequest", "socialRoutine", "discourseAct", "repairSignal", "adviceRequested",
-  "knowledgeQuery", "selfMemoryQuery", "relationalAct", "stopQuestions", "stopTalking",
+  "knowledgeQuery", "selfMemoryQuery", "worldMemory", "relationalAct", "stopQuestions", "stopTalking",
 ];
 
 function sameSemanticValue(a: unknown, b: unknown): boolean {

@@ -1,4 +1,5 @@
 import type { SemanticEvent } from "./semanticEventEngine";
+import type { SemanticWorldMemoryClaim } from "../types/semanticInterpretation";
 import type { EntityResolutionResult, ResolvedEntityReference } from "./entityResolutionEngine";
 
 export type WorldEventType =
@@ -66,6 +67,7 @@ export interface CanonicalWorldEvent {
   ambiguities: string[];
   evidence: string[];
   proposition?: WorldEventProposition;
+  memoryFacts?: SemanticWorldMemoryClaim[];
   polarity?: WorldEventPolarity;
   temporal?: WorldEventTemporalReference;
 }
@@ -330,6 +332,7 @@ export function buildCanonicalWorldEvent(
     ambiguities: [...new Set(ambiguities)],
     evidence,
     proposition: buildWorldEventProposition(eventType, actor, target, contentKey),
+    ...(semantic.worldMemory?.claims?.length ? { memoryFacts: semantic.worldMemory.claims } : {}),
     polarity: detectWorldEventPolarity(message),
     temporal: detectWorldEventTemporalReference(message),
   };
