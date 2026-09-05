@@ -190,6 +190,11 @@ describe("natural conversation v2 quality authority", () => {
     expect(resolved.requiredContent).not.toContain("engage_user_content");
   });
 
+  it("keeps 'naber şimdi' inside the canonical how_are_you social routine", async () => {
+    const result = await understandTurkishMessage("naber şimdi");
+    expect(result.event.socialRoutine).toBe("how_are_you");
+  });
+
   it("does not force content engagement on explicit question-stop control turns", () => {
     const resolved = resolvedPlan(0.2, { questionStopRequested: true });
     expect(resolved.requiredContent).not.toContain("engage_user_content");
