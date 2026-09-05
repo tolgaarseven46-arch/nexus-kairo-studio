@@ -5,8 +5,11 @@ const QUESTION_CLITIC_RE =
 const DIRECT_INTERROGATIVE_START_RE =
   /^\s*(?:neden|niye|nas[ıi]l|kim|kimle|kimin|kimden|kimde|kime|kimi|hangi|hangisi|hangileri|nerede|neresi|nereye|nereden|kaç)(?![\p{L}\p{N}_])/iu;
 
+const STRONG_INTERROGATIVE_ANYWHERE_RE =
+  /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|neresi|nereye|nereden|neden|niye|kaç)(?![\p{L}\p{N}_])/iu;
+
 const EMBEDDED_INTERROGATIVE_RE =
-  /(?:[,.!…;:]\s*|(?<![\p{L}\p{N}_])(?:peki|tamam|güzel|iyi|ee|e|hmm|hımm|ya)\s+)(?:neden|niye|nas[ıi]l|kim|kimle|kimin|kimden|kimde|kime|kimi|hangi|hangisi|hangileri|nerede|neresi|nereye|nereden|kaç)(?![\p{L}\p{N}_])/iu;
+  /(?:[,.!…;:]\s*|(?<![\p{L}\p{N}_])(?:peki|tamam|güzel|iyi|ee|e|hmm|hımm|ya|oh|ooo|aha|hee)\s+)(?:neden|niye|nas[ıi]l|kim|kimle|kimin|kimden|kimde|kime|kimi|hangi|hangisi|hangileri|nerede|neresi|nereye|nereden|kaç)(?![\p{L}\p{N}_])/iu;
 
 const CASE_MARKED_INTERROGATIVE_RE =
   /(?<![\p{L}\p{N}_])(?:kimle|kimin|kimden|kimde|kime|kimi|nerede|neresi|nereye|nereden|hangisi|hangileri|neden|niye)(?![\p{L}\p{N}_])/iu;
@@ -15,19 +18,25 @@ const DIRECT_SOCIAL_QUESTION_RE =
   /(?<![\p{L}\p{N}_])(?:nas[ıi]ls[ıi]n|senden\s+naber|sen\s+naber|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|nap[ıi]yon|iyi\s+misin)(?![\p{L}\p{N}_])/iu;
 
 const INTERROGATIVE_PREDICATE_RE =
-  /(?<![\p{L}\p{N}_])(?:ne\s+durumda|neyden(?:\s+bu\s+kadar)?|neye\s+göre|neyi\s+kast(?:ediyorsun|ettin)|ne\s+oldu|ne\s+oluyor|ne\s+olacak|ne\s+zaman|ne\s+kadar\s+(?:sürüyor|sürecek|var))(?![\p{L}\p{N}_])/iu;
+  /(?<![\p{L}\p{N}_])(?:ne\s+durumda|neyden(?:\s+bu\s+kadar)?|neye\s+göre|neyi\s+kast(?:ediyorsun|ettin)|ne\s+oldu|ne\s+oluyor|ne\s+olacak|ne\s+zaman|ne\s+kadar\s+(?:sürüyor|sürecek|var)|ne\s+yapas[ıi]n\s+var|ne\s+var(?:\s+(?:şu\s+an|şimdi))?)(?![\p{L}\p{N}_])/iu;
 
 const SUBJECT_NE_NOW_RE =
   /(?<![\p{L}\p{N}_])[\p{L}\p{N}_-]+\s+ne(?:\s+(?:şu\s+an|şimdi))?\s*[.!…]*\s*$/iu;
 
+const SUBJECT_NASIL_RE =
+  /(?<![\p{L}\p{N}_])[\p{L}\p{N}_-]+\s+nas[ıi]l(?:\s+(?:şu\s+an|şimdi))?\s*[.!…]*\s*$/iu;
+
 const REPORTED_SPEECH_SUFFIX_RE =
   /(?<![\p{L}\p{N}_])diye\s+(?:sordu|dedi|anlatt[ıi]|söyledi)(?![\p{L}\p{N}_])\s*[.!…]*\s*$/iu;
+
+const EMBEDDED_COMPLEMENT_RE =
+  /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|nereye|nereden|neden|niye|nas[ıi]l|ne)(?![\p{L}\p{N}_]).{0,70}\b[\p{L}]+(?:d[ıiuü]ğ[ıiuü]n[ıiuü]|t[ıiuü]ğ[ıiuü]n[ıiuü])\b.{0,40}\b(?:anlatt[ıi]|söyledi|dedi|biliyorum|biliyorsun|öğrendim|hatırlıyorum|duydum)\b/iu;
 
 const REPORTED_DIRECT_QUESTION_RE =
   /(?<![\p{L}\p{N}_])(?:neden|niye|nas[ıi]l|kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|neresi|nereye|nereden|kaç|ne(?:\s+(?:durumda|oldu|oluyor|olacak|zaman|kadar))?)(?![\p{L}\p{N}_]).{0,60}(?<![\p{L}\p{N}_])(?:diye\s+(?:sordu|dedi|anlatt[ıi]|söyledi)|sorduğunu|dediğini|anlattığını|söylediğini)(?![\p{L}\p{N}_])/iu;
 
 const REPORTED_INDIRECT_QUESTION_RE =
-  /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|nereye|nereden|neden|niye|nas[ıi]l|ne)(?![\p{L}\p{N}_]).{0,50}(?<![\p{L}\p{N}_])(?:olduğunu|olacağını|yaptığını|oynadığını|dediğini|istediğini|gittiğini|geldiğini)(?![\p{L}\p{N}_]).{0,30}(?<![\p{L}\p{N}_])(?:anlatt[ıi]|söyledi|dedi|biliyorum|biliyorsun|öğrendim)(?![\p{L}\p{N}_])/iu;
+  /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|nereye|nereden|neden|niye|nas[ıi]l|ne)(?![\p{L}\p{N}_]).{0,50}(?<![\p{L}\p{N}_])(?:olduğunu|olacağını|yaptığını|oynadığını|dediğini|istediğini|gittiğini|geldiğini|açtığını)(?![\p{L}\p{N}_]).{0,30}(?<![\p{L}\p{N}_])(?:anlatt[ıi]|söyledi|dedi|biliyorum|biliyorsun|öğrendim)(?![\p{L}\p{N}_])/iu;
 
 /**
  * Structural recognizer for whether generated Turkish text performs a question act.
@@ -42,17 +51,20 @@ export function isTurkishQuestionAct(text: string): boolean {
   if (
     REPORTED_SPEECH_SUFFIX_RE.test(value) ||
     REPORTED_DIRECT_QUESTION_RE.test(value) ||
-    REPORTED_INDIRECT_QUESTION_RE.test(value)
+    REPORTED_INDIRECT_QUESTION_RE.test(value) ||
+    EMBEDDED_COMPLEMENT_RE.test(value)
   ) return false;
   if (QUESTION_PUNCTUATION_RE.test(value)) return true;
 
   return (
     QUESTION_CLITIC_RE.test(value) ||
     DIRECT_INTERROGATIVE_START_RE.test(value) ||
+    STRONG_INTERROGATIVE_ANYWHERE_RE.test(value) ||
     EMBEDDED_INTERROGATIVE_RE.test(value) ||
     CASE_MARKED_INTERROGATIVE_RE.test(value) ||
     DIRECT_SOCIAL_QUESTION_RE.test(value) ||
     INTERROGATIVE_PREDICATE_RE.test(value) ||
-    SUBJECT_NE_NOW_RE.test(value)
+    SUBJECT_NE_NOW_RE.test(value) ||
+    SUBJECT_NASIL_RE.test(value)
   );
 }
