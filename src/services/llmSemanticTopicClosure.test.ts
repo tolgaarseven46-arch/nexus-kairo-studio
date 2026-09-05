@@ -13,10 +13,10 @@ function base(overrides: Partial<SemanticInterpretation> = {}): SemanticInterpre
 }
 
 describe('topic-local closure semantic invariant', () => {
-  it('topic_shift cannot become a full conversation stop', async () => {
+  it('keeps pure topic-local closure out of full conversation stop', async () => {
     const generated = base({
-      raw: 'konuyu kapatalım', normalized: 'konuyu kapatalım', primaryIntent: 'command', target: 'event', secondarySocialActs: ['stop_request'], stopRequest: true,
-      discourseFacets: { socialRoutine: 'none', discourseAct: 'topic_shift', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'none', relationalIntensity: 0.1, stopQuestions: true, stopTalking: true },
+      raw: 'konuyu kapatalım', normalized: 'konuyu kapatalım', primaryIntent: 'command', target: 'event', secondarySocialActs: [], stopRequest: false,
+      discourseFacets: { socialRoutine: 'none', discourseAct: 'topic_shift', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'none', relationalIntensity: 0.1, stopQuestions: false, stopTalking: false },
     });
     const generate = vi.fn().mockResolvedValue(JSON.stringify(generated));
     const result = await createLlmSemanticUnderstandingProvider({ generate }).interpret({ message: 'konuyu kapatalım' });
@@ -25,6 +25,20 @@ describe('topic-local closure semantic invariant', () => {
     expect(result.discourseFacets.stopQuestions).toBe(false);
     expect(result.stopRequest).toBe(false);
     expect(result.secondarySocialActs).not.toContain('stop_request');
+  });
+
+
+  it('preserves an explicit full-stop when it appears together with topic closure', async () => {
+    const generated = base({
+      raw: 'bu konuyu da kapat konuşmayı da bitir', normalized: 'bu konuyu da kapat konuşmayı da bitir', primaryIntent: 'command', target: 'kaira', secondarySocialActs: ['stop_request'], stopRequest: true,
+      discourseFacets: { socialRoutine: 'none', discourseAct: 'topic_shift', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'none', relationalIntensity: 0.3, stopQuestions: false, stopTalking: true },
+    });
+    const generate = vi.fn().mockResolvedValue(JSON.stringify(generated));
+    const result = await createLlmSemanticUnderstandingProvider({ generate }).interpret({ message: 'bu konuyu da kapat konuşmayı da bitir' });
+    expect(result.discourseFacets.discourseAct).toBe('topic_shift');
+    expect(result.discourseFacets.stopTalking).toBe(true);
+    expect(result.stopRequest).toBe(true);
+    expect(result.secondarySocialActs).toContain('stop_request');
   });
 
   it('preserves an actual full stop request', async () => {
