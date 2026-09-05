@@ -192,6 +192,7 @@ describe("natural conversation v2 quality authority", () => {
 
   it("keeps 'naber şimdi' inside the canonical how_are_you social routine", async () => {
     const result = await understandTurkishMessage("naber şimdi");
+    expect(result.interpretation.discourseFacets.socialRoutine).toBe("how_are_you");
     expect(result.event.socialRoutine).toBe("how_are_you");
   });
 
