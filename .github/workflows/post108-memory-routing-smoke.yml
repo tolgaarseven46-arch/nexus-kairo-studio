@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Verify third-party recall does not enter Kaira self-memory
+      - name: Verify third-party recall routing and final acceptance
         shell: bash
         run: |
           node <<'NODE'
@@ -51,7 +51,7 @@ jobs:
             relationshipScope: data?.kdm?.semanticEvent?.relationshipScope,
             selfMemoryQuery: data?.kdm?.semanticEvent?.selfMemoryQuery ?? null,
             selfMemoryStatus: data?.kdm?.selfMemoryRuntime?.status,
-            worldReply: data?.kdm?.worldMemoryGuard?.reply,
+            worldReply: String(data?.kdm?.worldMemoryGuard?.reply ?? ''),
             worldPolicyMode: data?.kdm?.worldReasoningPolicy?.mode,
             mustQualify: data?.kdm?.worldReasoningPolicy?.mustQualify,
             accepted: data?.consistency?.accepted,
@@ -64,9 +64,12 @@ jobs:
           if (row.target !== 'third_party') failures.push('target_not_third_party');
           if (row.selfMemoryQuery !== null) failures.push('third_party_self_memory_query_survived');
           if (row.selfMemoryStatus !== 'not_requested') failures.push('self_memory_runtime_invoked');
+          if (row.accepted !== true) failures.push('final_response_not_accepted');
+          if (/buna dair net bir anım yok|buna dair net bir bilgim yok/iu.test(row.reply)) failures.push('false_missing_memory_fallback');
+          if (row.worldReply && row.reply !== row.worldReply && row.mustQualify === true) failures.push('qualified_world_reply_not_preserved');
           if (failures.length) {
             console.error('POST108_MEMORY_SMOKE_FAILURE ' + JSON.stringify({failures,row}));
             process.exit(1);
           }
-          console.log('POST108_MEMORY_ROUTING_OK');
+          console.log('POST108_MEMORY_ROUTING_AND_ACCEPTANCE_OK');
           NODE
