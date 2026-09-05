@@ -1,0 +1,31 @@
+name: One-time affect baseline patch
+
+on:
+  push:
+    branches:
+      - refactor/affect-baseline-authority-seam
+    paths:
+      - .github/workflows/one-time-affect-baseline.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refactor/affect-baseline-authority-seam
+      - name: Apply targeted patch
+        run: node scripts/one-time-affect-baseline.mjs
+      - name: Validate diff
+        run: git diff --check
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/relationshipReducer.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "refactor(kaira): route reducer homeostasis through affect baseline"
+          git push origin HEAD:refactor/affect-baseline-authority-seam
