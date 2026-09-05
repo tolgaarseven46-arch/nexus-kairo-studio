@@ -21,35 +21,21 @@ export interface CanonicalObservationalContext {
   trust: number | string;
   conflict: number | string;
   hurt: number | string;
-  /** Qualitative reaction flavor — descriptive only, never a gate. */
   reactionMode?: string | null;
 }
 
 const yn = (b: boolean) => (b ? "evet" : "hayır");
 const allowed = (b: boolean) => (b ? "serbest" : "yasak");
 
-/**
- * The single canonical behavior block. Field order is fixed and every field is
- * printed once. Absent optional (canonical) fields fall back to the safe value
- * (flirtation/advice forbidden, axis "n/a") so the block is well-formed even if
- * PLAN_RESOLVER_V2 is off — though the two flags are meant to run together.
- */
 export function buildCanonicalBehaviorBlock(plan: KairaResponsePlan): string {
-  const axis = (n: number | undefined) =>
-    typeof n === "number" && Number.isFinite(n) ? `%${Math.round(n * 100)}` : "n/a";
+  const axis = (n: number | undefined) => typeof n === "number" && Number.isFinite(n) ? `%${Math.round(n * 100)}` : "n/a";
   const flirtationAllowed = plan.flirtationAllowed === true;
   const counterFlirtAllowed = plan.counterFlirtAllowed === true;
   const adviceAllowed = plan.allowAdvice === true;
-  const requiredContent =
-    plan.requiredContent && plan.requiredContent.length > 0
-      ? plan.requiredContent.join(", ")
-      : "yok";
-  const hardReasons =
-    plan.hardReasons && plan.hardReasons.length > 0 ? plan.hardReasons.join("; ") : "yok";
+  const requiredContent = plan.requiredContent && plan.requiredContent.length > 0 ? plan.requiredContent.join(", ") : "yok";
+  const hardReasons = plan.hardReasons && plan.hardReasons.length > 0 ? plan.hardReasons.join("; ") : "yok";
   const uncertainty = plan.uncertainty
-    ? `anlam=%${Math.round((plan.uncertainty.semantic ?? 0) * 100)}, ilişki=%${Math.round(
-        (plan.uncertainty.relational ?? 0) * 100,
-      )}`
+    ? `anlam=%${Math.round((plan.uncertainty.semantic ?? 0) * 100)}, ilişki=%${Math.round((plan.uncertainty.relational ?? 0) * 100)}`
     : "n/a";
   const expressionMode = plan.projections?.expressionMode ?? "natural_social";
 
@@ -79,9 +65,10 @@ export function buildCanonicalBehaviorBlock(plan: KairaResponsePlan): string {
     `HOW_PROJECTION.expressionMode=${expressionMode} (GÖZLEMSEL — KARAR DEĞİL)`,
     "requiredContent yalnızca ANLAMSAL yükümlülüktür. Etiket adlarını, iç state'i, skorları veya plan gerekçesini kullanıcıya raporlama/parafraz etme; gerekli anlamı doğal konuşma içinde gerçekleştir.",
     "hardReasons yalnız iç gerekçedir; kullanıcıya karar raporu gibi anlatılmaz.",
-    adviceAllowed
-      ? ""
-      : "TAVSİYE YASAĞI: kullanıcı açıkça tavsiye/öneri istemedi. Ne yapması gerektiğini söyleme; öğüt, reçete veya 'şunu yap' yönlendirmesi ekleme. Yalnız doğal sosyal tepki üret.",
+    adviceAllowed ? "" : "TAVSİYE YASAĞI: kullanıcı açıkça tavsiye/öneri istemedi. Ne yapması gerektiğini söyleme; öğüt, reçete veya 'şunu yap' yönlendirmesi ekleme. Yalnız doğal sosyal tepki üret.",
+    plan.requiredContent?.includes("engage_user_content")
+      ? "İÇERİĞE TEPKİ ZORUNLULUĞU: Kullanıcının somut söylediği şeye en az bir doğal tepki ver. Yalnız he/hee/hmm/anladım/tamam gibi içeriksiz acknowledgement ile geçiştirme. Mesajda olmayan yeni ayrıntı uydurma."
+      : "",
     expressionMode === "natural_repair"
       ? "HOW: Özrü doğal bir sosyal tepki olarak karşıla. Affetme veya yakınlığı yeniden açma yasağını koru; fakat iç ilişki durumunu, 'mesafe koydum' gibi state raporlarını veya sistem kararını açıklama."
       : expressionMode === "firm_boundary"
@@ -93,35 +80,14 @@ export function buildCanonicalBehaviorBlock(plan: KairaResponsePlan): string {
       ? "KARŞI-FLÖRT MUTLAK YASAK: kullanıcı flört etse/teklif etse bile Kaira flörte karşılık vermez, romantik/cinsel ima başlatmaz. Sıcak veya esprili olabilir; flörtü nazikçe geçiştirir. Güven, yakınlık, geçmiş ilişki, kayıt (register) veya ton bu sınırı açamaz."
       : "",
     "REALIZER KİLİDİ: Sen yalnızca bu planı tek bir doğal Türkçe mesaja dönüştürürsün. Planı genişletemez, gevşetemez, tersine çeviremez; kendi sosyal/ilişki kararını yeniden veremezsin. 'yasak' olan hiçbir şeyi üretme; bütçeleri aşma. Konuşma kimliği, ton, kayıt ve stil yalnızca NASIL söylendiğini belirler; hiçbir kapıyı açamaz.",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ].filter(Boolean).join("\n");
 }
 
-/**
- * Observational context only — intent / sentiment / relationship scores and the
- * qualitative reaction flavor. Explicitly NOT a decision surface: no gate verbs,
- * no "bağlayıcı", no "ihlal etme". The model reads it for grounding, not for
- * permissions.
- */
 export function buildCanonicalObservationalContext(ctx: CanonicalObservationalContext): string {
-  const reaction =
-    ctx.reactionMode && ctx.reactionMode !== "neutral"
-      ? ` Nitel tepki tonu: ${ctx.reactionMode} (yalnızca his; kapı değil).`
-      : "";
-  return (
-    `KDM BAĞLAMI (GÖZLEMSEL — KARAR DEĞİL): niyet=${ctx.intent}, duygu=${ctx.sentiment}, ` +
-    `sıcaklık=${ctx.warmth}, güven=${ctx.trust}, çatışma=${ctx.conflict}, kırgınlık=${ctx.hurt}.` +
-    reaction +
-    " Bu satır davranış izni vermez; izinler yalnızca KAIRA DAVRANIŞ PLANI'ndadır."
-  );
+  const reaction = ctx.reactionMode && ctx.reactionMode !== "neutral" ? ` Nitel tepki tonu: ${ctx.reactionMode} (yalnızca his; kapı değil).` : "";
+  return `KDM BAĞLAMI (GÖZLEMSEL — KARAR DEĞİL): niyet=${ctx.intent}, duygu=${ctx.sentiment}, sıcaklık=${ctx.warmth}, güven=${ctx.trust}, çatışma=${ctx.conflict}, kırgınlık=${ctx.hurt}.` + reaction + " Bu satır davranış izni vermez; izinler yalnızca KAIRA DAVRANIŞ PLANI'ndadır.";
 }
 
-/**
- * Dialogue move as pure context under the canonical flag: the one move + target +
- * rationale. The question / length / speculation / emoji gates it used to carry
- * now live only in the canonical behavior block.
- */
 export function buildCanonicalDialogueMoveContext(move: string, target: string | undefined, reason: string): string {
   return [
     "DİYALOG HAREKETİ (GÖZLEMSEL — KARAR DEĞİL):",
