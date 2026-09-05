@@ -10,20 +10,20 @@ jobs:
     steps:
       - name: Capture live semantic variance
         shell: bash
-        env:
-          BASE_URL: https://nexus-kairo-studio.onrender.com
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, subprocess
+          import json, subprocess, time
           base='https://nexus-kairo-studio.onrender.com'
           def post(msg):
             payload={'userMessage':msg,'userName':'Tolga','characterName':'Kaira','provider':'openrouter'}
-            p=subprocess.run(['curl','--connect-timeout','10','--max-time','50','-fsS','-H','Content-Type: application/json','-d',json.dumps(payload,ensure_ascii=False),base+'/api/language-understanding'],capture_output=True,text=True,timeout=60)
-            if p.returncode: raise SystemExit(p.stderr)
-            return json.loads(p.stdout)
-          for msg in ['Mert yine geç kaldı','Mert yine geç kaldı','Mert yine geç kaldı','Mert yüzünden çok üzgünüm']:
-            d=post(msg)
-            i=d.get('interpretation') or {}; e=d.get('event') or {}
-            print('SNAPSHOT',json.dumps({'message':msg,'intent':i.get('primaryIntent'),'target':i.get('target'),'valence':i.get('valence'),'emotionalLoad':i.get('emotionalLoad'),'support':i.get('support'),'affection':i.get('affection'),'socialRoutine':(i.get('discourseFacets') or {}).get('socialRoutine'),'uncertainty':i.get('uncertainty'),'eventIntent':e.get('intent'),'eventRoutine':e.get('socialRoutine'),'evidence':i.get('evidence')},ensure_ascii=False))
+            last=''
+            for attempt in range(3):
+              p=subprocess.run(['curl','--connect-timeout','10','--max-time','50','-fsS','--retry','2','--retry-all-errors','--retry-delay','1','-H','Content-Type: application/json','-d',json.dumps(payload,ensure_ascii=False),base+'/api/language-understanding'],capture_output=True,text=True,timeout=60)
+              if p.returncode==0: return json.loads(p.stdout)
+              last=p.stderr; time.sleep(1)
+            raise SystemExit(last)
+          for idx,msg in enumerate(['Mert yine geç kaldı','Mert yine geç kaldı','Mert yine geç kaldı','Mert yüzünden çok üzgünüm']):
+            d=post(msg); i=d.get('interpretation') or {}; e=d.get('event') or {}
+            print('SNAPSHOT',idx,json.dumps({'message':msg,'intent':i.get('primaryIntent'),'target':i.get('target'),'valence':i.get('valence'),'emotionalLoad':i.get('emotionalLoad'),'support':i.get('support'),'affection':i.get('affection'),'compliment':i.get('compliment'),'socialRoutine':(i.get('discourseFacets') or {}).get('socialRoutine'),'discourseAct':(i.get('discourseFacets') or {}).get('discourseAct'),'relationalAct':(i.get('discourseFacets') or {}).get('relationalAct'),'uncertainty':i.get('uncertainty'),'eventIntent':e.get('intent'),'eventRoutine':e.get('socialRoutine'),'evidence':i.get('evidence')},ensure_ascii=False),flush=True)
           PY
