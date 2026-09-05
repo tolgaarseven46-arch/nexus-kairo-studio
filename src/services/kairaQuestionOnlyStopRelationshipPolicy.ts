@@ -44,12 +44,17 @@ export function isRelationshipNeutralAccountabilityComplaint(
   interp: SemanticInterpretation,
 ): boolean {
   const independentHarmAct = interp.secondarySocialActs.some((act) =>
-    INDEPENDENT_HARM_ACTS.has(act),
+    act === "insult" ||
+    act === "coercion" ||
+    act === "manipulation" ||
+    act === "mockery" ||
+    act === "privacy_violation",
   );
   const independentVectorHarm =
     interp.severity.coercion >= RELATIONSHIP_HARM_COMPONENT_FLOOR ||
     interp.severity.manipulation >= RELATIONSHIP_HARM_COMPONENT_FLOOR ||
-    interp.severity.privacy >= RELATIONSHIP_HARM_COMPONENT_FLOOR;
+    interp.severity.privacy >= RELATIONSHIP_HARM_COMPONENT_FLOOR ||
+    interp.severity.aggression >= 0.2;
 
   return (
     interp.primaryIntent === "complaint" &&

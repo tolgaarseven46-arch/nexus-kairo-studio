@@ -77,12 +77,42 @@ export function groundSemanticEventForAppraisal(
   return { event: appraisalEvent, worldEvent };
 }
 
+function reconcileSemanticTargetWithEntityResolution(
+  interpretation: SemanticInterpretation,
+  entityResolution: EntityResolutionResult,
+): SemanticInterpretation {
+  if (interpretation.target !== "third_party") return interpretation;
+  const explicitKairaReference = entityResolution.references.some((ref) =>
+    (ref.role === "second_person" || ref.role === "character") &&
+    ref.resolvedId === "kaira" &&
+    ref.confidence >= 0.9
+  );
+  const explicitThirdPartyReference = entityResolution.references.some((ref) =>
+    ref.role === "named_person" && ref.resolvedId !== "current_user" && ref.resolvedId !== "kaira"
+  ) || entityResolution.namedPeople.length > 0;
+  const relationalAct = interpretation.discourseFacets.relationalAct;
+  const dyadicSemantic = relationalAct !== "none" ||
+    interpretation.primaryIntent === "affection" ||
+    interpretation.primaryIntent === "repair" ||
+    interpretation.primaryIntent === "command";
+  if (!explicitKairaReference || explicitThirdPartyReference || !dyadicSemantic) return interpretation;
+  return {
+    ...interpretation,
+    target: "kaira",
+    uncertainty: {
+      ...interpretation.uncertainty,
+      target: Math.min(interpretation.uncertainty.target, 0.2),
+    },
+  };
+}
+
 function buildResult(
   message: string,
   interpretation: SemanticInterpretation,
   entityResolution: EntityResolutionResult,
   rest: Omit<LanguageUnderstandingResult, "interpretation" | "event" | "entityResolution" | "worldEvent">,
 ): LanguageUnderstandingResult {
+  interpretation = reconcileSemanticTargetWithEntityResolution(interpretation, entityResolution);
   const projected = projectSemanticEvent(interpretation);
   const grounded = groundSemanticEventForAppraisal(message, projected, entityResolution);
   return {

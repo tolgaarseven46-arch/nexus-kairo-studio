@@ -40,6 +40,7 @@ const FIRST_PERSON = new Set([
   "bende",
   "benden",
   "benimle",
+  "benle",
 ]);
 
 const SECOND_PERSON = new Set([
@@ -50,6 +51,7 @@ const SECOND_PERSON = new Set([
   "sende",
   "senden",
   "seninle",
+  "senle",
 ]);
 
 const PERSON_CONTEXT_WORDS = new Set([

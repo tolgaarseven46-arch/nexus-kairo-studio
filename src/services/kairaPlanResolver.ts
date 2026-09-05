@@ -16,6 +16,7 @@ import type {
   KairaExpressionMode,
   KairaPlanProjections,
   KairaPlanUncertainty,
+  KairaSocialMove,
   SoftTendencyProfile,
 } from "../types/kairaBehaviorPlan";
 
@@ -48,6 +49,7 @@ export interface ResolvedKairaPlan {
   hardReasons: string[];
   uncertainty: KairaPlanUncertainty;
   projections: KairaPlanProjections;
+  socialMove: KairaSocialMove;
   resolverRationale: string[];
 }
 
@@ -125,6 +127,16 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   const emojiBudget =
     hard.emojiBudget > 0 && soft.warmthTendency >= 0.4 && !hard.mustAcknowledgeBoundary ? 1 : 0;
 
+  let socialMove: KairaSocialMove = "none";
+  if (dialogue.move === "respond_to_relational_bid") {
+    if (hard.hardDisengage) socialMove = "maintain_boundary";
+    else if (hard.mustAcknowledgeBoundary || contract.stance !== "open") socialMove = "set_boundary";
+    else if (dialogue.relationalAct === "reconciliation_attempt" && allowReopeningCloseness) socialMove = "accept_repair";
+    else if (allowAffection && dialogue.relationalAct === "closeness_bid") socialMove = "reciprocate_nonromantic_closeness";
+    else socialMove = soft.guardedness >= 0.55 ? "set_boundary" : "warm_deflect";
+    rationale.push(`social_move:${socialMove}`);
+  }
+
   // WHAT only. These labels say which semantic obligations must be preserved;
   // they never prescribe a sentence shape, state narration, or turn-closing style.
   const requiredContent: string[] = [];
@@ -135,6 +147,7 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     dialogue.move === "natural_reaction" &&
     !dialogue.allowSpeculation &&
     uncertainty.semantic >= 0.75;
+  if (socialMove !== "none") requiredContent.push(`social_move:${socialMove}`);
   if (preserveAmbiguity) {
     requiredContent.push("preserve_ambiguity");
     rationale.push("opaque_turn:preserve_ambiguity");
@@ -162,6 +175,7 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     requiredContent,
     hardReasons: hard.reasons,
     uncertainty,
+    socialMove,
     projections: {
       toneProjection: toneProjection(soft, hard),
       register: speech.register,

@@ -67,6 +67,24 @@ function trivialRenderIntent(
   ) {
     return null;
   }
+
+  // Intent comes ONLY from the shared SemanticEvent's routine — never a re-parse.
+  // Resolve it before the richness gate so a surface interrogative such as
+  // "nasıl gidiyor" can remain a trivial social routine even when the legacy
+  // compatibility intent is `information_request`.
+  const routine = event.socialRoutine ?? "none";
+
+  // Fast local rendering is only for semantically trivial routines. Surface
+  // interrogative form alone is not richness: "nasıl gidiyor" and
+  // "keyifler nasıl" are still local how-are-you routines. Typed knowledge or
+  // emotionally loaded third-party content stays on the full generation path.
+  // Direct relational bids are already excluded by the non-trivial dialogue move.
+  if (
+    (event.intent === "information_request" && routine === "none") ||
+    event.knowledgeQuery ||
+    (event.target === "third_party" && event.emotionalLoad >= 0.35)
+  ) return null;
+
   // The dialogue decision must have chosen a trivial move (or be absent for a
   // direct/legacy call). The local engine never overrides a non-trivial move.
   if (dialogueMove !== undefined && !TRIVIAL_RENDER_MOVES.has(dialogueMove)) return null;
@@ -74,8 +92,6 @@ function trivialRenderIntent(
   // Kaira, not a fresh routine — hand it to the pipeline.
   if (discourse?.previousTurnDependency) return null;
 
-  // Intent comes ONLY from the shared SemanticEvent's routine — never a re-parse.
-  const routine = event.socialRoutine ?? "none";
   switch (routine) {
     case "greeting":
       return (discourse?.routines.greeting.count ?? 0) >= 2 ? null : "greeting";
