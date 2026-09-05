@@ -19,6 +19,9 @@ describe('isTurkishQuestionAct', () => {
     'aha derbi modunda 😂 skoru yaz bakalım kim önde',
     'ooo kritik maç 😂 içinden kim geçsin istiyon',
     'siz neredeydiniz buluşma mı, işe mi geç kaldı yine',
+    'kaçta kalkman lazım 😅',
+    'kaça kadar açıksınız',
+    'kaçtan beri bekliyorsun',
   ])('detects punctuationless Turkish question act: %s', (text) => {
     expect(isTurkishQuestionAct(text)).toBe(true);
   });
@@ -32,6 +35,8 @@ describe('isTurkishQuestionAct', () => {
     'ne yapasın var diye sordu',
     'Mert bana nasılsın diye sordu',
     'Mert iyi misin diye sordu',
+    'saat kaçta olduğunu söyledi',
+    'kaça kadar açık olduğunu anlattı',
     'ne güzel maç',
     'skor bugün iki bir',
     '[bence] bu kadar yeter',
