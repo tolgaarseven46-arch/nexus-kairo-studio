@@ -1,0 +1,283 @@
+name: One-time Semantic Context Non-Invention
+
+on:
+  push:
+    branches:
+      - fix/semantic-context-non-invention
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[semantic-non-invention-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/semantic-context-non-invention
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Apply canonical semantic non-invention guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/services/llmSemanticUnderstandingProvider.ts')
+          s = p.read_text()
+
+          old = 'Geçmiş bağlamı yalnız hedef/alıntı/referans çözmek için kullan; ilişki politikası veya cevap kararı üretme.\n'
+          new = old + 'Bağlam kısa veya kısaltılmış bir mesajın sözlüksel açılımını UYDURAMAZ. Mesaj kendi başına anlam taşımıyorsa belirsizliği koru; bağlam yalnız hedef/referans/discourse bağımlılığını çözebilir.\n'
+          assert old in s
+          s = s.replace(old, new, 1)
+
+          marker = 'export function createLlmSemanticUnderstandingProvider(options: LlmSemanticProviderOptions): SemanticUnderstandingProvider {'
+          idx = s.index(marker)
+          prefix = s[:idx]
+          replacement = r'''function isShortContextAdjudicationCandidate(message: string, context?: LanguageUnderstandingContext): boolean {
+  const token = message.trim();
+  return Boolean(context?.recentMessages?.length) && /^[\p{L}\p{N}]{2,3}$/u.test(token);
+}
+
+function isSemanticallyOpaqueWithoutContext(interpretation: SemanticInterpretation): boolean {
+  const severityPeak = Math.max(
+    interpretation.severity.disrespect,
+    interpretation.severity.coercion,
+    interpretation.severity.manipulation,
+    interpretation.severity.privacy,
+    interpretation.severity.aggression,
+  );
+  const facets = interpretation.discourseFacets;
+  return interpretation.primaryIntent === "other"
+    && interpretation.secondarySocialActs.length === 0
+    && interpretation.target === "unknown"
+    && interpretation.valence === "neutral"
+    && severityPeak <= 0.15
+    && interpretation.affection <= 0.15
+    && interpretation.support <= 0.15
+    && interpretation.compliment <= 0.15
+    && interpretation.emotionalLoad <= 0.25
+    && !interpretation.apology
+    && !interpretation.repairAttempt
+    && !interpretation.stopRequest
+    && facets.socialRoutine === "none"
+    && facets.discourseAct === "none"
+    && facets.repairSignal === "none"
+    && !facets.adviceRequested
+    && facets.knowledgeQuery === null
+    && facets.selfMemoryQuery === null
+    && facets.relationalAct === "none"
+    && !facets.stopQuestions
+    && !facets.stopTalking
+    && interpretation.uncertainty.overall >= 0.7
+    && interpretation.uncertainty.intent >= 0.7;
+}
+
+function contextInventsLexicalMeaning(
+  baseline: SemanticInterpretation,
+  contextual: SemanticInterpretation,
+): boolean {
+  const baselineFacets = baseline.discourseFacets;
+  const contextualFacets = contextual.discourseFacets;
+  const contextualSeverityPeak = Math.max(
+    contextual.severity.disrespect,
+    contextual.severity.coercion,
+    contextual.severity.manipulation,
+    contextual.severity.privacy,
+    contextual.severity.aggression,
+  );
+  return contextual.primaryIntent !== baseline.primaryIntent
+    || contextual.secondarySocialActs.length > 0
+    || contextual.valence !== baseline.valence
+    || contextualSeverityPeak > 0.2
+    || contextual.affection > baseline.affection + 0.2
+    || contextual.support > baseline.support + 0.2
+    || contextual.compliment > baseline.compliment + 0.2
+    || contextual.emotionalLoad > baseline.emotionalLoad + 0.35
+    || contextual.apology !== baseline.apology
+    || contextual.repairAttempt !== baseline.repairAttempt
+    || contextual.stopRequest !== baseline.stopRequest
+    || contextualFacets.socialRoutine !== baselineFacets.socialRoutine
+    || contextualFacets.discourseAct !== baselineFacets.discourseAct
+    || contextualFacets.repairSignal !== baselineFacets.repairSignal
+    || contextualFacets.adviceRequested !== baselineFacets.adviceRequested
+    || contextualFacets.knowledgeQuery !== null
+    || contextualFacets.selfMemoryQuery !== null
+    || contextualFacets.relationalAct !== baselineFacets.relationalAct
+    || contextualFacets.stopQuestions !== baselineFacets.stopQuestions
+    || contextualFacets.stopTalking !== baselineFacets.stopTalking;
+}
+
+function preserveOnlyContextualReferent(
+  baseline: SemanticInterpretation,
+  contextual: SemanticInterpretation,
+): SemanticInterpretation {
+  if (contextual.target === "unknown" || contextual.target === baseline.target) return baseline;
+  return {
+    ...baseline,
+    target: contextual.target,
+    uncertainty: {
+      ...baseline.uncertainty,
+      target: Math.min(baseline.uncertainty.target, contextual.uncertainty.target),
+    },
+  };
+}
+
+export function createLlmSemanticUnderstandingProvider(options: LlmSemanticProviderOptions): SemanticUnderstandingProvider {
+  const interpretOnce = async (
+    message: string,
+    morphology: TurkishMorphologyResult | undefined,
+    context: LanguageUnderstandingContext | undefined,
+  ): Promise<SemanticInterpretation> => {
+    const prompt = `MESAJ:\n${message}\n\nMORFOLOJİ:\n${compactMorphology(morphology)}\n\nSON BAĞLAM:\n${compactContext(context)}\n\nKullanıcı adı: ${context?.userName ?? "bilinmiyor"}\nKarakter adı: ${context?.characterName ?? "Kaira"}`;
+    const raw = await options.generate({ system: SYSTEM, prompt, temperature: 0.05 });
+    const parsed = extractJson(raw) as Record<string, unknown>;
+    parsed.raw = message;
+    if (parsed.schemaVersion !== SEMANTIC_INTERPRETATION_SCHEMA_VERSION || !isSemanticInterpretation(parsed)) {
+      throw new Error("LLM semantic parser incomplete/invalid SemanticInterpretation@2 returned.");
+    }
+    const normalized = enforceProviderFieldInvariants(
+      normalizeSemanticInterpretation(parsed, message),
+      context,
+    );
+    normalized.evidence = normalized.evidence.length
+      ? normalized.evidence.map((e) => ({ ...e, source: "llm", provider: e.provider ?? options.name ?? "llm_semantic_parser_v2" }))
+      : [{ source: "llm", provider: options.name ?? "llm_semantic_parser_v2", cues: [], confidence: Math.max(0, 1 - normalized.uncertainty.overall) }];
+    return normalized;
+  };
+
+  return {
+    name: options.name ?? "llm_semantic_parser_v2",
+    async interpret({ message, morphology, context }): Promise<SemanticInterpretation> {
+      const contextual = await interpretOnce(message, morphology, context);
+      if (!isShortContextAdjudicationCandidate(message, context)) return contextual;
+
+      const contextFree = await interpretOnce(message, morphology, {
+        ...context,
+        recentMessages: [],
+      });
+      if (!isSemanticallyOpaqueWithoutContext(contextFree)) return contextual;
+      if (!contextInventsLexicalMeaning(contextFree, contextual)) return contextual;
+
+      return preserveOnlyContextualReferent(contextFree, contextual);
+    },
+  };
+}
+'''
+          p.write_text(prefix + replacement)
+          PY
+
+          cat > src/services/llmSemanticContextNonInvention.test.ts <<'EOF'
+          import { describe, expect, it, vi } from 'vitest';
+          import type { SemanticInterpretation } from '../types/semanticInterpretation';
+          import { createLlmSemanticUnderstandingProvider } from './llmSemanticUnderstandingProvider';
+
+          function interpretation(overrides: Partial<SemanticInterpretation> = {}): SemanticInterpretation {
+            return {
+              schemaVersion: 'semantic-interpretation@2',
+              raw: 'x', normalized: 'x', primaryIntent: 'other', secondarySocialActs: [], target: 'unknown', valence: 'neutral',
+              severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 },
+              jokingConfidence: 0.2, sincerityConfidence: 0.3, affection: 0, support: 0, compliment: 0, emotionalLoad: 0.1,
+              apology: false, repairAttempt: false, stopRequest: false,
+              discourseFacets: { socialRoutine: 'none', discourseAct: 'none', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'none', relationalIntensity: 0, stopQuestions: false, stopTalking: false },
+              uncertainty: { overall: 0.8, intent: 0.8, target: 0.8, severity: 0.5 },
+              evidence: [{ source: 'llm', provider: 'test', cues: ['x'], confidence: 0.2 }],
+              ...overrides,
+            };
+          }
+
+          const context = {
+            userName: 'Mert', characterName: 'Kaira',
+            recentMessages: [
+              { role: 'user' as const, content: 'seni sevdim' },
+              { role: 'assistant' as const, content: 'bunu duymak güzel' },
+            ],
+          };
+
+          describe('LLM semantic context non-invention', () => {
+            it('does not let warm context invent thanks/affection/closeness for an opaque short token', async () => {
+              const contextual = interpretation({
+                raw: 'sg', normalized: 'sg', primaryIntent: 'smalltalk', secondarySocialActs: ['affection', 'closeness_bid'],
+                target: 'kaira', valence: 'positive', affection: 0.75,
+                discourseFacets: { socialRoutine: 'thanks', discourseAct: 'none', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'closeness_bid', relationalIntensity: 0.5, stopQuestions: false, stopTalking: false },
+                uncertainty: { overall: 0.5, intent: 0.5, target: 0.4, severity: 0.2 },
+              });
+              const contextFree = interpretation({ raw: 'sg', normalized: 'sg' });
+              const generate = vi.fn()
+                .mockResolvedValueOnce(JSON.stringify(contextual))
+                .mockResolvedValueOnce(JSON.stringify(contextFree));
+              const provider = createLlmSemanticUnderstandingProvider({ generate });
+              const result = await provider.interpret({ message: 'sg', context });
+              expect(generate).toHaveBeenCalledTimes(2);
+              expect(result.primaryIntent).toBe('other');
+              expect(result.valence).toBe('neutral');
+              expect(result.secondarySocialActs).toEqual([]);
+              expect(result.affection).toBe(0);
+              expect(result.discourseFacets.relationalAct).toBe('none');
+              expect(result.uncertainty.overall).toBeGreaterThanOrEqual(0.7);
+            });
+
+            it('preserves a real short lexical command when context-free semantics are not opaque', async () => {
+              const command = interpretation({
+                raw: 'sus', normalized: 'sus', primaryIntent: 'command', target: 'kaira', valence: 'negative', stopRequest: true,
+                secondarySocialActs: ['stop_request'],
+                discourseFacets: { socialRoutine: 'none', discourseAct: 'none', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'none', relationalIntensity: 0, stopQuestions: false, stopTalking: true },
+                uncertainty: { overall: 0.1, intent: 0.1, target: 0.1, severity: 0.2 },
+              });
+              const generate = vi.fn().mockResolvedValue(JSON.stringify(command));
+              const provider = createLlmSemanticUnderstandingProvider({ generate });
+              const result = await provider.interpret({ message: 'sus', context });
+              expect(generate).toHaveBeenCalledTimes(2);
+              expect(result.primaryIntent).toBe('command');
+              expect(result.stopRequest).toBe(true);
+              expect(result.discourseFacets.stopTalking).toBe(true);
+            });
+
+            it('allows context to resolve only the referent when no lexical meaning is invented', async () => {
+              const contextual = interpretation({ raw: 'zx', normalized: 'zx', target: 'kaira', uncertainty: { overall: 0.8, intent: 0.8, target: 0.3, severity: 0.5 } });
+              const contextFree = interpretation({ raw: 'zx', normalized: 'zx' });
+              const generate = vi.fn().mockResolvedValueOnce(JSON.stringify(contextual)).mockResolvedValueOnce(JSON.stringify(contextFree));
+              const provider = createLlmSemanticUnderstandingProvider({ generate });
+              const result = await provider.interpret({ message: 'zx', context });
+              expect(result.target).toBe('kaira');
+              expect(result.primaryIntent).toBe('other');
+              expect(result.valence).toBe('neutral');
+            });
+          });
+          EOF
+
+          cat > docs/adr/0015-semantic-context-non-invention.md <<'EOF'
+          # ADR-0015: Conversation context may resolve referents but may not invent lexical meaning
+
+          ## Status
+          Accepted
+
+          ## Context
+          Production characterization of the real-chat `sg` failure showed a precise drift: without history, the canonical LLM semantic provider correctly returned an opaque/high-uncertainty neutral interpretation. In a warm history, the same token was upgraded without lexical evidence into positive thanks + affection + closeness. Conflict history returned it to ambiguous. The same current utterance was therefore acquiring content solely from relationship-shaped context.
+
+          ## Decision
+          The canonical semantic provider keeps context for target/referent/discourse resolution, but it may not manufacture content-bearing semantics for a very short utterance that is independently opaque.
+
+          For 2–3 character single-token utterances with history, the provider performs a context-free semantic adjudication. If the context-free reading is strongly opaque/neutral and the contextual reading adds intent, valence, severity, social acts, affect, stop/repair/advice/query or relational meaning, the context-free content wins. A contextual target-only resolution remains permitted.
+
+          This is an invariant inside the existing canonical semantic authority. It is not an `sg` lexicon, regex interpretation table, downstream classifier, or response-time patch.
+
+          ## Consequences
+          - Warm context cannot turn an unknown shorthand into thanks/affection/closeness by invention.
+          - Real short lexical commands such as `sus` remain intact because their context-free semantics are not opaque.
+          - Very short turns may incur one additional semantic-provider call when history exists; this is bounded to the 2–3 character adjudication surface and is accepted for correctness before later latency optimization.
+          EOF
+
+          rm -f .github/workflows/one-time-semantic-context-non-invention.yml
+          npm test -- --run src/services/llmSemanticContextNonInvention.test.ts
+          npx tsc --noEmit
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(semantic): prevent context meaning invention [semantic-non-invention-applied]'
+          git push origin HEAD:fix/semantic-context-non-invention
