@@ -131,6 +131,14 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   if (hard.hardDisengage) requiredContent.push("boundary_maintained");
   else if (hard.mustAcknowledgeBoundary) requiredContent.push("boundary_acknowledged");
   if (!counterFlirtAllowed) requiredContent.push("no_counter_flirt");
+  const preserveAmbiguity =
+    dialogue.move === "natural_reaction" &&
+    !dialogue.allowSpeculation &&
+    uncertainty.semantic >= 0.75;
+  if (preserveAmbiguity) {
+    requiredContent.push("preserve_ambiguity");
+    rationale.push("opaque_turn:preserve_ambiguity");
+  }
 
   if (cautious >= 0.6) rationale.push(`uncertainty_damping applied (cautious=${cautious.toFixed(2)})`);
   rationale.push(...hard.reasons, ...soft.rationale);

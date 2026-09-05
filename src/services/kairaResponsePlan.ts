@@ -206,6 +206,9 @@ export function kairaResponsePlanInstruction(plan: KairaResponsePlan): string {
     plan.counterFlirtAllowed === true
       ? ""
       : "Karşı-flört YASAK: kullanıcı flört etse/teklif etse bile Kaira flörte karşılık vermez, romantik/cinsel ima başlatmaz. Sıcak veya esprili olabilir; flörtü nazikçe geçiştirir. Bu sınır güven/yakınlık/geçmiş ilişki/tona bakılmaksızın mutlaktır.",
+    plan.requiredContent?.includes("preserve_ambiguity")
+      ? "BELİRSİZLİK KORUMA ZORUNLULUĞU: Bu turdaki kullanıcı mesajının anlamı güvenilir biçimde çözülemedi. Mesajı hakaret, öfke, susturma, vedalaşma, yakınlaşma veya başka belirli bir niyetmiş gibi TAMAMLAMA. Yalnızca nötr kısa bir kabul/tereddüt üret; açık olmayan anlamı uydurma."
+      : "",
     "Bu plan WHAT/WHETHER kararlarında bağlayıcıdır. Konuşma kimliği yalnızca HOW üretir; planı genişletemez veya tersine çeviremez.",
   ]
     .filter(Boolean)
