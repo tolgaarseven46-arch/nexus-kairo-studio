@@ -1,0 +1,51 @@
+name: One-time Transcript Echo Postfix
+
+on:
+  push:
+    branches:
+      - diag/transcript-echo-postfix
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: diag/transcript-echo-postfix
+          fetch-depth: 0
+      - name: Verify production final replies do not leak transcript wrappers
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://nexus-kairo-studio.onrender.com/api/chat'
+          for i in 1 2 3 4 5; do
+            body=$(printf '{"userId":"transcript_smoke_%s","userName":"Mert","userMessage":"çok saçmalıyorsun","character":{"name":"Kaira"},"personality":{},"history":[{"sender":"user","text":"naber","participantName":"Mert"},{"sender":"assistant","text":"iyi valla sen nasılsın","replyToParticipantName":"Mert"},{"sender":"user","text":"iyi maç izliyorum","participantName":"Mert"},{"sender":"assistant","text":"he iyiymiş","replyToParticipantName":"Mert"}],"provider":"openrouter","suppressRecentMemory":true,"kairaInstanceId":"transcript_smoke_instance_%s","kairaInstanceType":"welcome","requestId":"transcript-smoke-%s"}' "$i" "$i" "$i")
+            curl --retry 3 --retry-all-errors --retry-delay 2 --fail-with-body --silent --show-error --max-time 180 \
+              -H 'Content-Type: application/json' --data "$body" "$URL" > "/tmp/reply_$i.json"
+            cat "/tmp/reply_$i.json"
+            node - "$i" <<'NODE'
+          const fs = require('fs');
+          const i = process.argv[2];
+          const x = JSON.parse(fs.readFileSync(`/tmp/reply_${i}.json`, 'utf8'));
+          const reply = String(x.reply || '');
+          if (/\[[^\]]+\]:/.test(reply) || /\[\s*K(?:aira|airo)\s*→/iu.test(reply)) {
+            throw new Error(`internal transcript wrapper leaked in run ${i}: ${reply}`);
+          }
+          if (x?.kdm?.consistency?.accepted === false) {
+            throw new Error(`final consistency rejected in run ${i}: ${JSON.stringify(x.kdm.consistency)}`);
+          }
+          console.log(`TRANSCRIPT_ECHO_RUN_${i}_PASS :: ${reply}`);
+          NODE
+          done
+          echo 'PRODUCTION_TRANSCRIPT_ECHO_PASS'
+      - name: Self-remove diagnostic workflow
+        shell: bash
+        run: |
+          git rm .github/workflows/one-time-transcript-echo-postfix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: remove transcript echo postfix diagnostic'
+          git push origin HEAD:diag/transcript-echo-postfix
