@@ -10,13 +10,13 @@ const RHETORICAL_REACTION_CLITIC_RE =
   /^\s*(?:(?:vay|of|oha|yaa?|hadi\s+ya)\s+)?(?:yine|harbi|cidden)\s+m[ıiuü]\s+ya\b/iu;
 
 const DIRECT_INTERROGATIVE_START_RE =
-  /^\s*(?:neden|niye|nas[ıi]l|kim|kimle|kimin|kimden|kimde|kime|kimi|hangi|hangisi|hangileri|nerede|neresi|nereye|nereden|kaç)(?![\p{L}\p{N}_])/iu;
+  /^\s*(?:neden|niye|nas[ıi]l|kim|kimle|kimin|kimden|kimde|kime|kimi|hangi|hangisi|hangileri|nerede|neresi|nereye|nereden|kaç(?:ta|a|tan)?)(?![\p{L}\p{N}_])/iu;
 
 const STRONG_INTERROGATIVE_ANYWHERE_RE =
-  /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|neresi|nereye|nereden|neden|niye|kaç)(?![\p{L}\p{N}_])/iu;
+  /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|neresi|nereye|nereden|neden|niye|kaç(?:ta|a|tan)?)(?![\p{L}\p{N}_])/iu;
 
 const EMBEDDED_INTERROGATIVE_RE =
-  /(?:[,.!…;:]\s*|(?<![\p{L}\p{N}_])(?:peki|tamam|güzel|iyi|ee|e|hmm|hımm|ya|oh|ooo|aha|hee)\s+)(?:neden|niye|nas[ıi]l|kim|kimle|kimin|kimden|kimde|kime|kimi|hangi|hangisi|hangileri|nerede|neresi|nereye|nereden|kaç)(?![\p{L}\p{N}_])/iu;
+  /(?:[,.!…;:]\s*|(?<![\p{L}\p{N}_])(?:peki|tamam|güzel|iyi|ee|e|hmm|hımm|ya|oh|ooo|aha|hee)\s+)(?:neden|niye|nas[ıi]l|kim|kimle|kimin|kimden|kimde|kime|kimi|hangi|hangisi|hangileri|nerede|neresi|nereye|nereden|kaç(?:ta|a|tan)?)(?![\p{L}\p{N}_])/iu;
 
 const CASE_MARKED_INTERROGATIVE_RE =
   /(?<![\p{L}\p{N}_])(?:kimle|kimin|kimden|kimde|kime|kimi|nerede|neresi|nereye|nereden|hangisi|hangileri|neden|niye)(?![\p{L}\p{N}_])/iu;
@@ -37,13 +37,13 @@ const REPORTED_SPEECH_SUFFIX_RE =
   /(?<![\p{L}\p{N}_])diye\s+(?:sordu|dedi|anlatt[ıi]|söyledi)(?![\p{L}\p{N}_])\s*[.!…]*\s*$/iu;
 
 const EMBEDDED_COMPLEMENT_RE =
-  /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|nereye|nereden|neden|niye|nas[ıi]l|ne)(?![\p{L}\p{N}_]).{0,70}\b[\p{L}]+(?:d[ıiuü]ğ[ıiuü]n[ıiuü]|t[ıiuü]ğ[ıiuü]n[ıiuü])\b.{0,40}\b(?:anlatt[ıi]|söyledi|dedi|biliyorum|biliyorsun|öğrendim|hatırlıyorum|duydum)\b/iu;
+  /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|nereye|nereden|neden|niye|nas[ıi]l|kaç(?:ta|a|tan)?|ne)(?![\p{L}\p{N}_]).{0,70}\b[\p{L}]+(?:d[ıiuü]ğ[ıiuü]n[ıiuü]|t[ıiuü]ğ[ıiuü]n[ıiuü])\b.{0,40}\b(?:anlatt[ıi]|söyledi|dedi|biliyorum|biliyorsun|öğrendim|hatırlıyorum|duydum)\b/iu;
 
 const REPORTED_DIRECT_QUESTION_RE =
-  /(?<![\p{L}\p{N}_])(?:neden|niye|nas[ıi]l|kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|neresi|nereye|nereden|kaç|ne(?:\s+(?:durumda|oldu|oluyor|olacak|zaman|kadar))?)(?![\p{L}\p{N}_]).{0,60}(?<![\p{L}\p{N}_])(?:diye\s+(?:sordu|dedi|anlatt[ıi]|söyledi)|sorduğunu|dediğini|anlattığını|söylediğini)(?![\p{L}\p{N}_])/iu;
+  /(?<![\p{L}\p{N}_])(?:neden|niye|nas[ıi]l|kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|neresi|nereye|nereden|kaç(?:ta|a|tan)?|ne(?:\s+(?:durumda|oldu|oluyor|olacak|zaman|kadar))?)(?![\p{L}\p{N}_]).{0,60}(?<![\p{L}\p{N}_])(?:diye\s+(?:sordu|dedi|anlatt[ıi]|söyledi)|sorduğunu|dediğini|anlattığını|söylediğini)(?![\p{L}\p{N}_])/iu;
 
 const REPORTED_INDIRECT_QUESTION_RE =
-  /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|nereye|nereden|neden|niye|nas[ıi]l|ne)(?![\p{L}\p{N}_]).{0,50}(?<![\p{L}\p{N}_])(?:olduğunu|olacağını|yaptığını|oynadığını|dediğini|istediğini|gittiğini|geldiğini|açtığını)(?![\p{L}\p{N}_]).{0,30}(?<![\p{L}\p{N}_])(?:anlatt[ıi]|söyledi|dedi|biliyorum|biliyorsun|öğrendim)(?![\p{L}\p{N}_])/iu;
+  /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|nereye|nereden|neden|niye|nas[ıi]l|kaç(?:ta|a|tan)?|ne)(?![\p{L}\p{N}_]).{0,50}(?<![\p{L}\p{N}_])(?:olduğunu|olacağını|yaptığını|oynadığını|dediğini|istediğini|gittiğini|geldiğini|açtığını)(?![\p{L}\p{N}_]).{0,30}(?<![\p{L}\p{N}_])(?:anlatt[ıi]|söyledi|dedi|biliyorum|biliyorsun|öğrendim)(?![\p{L}\p{N}_])/iu;
 
 /**
  * Structural recognizer for whether generated Turkish text performs a question act.
