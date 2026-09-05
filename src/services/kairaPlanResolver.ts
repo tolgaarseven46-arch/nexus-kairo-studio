@@ -91,10 +91,8 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   const damp = (n: number) => clamp01(n * (1 - 0.35 * cautious));
 
   const continueConversation = !hard.hardDisengage;
-
   const allowQuestion =
     hard.questionAllowed && dialogue.allowFollowUpQuestion && damp(soft.questionDrive) >= 0.3;
-
   const allowHumor = hard.humorAllowed;
   const allowAdvice = hard.adviceAllowed === true;
 
@@ -104,12 +102,9 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   if (!allowAdvice) rationale.push("advice:hard-forbidden (not requested)");
 
   const intimacyCeiling = clamp01(Math.min(hard.intimacyCeiling, soft.intimacyInclination));
-
   const allowAffection =
     hard.affectionAllowed && intimacyCeiling >= 0.3 && damp(soft.warmthTendency) >= 0.35;
-
   const allowForgiveness = hard.forgivenessAllowed && soft.opennessTendency >= 0.25;
-
   const allowReopeningCloseness =
     hard.reopeningClosenessAllowed &&
     soft.opennessTendency >= 0.35 &&
@@ -123,7 +118,6 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
         1,
         Math.min(hard.maxWords, Math.round(hard.maxWords * (0.6 + 0.4 * soft.verbosityTendency))),
       );
-
   const emojiBudget =
     hard.emojiBudget > 0 && soft.warmthTendency >= 0.4 && !hard.mustAcknowledgeBoundary ? 1 : 0;
 
@@ -137,8 +131,6 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     rationale.push(`social_move:${socialMove}`);
   }
 
-  // WHAT only. These labels say which semantic obligations must be preserved;
-  // they never prescribe a sentence shape, state narration, or turn-closing style.
   const requiredContent: string[] = [];
   if (hard.hardDisengage) requiredContent.push("boundary_maintained");
   else if (hard.mustAcknowledgeBoundary) requiredContent.push("boundary_acknowledged");
@@ -147,11 +139,18 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     rationale.push("self_correction:explicit-accountability-required");
   }
   if (!counterFlirtAllowed) requiredContent.push("no_counter_flirt");
+
   const preserveAmbiguity =
     dialogue.move === "natural_reaction" &&
     !dialogue.allowSpeculation &&
     uncertainty.semantic >= 0.75;
-  const requireContentEngagement = dialogue.move === "natural_reaction" && !preserveAmbiguity;
+  const hasSocialRoutine = Boolean(dialogue.socialRoutine && dialogue.socialRoutine !== "none");
+  const requireContentEngagement =
+    dialogue.move === "natural_reaction" &&
+    !preserveAmbiguity &&
+    !hasSocialRoutine &&
+    contract.questionStopRequested !== true;
+
   if (socialMove !== "none") requiredContent.push(`social_move:${socialMove}`);
   if (preserveAmbiguity) {
     requiredContent.push("preserve_ambiguity");
@@ -159,6 +158,10 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   } else if (requireContentEngagement) {
     requiredContent.push("engage_user_content");
     rationale.push("natural_reaction:content-engagement-required");
+  } else if (dialogue.move === "natural_reaction" && hasSocialRoutine) {
+    rationale.push(`natural_reaction:social-routine:${dialogue.socialRoutine}`);
+  } else if (dialogue.move === "natural_reaction" && contract.questionStopRequested === true) {
+    rationale.push("natural_reaction:question-stop-control-turn");
   }
 
   if (cautious >= 0.6) rationale.push(`uncertainty_damping applied (cautious=${cautious.toFixed(2)})`);
