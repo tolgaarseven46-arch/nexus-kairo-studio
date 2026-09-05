@@ -63,6 +63,26 @@ describe("previous-turn dependency", () => {
     });
   });
 
+  it("closes a pending how-are-you question without swallowing substantive mixed-turn content", () => {
+    const asked = fold(u("naber"), k("iyi valla sen nasılsın"));
+    const message = "iyi ben de kahveyi döktüm masaya az önce";
+    const base = interpretSemanticEvent(message);
+    const mixed = reduceDiscourseState(asked, {
+      actor: "user",
+      message,
+      event: {
+        ...base,
+        intent: "general_chat",
+        target: "event",
+        socialRoutine: "none",
+        discourseAct: "none",
+        repairSignal: "none",
+      },
+    });
+    expect(mixed.pendingQuestion).toMatchObject({ asker: "kaira", answered: true });
+    expect(mixed.previousTurnDependency).toBeNull();
+  });
+
   it("a fresh greeting is NOT a previous-turn dependency", () => {
     const s = fold(u("naber"), k("iyi valla sen"), u("merhaba kanka"));
     expect(s.previousTurnDependency).toBeNull();

@@ -61,21 +61,21 @@ function isShort(message: string): boolean {
   return (message.trim().match(/\S+/gu) ?? []).length <= 4;
 }
 
-function startsNewTopic(event: SemanticEvent): boolean {
+function startsNewTopic(event: SemanticEvent, message: string): boolean {
   return (
     event.discourseAct === "topic_shift" ||
     event.intent === "information_request" ||
     event.intent === "emotional_share" ||
     ((event.socialRoutine ?? "none") === "none" &&
       event.discourseAct === "none" &&
-      !isShortIntent(event))
+      !isShortIntent(event, message))
   );
 }
 
-function isShortIntent(event: SemanticEvent): boolean {
+function isShortIntent(event: SemanticEvent, message: string): boolean {
   return (
     event.intent === "greeting" ||
-    event.intent === "general_chat" ||
+    (event.intent === "general_chat" && isShort(message)) ||
     (event.socialRoutine ?? "none") !== "none"
   );
 }
@@ -243,11 +243,18 @@ export function reduceDiscourseState(
       act === "correction" ||
       explicitRepair;
     const responseEvidence = contextualAnswer || (!isOwnRoutine && explicitDependency);
-    // A canonical semantic label such as complaint/general_chat must not erase a
-    // stronger turn-taking fact: a state-shaped answer to Kaira's still-pending
-    // question remains dependent on that question. Only treat it as a new topic
-    // when there is no contextual/explicit response evidence.
-    const unambiguousNewTopic = startsNewTopic(turn.event) && !responseEvidence;
+    // A state-shaped prefix may answer Kaira's pending question while the same
+    // turn also carries independently substantive canonical content. In that
+    // mixed case, close the pending question but do not let turn-taking context
+    // erase the new content. This is discourse structure only: no raw-text
+    // semantic classification or downstream reinterpretation is introduced.
+    const mixedAnswerCarriesIndependentContent =
+      contextualAnswer &&
+      !explicitDependency &&
+      startsNewTopic(turn.event, turn.message);
+    const unambiguousNewTopic =
+      startsNewTopic(turn.event, turn.message) &&
+      (!responseEvidence || mixedAnswerCarriesIndependentContent);
     const respondsToKaira =
       prev.lastKairaAct !== null &&
       !unambiguousNewTopic &&
@@ -274,7 +281,7 @@ export function reduceDiscourseState(
 
     // pending-question ledger
     let pendingQuestion = prev.pendingQuestion;
-    if (kairaPending && (respondsToKaira || act === "answer")) {
+    if (kairaPending && (contextualAnswer || respondsToKaira || act === "answer")) {
       pendingQuestion = { ...kairaPending, answered: true };
     }
     if (act === "question") {
