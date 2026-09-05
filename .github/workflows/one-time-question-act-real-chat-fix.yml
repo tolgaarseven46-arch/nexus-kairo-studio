@@ -1,0 +1,74 @@
+name: One-time Real-chat Question Act Fix
+
+on:
+  push:
+    branches:
+      - fix/question-act-detection-real-chat
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/question-act-detection-real-chat
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Patch punctuationless Turkish question detection
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/services/kairaResponsePlan.ts')
+          s = p.read_text()
+          old = '''const DIRECT_SOCIAL_QUESTION_RE =\n  /(?<![\\p{L}\\p{N}_])(?:nas[ıi]ls[ıi]n|senden\\s+naber|sen\\s+naber|ne\\s+yap[ıi]yorsun|nap[ıi]yorsun|nap[ıi]yon|iyi\\s+misin)(?![\\p{L}\\p{N}_])/iu;\n'''
+          new = old + '''const PUNCTUATIONLESS_INTERROGATIVE_PREDICATE_RE =\n  /(?<![\\p{L}\\p{N}_])(?:ne\\s+durumda|neyden(?:\\s+bu\\s+kadar)?|neye\\s+göre|neyi\\s+kast(?:ediyorsun|ettin)|ne\\s+oldu|ne\\s+oluyor)(?![\\p{L}\\p{N}_])/iu;\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''    DIRECT_SOCIAL_QUESTION_RE.test(text) ||\n    QUESTION_CLITIC_RE.test(text)\n'''
+          new = '''    DIRECT_SOCIAL_QUESTION_RE.test(text) ||\n    PUNCTUATIONLESS_INTERROGATIVE_PREDICATE_RE.test(text) ||\n    QUESTION_CLITIC_RE.test(text)\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          p = Path('src/services/kairaResponsePlan.test.ts')
+          s = p.read_text()
+          marker = '''  it("validator uses the same plan for question, forgiveness and emoji limits", () => {\n'''
+          block = '''  it("blocks real-chat punctuationless Turkish question acts when questions are forbidden", () => {\n    const contract = buildBehaviorContract(state("distancing", { hurtScore: 35 }));\n    const plan = buildKairaResponsePlan(contract, dialogue(), speech());\n\n    for (const reply of [\n      "oo keyifli akşam kime karşı oynuyorlar, skor ne durumda şimdi",\n      "he, sen de baya dengesiz yazıyorsun şu an neyden bu kadar gerildin böyle",\n      "tamam da ne oldu şimdi",\n    ]) {\n      expect(findKairaResponsePlanIssues(reply, plan), reply).toContain(\n        "response_plan_question_blocked",\n      );\n    }\n  });\n\n  it("does not turn ordinary non-question uses into question acts", () => {\n    const contract = buildBehaviorContract(state("distancing", { hurtScore: 35 }));\n    const plan = buildKairaResponsePlan(contract, dialogue(), speech());\n    expect(findKairaResponsePlanIssues("skor iyi durumda şimdi", plan)).not.toContain(\n      "response_plan_question_blocked",\n    );\n    expect(findKairaResponsePlanIssues("olan oldu şimdi", plan)).not.toContain(\n      "response_plan_question_blocked",\n    );\n  });\n\n'''
+          assert marker in s
+          s = s.replace(marker, block + marker, 1)
+          p.write_text(s)
+          PY
+
+          cat > docs/adr/0017-final-question-act-detection.md <<'EOF'
+          # ADR-0017: Final question permission uses punctuation-independent Turkish question acts
+
+          ## Status
+          Accepted
+
+          ## Context
+          A fresh 15-turn production chat produced two replies with `ResponsePlan.allowQuestion=false` but clear punctuationless Turkish questions: `skor ne durumda şimdi` and `neyden bu kadar gerildin böyle`. The canonical final boundary already validates question permission, but its detector did not recognize these clause forms, so consistency incorrectly reported 100.
+
+          ## Decision
+          Keep question permission enforcement in the existing canonical final-delivery boundary. Extend its punctuation-independent Turkish question-act detector with interrogative predicate forms that are observable in casual chat, rather than adding a second policy or rewriting replies generically.
+
+          ## Consequences
+          - Clear punctuationless question acts are rejected when `allowQuestion=false`.
+          - Ordinary declarative uses remain unaffected by regression coverage.
+          - Recovery remains owned by the existing generation/repair/fallback flow.
+          EOF
+
+          rm -f .github/workflows/one-time-question-act-real-chat-fix.yml
+          npm test -- --run src/services/kairaResponsePlan.test.ts
+          npx tsc --noEmit
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(response-plan): catch punctuationless question acts [question-act-applied]'
+          git push origin HEAD:fix/question-act-detection-real-chat
