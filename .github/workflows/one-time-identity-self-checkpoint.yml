@@ -1,0 +1,58 @@
+name: one-time identity self checkpoint
+on:
+  push:
+    branches: [docs/identity-self-phase-close]
+permissions:
+  contents: write
+jobs:
+  append:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/identity-self-phase-close
+      - name: Append checkpoint once
+        shell: bash
+        run: |
+          if grep -q "IDENTITY_SELF_PHASE_CLOSED_2026_09_05" PROJECT_STATE.md; then
+            echo "checkpoint already present"
+            exit 0
+          fi
+          cat >> PROJECT_STATE.md <<'EOF'
+
+## 2026-09-05 — Identity / Self Model integrity phase — CLOSED
+<!-- IDENTITY_SELF_PHASE_CLOSED_2026_09_05 -->
+
+### Completed chain
+- PR #90: direct natural self-fact questions (for example `sen neyi seversin?`) route to canonical self-memory without turning ordinary second-person social turns into self-memory recall.
+- PR #91: resolved canonical self-facts are final-delivery binding; generated replies cannot contradict or explicitly negate the resolved canonical value.
+- PR #92: resolved autobiographical memory requires canonical evidence anchoring; a wholly unrelated invented autobiography cannot replace the resolved memory.
+- PR #93: resting affect baseline became an explicit typed authority seam; reducer-local hidden baseline ownership was removed while shipped defaults were preserved.
+- PR #94: server KDM / RelationshipReducer became the sole canonical dynamic affect transition and recovery authority. Stable character/fine-tune config owns resting affect baseline; client temperament is behavior preview only and sends raw canonical dynamic state plus a separate typed affect baseline. Merge commit: `d64c5bbe86ac4ac0205cdaa32e4eeb78b7dc9690`.
+- PR #95: mixed autobiographical invention closed. A true memory anchor can no longer launder an unsupported second autobiographical clause or fabricated named/numeric detail. Merge commit: `6bbb3c1e7c146bea8dfd962936b9f459e2df7dd3`; ADR-0048.
+- PR #96: structured-memory ontology formalized without adding a second memory engine. Seven existing domains are declared with owner, semantic kind, persistence, mutability, recall authority and allowed promotion: self_fact, autobiographical_memory, world_event, claim, language_style, relationship_state, discourse_state. Claim -> WorldEvent remains explicit-grounded only; style/relationship/discourse cannot become factual truth. Merge commit: `e87f40172e5062ed624dbc79a992767167a743c8`; ADR-0049.
+- PR #97: Kaira's own previous-turn correction now has canonical `own_previous_correction` required content. Final delivery rejects defensive denial/blame-shifting or generic non-accountability while allowing concise natural ownership/apology surfaces. This is separate from user apology / RelationshipReducer repair. Merge commit: `b85390073552736f98468d6129d7077af93b54f7`; ADR-0050.
+
+### Architecture result
+- Canonical self truth remains instance-owned by `kairaCanonicalIdentityStore`.
+- Autobiographical truth remains evidence-bound at final delivery, including mixed-clause conformance.
+- Affect baseline and situational dynamic affect are separate authorities: stable config owns baseline, server KDM owns transitions/recovery.
+- Structured memory is an ontology of existing authorities, not a monolithic runtime store.
+- Kaira self-correction accountability is plan-owned WHAT content; HOW wording remains flexible.
+- RelationshipReducer, Claim provenance, WorldEvent truth, learned language HOW and ephemeral discourse state retain their existing independent ownership boundaries.
+
+### Verification / closure
+- PR #95, #96 and #97 each passed SHA-bound Architecture Review and the repository CI gates before merge; #94 had already passed the same architecture/full-test/TypeScript/production-build chain before merge.
+- Open GitHub issue audit returned 0 active issues.
+- Repository code search returned no active TODO/FIXME entries.
+- The PR #88 design-backlog items `structured-memory ontology`, `baseline affect vs situational appraisal`, and `explicit apology/accountability quality` are now closed by evidence-backed work above.
+- Do not reopen PR #90-#97, RelationshipReducer ownership, Claim/Event provenance, world-memory, old complaint-accountability or question-stop work without a new measured regression.
+
+### Next development rule
+- Identity / Self Model integrity phase is CLOSED. The next product phase must begin with a fresh natural-conversation characterization / measured product-quality target rather than speculative semantic expansion.
+EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md
+          git commit -m "docs: close identity self integrity phase"
+          git push origin HEAD:docs/identity-self-phase-close
