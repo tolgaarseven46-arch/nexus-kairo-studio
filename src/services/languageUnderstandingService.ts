@@ -105,22 +105,24 @@ function reconcileSemanticTargetWithEntityResolution(
 
 /**
  * Canonical typed reconciliation for a provider over-read seen in production:
- * a neutral, low-emotional-load third-party event is not a first-person
- * emotional disclosure merely because the event itself can carry mild affect.
- * This consumes only SemanticInterpretation fields; it never reparses raw text.
+ * a low-emotional-load third-party event is not a first-person emotional
+ * disclosure merely because the event itself receives mild negative valence.
+ * Genuine emotional openings remain protected by their higher emotional load
+ * and/or explicit emotional/relational discourse facets. This consumes only
+ * SemanticInterpretation fields; it never reparses raw text.
  */
 function reconcileNeutralThirdPartyEventOverread(
   interpretation: SemanticInterpretation,
 ): SemanticInterpretation {
-  const neutralThirdPartyEventOverread =
+  const lowLoadThirdPartyEventOverread =
     interpretation.primaryIntent === "emotional_share" &&
     interpretation.target === "third_party" &&
-    interpretation.valence === "neutral" &&
     interpretation.emotionalLoad <= 0.35 &&
     interpretation.discourseFacets.socialRoutine === "none" &&
+    interpretation.discourseFacets.relationalAct === "none" &&
     interpretation.support <= 0.3 &&
     interpretation.affection <= 0.3;
-  if (!neutralThirdPartyEventOverread) return interpretation;
+  if (!lowLoadThirdPartyEventOverread) return interpretation;
   return {
     ...interpretation,
     primaryIntent: "smalltalk",
@@ -129,7 +131,7 @@ function reconcileNeutralThirdPartyEventOverread(
       {
         source: "reconciled",
         provider: "canonical_language_gateway",
-        cues: ["neutral_third_party_low_emotional_load"],
+        cues: ["third_party_low_emotional_load_without_emotional_opening"],
         confidence: Math.max(0.7, 1 - interpretation.uncertainty.intent),
       },
     ],
