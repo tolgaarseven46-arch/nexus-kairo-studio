@@ -18,3 +18,4 @@ Legacy observations without typed facts remain available to legacy recall paths 
 - The language-understanding provider owns claim/query concept identity once; downstream layers consume it read-only.
 - No new regex/raw-text semantic authority is introduced.
 - New observations gain structured fact recall; legacy rows remain conservative rather than guessed.
+- CI validates the final source head independently of the one-time patching mechanism used to assemble the multi-file change.
