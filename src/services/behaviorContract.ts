@@ -12,6 +12,8 @@ export interface BehaviorContract {
   questions: BehaviorPermission;
   /** Runtime builder always emits this; optional only for old persisted/test projections. */
   advice?: BehaviorPermission;
+  /** Transient utterance-control observation; never persisted or promoted to relationship state. */
+  questionStopRequested?: boolean;
   forgivenessGranted: boolean;
   repairStatus: RepairStatus;
   reopeningCloseness: BehaviorPermission;
@@ -33,9 +35,6 @@ export function buildBehaviorContract(
   const conflict = Number(relationship?.conflictScore ?? trace?.relationship?.conflictScore ?? 0);
   const repairProgress = Number(relationship?.repairProgress ?? trace?.relationship?.repairProgress ?? 0);
   const repairAttempts = Number(relationship?.repairAttempts ?? trace?.relationship?.repairAttempts ?? 0);
-  // repairProgress is positive recovery evidence, not damage by itself. In active,
-  // low-hurt relationships it commonly grows after normal positive turns; treating
-  // it as unresolved damage made early conversations falsely distant.
   const unresolvedDamage = hurt >= 20 || conflict >= 20 || state !== "active";
   const stopTalking = semanticEvent?.stopTalking === true;
   const stopQuestions = semanticEvent?.stopQuestions === true;
@@ -44,6 +43,7 @@ export function buildBehaviorContract(
     ? Number(semanticEvent?.semanticUncertainty)
     : undefined;
   const observation = semanticUncertainty === undefined ? {} : { semanticUncertainty };
+  const transient = { questionStopRequested: stopQuestions };
   const reasons: string[] = [];
 
   if (state === "disengaged") {
@@ -55,6 +55,7 @@ export function buildBehaviorContract(
       affection: "forbidden",
       questions: "forbidden",
       advice: "forbidden",
+      ...transient,
       forgivenessGranted: false,
       repairStatus: repairAttempts > 0 || repairProgress > 0 ? "incomplete" : "none",
       reopeningCloseness: "forbidden",
@@ -74,6 +75,7 @@ export function buildBehaviorContract(
       affection: "forbidden",
       questions: "forbidden",
       advice: adviceRequested ? "allowed" : "forbidden",
+      ...transient,
       forgivenessGranted: false,
       repairStatus: "repairing",
       reopeningCloseness: "forbidden",
@@ -93,6 +95,7 @@ export function buildBehaviorContract(
       affection: "forbidden",
       questions: "forbidden",
       advice: adviceRequested ? "allowed" : "forbidden",
+      ...transient,
       forgivenessGranted: false,
       repairStatus: repairProgress > 0 || repairAttempts > 0 ? "incomplete" : "none",
       reopeningCloseness: "forbidden",
@@ -112,6 +115,7 @@ export function buildBehaviorContract(
       affection: "forbidden",
       questions: "forbidden",
       advice: "forbidden",
+      ...transient,
       forgivenessGranted: false,
       repairStatus: "repaired",
       reopeningCloseness: "forbidden",
@@ -129,6 +133,7 @@ export function buildBehaviorContract(
     affection: "allowed",
     questions: stopQuestions ? "forbidden" : "allowed",
     advice: adviceRequested ? "allowed" : "forbidden",
+    ...transient,
     forgivenessGranted: true,
     repairStatus: "repaired",
     reopeningCloseness: "allowed",
