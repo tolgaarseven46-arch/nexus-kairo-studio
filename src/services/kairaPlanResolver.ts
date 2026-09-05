@@ -151,10 +151,14 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     dialogue.move === "natural_reaction" &&
     !dialogue.allowSpeculation &&
     uncertainty.semantic >= 0.75;
+  const requireContentEngagement = dialogue.move === "natural_reaction" && !preserveAmbiguity;
   if (socialMove !== "none") requiredContent.push(`social_move:${socialMove}`);
   if (preserveAmbiguity) {
     requiredContent.push("preserve_ambiguity");
     rationale.push("opaque_turn:preserve_ambiguity");
+  } else if (requireContentEngagement) {
+    requiredContent.push("engage_user_content");
+    rationale.push("natural_reaction:content-engagement-required");
   }
 
   if (cautious >= 0.6) rationale.push(`uncertainty_damping applied (cautious=${cautious.toFixed(2)})`);
