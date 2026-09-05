@@ -9,7 +9,6 @@ import type { SemanticInterpretation } from "../types/semanticInterpretation";
 export type SemanticRelationshipScope = "kaira_user" | "third_party" | "event" | "unknown";
 export type AppraisalSemanticEvent = SemanticEvent & {
   relationshipScope?: SemanticRelationshipScope;
-  /** Read-only projection of the canonical interpretation uncertainty. */
   semanticUncertainty?: number;
 };
 
@@ -29,9 +28,7 @@ export interface SemanticUnderstandingProvider {
 
 export type LanguageUnderstandingSource = "client_shared" | "semantic_provider" | "fallback_regex";
 export interface LanguageUnderstandingResult {
-  /** Canonical immutable per-turn semantic truth. */
   interpretation: SemanticInterpretation;
-  /** Deterministic compatibility/appraisal projection; never a second authority. */
   event: AppraisalSemanticEvent;
   entityResolution: EntityResolutionResult;
   worldEvent: CanonicalWorldEvent;
@@ -106,6 +103,39 @@ function reconcileSemanticTargetWithEntityResolution(
   };
 }
 
+/**
+ * Canonical typed reconciliation for a provider over-read seen in production:
+ * a neutral, low-emotional-load third-party event is not a first-person
+ * emotional disclosure merely because the event itself can carry mild affect.
+ * This consumes only SemanticInterpretation fields; it never reparses raw text.
+ */
+function reconcileNeutralThirdPartyEventOverread(
+  interpretation: SemanticInterpretation,
+): SemanticInterpretation {
+  const neutralThirdPartyEventOverread =
+    interpretation.primaryIntent === "emotional_share" &&
+    interpretation.target === "third_party" &&
+    interpretation.valence === "neutral" &&
+    interpretation.emotionalLoad <= 0.35 &&
+    interpretation.discourseFacets.socialRoutine === "none" &&
+    interpretation.support <= 0.3 &&
+    interpretation.affection <= 0.3;
+  if (!neutralThirdPartyEventOverread) return interpretation;
+  return {
+    ...interpretation,
+    primaryIntent: "smalltalk",
+    evidence: [
+      ...interpretation.evidence,
+      {
+        source: "reconciled",
+        provider: "canonical_language_gateway",
+        cues: ["neutral_third_party_low_emotional_load"],
+        confidence: Math.max(0.7, 1 - interpretation.uncertainty.intent),
+      },
+    ],
+  };
+}
+
 function buildResult(
   message: string,
   interpretation: SemanticInterpretation,
@@ -113,6 +143,7 @@ function buildResult(
   rest: Omit<LanguageUnderstandingResult, "interpretation" | "event" | "entityResolution" | "worldEvent">,
 ): LanguageUnderstandingResult {
   interpretation = reconcileSemanticTargetWithEntityResolution(interpretation, entityResolution);
+  interpretation = reconcileNeutralThirdPartyEventOverread(interpretation);
   const projected = projectSemanticEvent(interpretation);
   const grounded = groundSemanticEventForAppraisal(message, projected, entityResolution);
   return {
