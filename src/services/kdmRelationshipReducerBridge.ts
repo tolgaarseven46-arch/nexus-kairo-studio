@@ -16,6 +16,7 @@ import { applyRelationshipContext } from "./relationshipBehaviorService";
 import { reduceRelationshipTurn, type RelationshipReducerResult, type RelationshipReducerPrev, type RelationshipTurnSignal } from "./relationshipReducer";
 import { DEFAULT_RELATIONSHIP_REDUCER_CONFIG } from "./relationshipReducerConfig";
 import { isRelationshipNeutralTurn, relationshipSeverityForInterpretation } from "./kairaQuestionOnlyStopRelationshipPolicy";
+import type { KairaAffectBaseline } from "./kairaAffectBaseline";
 
 type GroundedSemanticEvent = SemanticEvent & { relationshipScope?: SemanticRelationshipScope };
 
@@ -26,6 +27,7 @@ export interface KdmCanonicalInput {
   normalizedPersonality: DroitPersonalityTraits;
   baseBehaviorProfile: BehaviorLayerProfile;
   behaviorPolicy: BehaviorPolicyInput | null;
+  affectBaseline?: Partial<KairaAffectBaseline> | null;
   applyIntegrated: (profile: BehaviorLayerProfile, behaviorPolicy?: BehaviorPolicyInput | null) => BehaviorLayerProfile;
   semanticIntentToKdm: (event: SemanticEvent) => string;
   semanticSentimentToKdm: (event: SemanticEvent) => string;
@@ -155,7 +157,7 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
     boundarySetByKaira: Boolean(prevRel.disengageReason) || Boolean(prevRel.lastNegativePattern),
   };
 
-  const result = reduceRelationshipTurn({ prev, signal, timing: { elapsedMinutesSincePrev, nowIso }, config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG });
+  const result = reduceRelationshipTurn({ prev, signal, timing: { elapsedMinutesSincePrev, nowIso }, config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG, affectBaseline: input.affectBaseline });
   const prevInjury = Math.max(prev.scores.hurt ?? 0, prev.scores.conflict ?? 0);
   const nextInjury = Math.max(result.scores.hurt, result.scores.conflict);
   const projectedReactionMode: AffectiveReactionMode =

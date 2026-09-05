@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { analyzeKdmInteractionCanonicalTurn } from "./src/services/kdmConsistencyEngine";
 import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
+import { normalizeKairaAffectBaseline } from "./src/services/kairaAffectBaseline";
 import { claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";
 import { normalizeDroitPersonality } from "./src/services/droitPersonalityNormalizer";
 import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
@@ -552,6 +553,7 @@ app.post("/api/chat", async (req, res) => {
       suppressRecentMemory = false,
       semanticInterpretation: incomingSemanticInterpretation,
       behaviorPolicy: incomingBehaviorPolicy,
+      affectBaseline: incomingAffectBaseline,
       sessionId: incomingSessionId,
       kairaInstanceId: incomingKairaInstanceId,
       kairaInstanceType: incomingKairaInstanceType,
@@ -733,6 +735,7 @@ app.post("/api/chat", async (req, res) => {
       basePersonality = normalizeDroitPersonality(personality),
       responsePersonality = normalizeDroitPersonality(incomingResponsePersonality ?? basePersonality),
       behaviorPolicy = normalizeBehaviorPolicyInput(incomingBehaviorPolicy),
+      affectBaseline = normalizeKairaAffectBaseline(incomingAffectBaseline),
       kdmStart = now(),
       kdm = analyzeKdmInteractionCanonicalTurn(
         userMessage,
@@ -741,6 +744,7 @@ app.post("/api/chat", async (req, res) => {
         canonicalSemantic.interpretation,
         canonicalSemantic.event,
         behaviorPolicy,
+        affectBaseline,
       ),
       behaviorContract = buildBehaviorContract(kdm.nextDynamicState, kdm.trace, canonicalSemantic.event),
       behaviorProfile = kdm.behaviorProfile,
