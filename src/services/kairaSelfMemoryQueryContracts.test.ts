@@ -63,6 +63,35 @@ describe("Kaira self-memory semantic authority contracts", () => {
     expect(event.selfMemoryQuery).not.toHaveProperty("factKey");
   });
 
+  it("recognizes direct Kaira preference questions without requiring possessive wording", () => {
+    const messages = [
+      "sen neyi seversin?",
+      "sen hangi müziği seversin?",
+      "sen neyi tercih edersin?",
+      "senin favorin ne?",
+    ];
+
+    for (const message of messages) {
+      const event = canonicalizeSemanticEvent(message, interpretSemanticEvent(message));
+      expect(event.selfMemoryQuery, message).toMatchObject({ scope: "self_fact" });
+    }
+  });
+
+  it("does not treat bare sen as self-memory outside durable self-fact questions", () => {
+    const messages = [
+      "iyi senin",
+      "sen nasılsın",
+      "sen ne yapıyorsun",
+      "gel senle barışalım",
+      "sen benim kölemsin",
+    ];
+
+    for (const message of messages) {
+      const event = canonicalizeSemanticEvent(message, interpretSemanticEvent(message));
+      expect(event.selfMemoryQuery, message).toBeNull();
+    }
+  });
+
   it("does not turn third-party or user recall into Kaira autobiography", () => {
     const thirdParty = "Mert'in başına gelen olayı hatırlıyor musun?";
     expect(
