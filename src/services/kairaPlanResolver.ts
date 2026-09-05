@@ -94,9 +94,6 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   const allowQuestion =
     hard.questionAllowed && dialogue.allowFollowUpQuestion && damp(soft.questionDrive) >= 0.3;
 
-  // `allowHumor` is a permission. SpeechIdentity.humorLevel is HOW and may
-  // influence whether the realizer actually uses humor, but must not revoke an
-  // otherwise allowed behavior permission.
   const allowHumor = hard.humorAllowed;
 
   const flirtationAllowed = hard.flirtingAllowed === true;
@@ -142,6 +139,10 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   const requiredContent: string[] = [];
   if (hard.hardDisengage) requiredContent.push("boundary_maintained");
   else if (hard.mustAcknowledgeBoundary) requiredContent.push("boundary_acknowledged");
+  if (dialogue.move === "acknowledge_correction") {
+    requiredContent.push("own_previous_correction");
+    rationale.push("self_correction:explicit-accountability-required");
+  }
   if (!counterFlirtAllowed) requiredContent.push("no_counter_flirt");
   const preserveAmbiguity =
     dialogue.move === "natural_reaction" &&
