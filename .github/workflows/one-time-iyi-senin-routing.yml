@@ -1,0 +1,53 @@
+name: One-time Iyi Senin Routing
+
+on:
+  push:
+    branches:
+      - diag/iyi-senin-routing
+
+permissions:
+  contents: write
+
+jobs:
+  characterize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: diag/iyi-senin-routing
+          fetch-depth: 0
+      - name: Characterize semantic + chat routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://nexus-kairo-studio.onrender.com'
+          sem='{"userMessage":"iyi senin","userName":"Mert","characterName":"Kaira","history":[{"role":"user","content":"naber"},{"role":"assistant","content":"iyi valla sen nasılsın"}],"provider":"openrouter"}'
+          curl --retry 3 --retry-all-errors --retry-delay 2 --fail-with-body --silent --show-error --max-time 120 -H 'Content-Type: application/json' --data "$sem" "$URL/api/language-understanding" > /tmp/semantic.json
+          echo '=== SEMANTIC ==='; cat /tmp/semantic.json; echo
+          chat='{"userId":"iyi_senin_diag_'"$GITHUB_RUN_ID"'","userName":"Mert","userMessage":"iyi senin","character":{"name":"Kaira"},"personality":{},"history":[{"sender":"user","text":"naber","participantName":"Mert"},{"sender":"assistant","text":"iyi valla sen nasılsın","replyToParticipantName":"Mert"}],"provider":"openrouter","suppressRecentMemory":true,"kairaInstanceId":"kaira_reference_001","kairaInstanceType":"reference","requestId":"iyi-senin-'"$GITHUB_RUN_ID"'"}'
+          curl --retry 3 --retry-all-errors --retry-delay 2 --fail-with-body --silent --show-error --max-time 180 -H 'Content-Type: application/json' --data "$chat" "$URL/api/chat" > /tmp/chat.json
+          echo '=== CHAT ==='; cat /tmp/chat.json; echo
+          node <<'NODE'
+          const fs=require('fs');
+          const s=JSON.parse(fs.readFileSync('/tmp/semantic.json','utf8')).interpretation;
+          const c=JSON.parse(fs.readFileSync('/tmp/chat.json','utf8'));
+          console.log(JSON.stringify({
+            semantic:{primaryIntent:s?.primaryIntent,target:s?.target,socialRoutine:s?.discourseFacets?.socialRoutine,selfMemoryQuery:s?.discourseFacets?.selfMemoryQuery,knowledgeQuery:s?.discourseFacets?.knowledgeQuery,uncertainty:s?.uncertainty},
+            reply:c.reply,
+            move:c?.kdm?.responsePlan?.move,
+            allowQuestion:c?.kdm?.responsePlan?.allowQuestion,
+            semanticEvent:c?.kdm?.semanticEvent,
+            selfMemoryRuntime:c?.kdm?.selfMemoryRuntime,
+            consistency:c?.consistency,
+          },null,2));
+          NODE
+      - name: Self-remove routing workflow
+        if: always()
+        shell: bash
+        run: |
+          git rm .github/workflows/one-time-iyi-senin-routing.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: remove iyi senin routing workflow'
+          git push origin HEAD:diag/iyi-senin-routing
