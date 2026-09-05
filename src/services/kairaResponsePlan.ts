@@ -5,6 +5,7 @@ import type { KairaPlanProjections, KairaPlanUncertainty } from "../types/kairaB
 import { deriveHardConstraints } from "./kairaHardConstraints";
 import { deriveSoftTendencies } from "./kairaSoftTendencies";
 import { resolveKairaResponsePlan } from "./kairaPlanResolver";
+import { isTurkishQuestionAct } from "./kairaQuestionActRecognizer";
 
 export interface KairaResponsePlan {
   move: DialogueDecisionPlan["move"];
@@ -47,30 +48,8 @@ const responseUnitCount = (reply: string) =>
 const wordCount = (reply: string) =>
   reply.trim().split(/\s+/u).filter(Boolean).length;
 
-const QUESTION_PUNCTUATION_RE = /[?？]/u;
-const DIRECT_INTERROGATIVE_START_RE =
-  /^\s*(?:neden|niye|kim|kime|kimi|hangi|hangisi|nerede|neresi|nereye|nereden|kaç)(?![\p{L}\p{N}_])/iu;
-const EMBEDDED_DIRECT_INTERROGATIVE_RE =
-  /(?:[,.!…;:]\s*|(?<![\p{L}\p{N}_])(?:peki|tamam|güzel|iyi|ee|e|hmm|hımm|ya)\s+)(?:neden|niye|kim|kime|kimi|hangi|hangisi|nerede|neresi|nereye|nereden|kaç)(?![\p{L}\p{N}_])/iu;
-const DIRECT_SOCIAL_QUESTION_RE =
-  /(?<![\p{L}\p{N}_])(?:nas[ıi]ls[ıi]n|senden\s+naber|sen\s+naber|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|nap[ıi]yon|iyi\s+misin)(?![\p{L}\p{N}_])/iu;
-const PUNCTUATIONLESS_INTERROGATIVE_PREDICATE_RE =
-  /(?<![\p{L}\p{N}_])(?:ne\s+durumda|neyden(?:\s+bu\s+kadar)?|neye\s+göre|neyi\s+kast(?:ediyorsun|ettin)|ne\s+oldu|ne\s+oluyor)(?![\p{L}\p{N}_])/iu;
-const QUESTION_CLITIC_RE =
-  /(?<![\p{L}\p{N}_])(?:m[ıiuü]|misin|m[ıi]s[ıi]n|musun|m[üu]s[üu]n|m[ıi]y[ıi]m|muyum|m[üu]y[üu]m|m[ıi]yd[ıi]|m[ıi]yd[ıi]n|m[ıi]yd[ıi]k|m[ıi]yd[ıi]lar)(?![\p{L}\p{N}_])/iu;
-const REPORTED_QUESTION_RE =
-  /\b(?:nas[ıi]ls[ıi]n|ne\s+yap[ıi]yorsun|nap[ıi]yorsun|iyi\s+misin)\b.{0,40}\b(?:diye\s+(?:sordu|dedi)|sorduğunu|dediğini)\b/iu;
-
 export function looksLikeKairaQuestionAct(text: string): boolean {
-  if (QUESTION_PUNCTUATION_RE.test(text)) return true;
-  if (REPORTED_QUESTION_RE.test(text)) return false;
-  return (
-    DIRECT_INTERROGATIVE_START_RE.test(text) ||
-    EMBEDDED_DIRECT_INTERROGATIVE_RE.test(text) ||
-    DIRECT_SOCIAL_QUESTION_RE.test(text) ||
-    PUNCTUATIONLESS_INTERROGATIVE_PREDICATE_RE.test(text) ||
-    QUESTION_CLITIC_RE.test(text)
-  );
+  return isTurkishQuestionAct(text);
 }
 
 const HUMOR_RE = /(hahaha|hehe|şaka|takılıyorum|dalga|😂|🤣|😏)/iu;
