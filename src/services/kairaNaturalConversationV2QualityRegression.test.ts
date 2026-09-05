@@ -144,13 +144,28 @@ describe("natural conversation v2 quality authority", () => {
     expect(result.interpretation.evidence.some((e) => e.source === "reconciled")).toBe(true);
   });
 
-  it("preserves a genuine negative high-load third-party emotional share", async () => {
+  it("reconciles the same low-load third-party event when provider valence drifts negative", async () => {
+    const result = await understandTurkishMessage("Mert yine geç kaldı", {
+      incomingSemanticInterpretation: semantic({ valence: "negative" }),
+    });
+    expect(result.interpretation.primaryIntent).toBe("smalltalk");
+    expect(result.event.intent).not.toBe("emotional_share");
+    expect(result.interpretation.evidence.some((e) => e.source === "reconciled")).toBe(true);
+  });
+
+  it("preserves a genuine high-load third-party emotional opening", async () => {
+    const base = semantic();
     const result = await understandTurkishMessage("Mert yüzünden çok üzgünüm", {
       incomingSemanticInterpretation: semantic({
         raw: "Mert yüzünden çok üzgünüm",
         normalized: "mert yüzünden çok üzgünüm",
-        valence: "negative",
-        emotionalLoad: 0.75,
+        valence: "neutral",
+        emotionalLoad: 0.7,
+        discourseFacets: {
+          ...base.discourseFacets,
+          socialRoutine: "emotional_opening",
+          relationalAct: "reassurance_seek",
+        },
       }),
     });
     expect(result.interpretation.primaryIntent).toBe("emotional_share");
