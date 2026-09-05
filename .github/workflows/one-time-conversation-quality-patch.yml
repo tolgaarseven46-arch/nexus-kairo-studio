@@ -22,7 +22,7 @@ jobs:
           node-version: 20
       - run: npm ci
       - name: Apply patch
-        run: python .github/scripts/one_time_conversation_quality_patch_v2.py
+        run: python .github/scripts/one_time_conversation_quality_patch_v3.py
       - name: Verify focused quality regressions
         run: |
           npm test -- --run src/services/conversationQualityMechanismRegression.test.ts
