@@ -4,10 +4,10 @@ import { readFileSync } from "node:fs";
 const source = (path: string) => readFileSync(path, "utf8");
 
 describe("KDM canonical SemanticInterpretation@2 authority", () => {
-  it("receives the ingestion-time interpretation and its deterministic event projection", () => {
+  it("receives the ingestion-time interpretation, deterministic event projection, behavior policy, and affect baseline", () => {
     const server = source("server.ts");
     expect(server).toContain('import { analyzeKdmInteractionCanonicalTurn } from "./src/services/kdmConsistencyEngine"');
-    expect(server).toMatch(/analyzeKdmInteractionCanonicalTurn\(\s*userMessage,\s*basePersonality,\s*effective,\s*canonicalSemantic\.interpretation,\s*canonicalSemantic\.event,\s*behaviorPolicy,\s*\)/u);
+    expect(server).toMatch(/analyzeKdmInteractionCanonicalTurn\(\s*userMessage,\s*basePersonality,\s*effective,\s*canonicalSemantic\.interpretation,\s*canonicalSemantic\.event,\s*behaviorPolicy,\s*affectBaseline,\s*\)/u);
     expect(server).not.toMatch(/\banalyzeKdmInteraction\(/u);
   });
 
