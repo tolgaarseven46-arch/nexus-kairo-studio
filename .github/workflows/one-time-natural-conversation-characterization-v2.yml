@@ -1,0 +1,84 @@
+name: one-time natural conversation characterization v2
+'on':
+  push:
+    branches:
+      - diag/natural-conversation-characterization-v2
+permissions:
+  contents: read
+jobs:
+  characterize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Run live mundane-social continuity matrix
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, urllib.request, uuid
+
+          base = "https://nexus-kairo-studio.onrender.com"
+          uid = "diag_natural_v2_" + uuid.uuid4().hex[:10]
+          sid = "session_" + uid
+          history = []
+          turns = [
+            "az önce kahveyi döktüm masaya",
+            "temizledim ya bi şey olmadı",
+            "ama klavye ucundan nasibini aldı :d",
+            "neyse çalışıyor şimdilik",
+            "yarın toplantım var",
+            "sence hazırlanayım mı yoksa sabah bakarım?",
+            "tamam mantıklı",
+            "bu arada Mert yine geç kaldı",
+            "yok kızmadım komik geldi sadece",
+            "herif zaman kavramıyla kavgalı resmen hahah",
+            "neyse ben bi kahve daha yapcam",
+            "bu sefer masaya değil ağzıma dökerim inş :d",
+            "hadi ben kaçtım sonra konuşuruz"
+          ]
+
+          def post(msg, i):
+            payload = {
+              "userId": uid, "userName": "Tolga", "userMessage": msg,
+              "history": history, "provider": "openrouter",
+              "kairaInstanceId": "reference", "kairaInstanceType": "reference",
+              "sessionId": sid, "requestId": f"natural-v2-{i}-{uuid.uuid4().hex[:8]}"
+            }
+            req = urllib.request.Request(base + "/api/chat", data=json.dumps(payload).encode(), headers={"Content-Type":"application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=90) as r:
+              return json.loads(r.read().decode())
+
+          failures=[]
+          last_reply=""
+          for i,msg in enumerate(turns,1):
+            try:
+              out=post(msg,i)
+            except Exception as e:
+              print(f"TURN {i} HTTP_ERROR {type(e).__name__}: {e}")
+              failures.append(f"turn_{i}_http")
+              continue
+            reply=str(out.get("reply") or out.get("response") or "").strip()
+            kdm=out.get("kdm") or {}
+            plan=kdm.get("responsePlan") or out.get("responsePlan") or {}
+            sem=kdm.get("semanticInterpretation") or out.get("semanticInterpretation") or {}
+            print("---")
+            print(f"TURN {i}")
+            print("USER="+msg)
+            print("KAIRA="+reply.replace("\n"," "))
+            print("MOVE="+str(plan.get("move")))
+            print("ALLOW_Q="+str(plan.get("allowQuestion")))
+            print("ALLOW_ADVICE="+str(plan.get("allowAdvice")))
+            print("SOCIAL_MOVE="+str(plan.get("socialMove")))
+            print("INTENT="+str(sem.get("intent")))
+            if not reply: failures.append(f"turn_{i}_empty")
+            low=reply.lower()
+            if any(x in low for x in ["yardımcı olabilirim","nasıl yardımcı olabilirim","bir yapay zeka","algoritmam","veri merkezi"]):
+              failures.append(f"turn_{i}_assistant_drift")
+            if last_reply and reply.casefold()==last_reply.casefold() and len(reply.split())>=4:
+              failures.append(f"turn_{i}_exact_repeat")
+            history.append({"sender":"user","participantName":"Tolga","text":msg})
+            history.append({"sender":"droit","participantName":"Kaira","text":reply})
+            last_reply=reply
+          print("=== V2 SUMMARY ===")
+          print("FAILURES="+json.dumps(failures,ensure_ascii=False))
+          print("NATURAL_CHARACTERIZATION_V2_COMPLETE")
+          PY
