@@ -10,6 +10,8 @@ export interface BehaviorContract {
   playfulness: BehaviorPermission;
   affection: BehaviorPermission;
   questions: BehaviorPermission;
+  /** Runtime builder always emits this; optional only for old persisted/test projections. */
+  advice?: BehaviorPermission;
   forgivenessGranted: boolean;
   repairStatus: RepairStatus;
   reopeningCloseness: BehaviorPermission;
@@ -23,7 +25,7 @@ export interface BehaviorContract {
 export function buildBehaviorContract(
   dynamicState: DroitDynamicState,
   trace?: ReasoningTrace | null,
-  semanticEvent?: (Pick<SemanticEvent, "stopTalking" | "stopQuestions"> & { semanticUncertainty?: number }) | null,
+  semanticEvent?: (Pick<SemanticEvent, "stopTalking" | "stopQuestions" | "adviceRequested"> & { semanticUncertainty?: number }) | null,
 ): BehaviorContract {
   const relationship = dynamicState.relationship;
   const state = (relationship?.conversationState ?? "active") as BehaviorContract["conversationState"];
@@ -37,6 +39,7 @@ export function buildBehaviorContract(
   const unresolvedDamage = hurt >= 20 || conflict >= 20 || state !== "active";
   const stopTalking = semanticEvent?.stopTalking === true;
   const stopQuestions = semanticEvent?.stopQuestions === true;
+  const adviceRequested = semanticEvent?.adviceRequested === true;
   const semanticUncertainty = Number.isFinite(semanticEvent?.semanticUncertainty)
     ? Number(semanticEvent?.semanticUncertainty)
     : undefined;
@@ -51,6 +54,7 @@ export function buildBehaviorContract(
       playfulness: "forbidden",
       affection: "forbidden",
       questions: "forbidden",
+      advice: "forbidden",
       forgivenessGranted: false,
       repairStatus: repairAttempts > 0 || repairProgress > 0 ? "incomplete" : "none",
       reopeningCloseness: "forbidden",
@@ -69,6 +73,7 @@ export function buildBehaviorContract(
       playfulness: "forbidden",
       affection: "forbidden",
       questions: "forbidden",
+      advice: adviceRequested ? "allowed" : "forbidden",
       forgivenessGranted: false,
       repairStatus: "repairing",
       reopeningCloseness: "forbidden",
@@ -87,6 +92,7 @@ export function buildBehaviorContract(
       playfulness: "forbidden",
       affection: "forbidden",
       questions: "forbidden",
+      advice: adviceRequested ? "allowed" : "forbidden",
       forgivenessGranted: false,
       repairStatus: repairProgress > 0 || repairAttempts > 0 ? "incomplete" : "none",
       reopeningCloseness: "forbidden",
@@ -105,6 +111,7 @@ export function buildBehaviorContract(
       playfulness: "forbidden",
       affection: "forbidden",
       questions: "forbidden",
+      advice: "forbidden",
       forgivenessGranted: false,
       repairStatus: "repaired",
       reopeningCloseness: "forbidden",
@@ -121,6 +128,7 @@ export function buildBehaviorContract(
     playfulness: "allowed",
     affection: "allowed",
     questions: stopQuestions ? "forbidden" : "allowed",
+    advice: adviceRequested ? "allowed" : "forbidden",
     forgivenessGranted: true,
     repairStatus: "repaired",
     reopeningCloseness: "allowed",
@@ -129,6 +137,7 @@ export function buildBehaviorContract(
     reasons: [
       "İlişki aktif ve çözülmemiş hasar eşiği yok.",
       ...(stopQuestions ? ["Kullanıcı bu tur yeni soru sorulmamasını açıkça istedi."] : []),
+      ...(adviceRequested ? ["Kullanıcı bu tur açıkça tavsiye/öneri istedi."] : ["Kullanıcı bu tur tavsiye istemedi."]),
     ],
     ...observation,
   };
@@ -142,11 +151,12 @@ export function behaviorContractInstruction(contract: BehaviorContract): string 
     `playfulness=${contract.playfulness}`,
     `affection=${contract.affection}`,
     `questions=${contract.questions}`,
+    `advice=${contract.advice ?? "forbidden"}`,
     `forgivenessGranted=${contract.forgivenessGranted}`,
     `repairStatus=${contract.repairStatus}`,
     `reopeningCloseness=${contract.reopeningCloseness}`,
     `stance=${contract.stance}`,
     `maxResponseLength=${contract.maxResponseLength}`,
-    "Bu sözleşmeye aykırı sosyal anlam üretme. Özellikle affetme verilmediyse 'geçti gitti', 'sorun yok', 'affettim' gibi kapanışlar; playfulness yasaksa şakalaşma; reopeningCloseness yasaksa yakınlığı normale döndüren ifadeler kullanma.",
+    "Bu sözleşmeye aykırı sosyal anlam üretme. Özellikle affetme verilmediyse 'geçti gitti', 'sorun yok', 'affettim' gibi kapanışlar; playfulness yasaksa şakalaşma; reopeningCloseness yasaksa yakınlığı normale döndüren ifadeler; advice yasaksa kullanıcı istemeden öğüt/tavsiye verme.",
   ].join("\n");
 }

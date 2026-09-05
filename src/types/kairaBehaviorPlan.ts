@@ -49,6 +49,8 @@ export interface HardConstraintSet {
   questionAllowed: boolean;
   humorAllowed: boolean;
   affectionAllowed: boolean;
+  /** Runtime derivation always supplies this; optional only for old fixtures. */
+  adviceAllowed?: boolean;
   forgivenessAllowed: boolean;
   reopeningClosenessAllowed: boolean;
   /** Length / emoji ceilings. */

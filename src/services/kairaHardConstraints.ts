@@ -68,10 +68,14 @@ export function deriveHardConstraints(
     !hardDisengage && contract.playfulness === "allowed" && !dialogueFocused;
   const affectionAllowed =
     !hardDisengage && contract.affection === "allowed" && !dialogueFocused;
+  const adviceAllowed =
+    !hardDisengage && contract.advice === "allowed";
   const forgivenessAllowed =
     contract.forgivenessGranted && !hardDisengage && !dialogueFocused;
   const reopeningClosenessAllowed =
     !hardDisengage && contract.reopeningCloseness === "allowed" && !dialogueFocused;
+
+  if (!adviceAllowed) reasons.push("unsolicited_advice_forbidden");
 
   const contractSentences = contract.maxResponseLength === "short" ? 1 : 2;
   const maxSentences = Math.max(1, Math.min(dialogue.maxSentences, contractSentences));
@@ -101,6 +105,7 @@ export function deriveHardConstraints(
     questionAllowed,
     humorAllowed,
     affectionAllowed,
+    adviceAllowed,
     forgivenessAllowed,
     reopeningClosenessAllowed,
     maxSentences,

@@ -31,7 +31,7 @@ const allowed = (b: boolean) => (b ? "serbest" : "yasak");
 /**
  * The single canonical behavior block. Field order is fixed and every field is
  * printed once. Absent optional (canonical) fields fall back to the safe value
- * (flirtation forbidden, axis "n/a") so the block is well-formed even if
+ * (flirtation/advice forbidden, axis "n/a") so the block is well-formed even if
  * PLAN_RESOLVER_V2 is off — though the two flags are meant to run together.
  */
 export function buildCanonicalBehaviorBlock(plan: KairaResponsePlan): string {
@@ -39,6 +39,7 @@ export function buildCanonicalBehaviorBlock(plan: KairaResponsePlan): string {
     typeof n === "number" && Number.isFinite(n) ? `%${Math.round(n * 100)}` : "n/a";
   const flirtationAllowed = plan.flirtationAllowed === true;
   const counterFlirtAllowed = plan.counterFlirtAllowed === true;
+  const adviceAllowed = plan.allowAdvice === true;
   const requiredContent =
     plan.requiredContent && plan.requiredContent.length > 0
       ? plan.requiredContent.join(", ")
@@ -60,6 +61,7 @@ export function buildCanonicalBehaviorBlock(plan: KairaResponsePlan): string {
     `allowQuestion=${allowed(plan.allowQuestion)}`,
     `allowHumor=${allowed(plan.allowHumor)}`,
     `allowAffection=${allowed(plan.allowAffection)}`,
+    `allowAdvice=${allowed(adviceAllowed)}`,
     `allowForgiveness=${allowed(plan.allowForgiveness)}`,
     `allowReopeningCloseness=${allowed(plan.allowReopeningCloseness)}`,
     `flirtationAllowed=${yn(flirtationAllowed)}`,
@@ -77,6 +79,9 @@ export function buildCanonicalBehaviorBlock(plan: KairaResponsePlan): string {
     `HOW_PROJECTION.expressionMode=${expressionMode} (GÖZLEMSEL — KARAR DEĞİL)`,
     "requiredContent yalnızca ANLAMSAL yükümlülüktür. Etiket adlarını, iç state'i, skorları veya plan gerekçesini kullanıcıya raporlama/parafraz etme; gerekli anlamı doğal konuşma içinde gerçekleştir.",
     "hardReasons yalnız iç gerekçedir; kullanıcıya karar raporu gibi anlatılmaz.",
+    adviceAllowed
+      ? ""
+      : "TAVSİYE YASAĞI: kullanıcı açıkça tavsiye/öneri istemedi. Ne yapması gerektiğini söyleme; öğüt, reçete veya 'şunu yap' yönlendirmesi ekleme. Yalnız doğal sosyal tepki üret.",
     expressionMode === "natural_repair"
       ? "HOW: Özrü doğal bir sosyal tepki olarak karşıla. Affetme veya yakınlığı yeniden açma yasağını koru; fakat iç ilişki durumunu, 'mesafe koydum' gibi state raporlarını veya sistem kararını açıklama."
       : expressionMode === "firm_boundary"
@@ -123,6 +128,6 @@ export function buildCanonicalDialogueMoveContext(move: string, target: string |
     `- Bu turdaki tek ana hareket: ${move}`,
     `- Hedef kişi: ${target || "aktif konuşan/genel sohbet"}`,
     `- Gerekçe: ${reason}`,
-    "Soru / uzunluk / emoji sınırları KAIRA DAVRANIŞ PLANI'ndadır; burada tekrar edilmez.",
+    "Soru / tavsiye / uzunluk / emoji sınırları KAIRA DAVRANIŞ PLANI'ndadır; burada tekrar edilmez.",
   ].join("\n");
 }
