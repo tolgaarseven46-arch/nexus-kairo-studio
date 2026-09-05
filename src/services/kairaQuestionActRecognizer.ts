@@ -21,10 +21,10 @@ const SUBJECT_NE_NOW_RE =
   /(?<![\p{L}\p{N}_])[\p{L}\p{N}_-]+\s+ne(?:\s+(?:şu\s+an|şimdi))?\s*[.!…]*\s*$/iu;
 
 const REPORTED_DIRECT_QUESTION_RE =
-  /\b(?:neden|niye|nas[ıi]l|kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|neresi|nereye|nereden|kaç|ne(?:\s+(?:durumda|oldu|oluyor|olacak|zaman|kadar))?)\b.{0,60}\b(?:diye\s+(?:sordu|dedi|anlatt[ıi]|söyledi)|sorduğunu|dediğini|anlattığını|söylediğini)\b/iu;
+  /(?<![\p{L}\p{N}_])(?:neden|niye|nas[ıi]l|kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|neresi|nereye|nereden|kaç|ne(?:\s+(?:durumda|oldu|oluyor|olacak|zaman|kadar))?)(?![\p{L}\p{N}_]).{0,60}(?<![\p{L}\p{N}_])(?:diye\s+(?:sordu|dedi|anlatt[ıi]|söyledi)|sorduğunu|dediğini|anlattığını|söylediğini)(?![\p{L}\p{N}_])/iu;
 
 const REPORTED_INDIRECT_QUESTION_RE =
-  /\b(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|nereye|nereden|neden|niye|nas[ıi]l|ne)\b.{0,50}\b(?:olduğunu|olacağını|yaptığını|oynadığını|dediğini|istediğini|gittiğini|geldiğini)\b.{0,30}\b(?:anlatt[ıi]|söyledi|dedi|biliyorum|biliyorsun|öğrendim)\b/iu;
+  /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|nereye|nereden|neden|niye|nas[ıi]l|ne)(?![\p{L}\p{N}_]).{0,50}(?<![\p{L}\p{N}_])(?:olduğunu|olacağını|yaptığını|oynadığını|dediğini|istediğini|gittiğini|geldiğini)(?![\p{L}\p{N}_]).{0,30}(?<![\p{L}\p{N}_])(?:anlatt[ıi]|söyledi|dedi|biliyorum|biliyorsun|öğrendim)(?![\p{L}\p{N}_])/iu;
 
 /**
  * Structural recognizer for whether generated Turkish text performs a question act.
