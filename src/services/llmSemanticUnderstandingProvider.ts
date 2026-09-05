@@ -111,6 +111,7 @@ DISCOURSE FACET OPERASYONEL EŞLEMELERİ:
 - "Mert bana salak dedi" gibi üçüncü kişinin bildirilmiş sözünde target:third_party kullan; bildirilen söz açık hakaret içeriyorsa secondarySocialActs içinde insult KORUNUR. Bu act bildirilen içeriği tarif eder, Kaira'ya yöneltilmiş saldırı anlamına gelmez. "Ayşe ona kızmış" gibi hakaret içermeyen üçüncü kişi olayı insult act üretmez.
 - Yalnız "salak" gibi hedefi belirsiz tek hakaret sözcüğünde target:unknown, primaryIntent:other, secondarySocialActs içinde insult YOK, uncertainty.overall EN AZ 0.70, uncertainty.target EN AZ 0.80 ve disrespect en fazla 0.30 olmalı; bu yalnız lexical candidate kanıtıdır. "sen salaksın" / "Kaira sen salaksın" gibi açık ikinci-şahıs hedefinde target:kaira ve gerçek hostility kanıtına uygun primaryIntent:insult / insult act / severity üret.
 - "soru sorma artık" = stopQuestions:true, stopTalking:false, stopRequest:false ve secondarySocialActs içinde stop_request YOK. "sus artık", "konuşma artık" = stopTalking:true + stopRequest:true; stop_request secondary act yalnız tam konuşmayı durdurma anlamı varsa kullanılabilir. stopQuestions yalnız mesaj ayrıca soruları da durduruyorsa true.
+- Konu/başlık kapatma yalnız mevcut konuyu sonlandırır: "boşver bu konuyu", "konuyu kapatalım", "bunu geçelim" gibi topic-local closure = discourseAct:topic_shift + stopQuestions:false + stopTalking:false + stopRequest:false. Kullanıcı ayrıca "başka şey konuşalım" demese bile bunu tüm sohbeti durdurma olarak yükseltme. Full conversation stop yalnız Kaira’nın konuşmasını/sohbetin tamamını açıkça durduruyorsa kullanılır.
 - "moralim bozuk, ne yapmalıyım?", "sence ne yapayım?" gibi açık öneri/tavsiye talebi = adviceRequested:true. Düz duygu paylaşımı veya bilgi sorusu adviceRequested değildir.
 Bu örnekler karar/policy üretmez; yalnız canonical utterance semantiğini sabitler.
 
@@ -159,7 +160,9 @@ function enforceProviderFieldInvariants(
   const repairSignal = repairAllowed
     ? interpretation.discourseFacets.repairSignal
     : "none";
-  const stopTalking = interpretation.discourseFacets.stopTalking;
+  const topicLocalClosure = interpretation.discourseFacets.discourseAct === "topic_shift";
+  const stopTalking = topicLocalClosure ? false : interpretation.discourseFacets.stopTalking;
+  const stopQuestions = topicLocalClosure ? false : interpretation.discourseFacets.stopQuestions;
   const secondarySocialActs = stopTalking
     ? interpretation.secondarySocialActs
     : interpretation.secondarySocialActs.filter((act) => act !== "stop_request");
@@ -175,6 +178,8 @@ function enforceProviderFieldInvariants(
     discourseFacets: {
       ...interpretation.discourseFacets,
       repairSignal,
+      stopQuestions,
+      stopTalking,
     },
   };
 }
