@@ -8,6 +8,36 @@ const query = {
   confidence: 0.95,
 };
 
+const resolvedFlowerFact = (): KairaAutobiographicalRecallRuntimeResult => ({
+  status: "resolved",
+  recall: {
+    query: {
+      surface: "senin en sevdiğin çiçek ne",
+      scope: "self_fact",
+      factKey: "favorite_flower",
+      confidence: 0.95,
+    },
+    selfFacts: [
+      {
+        score: 1,
+        reasons: ["canonical_fact_key_match"],
+        fact: {
+          id: "sf_flower",
+          domain: "preference",
+          key: "favorite_flower",
+          value: "krizantem",
+          canonical: true,
+          confidence: 1,
+          source: "identity_seed",
+        },
+      },
+    ],
+    memories: [],
+    withheldSensitiveCount: 0,
+  },
+  instruction: "grounded",
+});
+
 describe("Kaira autobiographical response guard", () => {
   it("does nothing when self-memory was not requested", () => {
     expect(
@@ -19,7 +49,7 @@ describe("Kaira autobiographical response guard", () => {
     ).toEqual({ reply: "normal cevap", changed: false });
   });
 
-  it("preserves a response when canonical evidence exists", () => {
+  it("preserves a response when canonical autobiographical evidence exists", () => {
     const runtime: KairaAutobiographicalRecallRuntimeResult = {
       status: "resolved",
       recall: {
@@ -50,6 +80,40 @@ describe("Kaira autobiographical response guard", () => {
       reply: "evet yağmura yakalanmıştım",
       changed: false,
     });
+  });
+
+  it("preserves a resolved self-fact reply that states the canonical value", () => {
+    expect(
+      enforceKairaAutobiographicalResponse(
+        "En sevdiğim çiçek krizantem.",
+        resolvedFlowerFact(),
+      ),
+    ).toEqual({
+      reply: "En sevdiğim çiçek krizantem.",
+      changed: false,
+    });
+  });
+
+  it("replaces a resolved self-fact reply that contradicts the canonical value", () => {
+    const guarded = enforceKairaAutobiographicalResponse(
+      "En sevdiğim çiçek güldür.",
+      resolvedFlowerFact(),
+    );
+    expect(guarded).toEqual({
+      reply: "Buna dair net kaydım: krizantem.",
+      changed: true,
+      reason: "self_memory_resolved_fact_conformance",
+    });
+  });
+
+  it("does not accept mentioning the canonical value only to negate it", () => {
+    const guarded = enforceKairaAutobiographicalResponse(
+      "Krizantem değil, gül.",
+      resolvedFlowerFact(),
+    );
+    expect(guarded.reply).toBe("Buna dair net kaydım: krizantem.");
+    expect(guarded.changed).toBe(true);
+    expect(guarded.reason).toBe("self_memory_resolved_fact_conformance");
   });
 
   it("replaces model-prior autobiography when no canonical record matched", () => {
