@@ -891,6 +891,7 @@ app.post("/api/chat", async (req, res) => {
           reply: userFacingReply,
           memoryScope: kairaPolicy.persistentUserMemory ? dialogueAnalysis.memoryScope : "session",
           dialogueAnalysis,
+          semanticInterpretation: canonicalSemantic.interpretation,
         }) : Promise.resolve(),
         recordKdmMetric({
           userId: stateUserId,
@@ -1351,6 +1352,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         reply,
         memoryScope: kairaPolicy.persistentUserMemory ? dialogueAnalysis.memoryScope : "session",
         dialogueAnalysis,
+          semanticInterpretation: canonicalSemantic.interpretation,
       }) : Promise.resolve(),
       recordKdmMetric({
         userId: stateUserId,
