@@ -31,17 +31,23 @@ jobs:
           Path('/tmp/apply_patch.py').write_text('\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n')
           PY
           python /tmp/apply_patch.py
-      - name: Validate patched files
+      - name: Capture validation
+        shell: bash
         run: |
-          npm ci
-          npm test -- --run
-          npm run typecheck
-          npm run build
-      - name: Commit patch
+          set +e
+          npm ci > validation-debug.log 2>&1
+          INSTALL=$?
+          if [ "$INSTALL" -eq 0 ]; then npm test -- --run >> validation-debug.log 2>&1; TESTS=$?; else TESTS=99; fi
+          if [ "$INSTALL" -eq 0 ]; then npm run typecheck >> validation-debug.log 2>&1; TYPES=$?; else TYPES=99; fi
+          if [ "$INSTALL" -eq 0 ]; then npm run build >> validation-debug.log 2>&1; BUILD=$?; else BUILD=99; fi
+          printf '\nRESULT install=%s tests=%s typecheck=%s build=%s\n' "$INSTALL" "$TESTS" "$TYPES" "$BUILD" >> validation-debug.log
+          exit 0
+      - name: Commit patched source and debug output
+        shell: bash
         run: |
           rm -f .github/workflows/apply-world-memory-fact-model.yml .github/workflows/run-world-memory-fact-patch.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "fix(kaira): add canonical world-memory fact identity"
+          git commit -m "wip(kaira): capture world-memory fact validation"
           git push origin HEAD:fix/world-memory-evidence-eligibility
