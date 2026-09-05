@@ -47,6 +47,7 @@ const SYSTEM = `Sen Kaira'nın canonical Türkçe semantic parser katmanısın.
 Cevap yazma, kişilik oynama veya Kaira'nın nasıl davranması gerektiğine karar verme.
 Yalnızca kullanıcının BU mesajında bulunan utterance-level anlamı SemanticInterpretation@2 şemasında çıkar.
 Geçmiş bağlamı yalnız hedef/alıntı/referans çözmek için kullan; ilişki politikası veya cevap kararı üretme.
+Bağlam kısa veya kısaltılmış bir mesajın sözlüksel açılımını UYDURAMAZ. Mesaj kendi başına anlam taşımıyorsa belirsizliği koru; bağlam yalnız hedef/referans/discourse bağımlılığını çözebilir.
 
 SADECE geçerli JSON döndür. Şema tam olarak:
 ${JSON.stringify(schemaExample)}
@@ -178,26 +179,127 @@ function enforceProviderFieldInvariants(
   };
 }
 
+function isShortContextAdjudicationCandidate(message: string, context?: LanguageUnderstandingContext): boolean {
+  const token = message.trim();
+  return Boolean(context?.recentMessages?.length) && /^[\p{L}\p{N}]{2,3}$/u.test(token);
+}
+
+function isSemanticallyOpaqueWithoutContext(interpretation: SemanticInterpretation): boolean {
+  const severityPeak = Math.max(
+    interpretation.severity.disrespect,
+    interpretation.severity.coercion,
+    interpretation.severity.manipulation,
+    interpretation.severity.privacy,
+    interpretation.severity.aggression,
+  );
+  const facets = interpretation.discourseFacets;
+  return interpretation.primaryIntent === "other"
+    && interpretation.secondarySocialActs.length === 0
+    && interpretation.target === "unknown"
+    && interpretation.valence === "neutral"
+    && severityPeak <= 0.15
+    && interpretation.affection <= 0.15
+    && interpretation.support <= 0.15
+    && interpretation.compliment <= 0.15
+    && interpretation.emotionalLoad <= 0.25
+    && !interpretation.apology
+    && !interpretation.repairAttempt
+    && !interpretation.stopRequest
+    && facets.socialRoutine === "none"
+    && facets.discourseAct === "none"
+    && facets.repairSignal === "none"
+    && !facets.adviceRequested
+    && facets.knowledgeQuery === null
+    && facets.selfMemoryQuery === null
+    && facets.relationalAct === "none"
+    && !facets.stopQuestions
+    && !facets.stopTalking
+    && interpretation.uncertainty.overall >= 0.7
+    && interpretation.uncertainty.intent >= 0.7;
+}
+
+function contextInventsLexicalMeaning(
+  baseline: SemanticInterpretation,
+  contextual: SemanticInterpretation,
+): boolean {
+  const baselineFacets = baseline.discourseFacets;
+  const contextualFacets = contextual.discourseFacets;
+  const contextualSeverityPeak = Math.max(
+    contextual.severity.disrespect,
+    contextual.severity.coercion,
+    contextual.severity.manipulation,
+    contextual.severity.privacy,
+    contextual.severity.aggression,
+  );
+  return contextual.primaryIntent !== baseline.primaryIntent
+    || contextual.secondarySocialActs.length > 0
+    || contextual.valence !== baseline.valence
+    || contextualSeverityPeak > 0.2
+    || contextual.affection > baseline.affection + 0.2
+    || contextual.support > baseline.support + 0.2
+    || contextual.compliment > baseline.compliment + 0.2
+    || contextual.emotionalLoad > baseline.emotionalLoad + 0.35
+    || contextual.apology !== baseline.apology
+    || contextual.repairAttempt !== baseline.repairAttempt
+    || contextual.stopRequest !== baseline.stopRequest
+    || contextualFacets.socialRoutine !== baselineFacets.socialRoutine
+    || contextualFacets.discourseAct !== baselineFacets.discourseAct
+    || contextualFacets.repairSignal !== baselineFacets.repairSignal
+    || contextualFacets.adviceRequested !== baselineFacets.adviceRequested
+    || contextualFacets.knowledgeQuery !== null
+    || contextualFacets.selfMemoryQuery !== null
+    || contextualFacets.relationalAct !== baselineFacets.relationalAct
+    || contextualFacets.stopQuestions !== baselineFacets.stopQuestions
+    || contextualFacets.stopTalking !== baselineFacets.stopTalking;
+}
+
+function preserveOnlyContextualReferent(
+  baseline: SemanticInterpretation,
+  contextual: SemanticInterpretation,
+): SemanticInterpretation {
+  if (contextual.target === "unknown" || contextual.target === baseline.target) return baseline;
+  return {
+    ...baseline,
+    target: contextual.target,
+    uncertainty: {
+      ...baseline.uncertainty,
+      target: Math.min(baseline.uncertainty.target, contextual.uncertainty.target),
+    },
+  };
+}
+
 export function createLlmSemanticUnderstandingProvider(options: LlmSemanticProviderOptions): SemanticUnderstandingProvider {
+  const interpretOnce = async (
+    message: string,
+    morphology: TurkishMorphologyResult | undefined,
+    context: LanguageUnderstandingContext | undefined,
+  ): Promise<SemanticInterpretation> => {
+    const prompt = `MESAJ:\n${message}\n\nMORFOLOJİ:\n${compactMorphology(morphology)}\n\nSON BAĞLAM:\n${compactContext(context)}\n\nKullanıcı adı: ${context?.userName ?? "bilinmiyor"}\nKarakter adı: ${context?.characterName ?? "Kaira"}`;
+    const raw = await options.generate({ system: SYSTEM, prompt, temperature: 0.05 });
+    const parsed = extractJson(raw) as Record<string, unknown>;
+    parsed.raw = message;
+    if (parsed.schemaVersion !== SEMANTIC_INTERPRETATION_SCHEMA_VERSION || !isSemanticInterpretation(parsed)) {
+      throw new Error("LLM semantic parser incomplete/invalid SemanticInterpretation@2 returned.");
+    }
+    const normalized = enforceProviderFieldInvariants(
+      normalizeSemanticInterpretation(parsed, message),
+      context,
+    );
+    normalized.evidence = normalized.evidence.length
+      ? normalized.evidence.map((e) => ({ ...e, source: "llm", provider: e.provider ?? options.name ?? "llm_semantic_parser_v2" }))
+      : [{ source: "llm", provider: options.name ?? "llm_semantic_parser_v2", cues: [], confidence: Math.max(0, 1 - normalized.uncertainty.overall) }];
+    return normalized;
+  };
+
   return {
     name: options.name ?? "llm_semantic_parser_v2",
     async interpret({ message, morphology, context }): Promise<SemanticInterpretation> {
-      const prompt = `MESAJ:\n${message}\n\nMORFOLOJİ:\n${compactMorphology(morphology)}\n\nSON BAĞLAM:\n${compactContext(context)}\n\nKullanıcı adı: ${context?.userName ?? "bilinmiyor"}\nKarakter adı: ${context?.characterName ?? "Kaira"}`;
-      const raw = await options.generate({ system: SYSTEM, prompt, temperature: 0.05 });
-      const parsed = extractJson(raw) as Record<string, unknown>;
-      // Only evidence identity is authoritative at the boundary. The model may not rewrite raw text.
-      parsed.raw = message;
-      if (parsed.schemaVersion !== SEMANTIC_INTERPRETATION_SCHEMA_VERSION || !isSemanticInterpretation(parsed)) {
-        throw new Error("LLM semantic parser incomplete/invalid SemanticInterpretation@2 returned.");
-      }
-      const normalized = enforceProviderFieldInvariants(
-        normalizeSemanticInterpretation(parsed, message),
-        context,
-      );
-      normalized.evidence = normalized.evidence.length
-        ? normalized.evidence.map((e) => ({ ...e, source: "llm", provider: e.provider ?? options.name ?? "llm_semantic_parser_v2" }))
-        : [{ source: "llm", provider: options.name ?? "llm_semantic_parser_v2", cues: [], confidence: Math.max(0, 1 - normalized.uncertainty.overall) }];
-      return normalized;
+      const contextual = await interpretOnce(message, morphology, context);
+      if (!isShortContextAdjudicationCandidate(message, context)) return contextual;
+      const contextFree = await interpretOnce(message, morphology, { ...context, recentMessages: [] });
+      if (!isSemanticallyOpaqueWithoutContext(contextFree)) return contextual;
+      if (!contextInventsLexicalMeaning(contextFree, contextual)) return contextual;
+      return preserveOnlyContextualReferent(contextFree, contextual);
     },
   };
 }
