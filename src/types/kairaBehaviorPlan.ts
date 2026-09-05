@@ -78,6 +78,14 @@ export interface KairaPlanUncertainty {
   relational: number;
 }
 
+export type KairaSocialMove =
+  | "none"
+  | "accept_repair"
+  | "reciprocate_nonromantic_closeness"
+  | "warm_deflect"
+  | "set_boundary"
+  | "maintain_boundary";
+
 export type KairaExpressionMode =
   | "natural_social"
   | "firm_boundary"

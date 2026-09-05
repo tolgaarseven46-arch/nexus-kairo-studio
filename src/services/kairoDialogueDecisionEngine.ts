@@ -4,8 +4,9 @@ import { effectivelySupportedClaims, type DialogueClaim } from "./claimProvenanc
 import {
   interpretSemanticEvent,
   type SemanticEvent,
-  type SemanticRepairSignal,
   type SemanticSocialRoutine,
+  type SemanticRepairSignal,
+  type RelationalAct,
 } from "./semanticEventEngine";
 import { projectSemanticEventToDialogueAnalysis } from "./kairaDialogueTurnProjection";
 import type { DialogueTurnAnalysis } from "./kairoDialogueChaosEngine";
@@ -22,6 +23,7 @@ export type DialogueMove =
   | "join_banter"
   | "follow_topic_shift"
   | "complete_social_routine"
+  | "respond_to_relational_bid"
   | "natural_reaction";
 
 export type DialogueObligationResolution =
@@ -43,6 +45,7 @@ export interface DialogueDecisionPlan {
   target?: string;
   socialRoutine?: SemanticSocialRoutine;
   repairSignal?: SemanticRepairSignal;
+  relationalAct?: RelationalAct;
   /** Observed Kaira social act that must not be emitted again on this turn. */
   repeatGuard?: { act: DiscourseSocialAct; count: number };
   /**
@@ -91,6 +94,7 @@ const SOCIAL_ONLY_MOVES = new Set<DialogueDecisionPlan["move"]>([
   "repair_or_rephrase",
   "follow_topic_shift",
   "complete_social_routine",
+  "respond_to_relational_bid",
 ]);
 const PROCRASTINATION_BANTER_RE =
   /\b(son dakikaya bırak\w*|ertele\w*|geciktir\w*|üşen\w*|yapmayıp bekle\w*)\b/i;
@@ -417,6 +421,28 @@ if (event.adviceRequested) {
         "Yeni konuya doğal biçimde geç; kapanan konuyu zorla geri getirme.",
     };
   }
+  const directRelationalBid =
+    event.target === "kaira" &&
+    (event.relationalAct === "closeness_bid" ||
+      event.relationalAct === "reconciliation_attempt" ||
+      event.relationalAct === "repair_probe" ||
+      event.relationalAct === "reassurance_seek" ||
+      event.intent === "affection" ||
+      (event.intent === "command" && event.affection > 0));
+  if (directRelationalBid) {
+    return {
+      move: "respond_to_relational_bid",
+      relationalAct: event.relationalAct,
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 12,
+      hasSupportedTargetClaim: false,
+      reason:
+        "Kullanıcı Kaira'ya doğrudan ilişkisel/yakınlık hamlesi yaptı. Generic acknowledgement ile geçiştirme; canonical behavior planın izinlerine göre kabul, onarım-kabulü, sıcak geçiştirme veya sınır koyma hareketlerinden birini açıkça gerçekleştir.",
+    };
+  }
+
   if (event.intent === "banter") {
     return {
       move: "join_banter",
@@ -523,6 +549,7 @@ export function buildDialogueDecisionInstruction(
 - Kelime bütçesi: ${effectiveMaxWords ? `en fazla ${effectiveMaxWords} kelime` : "özel sınır yok"}
 - Tekrar koruması: ${plan.repeatGuard ? `"${plan.repeatGuard.act}" sosyal işini yeniden üretme` : "yok"}
 - Obligation: ${plan.obligation ? `${plan.obligation.type}; yalnız acknowledgement ile kapanamaz` : "yok"}
+- Relational act: ${plan.relationalAct ?? "none"}
 - Gerekçe: ${effectiveReason}
 Doğru cevabı verdikten sonra ikinci bir tahmin, seçenek listesi, yeni şaka veya otomatik soru ekleyerek cevabın mantığını BOZMA.`;
 }
@@ -547,6 +574,9 @@ export function findDialogueDecisionIssues(
   );
   const effectiveMaxSentences = style?.maxSentences ?? plan.maxSentences;
   const effectiveMaxWords = style?.maxWords ?? plan.maxWords;
+  if (plan.move === "respond_to_relational_bid" && KAIRA_SHORT_ACK_RE.test(reply.trim())) {
+    issues.push("Relational bid generic acknowledgement ile geçiştirilemez; anlamlı sosyal hareket gerekli");
+  }
   if (
     plan.obligation?.satisfactionCriteria.forbiddenResponseClasses.includes("acknowledgement_only") &&
     KAIRA_SHORT_ACK_RE.test(reply.trim())
@@ -636,6 +666,7 @@ export function buildGroundedDialogueFallback(
   userName: string,
   currentAnalysis?: DialogueTurnAnalysis,
   effectiveAllowQuestion = plan.allowFollowUpQuestion,
+  relationalFallback?: string | null,
 ): string | null {
   if (plan.move === "invite_emotional_context") {
     return effectiveAllowQuestion ? "hmm niye" : "hmm";
@@ -657,6 +688,7 @@ export function buildGroundedDialogueFallback(
   }
   if (plan.move === "follow_previous_answer") return "he tamam o zaman";
   if (plan.move === "acknowledge_correction") return "he doğru";
+  if (plan.move === "respond_to_relational_bid") return relationalFallback || null;
   if (plan.move === "natural_reaction")
     return plan.repeatGuard?.act === "agreement_ack" ? "devam edelim" : "he anladım";
   if (plan.move === "follow_topic_shift") return "he tamam";

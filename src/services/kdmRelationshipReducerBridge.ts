@@ -43,6 +43,11 @@ function minutesBetween(fromIso: string | undefined, toIso: string) {
 
 /** Stable repeat label derived only from canonical v2 fields. No raw-text parse. */
 export function semanticNegativePattern(interp: SemanticInterpretation): string | null {
+  const explicitInsultOrMockery =
+    interp.primaryIntent === "insult" ||
+    interp.secondarySocialActs.includes("insult") ||
+    interp.secondarySocialActs.includes("mockery");
+  if (interp.primaryIntent === "complaint" && !explicitInsultOrMockery) return null;
   const maxSeverity = Math.max(
     interp.severity.disrespect,
     interp.severity.coercion,

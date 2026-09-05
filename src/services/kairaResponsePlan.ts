@@ -1,7 +1,7 @@
 import type { BehaviorContract } from "./behaviorContract";
 import type { DialogueDecisionPlan } from "./kairoDialogueDecisionEngine";
 import type { KairoSpeechIdentity } from "./kairoSpeechIdentity";
-import type { KairaPlanProjections, KairaPlanUncertainty } from "../types/kairaBehaviorPlan";
+import type { KairaPlanProjections, KairaPlanUncertainty, KairaSocialMove } from "../types/kairaBehaviorPlan";
 import { deriveHardConstraints } from "./kairaHardConstraints";
 import { deriveSoftTendencies } from "./kairaSoftTendencies";
 import { resolveKairaResponsePlan } from "./kairaPlanResolver";
@@ -34,6 +34,7 @@ export interface KairaResponsePlan {
   hardReasons?: string[];
   uncertainty?: KairaPlanUncertainty;
   projections?: KairaPlanProjections;
+  socialMove?: KairaSocialMove;
 }
 
 const countEmoji = (text: string) =>
@@ -54,6 +55,7 @@ export function looksLikeKairaQuestionAct(text: string): boolean {
 
 const HUMOR_RE = /(hahaha|hehe|şaka|takılıyorum|dalga|😂|🤣|😏)/iu;
 const AFFECTION_RE = /(öp|öpüc|sarıl|kucağ|dudak|bebeğim|aşkım|tatlım|sevgilim)/iu;
+const SOCIAL_ACK_ONLY_RE = /^(?:he|hee|hmm|anladım|he anladım|tamam|tamamdır)[.!…]*$/iu;
 const FORGIVENESS_RE = /(geçti gitti|sorun yok|affettim|tamamen geçti|kapandı gitti)/iu;
 const COUNTER_FLIRT_RE =
   /(seninle çık(ar|mak|alım)|benimle çık|randevu(ya çıkalım| ver, teklifini kabul)?|ben de senden hoşlan|ben de sana (aşığ|âşığ|vurgun)|senden hoşlanıyorum|sana aşık oldum|sana âşık oldum|beni öp|öpüşelim|öpelim mi|seni de öpmek|sevgilim ol|sende bende|flört edelim|flort edelim|ben de flört|seni arzuluyorum|seni istiyorum canım|kalbimi çaldın|😘|😍|🥰|😗|😙|😚|💋|❤️‍🔥)/iu;
@@ -162,6 +164,7 @@ export function buildKairaResponsePlan(
     hardReasons: resolved.hardReasons,
     uncertainty: resolved.uncertainty,
     projections: resolved.projections,
+    socialMove: resolved.socialMove,
   };
 }
 
@@ -179,12 +182,16 @@ export function kairaResponsePlanInstruction(plan: KairaResponsePlan): string {
     `allowForgiveness=${plan.allowForgiveness}`,
     `allowReopeningCloseness=${plan.allowReopeningCloseness}`,
     `counterFlirt=${plan.counterFlirtAllowed === true ? "allowed" : "forbidden"}`,
+    `socialMove=${plan.socialMove ?? "none"}`,
     `maxSentences=${plan.maxSentences}`,
     `maxWords=${plan.maxWords}`,
     `emojiBudget=${plan.emojiBudget}`,
     plan.counterFlirtAllowed === true
       ? ""
       : "Karşı-flört YASAK: kullanıcı flört etse/teklif etse bile Kaira flörte karşılık vermez, romantik/cinsel ima başlatmaz. Sıcak veya esprili olabilir; flörtü nazikçe geçiştirir. Bu sınır güven/yakınlık/geçmiş ilişki/tona bakılmaksızın mutlaktır.",
+    plan.socialMove && plan.socialMove !== "none"
+      ? "SOSYAL HAREKET ZORUNLULUĞU: Bu tur ilişkisel bir hamleye cevap veriyorsun. socialMove alanındaki hareketi açıkça gerçekleştir; yalnızca he/hee/hmm/anladım/tamam gibi generic acknowledgement ile geçiştirme."
+      : "",
     plan.requiredContent?.includes("preserve_ambiguity")
       ? "BELİRSİZLİK KORUMA ZORUNLULUĞU: Bu turdaki kullanıcı mesajının anlamı güvenilir biçimde çözülemedi. Mesajı hakaret, öfke, susturma, vedalaşma, yakınlaşma veya başka belirli bir niyetmiş gibi TAMAMLAMA. Yalnızca nötr kısa bir kabul/tereddüt üret; açık olmayan anlamı uydurma."
       : "",
@@ -203,6 +210,7 @@ export function findKairaResponsePlanIssues(
   const issues: string[] = [];
 
   if (!plan.allowQuestion && looksLikeKairaQuestionAct(text)) issues.push("response_plan_question_blocked");
+  if (plan.socialMove && plan.socialMove !== "none" && SOCIAL_ACK_ONLY_RE.test(text)) issues.push("response_plan_social_move_missing");
   if (!plan.allowHumor && HUMOR_RE.test(text)) issues.push("response_plan_humor_blocked");
   if (!plan.allowAffection && AFFECTION_RE.test(text)) issues.push("response_plan_affection_blocked");
   if (plan.counterFlirtAllowed === false && COUNTER_FLIRT_RE.test(text))
@@ -214,4 +222,16 @@ export function findKairaResponsePlanIssues(
   if (countEmoji(text) > plan.emojiBudget) issues.push("response_plan_emoji_budget_exceeded");
 
   return issues;
+}
+
+
+export function kairaSocialMoveFallback(plan: KairaResponsePlan): string | null {
+  switch (plan.socialMove) {
+    case "accept_repair": return "tamam, barışalım";
+    case "reciprocate_nonromantic_closeness": return "gel bakalım";
+    case "warm_deflect": return "yok o kadar değil";
+    case "set_boundary": return "onu istemiyorum";
+    case "maintain_boundary": return "hayır, bu sınır değişmedi";
+    default: return null;
+  }
 }

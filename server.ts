@@ -9,7 +9,7 @@ import { normalizeDroitPersonality } from "./src/services/droitPersonalityNormal
 import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
 import { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";
-import { buildKairaResponsePlan, findKairaResponsePlanIssues, kairaResponsePlanInstruction } from "./src/services/kairaResponsePlan";
+import { buildKairaResponsePlan, findKairaResponsePlanIssues, kairaResponsePlanInstruction, kairaSocialMoveFallback } from "./src/services/kairaResponsePlan";
 import {
   buildCanonicalBehaviorBlock,
   buildCanonicalObservationalContext,
@@ -1098,6 +1098,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         userName,
         dialogueAnalysis,
         responsePlan.allowQuestion,
+        kairaSocialMoveFallback(responsePlan),
       );
       if (!providerFallback) throw generationError;
       reply = providerFallback;
@@ -1176,6 +1177,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         userName,
         dialogueAnalysis,
         responsePlan.allowQuestion,
+        kairaSocialMoveFallback(responsePlan),
       );
       if (fallback) {
         const fallbackIssues = [
@@ -1270,6 +1272,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
     if (!canonicalConstraint && postEnforcementPlanIssues.length) {
       const planSafeFallback = buildGroundedDialogueFallback(
         dialogueDecision, cleanHistory, userMessage, userName, dialogueAnalysis, responsePlan.allowQuestion,
+        kairaSocialMoveFallback(responsePlan),
       );
       if (planSafeFallback) {
         const candidateWorldGuard = enforceWorldModelRecallResponse(planSafeFallback, retrievedWorldEvents, worldReasoningContext);

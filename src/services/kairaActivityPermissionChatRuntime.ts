@@ -48,7 +48,9 @@ export function buildKairaActivityPermissionChatPrompt(input: {
     requestId: input.requestId,
     activityId: input.activityId,
     activityLabel: label,
-    text: `Bu arada ${label} aktivitesini yapmam için izin veriyor musun? Evet ya da hayır diyebilirsin.`,
+    text: label === "planladığım aktivite"
+      ? "Bu arada planladığım aktiviteyi yapmam için izin veriyor musun? Evet ya da hayır diyebilirsin."
+      : `Bu arada ${label} aktivitesini yapmam için izin veriyor musun? Evet ya da hayır diyebilirsin.`,
   };
 }
 

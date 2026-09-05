@@ -67,6 +67,17 @@ function trivialRenderIntent(
   ) {
     return null;
   }
+  // Fast local rendering is only for semantically trivial routines. A current
+  // turn that asks for knowledge/causality, carries a typed relational act, or
+  // describes a third-party emotional event must stay on the full generation path.
+  if (
+    event.intent === "question" ||
+    event.intent === "information_request" ||
+    event.knowledgeQuery ||
+    event.relationalAct !== "none" ||
+    (event.target === "third_party" && event.emotionalLoad >= 0.35)
+  ) return null;
+
   // The dialogue decision must have chosen a trivial move (or be absent for a
   // direct/legacy call). The local engine never overrides a non-trivial move.
   if (dialogueMove !== undefined && !TRIVIAL_RENDER_MOVES.has(dialogueMove)) return null;
