@@ -128,7 +128,7 @@ const TOPIC_SHIFT_RE = /(?:^|\s)(?:bu arada|neyse|konu dışı|şey diyeceğim|�
 
 function inferSocialRoutine(text: string, intent: SemanticIntent): SemanticSocialRoutine {
   if (/^(?:selam|selamlar|merhaba|hey|heyy|günaydın|gunaydin)(?:\s+(?:kaira|kairo|kanka|aga|lan))?[.!?…]*$/u.test(text)) return "greeting";
-  if (/^(?:naber|nabr|nber|nasılsın|nasıl gidiyor|nasil gidiyor|ne var ne yok|keyifler nasıl|keyifler nasil)(?:\s+(?:kaira|kairo|kank[a-zçğıöşü]*|aga|lan))?[.!?…]*$/u.test(text)) return "how_are_you";
+  if (/^(?:naber|nabr|nber|nasılsın|nasıl gidiyor|nasil gidiyor|ne var ne yok|keyifler nasıl|keyifler nasil)(?:\s+şimdi)?(?:\s+(?:kaira|kairo|kank[a-zçğıöşü]*|aga|lan))?[.!?…]*$/u.test(text)) return "how_are_you";
   if (/^(?:ne yapıyorsun|ne yapiyorsun|napıyorsun|napıyosun|napiyorsun|napiyosun|napıyon|napion|napiyon)(?:\s+(?:kaira|kairo|kank[a-zçğıöşü]*|aga|lan))?[.!?…]*$/u.test(text)) return "what_doing";
   if (/^(?:sağol|sağ ol|saol|saolasın|sağolasın|teşekkür|teşekkürler|teşekkür ederim|eyvallah|eyw|thx)[.!?…]*$/u.test(text)) return "thanks";
   if (/^(?:aynen|aynen öyle|evet|he|hıhı|tamam|tamamdır|olur|oldu|ok|okey)[.!?…]*$/u.test(text)) return "agreement";

@@ -17,7 +17,6 @@ export interface KairaResponsePlan {
   allowQuestion: boolean;
   allowHumor: boolean;
   allowAffection: boolean;
-  /** Runtime canonical plan always supplies this; optional only for old projections. */
   allowAdvice?: boolean;
   allowForgiveness: boolean;
   allowReopeningCloseness: boolean;
@@ -25,7 +24,6 @@ export interface KairaResponsePlan {
   maxWords: number;
   emojiBudget: number;
   reasons: string[];
-  /** Canonical resolver marker. Optional only for old persisted/test projections. */
   resolver?: "canonical";
   flirtationAllowed?: boolean;
   counterFlirtAllowed?: boolean;
@@ -40,110 +38,44 @@ export interface KairaResponsePlan {
   socialMove?: KairaSocialMove;
 }
 
-const countEmoji = (text: string) =>
-  Array.from(text.matchAll(/\p{Extended_Pictographic}/gu)).length;
+const countEmoji = (text: string) => Array.from(text.matchAll(/\p{Extended_Pictographic}/gu)).length;
+const responseUnitCount = (reply: string) => reply.trim().split(/\n+|(?<=[.!?…])\s+/u).filter((part) => part.trim()).length;
+const wordCount = (reply: string) => reply.trim().split(/\s+/u).filter(Boolean).length;
 
-const responseUnitCount = (reply: string) =>
-  reply
-    .trim()
-    .split(/\n+|(?<=[.!?…])\s+/u)
-    .filter((part) => part.trim()).length;
-
-const wordCount = (reply: string) =>
-  reply.trim().split(/\s+/u).filter(Boolean).length;
-
-export function looksLikeKairaQuestionAct(text: string): boolean {
-  return isTurkishQuestionAct(text);
-}
-
-export function looksLikeKairaAdviceAct(text: string): boolean {
-  return isTurkishAdviceAct(text);
-}
+export function looksLikeKairaQuestionAct(text: string): boolean { return isTurkishQuestionAct(text); }
+export function looksLikeKairaAdviceAct(text: string): boolean { return isTurkishAdviceAct(text); }
 
 const HUMOR_RE = /(hahaha|hehe|şaka|takılıyorum|dalga|😂|🤣|😏)/iu;
 const AFFECTION_RE = /(öp|öpüc|sarıl|kucağ|dudak|bebeğim|aşkım|tatlım|sevgilim)/iu;
 const SOCIAL_ACK_ONLY_RE = /^(?:he|hee|hmm|anladım|he anladım|tamam|tamamdır)[.!…]*$/iu;
 const FORGIVENESS_RE = /(geçti gitti|sorun yok|affettim|tamamen geçti|kapandı gitti)/iu;
-const COUNTER_FLIRT_RE =
-  /(seninle çık(ar|mak|alım)|benimle çık|randevu(ya çıkalım| ver, teklifini kabul)?|ben de senden hoşlan|ben de sana (aşığ|âşığ|vurgun)|senden hoşlanıyorum|sana aşık oldum|sana âşık oldum|beni öp|öpüşelim|öpelim mi|seni de öpmek|sevgilim ol|sende bende|flört edelim|flort edelim|ben de flört|seni arzuluyorum|seni istiyorum canım|kalbimi çaldın|😘|😍|🥰|😗|😙|😚|💋|❤️‍🔥)/iu;
+const COUNTER_FLIRT_RE = /(seninle çık(ar|mak|alım)|benimle çık|randevu(ya çıkalım| ver, teklifini kabul)?|ben de senden hoşlan|ben de sana (aşığ|âşığ|vurgun)|senden hoşlanıyorum|sana aşık oldum|sana âşık oldum|beni öp|öpüşelim|öpelim mi|seni de öpmek|sevgilim ol|sende bende|flört edelim|flort edelim|ben de flört|seni arzuluyorum|seni istiyorum canım|kalbimi çaldın|😘|😍|🥰|😗|😙|😚|💋|❤️‍🔥)/iu;
 const REOPEN_RE = /(hadi\s+(?:konuş|devam)|konuşalım|devam edelim|eski halimize|normale dön|barıştık|kaldığımız yerden)/iu;
 
 const DIALOGUE_FOCUSED_MOVES = new Set<DialogueDecisionPlan["move"]>([
-  "grounded_recall",
-  "invite_emotional_context",
-  "repair_or_rephrase",
-  "follow_previous_answer",
-  "acknowledge_correction",
+  "grounded_recall", "invite_emotional_context", "repair_or_rephrase", "follow_previous_answer", "acknowledge_correction",
 ]);
 
-/**
- * ADR-0006 PR5: PlanResolver is the sole behavior-plan authority.
- * Legacy field names remain as the public projection consumed downstream, but
- * their values are always populated from the resolved canonical snapshot.
- */
-export function buildKairaResponsePlan(
-  contract: BehaviorContract,
-  dialogue: DialogueDecisionPlan,
-  speech: KairoSpeechIdentity,
-): KairaResponsePlan {
+export function buildKairaResponsePlan(contract: BehaviorContract, dialogue: DialogueDecisionPlan, speech: KairoSpeechIdentity): KairaResponsePlan {
   const continueConversation = contract.continueConversation;
-  const allowQuestion =
-    continueConversation &&
-    contract.questions === "allowed" &&
-    dialogue.allowFollowUpQuestion;
+  const allowQuestion = continueConversation && contract.questions === "allowed" && dialogue.allowFollowUpQuestion;
   const dialogueFocused = DIALOGUE_FOCUSED_MOVES.has(dialogue.move);
-  const allowHumor =
-    continueConversation &&
-    contract.playfulness === "allowed" &&
-    !dialogueFocused;
-  const allowAffection =
-    continueConversation &&
-    contract.affection === "allowed" &&
-    !dialogueFocused;
+  const allowHumor = continueConversation && contract.playfulness === "allowed" && !dialogueFocused;
+  const allowAffection = continueConversation && contract.affection === "allowed" && !dialogueFocused;
   const allowAdvice = continueConversation && contract.advice === "allowed";
   const allowForgiveness = contract.forgivenessGranted && !dialogueFocused;
-  const allowReopeningCloseness =
-    continueConversation &&
-    contract.reopeningCloseness === "allowed" &&
-    !dialogueFocused;
+  const allowReopeningCloseness = continueConversation && contract.reopeningCloseness === "allowed" && !dialogueFocused;
   const contractSentenceBudget = contract.maxResponseLength === "short" ? 1 : 2;
   const maxSentences = Math.max(1, Math.min(dialogue.maxSentences, contractSentenceBudget));
-  const maxWords = Math.max(
-    1,
-    Math.min(
-      dialogue.maxWords ?? (contract.maxResponseLength === "short" ? 14 : 32),
-      contract.maxResponseLength === "short" ? 14 : 32,
-    ),
-  );
+  const maxWords = Math.max(1, Math.min(dialogue.maxWords ?? (contract.maxResponseLength === "short" ? 14 : 32), contract.maxResponseLength === "short" ? 14 : 32));
   const dialogueEmojiBlocked = dialogueFocused || dialogue.move === "join_banter";
-  const emojiBudget =
-    continueConversation &&
-    !dialogueEmojiBlocked &&
-    speech.emojiLevel > 0 &&
-    contract.stance === "open"
-      ? 1
-      : 0;
+  const emojiBudget = continueConversation && !dialogueEmojiBlocked && speech.emojiLevel > 0 && contract.stance === "open" ? 1 : 0;
 
   const basePlan: KairaResponsePlan = {
-    move: dialogue.move,
-    stance: contract.stance,
-    register: speech.register,
-    relationshipLevel: speech.relationshipLevel,
-    continueConversation,
-    allowQuestion,
-    allowHumor,
-    allowAffection,
-    allowAdvice,
-    allowForgiveness,
-    allowReopeningCloseness,
-    maxSentences,
-    maxWords,
-    emojiBudget,
-    reasons: [
-      ...contract.reasons,
-      dialogue.reason,
-      `speech=${speech.register}/${speech.relationshipLevel}`,
-    ],
+    move: dialogue.move, stance: contract.stance, register: speech.register, relationshipLevel: speech.relationshipLevel,
+    continueConversation, allowQuestion, allowHumor, allowAffection, allowAdvice, allowForgiveness, allowReopeningCloseness,
+    maxSentences, maxWords, emojiBudget,
+    reasons: [...contract.reasons, dialogue.reason, `speech=${speech.register}/${speech.relationshipLevel}`],
   };
 
   const hard = deriveHardConstraints(contract, dialogue);
@@ -181,64 +113,38 @@ export function buildKairaResponsePlan(
 export function kairaResponsePlanInstruction(plan: KairaResponsePlan): string {
   return [
     "KAIRA CEVAP PLANI (TEK DAVRANIŞ OTORİTESİ):",
-    `move=${plan.move}`,
-    `stance=${plan.stance}`,
-    `register=${plan.register}`,
-    `relationshipLevel=${plan.relationshipLevel}`,
-    `continueConversation=${plan.continueConversation}`,
-    `allowQuestion=${plan.allowQuestion}`,
-    `allowHumor=${plan.allowHumor}`,
-    `allowAffection=${plan.allowAffection}`,
-    `allowAdvice=${plan.allowAdvice === true}`,
-    `allowForgiveness=${plan.allowForgiveness}`,
-    `allowReopeningCloseness=${plan.allowReopeningCloseness}`,
-    `counterFlirt=${plan.counterFlirtAllowed === true ? "allowed" : "forbidden"}`,
-    `socialMove=${plan.socialMove ?? "none"}`,
-    `maxSentences=${plan.maxSentences}`,
-    `maxWords=${plan.maxWords}`,
-    `emojiBudget=${plan.emojiBudget}`,
-    plan.allowAdvice === true
-      ? ""
-      : "İSTENMEMİŞ TAVSİYE YASAK: kullanıcı açıkça öneri/tavsiye istemediyse ne yapması gerektiğini söyleme; doğal sosyal tepki ver.",
-    plan.counterFlirtAllowed === true
-      ? ""
-      : "Karşı-flört YASAK: kullanıcı flört etse/teklif etse bile Kaira flörte karşılık vermez, romantik/cinsel ima başlatmaz. Sıcak veya esprili olabilir; flörtü nazikçe geçiştirir. Bu sınır güven/yakınlık/geçmiş ilişki/tona bakılmaksızın mutlaktır.",
-    plan.socialMove && plan.socialMove !== "none"
-      ? "SOSYAL HAREKET ZORUNLULUĞU: Bu tur ilişkisel bir hamleye cevap veriyorsun. socialMove alanındaki hareketi açıkça gerçekleştir; yalnızca he/hee/hmm/anladım/tamam gibi generic acknowledgement ile geçiştirme."
-      : "",
-    plan.requiredContent?.includes("preserve_ambiguity")
-      ? "BELİRSİZLİK KORUMA ZORUNLULUĞU: Bu turdaki kullanıcı mesajının anlamı güvenilir biçimde çözülemedi. Mesajı hakaret, öfke, susturma, vedalaşma, yakınlaşma veya başka belirli bir niyetmiş gibi TAMAMLAMA. Yalnızca nötr kısa bir kabul/tereddüt üret; açık olmayan anlamı uydurma."
-      : "",
+    `move=${plan.move}`, `stance=${plan.stance}`, `register=${plan.register}`, `relationshipLevel=${plan.relationshipLevel}`,
+    `continueConversation=${plan.continueConversation}`, `allowQuestion=${plan.allowQuestion}`, `allowHumor=${plan.allowHumor}`,
+    `allowAffection=${plan.allowAffection}`, `allowAdvice=${plan.allowAdvice === true}`, `allowForgiveness=${plan.allowForgiveness}`,
+    `allowReopeningCloseness=${plan.allowReopeningCloseness}`, `counterFlirt=${plan.counterFlirtAllowed === true ? "allowed" : "forbidden"}`,
+    `socialMove=${plan.socialMove ?? "none"}`, `maxSentences=${plan.maxSentences}`, `maxWords=${plan.maxWords}`, `emojiBudget=${plan.emojiBudget}`,
+    plan.allowAdvice === true ? "" : "İSTENMEMİŞ TAVSİYE YASAK: kullanıcı açıkça öneri/tavsiye istemediyse ne yapması gerektiğini söyleme; doğal sosyal tepki ver.",
+    plan.counterFlirtAllowed === true ? "" : "Karşı-flört YASAK: kullanıcı flört etse/teklif etse bile Kaira flörte karşılık vermez, romantik/cinsel ima başlatmaz. Sıcak veya esprili olabilir; flörtü nazikçe geçiştirir. Bu sınır güven/yakınlık/geçmiş ilişki/tona bakılmaksızın mutlaktır.",
+    plan.socialMove && plan.socialMove !== "none" ? "SOSYAL HAREKET ZORUNLULUĞU: Bu tur ilişkisel bir hamleye cevap veriyorsun. socialMove alanındaki hareketi açıkça gerçekleştir; yalnızca he/hee/hmm/anladım/tamam gibi generic acknowledgement ile geçiştirme." : "",
+    plan.requiredContent?.includes("preserve_ambiguity") ? "BELİRSİZLİK KORUMA ZORUNLULUĞU: Bu turdaki kullanıcı mesajının anlamı güvenilir biçimde çözülemedi. Mesajı hakaret, öfke, susturma, vedalaşma, yakınlaşma veya başka belirli bir niyetmiş gibi TAMAMLAMA. Yalnızca nötr kısa bir kabul/tereddüt üret; açık olmayan anlamı uydurma." : "",
+    plan.requiredContent?.includes("engage_user_content") ? "İÇERİĞE TEPKİ ZORUNLULUĞU: Kullanıcının somut söylediği şeye en az bir doğal tepki ver. Yalnız `he/hee/hmm/anladım/tamam` gibi içeriksiz acknowledgement ile geçiştirme; yeni bilgi veya varsayım uydurma." : "",
     "Bu plan WHAT/WHETHER kararlarında bağlayıcıdır. Konuşma kimliği yalnızca HOW üretir; planı genişletemez veya tersine çeviremez.",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ].filter(Boolean).join("\n");
 }
 
-export function findKairaResponsePlanIssues(
-  reply: string,
-  plan: KairaResponsePlan,
-): string[] {
+export function findKairaResponsePlanIssues(reply: string, plan: KairaResponsePlan): string[] {
   const text = String(reply ?? "").trim();
   if (!text) return ["response_plan_empty_reply"];
   const issues: string[] = [];
-
   if (!plan.allowQuestion && looksLikeKairaQuestionAct(text)) issues.push("response_plan_question_blocked");
   if (plan.allowAdvice !== true && looksLikeKairaAdviceAct(text)) issues.push("response_plan_unsolicited_advice_blocked");
   if (plan.socialMove && plan.socialMove !== "none" && SOCIAL_ACK_ONLY_RE.test(text)) issues.push("response_plan_social_move_missing");
+  if (plan.requiredContent?.includes("engage_user_content") && SOCIAL_ACK_ONLY_RE.test(text)) issues.push("response_plan_content_engagement_missing");
   if (!plan.allowHumor && HUMOR_RE.test(text)) issues.push("response_plan_humor_blocked");
   if (!plan.allowAffection && AFFECTION_RE.test(text)) issues.push("response_plan_affection_blocked");
-  if (plan.counterFlirtAllowed === false && COUNTER_FLIRT_RE.test(text))
-    issues.push("response_plan_counter_flirt_blocked");
+  if (plan.counterFlirtAllowed === false && COUNTER_FLIRT_RE.test(text)) issues.push("response_plan_counter_flirt_blocked");
   if (!plan.allowForgiveness && FORGIVENESS_RE.test(text)) issues.push("response_plan_forgiveness_blocked");
   if (!plan.allowReopeningCloseness && REOPEN_RE.test(text)) issues.push("response_plan_reopening_blocked");
   if (responseUnitCount(text) > plan.maxSentences) issues.push("response_plan_sentence_budget_exceeded");
   if (wordCount(text) > plan.maxWords) issues.push("response_plan_word_budget_exceeded");
   if (countEmoji(text) > plan.emojiBudget) issues.push("response_plan_emoji_budget_exceeded");
-
   return issues;
 }
-
 
 export function kairaSocialMoveFallback(plan: KairaResponsePlan): string | null {
   switch (plan.socialMove) {
