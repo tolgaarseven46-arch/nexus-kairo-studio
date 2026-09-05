@@ -1,0 +1,273 @@
+name: Apply World Memory Fact Model
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'fix/world-memory-evidence-eligibility'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/world-memory-evidence-eligibility
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply canonical fact/query wiring
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'pattern not found in {path}: {old[:120]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          # 1) Canonical semantic contract: typed world-memory claims/query.
+          replace('src/types/semanticInterpretation.ts',
+          '''export interface SemanticSelfMemoryQuery {\n  surface: string;\n  scope: "self_fact" | "autobiographical_memory" | "any";\n  factKey?: string;\n  retrievalMode: "targeted" | "broad";\n  confidence: number;\n}\n''',
+          '''export interface SemanticSelfMemoryQuery {\n  surface: string;\n  scope: "self_fact" | "autobiographical_memory" | "any";\n  factKey?: string;\n  retrievalMode: "targeted" | "broad";\n  confidence: number;\n}\n\nexport type SemanticWorldMemoryValue = string | number | boolean;\n\n/** Canonical attribute-value claim contained in the current utterance. */\nexport interface SemanticWorldMemoryClaim {\n  subjectId: string;\n  attributeKey: string;\n  value: SemanticWorldMemoryValue;\n  confidence: number;\n}\n\n/** Canonical attribute lookup requested from persistent world memory. */\nexport interface SemanticWorldMemoryQuery {\n  subjectId: string;\n  attributeKey: string;\n  confidence: number;\n}\n\nexport interface SemanticWorldMemorySemantics {\n  claims: SemanticWorldMemoryClaim[];\n  query: SemanticWorldMemoryQuery | null;\n}\n''')
+          replace('src/types/semanticInterpretation.ts',
+          '''  | "selfMemoryQuery"\n  | "relationalAct"''',
+          '''  | "selfMemoryQuery"\n  | "worldMemory"\n  | "relationalAct"''')
+          replace('src/types/semanticInterpretation.ts',
+          '''  discourseFacets: SemanticDiscourseFacets;\n  uncertainty: InterpretationUncertainty;''',
+          '''  discourseFacets: SemanticDiscourseFacets;\n  /** Structured world-memory semantics; optional for legacy/fallback producers. */\n  worldMemory?: SemanticWorldMemorySemantics;\n  uncertainty: InterpretationUncertainty;''')
+
+          # 2) Normalize structured facts without raw-text inference.
+          replace('src/services/semanticInterpretationSchema.ts',
+          '''  "adviceRequested", "knowledgeQuery", "selfMemoryQuery", "relationalAct",\n  "stopQuestions", "stopTalking",\n]);''',
+          '''  "adviceRequested", "knowledgeQuery", "selfMemoryQuery", "worldMemory", "relationalAct",\n  "stopQuestions", "stopTalking",\n]);''')
+          marker = '''function normalizeSelfMemoryQuery(value: unknown): SemanticDiscourseFacets["selfMemoryQuery"] {\n'''
+          insert = '''function canonicalMemoryKey(value: unknown): string {\n  if (typeof value !== "string") return "";\n  return value.trim().toLocaleLowerCase("en-US").replace(/[^a-z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96);\n}\nfunction normalizeWorldMemory(value: unknown): SemanticInterpretation["worldMemory"] {\n  if (!value || typeof value !== "object") return undefined;\n  const v = value as Record<string, unknown>;\n  const claims = Array.isArray(v.claims) ? v.claims.flatMap((raw) => {\n    if (!raw || typeof raw !== "object") return [];\n    const c = raw as Record<string, unknown>;\n    const subjectId = canonicalMemoryKey(c.subjectId);\n    const attributeKey = canonicalMemoryKey(c.attributeKey);\n    const validValue = typeof c.value === "string" || typeof c.value === "boolean" || (typeof c.value === "number" && Number.isFinite(c.value));\n    if (!subjectId || !attributeKey || !validValue) return [];\n    const normalizedValue = typeof c.value === "string" ? c.value.trim().replace(/\\s+/g, " ").slice(0, 160) : c.value;\n    if (normalizedValue === "") return [];\n    return [{ subjectId, attributeKey, value: normalizedValue, confidence: clamp01(c.confidence) }];\n  }).slice(0, 12) : [];\n  let query = null;\n  if (v.query && typeof v.query === "object") {\n    const q = v.query as Record<string, unknown>;\n    const subjectId = canonicalMemoryKey(q.subjectId);\n    const attributeKey = canonicalMemoryKey(q.attributeKey);\n    if (subjectId && attributeKey) query = { subjectId, attributeKey, confidence: clamp01(q.confidence) };\n  }\n  return { claims, query };\n}\n\n'''
+          p = Path('src/services/semanticInterpretationSchema.ts')
+          text = p.read_text()
+          if marker not in text: raise SystemExit('schema insertion marker missing')
+          p.write_text(text.replace(marker, insert + marker, 1))
+          replace('src/services/semanticInterpretationSchema.ts',
+          '''  const discourseFacets = normalizeDiscourseFacets(v.discourseFacets);\n  return {''',
+          '''  const discourseFacets = normalizeDiscourseFacets(v.discourseFacets);\n  const worldMemory = normalizeWorldMemory(v.worldMemory);\n  return {''')
+          replace('src/services/semanticInterpretationSchema.ts',
+          '''    discourseFacets,\n    uncertainty: normalizeUncertainty(v.uncertainty), evidence: normalizeEvidence(v.evidence),''',
+          '''    discourseFacets,\n    ...(worldMemory ? { worldMemory } : {}),\n    uncertainty: normalizeUncertainty(v.uncertainty), evidence: normalizeEvidence(v.evidence),''')
+
+          # 3) LLM parser schema/instructions + grounding provenance.
+          replace('src/services/llmSemanticUnderstandingProvider.ts',
+          '''    selfMemoryQuery: null,\n    relationalAct: "none",''',
+          '''    selfMemoryQuery: null,\n    relationalAct: "none",''')
+          replace('src/services/llmSemanticUnderstandingProvider.ts',
+          '''  },\n  uncertainty: { overall: 0.25, intent: 0.2, target: 0.3, severity: 0.25 },''',
+          '''  },\n  worldMemory: { claims: [], query: null },\n  uncertainty: { overall: 0.25, intent: 0.2, target: 0.3, severity: 0.25 },''')
+          replace('src/services/llmSemanticUnderstandingProvider.ts',
+          '''selfMemoryQuery = null veya {surface, scope:self_fact|autobiographical_memory|any, factKey?, retrievalMode:targeted|broad, confidence}; yalnız Kaira'nın kendi özelliği/geçmişi/anısı soruluyorsa\nrelationalAct = none''',
+          '''selfMemoryQuery = null veya {surface, scope:self_fact|autobiographical_memory|any, factKey?, retrievalMode:targeted|broad, confidence}; yalnız Kaira'nın kendi özelliği/geçmişi/anısı soruluyorsa\n\nWORLD MEMORY SEMANTICS:\nworldMemory = {claims, query}. Bu alan yalnız persistent dış-dünya/kişi bilgisinin typed fact kimliğini taşır; cevap/policy değildir.\n- claims: kullanıcının BU mesajda açıkça verdiği attribute-value gerçekleri. Her claim {subjectId, attributeKey, value, confidence}.\n- query: geçmişten istenen belirli attribute için {subjectId, attributeKey, confidence}; attribute belli değilse null.\n- subjectId bağlam boyunca stabil canonical kimlik olmalı. Kullanıcının romantik partneri için current_user.partner; Kaira için kaira; adı açık kişiler için person:<normalize_ad>.\n- attributeKey kısa İngilizce snake_case kavram anahtarıdır: eye_color, hair_color, age, origin, favorite_feature gibi. Aynı kavram claim ve query'de AYNI key'i kullanmalı.\n- Bağlam yalnız özne/referans çözmek için kullanılabilir. Örnek: önce “benim manit var”, sonra “sarışın mavi gözlü” => current_user.partner için hair_color=sarışın ve eye_color=mavi claimleri.\n- “benim manitin gözleri ne renkti?” => query {subjectId:"current_user.partner", attributeKey:"eye_color", confidence yüksek}.\n- “onda en çok hangi özelliğini seviyordum?” => query {subjectId:"current_user.partner", attributeKey:"favorite_feature", confidence uygun}.\n- Mesaj açık attribute-value vermiyorsa claim UYDURMA. Belirsiz attribute lookup'ta query üretme.\n\nrelationalAct = none''')
+          replace('src/services/llmSemanticUnderstandingProvider.ts',
+          '''    && facets.selfMemoryQuery === null\n    && facets.relationalAct === "none"''',
+          '''    && facets.selfMemoryQuery === null\n    && (interpretation.worldMemory?.claims.length ?? 0) === 0\n    && interpretation.worldMemory?.query == null\n    && facets.relationalAct === "none"''')
+          replace('src/services/llmSemanticUnderstandingProvider.ts',
+          '''    || contextualFacets.selfMemoryQuery !== null\n    || contextualFacets.relationalAct !== baselineFacets.relationalAct''',
+          '''    || contextualFacets.selfMemoryQuery !== null\n    || !sameSemanticValue(contextual.worldMemory ?? null, baseline.worldMemory ?? null)\n    || contextualFacets.relationalAct !== baselineFacets.relationalAct''')
+          replace('src/services/llmSemanticUnderstandingProvider.ts',
+          '''    case "selfMemoryQuery": return interpretation.discourseFacets.selfMemoryQuery;\n    case "relationalAct":''',
+          '''    case "selfMemoryQuery": return interpretation.discourseFacets.selfMemoryQuery;\n    case "worldMemory": return interpretation.worldMemory ?? null;\n    case "relationalAct":''')
+          replace('src/services/llmSemanticUnderstandingProvider.ts',
+          '''  "knowledgeQuery", "selfMemoryQuery", "relationalAct", "stopQuestions", "stopTalking",\n];''',
+          '''  "knowledgeQuery", "selfMemoryQuery", "worldMemory", "relationalAct", "stopQuestions", "stopTalking",\n];''')
+
+          # 4) Compatibility projection carries typed semantics unchanged.
+          replace('src/services/semanticEventEngine.ts',
+          '''export type SemanticValence = "positive" | "negative" | "neutral";''',
+          '''import type { SemanticWorldMemorySemantics } from "../types/semanticInterpretation";\n\nexport type SemanticValence = "positive" | "negative" | "neutral";''')
+          replace('src/services/semanticEventEngine.ts',
+          '''  knowledgeQuery?: SemanticKnowledgeQuery | null;\n  valence:''',
+          '''  knowledgeQuery?: SemanticKnowledgeQuery | null;\n  worldMemory?: SemanticWorldMemorySemantics;\n  valence:''')
+          replace('src/services/semanticInterpretationProjection.ts',
+          '''    selfMemoryQuery: interp.discourseFacets.selfMemoryQuery,\n    valence:''',
+          '''    selfMemoryQuery: interp.discourseFacets.selfMemoryQuery,\n    ...(interp.worldMemory ? { worldMemory: interp.worldMemory } : {}),\n    valence:''')
+
+          # 5) Persist canonical facts with observations.
+          replace('src/services/worldEventEngine.ts',
+          '''import type { SemanticEvent } from "./semanticEventEngine";''',
+          '''import type { SemanticEvent } from "./semanticEventEngine";\nimport type { SemanticWorldMemoryClaim } from "../types/semanticInterpretation";''')
+          replace('src/services/worldEventEngine.ts',
+          '''  proposition?: WorldEventProposition;\n  polarity?: WorldEventPolarity;''',
+          '''  proposition?: WorldEventProposition;\n  memoryFacts?: SemanticWorldMemoryClaim[];\n  polarity?: WorldEventPolarity;''')
+          replace('src/services/worldEventEngine.ts',
+          '''    proposition: buildWorldEventProposition(eventType, actor, target, contentKey),\n    polarity:''',
+          '''    proposition: buildWorldEventProposition(eventType, actor, target, contentKey),\n    ...(semantic.worldMemory?.claims?.length ? { memoryFacts: semantic.worldMemory.claims } : {}),\n    polarity:''')
+
+          # 6) Retrieval: typed fact identity is an eligibility gate, not a score hint.
+          replace('src/services/worldEventRetrieval.ts',
+          '''import type { SemanticInterpretation } from "../types/semanticInterpretation";''',
+          '''import type { SemanticInterpretation, SemanticWorldMemoryQuery } from "../types/semanticInterpretation";''')
+          replace('src/services/worldEventRetrieval.ts',
+          '''const tokens = (value: string) =>\n  normalize(value).split(/[^\\p{L}\\p{N}_]+/u).filter((token) => token.length >= 2);\n''',
+          '''const tokens = (value: string) =>\n  normalize(value).split(/[^\\p{L}\\p{N}_]+/u).filter((token) => token.length >= 2);\n\nconst memoryKey = (value: string) => value.toLocaleLowerCase("en-US").trim();\nfunction matchingMemoryFacts(observation: WorldEventObservation, query: SemanticWorldMemoryQuery) {\n  return (observation.event.memoryFacts ?? []).filter((fact) =>\n    fact.confidence >= 0.72 &&\n    memoryKey(fact.subjectId) === memoryKey(query.subjectId) &&\n    memoryKey(fact.attributeKey) === memoryKey(query.attributeKey)\n  );\n}\n''')
+          replace('src/services/worldEventRetrieval.ts',
+          '''  maxItems = 5,\n  queryAnchorAt = new Date().toISOString(),\n): RetrievedWorldEvent[] {''',
+          '''  maxItems = 5,\n  queryAnchorAt = new Date().toISOString(),\n  memoryQuery?: SemanticWorldMemoryQuery | null,\n): RetrievedWorldEvent[] {''')
+          replace('src/services/worldEventRetrieval.ts',
+          '''  const temporalCandidates = temporalQueryCandidates(message, observations, queryAnchorAt);\n  const projection =''',
+          '''  const temporalCandidates = temporalQueryCandidates(message, observations, queryAnchorAt);\n  const canonicalMemoryQuery = memoryQuery && memoryQuery.confidence >= 0.72 ? memoryQuery : null;\n  const projection =''')
+          replace('src/services/worldEventRetrieval.ts',
+          '''  const ranked = temporalCandidates.observations\n    .filter((observation) => !STORED_QUERY_RE.test(normalize(observation.event.raw || "")))\n    .map((observation) => {''',
+          '''  const ranked = temporalCandidates.observations\n    .filter((observation) => !STORED_QUERY_RE.test(normalize(observation.event.raw || "")))\n    .filter((observation) => !canonicalMemoryQuery || matchingMemoryFacts(observation, canonicalMemoryQuery).length > 0)\n    .map((observation) => {''')
+          replace('src/services/worldEventRetrieval.ts',
+          '''      const projectedState = asksCurrentState\n        ? projectionByKey.get(projectionKey(observation))\n        : undefined;\n      const names =''',
+          '''      const projectedState = asksCurrentState\n        ? projectionByKey.get(projectionKey(observation))\n        : undefined;\n      const structuredFactMatches = canonicalMemoryQuery ? matchingMemoryFacts(observation, canonicalMemoryQuery) : [];\n      if (structuredFactMatches.length) {\n        score += 8;\n        reasons.push(`memory_fact:${canonicalMemoryQuery!.subjectId}:${canonicalMemoryQuery!.attributeKey}`);\n      }\n      const names =''')
+          replace('src/services/worldEventRetrieval.ts',
+          '''    const temporal = event.temporal?.resolved\n      ? `; zaman=${event.temporal.resolved.startAt}..${event.temporal.resolved.endAt}`\n      : "";\n    return `- #${index + 1} [${epistemic}; ${certainty}${polarity}${stateLabel}${temporal}${conflictLabel}; güven=${Number(event.certainty ?? 0).toFixed(2)}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;''',
+          '''    const temporal = event.temporal?.resolved\n      ? `; zaman=${event.temporal.resolved.startAt}..${event.temporal.resolved.endAt}`\n      : "";\n    const facts = (event.memoryFacts ?? [])\n      .filter((fact) => fact.confidence >= 0.72)\n      .map((fact) => `${fact.subjectId}.${fact.attributeKey}=${String(fact.value)}`)\n      .join(", ");\n    const factText = facts ? `; facts=${facts}` : "";\n    return `- #${index + 1} [${epistemic}; ${certainty}${polarity}${stateLabel}${temporal}${conflictLabel}; güven=${Number(event.certainty ?? 0).toFixed(2)}${factText}] ${actor} -> ${target}: ${event.eventType}. Kanıt: ${event.raw}`;''')
+
+          # 7) Deterministic guard must preserve the matched fact value.
+          replace('src/services/worldModelResponseGuard.ts',
+          '''import type { WorldReasoningPolicy } from "./worldReasoningPolicy";''',
+          '''import type { WorldReasoningPolicy } from "./worldReasoningPolicy";\nimport type { SemanticWorldMemoryQuery } from "../types/semanticInterpretation";''')
+          replace('src/services/worldModelResponseGuard.ts',
+          '''    | "epistemic_qualifier_lost";''',
+          '''    | "epistemic_qualifier_lost"\n    | "memory_fact_value_missing";''')
+          replace('src/services/worldModelResponseGuard.ts',
+          '''export interface WorldModelReasoningContext {\n  appraisal: WorldStateAppraisal;\n  policy: WorldReasoningPolicy;\n}''',
+          '''export interface WorldModelReasoningContext {\n  appraisal: WorldStateAppraisal;\n  policy: WorldReasoningPolicy;\n  memoryQuery?: SemanticWorldMemoryQuery | null;\n}''')
+          replace('src/services/worldModelResponseGuard.ts',
+          '''function grounded(items: RetrievedWorldEvent[]) {\n  return items.filter((item) => item.observation.status === "grounded");\n}\n''',
+          '''function grounded(items: RetrievedWorldEvent[]) {\n  return items.filter((item) => item.observation.status === "grounded");\n}\n\nfunction matchedFactValues(items: RetrievedWorldEvent[], query?: SemanticWorldMemoryQuery | null) {\n  if (!query || query.confidence < 0.72) return [];\n  const key = (value: string) => value.toLocaleLowerCase("en-US").trim();\n  return grounded(items).flatMap((item) =>\n    (item.observation.event.memoryFacts ?? [])\n      .filter((fact) => fact.confidence >= 0.72 && key(fact.subjectId) === key(query.subjectId) && key(fact.attributeKey) === key(query.attributeKey))\n      .map((fact) => fact.value)\n  );\n}\n''')
+          replace('src/services/worldModelResponseGuard.ts',
+          '''  if (\n    policy.mustQualify &&\n    policy.mayAnswerFromMemory &&\n    !EPISTEMIC_QUALIFIER_RE.test(text) &&\n    !CONFLICT_PRESERVED_RE.test(text)\n  ) {\n    issues.push({\n      code: "epistemic_qualifier_lost",\n      message: "World reasoning policy epistemik niteleme gerektiriyor; cevap kanıtı doğrulanmış dış dünya gerçeğine yükseltemez.",\n    });\n  }\n\n  return issues;''',
+          '''  if (\n    policy.mustQualify &&\n    policy.mayAnswerFromMemory &&\n    !EPISTEMIC_QUALIFIER_RE.test(text) &&\n    !CONFLICT_PRESERVED_RE.test(text)\n  ) {\n    issues.push({\n      code: "epistemic_qualifier_lost",\n      message: "World reasoning policy epistemik niteleme gerektiriyor; cevap kanıtı doğrulanmış dış dünya gerçeğine yükseltemez.",\n    });\n  }\n\n  const factValues = matchedFactValues(items, context.memoryQuery);\n  if (factValues.length && !factValues.some((value) => text.includes(normalize(String(value))))) {\n    issues.push({\n      code: "memory_fact_value_missing",\n      message: "Canonical world-memory query belirli bir typed fact ile eşleşti; cevap eşleşen fact değerini korumalı.",\n    });\n  }\n\n  return issues;''')
+          replace('src/services/worldModelResponseGuard.ts',
+          '''  const { policy } = context;\n  if (policy.mustPreserveConflict) {''',
+          '''  const { policy } = context;\n  const factValues = Array.from(new Set(matchedFactValues(items, context.memoryQuery).map(String)));\n  if (factValues.length) {\n    const value = factValues.join(" / ");\n    return policy.mustPreserveReportedAttribution\n      ? `Bana daha önce bunu ${value} olarak aktarmıştın.`\n      : `Hatırladığım kayda göre: ${value}.`;\n  }\n  if (policy.mustPreserveConflict) {''')
+
+          # 8) Runtime passes the canonical query into retrieval + enforcement.
+          replace('server.ts',
+          '''          await loadRecentWorldEventObservations(userId, 30, kairaInstance.instanceId).catch(() => []),\n          5,\n        )''',
+          '''          await loadRecentWorldEventObservations(userId, 30, kairaInstance.instanceId).catch(() => []),\n          5,\n          undefined,\n          canonicalSemantic.interpretation.worldMemory?.query ?? null,\n        )''')
+          replace('server.ts',
+          '''    const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy };''',
+          '''    const worldReasoningContext = {\n      appraisal: worldStateAppraisal,\n      policy: worldReasoningPolicy,\n      memoryQuery: canonicalSemantic.interpretation.worldMemory?.query ?? null,\n    };''')
+
+          # 9) Regression coverage for Turn 13 failure boundary.
+          Path('src/services/worldMemoryFactRouting.test.ts').write_text(r'''import { describe, expect, it } from "vitest";
+import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";
+import { projectSemanticEvent } from "./semanticInterpretationProjection";
+import { buildCanonicalWorldEvent } from "./worldEventEngine";
+import { rankWorldEventObservations } from "./worldEventRetrieval";
+import { enforceWorldModelRecallResponse } from "./worldModelResponseGuard";
+import type { WorldEventObservation } from "./worldModelEventStore";
+
+const query = { subjectId: "current_user.partner", attributeKey: "eye_color", confidence: 0.96 } as const;
+
+function row(raw: string, memoryFacts: any[] = []): WorldEventObservation {
+  return {
+    userId: "mert",
+    kairaInstanceId: "kaira_reference_001",
+    sessionId: "s1",
+    speakerName: "Mert",
+    kind: "direct_interaction",
+    status: "grounded",
+    createdAt: "2026-09-05T14:00:00.000Z",
+    event: {
+      raw,
+      eventType: "general",
+      actor: { id: "current_user", name: "Mert", source: "first_person", confidence: 1 },
+      target: { id: "current_user", name: "Mert", source: "first_person", confidence: 1 },
+      reportedSpeech: false,
+      certainty: 0.96,
+      ambiguities: [],
+      evidence: ["actor:current_speaker"],
+      memoryFacts,
+    },
+  };
+}
+
+describe("canonical world-memory fact routing", () => {
+  it("projects typed claims from SemanticInterpretation without reparsing raw text", () => {
+    const base = interpretationFromRegexFloor("sarışın mavi gözlü");
+    const event = projectSemanticEvent({
+      ...base,
+      worldMemory: {
+        claims: [{ subjectId: "current_user.partner", attributeKey: "eye_color", value: "mavi", confidence: 0.97 }],
+        query: null,
+      },
+    });
+    expect(event.worldMemory?.claims[0]).toMatchObject({ attributeKey: "eye_color", value: "mavi" });
+  });
+
+  it("persists typed claims on canonical world events", () => {
+    const semantic = projectSemanticEvent({
+      ...interpretationFromRegexFloor("sarışın mavi gözlü"),
+      worldMemory: {
+        claims: [{ subjectId: "current_user.partner", attributeKey: "eye_color", value: "mavi", confidence: 0.97 }],
+        query: null,
+      },
+    });
+    const event = buildCanonicalWorldEvent("sarışın mavi gözlü", semantic, {
+      speaker: { id: "current_user", name: "Mert" },
+      addressee: { id: "kaira", name: "KAIRO" },
+      references: [{ surface: "ben", normalized: "ben", role: "first_person", resolvedId: "current_user", resolvedName: "Mert", confidence: 1 }],
+      namedPeople: [], ambiguities: [], confidence: 0.96,
+    } as any);
+    expect(event.memoryFacts?.[0]).toMatchObject({ subjectId: "current_user.partner", attributeKey: "eye_color", value: "mavi" });
+  });
+
+  it("makes exact typed fact identity an eligibility gate", () => {
+    const wrong = row("benim manit var");
+    const noise = row("tamam boşver onu sen bana bir şarkı öner rap");
+    const exact = row("sarışın mavi gözlü rus asıllı 19 yaşında çok tatlı", [
+      { subjectId: "current_user.partner", attributeKey: "eye_color", value: "mavi", confidence: 0.97 },
+      { subjectId: "current_user.partner", attributeKey: "hair_color", value: "sarışın", confidence: 0.97 },
+    ]);
+    const ranked = rankWorldEventObservations("benim manitin gözleri ne renkti", [wrong, noise, exact], 5, undefined, query);
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0]?.observation.event.raw).toContain("mavi gözlü");
+    expect(ranked[0]?.reasons).toContain("memory_fact:current_user.partner:eye_color");
+  });
+
+  it("deterministically restores the matched fact value if generation drifts", () => {
+    const exact = row("sarışın mavi gözlü rus asıllı 19 yaşında çok tatlı", [
+      { subjectId: "current_user.partner", attributeKey: "eye_color", value: "mavi", confidence: 0.97 },
+    ]);
+    const result = enforceWorldModelRecallResponse(
+      "Hatırladığım kadarıyla sarışındı.",
+      [{ observation: exact, score: 12, reasons: ["memory_fact:current_user.partner:eye_color"] }],
+      {
+        appraisal: { mayClaimNoMemory: false } as any,
+        policy: { mayAnswerFromMemory: true, mustQualify: true, mustPreserveConflict: false, mustPreserveReportedAttribution: false } as any,
+        memoryQuery: query,
+      },
+    );
+    expect(result.changed).toBe(true);
+    expect(result.reply).toBe("Hatırladığım kayda göre: mavi.");
+    expect(result.issues.map((issue) => issue.code)).toContain("memory_fact_value_missing");
+  });
+});
+''')
+
+          Path('docs/adr/0057-canonical-world-memory-fact-identity.md').write_text('''# ADR-0057: Canonical world-memory fact identity\n\n## Status\nAccepted\n\n## Context\nThe 2026-09-05 KNT acceptance trace exposed a retrieval failure on “benim manitin gözleri ne renkti”. Canonical language understanding knew the requested concept, but persisted world observations represented descriptive turns only as generic events plus raw text. Retrieval therefore allowed generic grounded/direct-interaction scoring to make unrelated rows eligible evidence.\n\n## Decision\nSemanticInterpretation@2 may carry optional typed `worldMemory` semantics: utterance claims and a single targeted query. A fact is identified by canonical `subjectId + attributeKey`, with a typed value and confidence. The compatibility SemanticEvent projection preserves this structure without raw-text reinterpretation; CanonicalWorldEvent persists claims as `memoryFacts`.\n\nWhen a high-confidence world-memory query exists, retrieval uses exact typed fact identity as an eligibility gate. Generic grounded/direct/lexical scores cannot admit observations that do not carry the requested fact. The response guard receives the same query and deterministically preserves the matched fact value.\n\nLegacy observations without typed facts remain available to legacy recall paths when no typed query exists; they are not promoted into answers for a typed fact query.\n\n## Consequences\n- Turn-13-style retrieval can no longer answer an eye-color query from a generic “partner exists” row.\n- The language-understanding provider owns claim/query concept identity once; downstream layers consume it read-only.\n- No new regex/raw-text semantic authority is introduced.\n- New observations gain structured fact recall; legacy rows remain conservative rather than guessed.\n''')
+
+          # Remove this one-time patch workflow from the resulting branch.
+          Path('.github/workflows/apply-world-memory-fact-model.yml').unlink()
+          PY
+      - name: Validate patched files
+        run: |
+          npm ci
+          npm test -- --run
+          npm run typecheck
+          npm run build
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(kaira): add canonical world-memory fact identity"
+          git push origin HEAD:fix/world-memory-evidence-eligibility
