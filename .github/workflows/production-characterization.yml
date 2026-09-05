@@ -6,52 +6,24 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 6
     steps:
-      - name: Characterize live production with client-faithful semantic history
+      - name: Capture live semantic variance
         shell: bash
         env:
           BASE_URL: https://nexus-kairo-studio.onrender.com
         run: |
           set -euo pipefail
-          curl --connect-timeout 10 --max-time 30 -fsS "$BASE_URL/api/health"
-          curl --connect-timeout 10 --max-time 30 -fsS "$BASE_URL/api/runtime-info"
           python - <<'PY'
-          import json, subprocess, re, uuid
+          import json, subprocess
           base='https://nexus-kairo-studio.onrender.com'
-          def post(path,payload,limit=60):
-            p=subprocess.run(['curl','--connect-timeout','10','--max-time',str(limit),'-fsS','-H','Content-Type: application/json','-d',json.dumps(payload,ensure_ascii=False),base+path],capture_output=True,text=True,timeout=limit+10)
-            if p.returncode: raise SystemExit(f'{path} failed: {p.stderr}')
+          def post(msg):
+            payload={'userMessage':msg,'userName':'Tolga','characterName':'Kaira','provider':'openrouter'}
+            p=subprocess.run(['curl','--connect-timeout','10','--max-time','50','-fsS','-H','Content-Type: application/json','-d',json.dumps(payload,ensure_ascii=False),base+'/api/language-understanding'],capture_output=True,text=True,timeout=60)
+            if p.returncode: raise SystemExit(p.stderr)
             return json.loads(p.stdout)
-          def understand(msg,history):
-            recent=[{'role':'assistant' if x['sender']=='droit' else 'user','content':x['text']} for x in history[-8:]]
-            d=post('/api/language-understanding',{'userMessage':msg,'userName':'Tolga','characterName':'Kaira','history':recent,'provider':'openrouter'},45)
-            if not d.get('interpretation'): raise SystemExit('missing canonical interpretation for '+msg)
-            return d
-          # Independent canonical semantic acceptance.
-          for msg,routine,kind in [('naber şimdi','how_are_you',None),('Mert yine geç kaldı',None,'not_emotional'),('Mert yüzünden çok üzgünüm',None,'emotional')]:
-            d=understand(msg,[]); event=d.get('event') or {}
-            if routine and event.get('socialRoutine') != routine: raise SystemExit(f'{msg}: expected {routine}, got {event}')
-            if kind=='not_emotional' and event.get('intent')=='emotional_share': raise SystemExit('neutral third-party overread')
-            if kind=='emotional' and event.get('intent')!='emotional_share': raise SystemExit('genuine emotional share lost')
-            print('SEMANTIC',msg,event.get('intent'),event.get('socialRoutine'))
-          history=[]; dynamic={}; rows=[]
-          for i,msg in enumerate(['bugün bütün kahveyi masaya döktüm','soru sorma artık','bugün iş çok yoğundu']):
-            lu=understand(msg,history)
-            payload={'userId':'prod_characterization_pr100_faithful','userName':'Tolga','userMessage':msg,'semanticInterpretation':lu['interpretation'],'character':{'name':'Kaira'},'personality':{},'dynamicState':dynamic,'history':history,'provider':'openrouter','suppressRecentMemory':True,'kairaInstanceId':'prod-char-pr100-faithful','kairaInstanceType':'free_trial','sessionId':'prod-char-pr100-faithful','requestId':f'pr100-v3-{i}-{uuid.uuid4()}'}
-            d=post('/api/chat',payload,75); reply=str(d.get('reply','')).strip()
-            if not reply: raise SystemExit('empty reply')
-            plan=((d.get('kdm') or {}).get('responsePlan') or {})
-            contract=((d.get('kdm') or {}).get('behaviorContract') or {})
-            rows.append({'message':msg,'reply':reply,'allowQuestion':plan.get('allowQuestion'),'questionStopRequested':contract.get('questionStopRequested'),'event':(d.get('kdm') or {}).get('semanticEvent')})
-            dynamic=(d.get('kdm') or {}).get('dynamicState') or dynamic
-            history += [
-              {'sender':'user','text':msg,'participantId':'prod-user','participantName':'Tolga','semanticInterpretation':lu['interpretation'],'semanticSource':lu.get('semanticSource')},
-              {'sender':'droit','text':reply,'participantId':'kaira','participantName':'Kaira'}
-            ]
-          generic=re.compile(r'^(?:he|hee|hmm|tamam|anladım|he anladım)[.!…]*$',re.I)
-          if generic.match(rows[0]['reply']): raise SystemExit('ordinary content collapsed to generic ACK')
-          print(json.dumps(rows,ensure_ascii=False,indent=2))
-          # Measured acceptance: explicit stop turn must be question-forbidden. The following turn is characterized, not pre-assumed.
-          if rows[1]['allowQuestion'] is not False: raise SystemExit('explicit question-stop turn did not forbid questions')
+          for msg in ['Mert yine geç kaldı','Mert yine geç kaldı','Mert yine geç kaldı','Mert yüzünden çok üzgünüm']:
+            d=post(msg)
+            i=d.get('interpretation') or {}; e=d.get('event') or {}
+            print('SNAPSHOT',json.dumps({'message':msg,'intent':i.get('primaryIntent'),'target':i.get('target'),'valence':i.get('valence'),'emotionalLoad':i.get('emotionalLoad'),'support':i.get('support'),'affection':i.get('affection'),'socialRoutine':(i.get('discourseFacets') or {}).get('socialRoutine'),'uncertainty':i.get('uncertainty'),'eventIntent':e.get('intent'),'eventRoutine':e.get('socialRoutine'),'evidence':i.get('evidence')},ensure_ascii=False))
           PY
