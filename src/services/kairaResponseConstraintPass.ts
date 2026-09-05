@@ -23,6 +23,7 @@ import {
   findKairaEpistemicResponseIssues,
   type KairaEpistemicEnforcementResult,
 } from "./kairaEpistemicResponsePolicy";
+import { findKairaAmbiguityPreservationIssues } from "./kairaAmbiguityPreservation";
 
 export type KairaConstraintWorldItems = Parameters<typeof enforceWorldModelRecallResponse>[1];
 export type KairaConstraintWorldContext = Parameters<typeof enforceWorldModelRecallResponse>[2];
@@ -144,6 +145,7 @@ function runOrderedPass(
 
   const issues = [
     ...findKairaResponsePlanIssues(delivered, input.plan),
+    ...findKairaAmbiguityPreservationIssues(delivered, input.plan),
     ...findWorldModelResponseIssues(delivered, input.worldItems, input.worldContext).map(
       (issue) => issue.message,
     ),
