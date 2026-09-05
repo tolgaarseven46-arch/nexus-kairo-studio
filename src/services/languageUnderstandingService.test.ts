@@ -51,6 +51,69 @@ describe("language understanding gateway", () => {
     expect(result.event.intent).toBe("insult");
   });
 
+  it("drops an autobiographical query that contradicts a canonical third-party target", async () => {
+    const base = interpretationFromRegexFloor("peki ben onda en çok hangi özelliğini seviyordum");
+    const semanticProvider: SemanticUnderstandingProvider = {
+      name: "test-semantic",
+      interpret: async () => ({
+        ...base,
+        primaryIntent: "question",
+        target: "third_party",
+        discourseFacets: {
+          ...base.discourseFacets,
+          selfMemoryQuery: {
+            surface: "onda en çok hangi özelliğini seviyordum",
+            scope: "autobiographical_memory",
+            retrievalMode: "targeted",
+            confidence: 0.75,
+          },
+        },
+      }),
+    };
+
+    const result = await understandTurkishMessage("peki ben onda en çok hangi özelliğini seviyordum", {
+      semanticProvider,
+    });
+
+    expect(result.interpretation.target).toBe("third_party");
+    expect(result.interpretation.discourseFacets.selfMemoryQuery).toBeNull();
+    expect(result.event.selfMemoryQuery).toBeNull();
+    expect(result.interpretation.evidence.some((entry) =>
+      entry.source === "reconciled" && entry.cues.includes("self_memory_query_requires_kaira_target")
+    )).toBe(true);
+  });
+
+  it("preserves autobiographical recall when the canonical target is Kaira", async () => {
+    const base = interpretationFromRegexFloor("sen hangi takımlısın");
+    const selfMemoryQuery = {
+      surface: "hangi takımlısın",
+      scope: "self_fact" as const,
+      retrievalMode: "targeted" as const,
+      factKey: "sports.team",
+      confidence: 0.9,
+    };
+    const semanticProvider: SemanticUnderstandingProvider = {
+      name: "test-semantic",
+      interpret: async () => ({
+        ...base,
+        primaryIntent: "question",
+        target: "kaira",
+        discourseFacets: {
+          ...base.discourseFacets,
+          selfMemoryQuery,
+        },
+      }),
+    };
+
+    const result = await understandTurkishMessage("sen hangi takımlısın", {
+      semanticProvider,
+    });
+
+    expect(result.interpretation.target).toBe("kaira");
+    expect(result.interpretation.discourseFacets.selfMemoryQuery).toEqual(selfMemoryQuery);
+    expect(result.event.selfMemoryQuery).toEqual(selfMemoryQuery);
+  });
+
   it("falls back when an external semantic provider fails", async () => {
     const semanticProvider: SemanticUnderstandingProvider = {
       name: "broken-semantic",

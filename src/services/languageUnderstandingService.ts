@@ -138,6 +138,41 @@ function reconcileNeutralThirdPartyEventOverread(
   };
 }
 
+/**
+ * Self/autobiographical memory belongs only to Kaira. A semantic provider may
+ * emit a syntactically valid selfMemoryQuery while simultaneously resolving the
+ * message target to the current user, a third party, an event, or unknown. That
+ * is an ownership contradiction inside the canonical interpretation, not a
+ * signal for the autobiographical runtime to arbitrate later.
+ *
+ * Reconcile the typed canonical fields here, before projection. This never
+ * reparses raw text and keeps SemanticInterpretation@2 as the single authority.
+ */
+function reconcileSelfMemoryQueryOwnership(
+  interpretation: SemanticInterpretation,
+): SemanticInterpretation {
+  if (!interpretation.discourseFacets.selfMemoryQuery || interpretation.target === "kaira") {
+    return interpretation;
+  }
+
+  return {
+    ...interpretation,
+    discourseFacets: {
+      ...interpretation.discourseFacets,
+      selfMemoryQuery: null,
+    },
+    evidence: [
+      ...interpretation.evidence,
+      {
+        source: "reconciled",
+        provider: "canonical_language_gateway",
+        cues: ["self_memory_query_requires_kaira_target"],
+        confidence: Math.max(0.8, 1 - interpretation.uncertainty.target),
+      },
+    ],
+  };
+}
+
 function buildResult(
   message: string,
   interpretation: SemanticInterpretation,
@@ -146,6 +181,7 @@ function buildResult(
 ): LanguageUnderstandingResult {
   interpretation = reconcileSemanticTargetWithEntityResolution(interpretation, entityResolution);
   interpretation = reconcileNeutralThirdPartyEventOverread(interpretation);
+  interpretation = reconcileSelfMemoryQueryOwnership(interpretation);
   const projected = projectSemanticEvent(interpretation);
   const grounded = groundSemanticEventForAppraisal(message, projected, entityResolution);
   return {
