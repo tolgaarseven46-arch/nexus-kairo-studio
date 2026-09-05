@@ -1,0 +1,95 @@
+name: one-time natural conversation characterization
+'on':
+  push:
+    branches:
+      - diag/natural-conversation-characterization-v1
+permissions:
+  contents: read
+jobs:
+  characterize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Run fresh production conversation matrix
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, urllib.request, uuid
+
+          base = "https://nexus-kairo-studio.onrender.com"
+          user_id = "diag_natural_v1_" + uuid.uuid4().hex[:10]
+          session_id = "session_" + user_id
+          history = []
+          turns = [
+            "naber kaira",
+            "iyi ya bugün biraz yoruldum",
+            "aslında işten değil kafam dolu",
+            "boşver konuşmayalım onu",
+            "neyse sen napıyosun",
+            "az önce aynı şeyi söylemiş gibi oldun",
+            "yok yok yanlış anladın, sana kızmadım",
+            "hahah tamam ya şaka yapıyorum",
+            "gel sarılalım bari",
+            "yok o kadar da samimi olmayalım :d",
+            "bu arada yarın erken kalkıcam",
+            "neyse ben kaçtım görüşürüz"
+          ]
+
+          def post(path, payload):
+            data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            req = urllib.request.Request(base + path, data=data, headers={"Content-Type":"application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=90) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          print("CHARACTERIZATION_USER=" + user_id)
+          failures = []
+          last_reply = None
+          for i, msg in enumerate(turns, 1):
+            payload = {
+              "userId": user_id,
+              "userName": "Tolga",
+              "userMessage": msg,
+              "history": history,
+              "provider": "openrouter",
+              "kairaInstanceId": "reference",
+              "kairaInstanceType": "reference",
+              "sessionId": session_id,
+              "requestId": f"natural-v1-{i}-{uuid.uuid4().hex[:8]}"
+            }
+            try:
+              out = post("/api/chat", payload)
+            except Exception as e:
+              print(f"TURN {i} HTTP_ERROR {type(e).__name__}: {e}")
+              failures.append(f"turn_{i}_http")
+              continue
+            reply = str(out.get("reply") or out.get("response") or "").strip()
+            kdm = out.get("kdm") or {}
+            plan = kdm.get("responsePlan") or out.get("responsePlan") or {}
+            sem = kdm.get("semanticInterpretation") or out.get("semanticInterpretation") or {}
+            consistency = out.get("consistency") or kdm.get("consistency") or {}
+            print("---")
+            print(f"TURN {i}")
+            print("USER=" + msg)
+            print("KAIRA=" + reply.replace("\n", " "))
+            print("MOVE=" + str(plan.get("move")))
+            print("ALLOW_Q=" + str(plan.get("allowQuestion")))
+            print("SOCIAL_MOVE=" + str(plan.get("socialMove")))
+            print("INTENT=" + str(sem.get("intent")))
+            print("CONSISTENCY=" + str(consistency.get("accepted")) + "/" + str(consistency.get("score")))
+            print("PROVIDER=" + str(out.get("providerUsed") or kdm.get("providerUsed")))
+            if not reply:
+              failures.append(f"turn_{i}_empty")
+            low = reply.lower()
+            if any(x in low for x in ["yardımcı olabilirim", "nasıl yardımcı olabilirim", "veri merkezi", "cpu", "işlemci", "algoritmam"]):
+              failures.append(f"turn_{i}_assistant_or_persona_drift")
+            if last_reply and reply and reply.casefold() == last_reply.casefold() and len(reply.split()) >= 4:
+              failures.append(f"turn_{i}_exact_repeat")
+            history.append({"sender":"user","participantName":"Tolga","text":msg})
+            history.append({"sender":"droit","participantName":"Kaira","text":reply})
+            last_reply = reply
+
+          print("=== CHARACTERIZATION SUMMARY ===")
+          print("FAILURES=" + json.dumps(failures, ensure_ascii=False))
+          print("TURN_COUNT=" + str(len(turns)))
+          print("NATURAL_CHARACTERIZATION_V1_COMPLETE")
+          PY
