@@ -69,13 +69,12 @@ function trivialRenderIntent(
   }
   // Fast local rendering is only for semantically trivial routines. Surface
   // interrogative form alone is not richness: "nasıl gidiyor" and
-  // "keyifler nasıl" are still local how-are-you routines. Typed knowledge,
-  // causal/relational content, or emotionally loaded third-party turns stay on
-  // the full generation path.
+  // "keyifler nasıl" are still local how-are-you routines. Typed knowledge or
+  // emotionally loaded third-party content stays on the full generation path.
+  // Direct relational bids are already excluded by the non-trivial dialogue move.
   if (
     event.intent === "information_request" ||
     event.knowledgeQuery ||
-    event.relationalAct !== "none" ||
     (event.target === "third_party" && event.emotionalLoad >= 0.35)
   ) return null;
 
