@@ -283,6 +283,7 @@ function planDialogueResponseBase(
   ) {
     return {
       move: "natural_reaction",
+      socialRoutine: event.socialRoutine,
       allowFollowUpQuestion: false,
       allowSpeculation: false,
       maxSentences: 1,
@@ -328,6 +329,7 @@ function planDialogueResponseBase(
   if (isReciprocalSocialRoutine(event)) {
     return {
       move: "natural_reaction",
+      socialRoutine: event.socialRoutine,
       allowFollowUpQuestion: true,
       allowSpeculation: false,
       maxSentences: 2,
