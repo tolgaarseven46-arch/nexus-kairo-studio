@@ -8,6 +8,40 @@ const query = {
   confidence: 0.95,
 };
 
+const resolvedMemory = (): KairaAutobiographicalRecallRuntimeResult => ({
+  status: "resolved",
+  recall: {
+    query,
+    selfFacts: [],
+    memories: [
+      {
+        score: 0.8,
+        reasons: ["fact_overlap"],
+        memory: {
+          id: "mem_1",
+          origin: "lived",
+          participantIds: [],
+          eventType: "storm_shelter",
+          facts: [
+            "şiddetli yağmura yakalandılar",
+            "bir sığınak buldular",
+            "olayı sonradan komik hatırlıyor",
+          ],
+          emotions: [
+            { label: "kaygı", intensity: 0.55 },
+            { label: "eğlence", intensity: 0.7 },
+          ],
+          salience: 0.7,
+          sensitivity: "ordinary",
+          canonical: true,
+        },
+      },
+    ],
+    withheldSensitiveCount: 0,
+  },
+  instruction: "grounded",
+});
+
 const resolvedFlowerFact = (): KairaAutobiographicalRecallRuntimeResult => ({
   status: "resolved",
   recall: {
@@ -49,36 +83,28 @@ describe("Kaira autobiographical response guard", () => {
     ).toEqual({ reply: "normal cevap", changed: false });
   });
 
-  it("preserves a response when canonical autobiographical evidence exists", () => {
-    const runtime: KairaAutobiographicalRecallRuntimeResult = {
-      status: "resolved",
-      recall: {
-        query,
-        selfFacts: [],
-        memories: [
-          {
-            score: 0.8,
-            reasons: ["fact_overlap"],
-            memory: {
-              id: "mem_1",
-              origin: "lived",
-              participantIds: [],
-              eventType: "storm",
-              facts: ["yağmura yakalandı"],
-              emotions: [],
-              salience: 0.7,
-              sensitivity: "ordinary",
-              canonical: true,
-            },
-          },
-        ],
-        withheldSensitiveCount: 0,
-      },
-      instruction: "grounded",
-    };
-    expect(enforceKairaAutobiographicalResponse("evet yağmura yakalanmıştım", runtime)).toEqual({
+  it("preserves a response when it carries a canonical autobiographical anchor", () => {
+    expect(
+      enforceKairaAutobiographicalResponse(
+        "evet yağmura yakalanmıştım",
+        resolvedMemory(),
+      ),
+    ).toEqual({
       reply: "evet yağmura yakalanmıştım",
       changed: false,
+    });
+  });
+
+  it("rejects a resolved autobiographical reply with no canonical evidence anchor", () => {
+    const guarded = enforceKairaAutobiographicalResponse(
+      "Paris'te çocukken kaybolmuştum.",
+      resolvedMemory(),
+    );
+    expect(guarded).toEqual({
+      reply:
+        "Buna dair net kaydım şu: şiddetli yağmura yakalandılar; bir sığınak buldular; olayı sonradan komik hatırlıyor.",
+      changed: true,
+      reason: "self_memory_resolved_memory_anchor_missing",
     });
   });
 

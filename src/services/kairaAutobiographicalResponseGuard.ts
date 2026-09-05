@@ -21,6 +21,18 @@ const normalizeComparable = (value: unknown) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const evidenceTokens = (value: unknown) =>
+  normalizeComparable(value)
+    .split(" ")
+    .filter((token) => token.length >= 4);
+
+const relatedEvidenceToken = (left: string, right: string) => {
+  if (left === right) return true;
+  if (Math.min(left.length, right.length) < 5) return false;
+  const prefixLength = Math.min(6, left.length, right.length);
+  return left.slice(0, prefixLength) === right.slice(0, prefixLength);
+};
+
 function enforceResolvedSelfFact(
   reply: string,
   runtime: KairaAutobiographicalRecallRuntimeResult,
@@ -59,6 +71,51 @@ function enforceResolvedSelfFact(
   };
 }
 
+function enforceResolvedAutobiographicalMemoryAnchor(
+  reply: string,
+  runtime: KairaAutobiographicalRecallRuntimeResult,
+): KairaAutobiographicalResponseGuardResult | null {
+  const recall = runtime.recall;
+  if (
+    runtime.status !== "resolved" ||
+    !recall ||
+    recall.query.scope !== "autobiographical_memory" ||
+    recall.memories.length === 0
+  ) {
+    return null;
+  }
+
+  const strongest = recall.memories[0]?.memory;
+  if (!strongest) return null;
+
+  const canonicalEvidence = [
+    strongest.eventType,
+    ...strongest.facts,
+    ...strongest.emotions.map((emotion) => emotion.label),
+    ...(strongest.placeId ? [strongest.placeId] : []),
+    ...strongest.participantIds,
+  ].flatMap(evidenceTokens);
+  if (canonicalEvidence.length === 0) return null;
+
+  const replyTokens = evidenceTokens(reply);
+  const hasCanonicalAnchor = replyTokens.some((replyToken) =>
+    canonicalEvidence.some((evidenceToken) =>
+      relatedEvidenceToken(replyToken, evidenceToken),
+    ),
+  );
+  if (hasCanonicalAnchor) return null;
+
+  const canonicalSummary = strongest.facts.join("; ");
+  const fallback = canonicalSummary
+    ? `Buna dair net kaydım şu: ${canonicalSummary}.`
+    : "Buna dair net bir anım yok.";
+  return {
+    reply: fallback,
+    changed: reply.trim() !== fallback,
+    reason: "self_memory_resolved_memory_anchor_missing",
+  };
+}
+
 export function enforceKairaAutobiographicalResponse(
   reply: string,
   runtime: KairaAutobiographicalRecallRuntimeResult,
@@ -69,6 +126,9 @@ export function enforceKairaAutobiographicalResponse(
 
   const resolvedSelfFact = enforceResolvedSelfFact(reply, runtime);
   if (resolvedSelfFact) return resolvedSelfFact;
+
+  const resolvedMemoryAnchor = enforceResolvedAutobiographicalMemoryAnchor(reply, runtime);
+  if (resolvedMemoryAnchor) return resolvedMemoryAnchor;
 
   if (hasResolvedEvidence(runtime)) {
     return { reply, changed: false };
