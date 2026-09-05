@@ -28,8 +28,11 @@ describe("world reasoning policy runtime integration contract", () => {
     expect(server).not.toContain("${behaviorContractInstruction(behaviorContract)}");
   });
 
-  it("passes the canonical reasoning policy to deterministic final enforcement", () => {
-    expect(server).toContain("const worldReasoningContext = { appraisal: worldStateAppraisal, policy: worldReasoningPolicy }");
+  it("passes the canonical reasoning policy and typed memory query to deterministic final enforcement", () => {
+    expect(server).toContain("const worldReasoningContext = {");
+    expect(server).toContain("appraisal: worldStateAppraisal");
+    expect(server).toContain("policy: worldReasoningPolicy");
+    expect(server).toContain("memoryQuery: canonicalSemantic.interpretation.worldMemory?.query ?? null");
     expect(server).toContain("retrievedWorldEvents, worldReasoningContext");
   });
 
