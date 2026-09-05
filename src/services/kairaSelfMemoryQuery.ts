@@ -77,9 +77,9 @@ export function inferFallbackSelfMemoryQuery(
   const recallCue = /hatırlıyor musun|hatırladın mı|hatırlıyor muydun|anı(?:n|ların|larını)?|geçmiş(?:in|inde)?|başına gel|yaşadığın|yaşamış mıydın|olmuş muydu/u.test(text);
   const broadRecallCue = /(?:geçmişinde|hayatında) (?:neler|ne) (?:yaşadın|oldu)|(?:en önemli|unutamadığın) anı(?:n)?|başına (?:neler|ne) geldi|anıların neler/u.test(text);
   const factCue = /en sevdiğin|sevdiğin|tercih ettiğin|favori(?:n)?|hangi .* seversin|ne seversin|neyi seversin|ne(?:yi)? tercih edersin|neye inanırsın|nasıl birisin/u.test(text);
-  const directKairaFactQuestion = /\bsen\b/u.test(text) && factCue.test(text);
+  const directKairaFactQuestion = /\bsen\b/u.test(text) && factCue;
 
-  if ((explicitKairaSelf || directKairaFactQuestion) && factCue.test(text)) {
+  if ((explicitKairaSelf || directKairaFactQuestion) && factCue) {
     return { surface, scope: "self_fact", confidence: 0.88 };
   }
   if (explicitKairaSelf && recallCue) {
