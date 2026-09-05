@@ -16,6 +16,7 @@ import {
   type SemanticSocialRoutine,
   type SemanticTarget,
   type SemanticValence,
+  type SemanticWorldMemoryValue,
   type SeverityVector,
 } from "../types/semanticInterpretation";
 
@@ -121,6 +122,15 @@ function canonicalMemoryKey(value: unknown): string {
   if (typeof value !== "string") return "";
   return value.trim().toLocaleLowerCase("en-US").replace(/[^a-z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96);
 }
+function normalizeWorldMemoryValue(value: unknown): SemanticWorldMemoryValue | undefined {
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(/\s+/g, " ").slice(0, 160);
+    return normalized || undefined;
+  }
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return undefined;
+}
 function normalizeWorldMemory(value: unknown): SemanticInterpretation["worldMemory"] {
   if (!value || typeof value !== "object") return undefined;
   const v = value as Record<string, unknown>;
@@ -129,10 +139,8 @@ function normalizeWorldMemory(value: unknown): SemanticInterpretation["worldMemo
     const c = raw as Record<string, unknown>;
     const subjectId = canonicalMemoryKey(c.subjectId);
     const attributeKey = canonicalMemoryKey(c.attributeKey);
-    const validValue = typeof c.value === "string" || typeof c.value === "boolean" || (typeof c.value === "number" && Number.isFinite(c.value));
-    if (!subjectId || !attributeKey || !validValue) return [];
-    const normalizedValue = typeof c.value === "string" ? c.value.trim().replace(/\s+/g, " ").slice(0, 160) : c.value;
-    if (normalizedValue === "") return [];
+    const normalizedValue = normalizeWorldMemoryValue(c.value);
+    if (!subjectId || !attributeKey || normalizedValue === undefined) return [];
     return [{ subjectId, attributeKey, value: normalizedValue, confidence: clamp01(c.confidence) }];
   }).slice(0, 12) : [];
   let query = null;
