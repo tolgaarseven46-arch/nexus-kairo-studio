@@ -18,6 +18,7 @@ describe('isTurkishQuestionAct', () => {
     'tamam boşverelim maçı 😄 ne yapasın var, aklında başka ne var şimdi',
     'aha derbi modunda 😂 skoru yaz bakalım kim önde',
     'ooo kritik maç 😂 içinden kim geçsin istiyon',
+    'siz neredeydiniz buluşma mı, işe mi geç kaldı yine',
   ])('detects punctuationless Turkish question act: %s', (text) => {
     expect(isTurkishQuestionAct(text)).toBe(true);
   });
@@ -34,6 +35,8 @@ describe('isTurkishQuestionAct', () => {
     'ne güzel maç',
     'skor bugün iki bir',
     '[bence] bu kadar yeter',
+    'vay yine mi ya, kronikleşti bu çocuğun olayı',
+    'yine mi ya',
   ])('does not misclassify reported/declarative text: %s', (text) => {
     expect(isTurkishQuestionAct(text)).toBe(false);
   });

@@ -25,6 +25,7 @@ import {
 } from "./kairaEpistemicResponsePolicy";
 import { findKairaAmbiguityPreservationIssues } from "./kairaAmbiguityPreservation";
 import { findKairaSelfCorrectionAccountabilityIssues } from "./kairaSelfCorrectionAccountability";
+import { removeForbiddenQuestionUnits } from "./kairaDeliveredQuestionConstraint";
 
 export type KairaConstraintWorldItems = Parameters<typeof enforceWorldModelRecallResponse>[1];
 export type KairaConstraintWorldContext = Parameters<typeof enforceWorldModelRecallResponse>[2];
@@ -130,10 +131,10 @@ function runOrderedPass(
     input.epistemicContext,
   );
 
-  // Mechanical enforcement may trim length/emoji/humor, but question permission
-  // is a social WHAT/WHETHER contract. Do not let the legacy enforcer rewrite a
-  // forbidden question into a canned acknowledgement; final plan/dialogue
-  // conformance below owns rejection and normal repair owns recovery.
+  // Mechanical enforcement may trim length/emoji/humor. Question permission is
+  // still owned by KairaResponsePlan; this pass may only delete structurally
+  // recognized forbidden question units from a multi-unit candidate when valid
+  // non-question content remains. It never invents a canned replacement.
   const planEnforcement = enforceKairoResponse(epistemicGuard.reply, input.trace, {
     continueConversation: input.plan.continueConversation,
     humorAllowed: input.plan.allowHumor,
@@ -142,7 +143,12 @@ function runOrderedPass(
     maxSentences: input.plan.maxSentences,
     maxWords: input.plan.maxWords,
   });
-  const delivered = planEnforcement.reply.trim();
+  const mechanicallyConformed = removeForbiddenQuestionUnits(
+    planEnforcement.reply,
+    input.plan.allowQuestion,
+  );
+  const delivered = mechanicallyConformed.trim();
+  const questionUnitRemoved = delivered !== planEnforcement.reply.trim();
 
   const issues = [
     ...findKairaResponsePlanIssues(delivered, input.plan),
@@ -159,6 +165,7 @@ function runOrderedPass(
     ...(autobiographicalGuard.reason ? [autobiographicalGuard.reason] : []),
     ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),
     ...planEnforcement.reasons,
+    ...(questionUnitRemoved ? ["response_plan_forbidden_question_unit_removed"] : []),
   ];
 
   return {
@@ -168,7 +175,8 @@ function runOrderedPass(
       worldGuard.changed ||
       autobiographicalGuard.changed ||
       epistemicGuard.changed ||
-      planEnforcement.changed,
+      planEnforcement.changed ||
+      questionUnitRemoved,
     reasons: [...new Set(reasons)],
     issues: [...new Set(issues)],
     worldGuard,

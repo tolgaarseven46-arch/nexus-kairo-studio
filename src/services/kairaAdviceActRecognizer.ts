@@ -1,6 +1,10 @@
 const EXPLICIT_ADVICE_RE =
   /\b(?:bence\s+)?(?:erken\s+yat|biraz\s+dinlen|dinlensen\s+iyi\s+olur|uyusan\s+iyi\s+olur|şunu\s+yap|bunu\s+yap|yapmalısın|yapmalisin|etmelisin|denemelisin|gitmelisin|kalmalısın|kalmalisin|iyi\s+gelir|faydalı\s+olur|mantıklı\s+olur)\b/iu;
 const ADVICE_SUFFIX_RE = /\b[\p{L}]+(?:malısın|melisin|malisin)\b/iu;
+const NECESSITY_ADVICE_RE =
+  /\b(?:[\p{L}]+\s+){0,3}(?:geçmen|yapman|gitmen|kalman|yatman|uyuman|dinlenmen)\s+lazım\b/iu;
+const IMPERATIVE_ADVICE_RE =
+  /\b(?:biraz\s+|azıcık\s+|direkt\s+)?(?:dinlen|uyu|yat)(?:\s+bence)?\b/iu;
 
 /**
  * Structural delivered-text recognizer only. It does not decide whether advice
@@ -10,5 +14,10 @@ const ADVICE_SUFFIX_RE = /\b[\p{L}]+(?:malısın|melisin|malisin)\b/iu;
 export function isTurkishAdviceAct(text: string): boolean {
   const normalized = String(text ?? "").trim();
   if (!normalized) return false;
-  return EXPLICIT_ADVICE_RE.test(normalized) || ADVICE_SUFFIX_RE.test(normalized);
+  return (
+    EXPLICIT_ADVICE_RE.test(normalized) ||
+    ADVICE_SUFFIX_RE.test(normalized) ||
+    NECESSITY_ADVICE_RE.test(normalized) ||
+    IMPERATIVE_ADVICE_RE.test(normalized)
+  );
 }

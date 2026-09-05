@@ -2,6 +2,13 @@ const QUESTION_PUNCTUATION_RE = /[?？]/u;
 const QUESTION_CLITIC_RE =
   /(?<![\p{L}\p{N}_])(?:m[ıiuü]|misin|m[ıi]s[ıi]n|musun|m[üu]s[üu]n|m[ıi]y[ıi]m|muyum|m[üu]y[üu]m|m[ıi]yd[ıi]|m[ıi]yd[ıi]n|m[ıi]yd[ıi]k|m[ıi]yd[ıi]lar)(?![\p{L}\p{N}_])/iu;
 
+// Reaction-shaped Turkish clitics such as “vay yine mi ya” are not requests
+// for information. Suppress only the clitic signal itself; any independent
+// interrogative cue elsewhere in the same text still makes the output a
+// question act through the remaining structural recognizers below.
+const RHETORICAL_REACTION_CLITIC_RE =
+  /^\s*(?:(?:vay|of|oha|yaa?|hadi\s+ya)\s+)?(?:yine|harbi|cidden)\s+m[ıiuü]\s+ya\b/iu;
+
 const DIRECT_INTERROGATIVE_START_RE =
   /^\s*(?:neden|niye|nas[ıi]l|kim|kimle|kimin|kimden|kimde|kime|kimi|hangi|hangisi|hangileri|nerede|neresi|nereye|nereden|kaç)(?![\p{L}\p{N}_])/iu;
 
@@ -56,8 +63,11 @@ export function isTurkishQuestionAct(text: string): boolean {
   ) return false;
   if (QUESTION_PUNCTUATION_RE.test(value)) return true;
 
+  const cliticQuestion =
+    QUESTION_CLITIC_RE.test(value) && !RHETORICAL_REACTION_CLITIC_RE.test(value);
+
   return (
-    QUESTION_CLITIC_RE.test(value) ||
+    cliticQuestion ||
     DIRECT_INTERROGATIVE_START_RE.test(value) ||
     STRONG_INTERROGATIVE_ANYWHERE_RE.test(value) ||
     EMBEDDED_INTERROGATIVE_RE.test(value) ||
