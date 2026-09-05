@@ -16,6 +16,7 @@ import { groundSemanticEventForAppraisal } from "./languageUnderstandingService"
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 import { analyzeKdmInteractionCanonical } from "./kdmRelationshipReducerBridge";
 import { isKdmSalientEmotionalLoad } from "./emotionalLoadPolicy";
+import type { KairaAffectBaseline } from "./kairaAffectBaseline";
 
 export interface KdmAnalysisResult {
   trace: ReasoningTrace;
@@ -188,6 +189,7 @@ export function analyzeKdmInteractionCanonicalTurn(
   semanticInterpretation: SemanticInterpretation,
   semanticEvent: SemanticEvent,
   behaviorPolicy?: BehaviorPolicyInput | null,
+  affectBaseline?: Partial<KairaAffectBaseline> | null,
 ): KdmAnalysisResult {
   const state: DroitDynamicState = { ...DEFAULT_DYNAMIC_STATE, ...(currentDynamicState || {}) };
   const normalizedPersonality = normalizeDroitPersonality(personality);
@@ -199,6 +201,7 @@ export function analyzeKdmInteractionCanonicalTurn(
     normalizedPersonality,
     baseBehaviorProfile,
     behaviorPolicy: behaviorPolicy ?? null,
+    affectBaseline: affectBaseline ?? null,
     applyIntegrated: applyIntegratedBehaviorPolicy,
     semanticIntentToKdm,
     semanticSentimentToKdm,

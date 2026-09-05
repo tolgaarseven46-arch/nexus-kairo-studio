@@ -7,7 +7,8 @@ import {
 import type { BehaviorLayerProfile } from "./droitBehaviorEngine";
 import { validateKairoResponse, ResponseConsistencyResult } from "./kairoResponseConsistency";
 import { appraiseEventV0, type AppraisalEventKind } from "./appraisalEngine";
-import { computeTemperamentResponse, recoverTemperamentAffect, temperamentFromFineTune } from "./temperamentEngine";
+import { computeTemperamentResponse, temperamentFromFineTune } from "./temperamentEngine";
+import { kairaAffectBaselineFromFineTune } from "./kairaAffectBaseline";
 import { applyPersonalityTendencies } from "./personalityTendencyEngine";
 import { applyMotivations } from "./motivationEngine";
 import { applyValues } from "./valueEngine";
@@ -145,22 +146,16 @@ function minutesBetween(iso?: string) {
   return Math.max(0, (Date.now() - timestamp) / 60000);
 }
 
-function applyTemperamentBeforeKdm(
+function projectTemperamentForBehavior(
   semanticEvent: SemanticEvent,
-  dynamicState?: DroitDynamicState,
+  dynamicState: DroitDynamicState | undefined,
+  fineTune: Record<string, number>,
 ): DroitDynamicState | undefined {
   if (!dynamicState) return dynamicState;
-  const fineTune = readFineTuneProfile();
   const temperament = temperamentFromFineTune(fineTune);
   const event = appraisalEventFromSemantic(semanticEvent);
   const relationship = dynamicState.relationship;
-  const elapsedSinceInteractionMinutes = minutesBetween(relationship?.lastInteractionAt) ?? 0;
-  const recoveredAffect = recoverTemperamentAffect(
-    { anger: dynamicState.anger, stress: dynamicState.stress },
-    temperament,
-    elapsedSinceInteractionMinutes,
-  );
-  const recoveredState = { ...dynamicState, ...recoveredAffect };
+  const previewState = { ...dynamicState };
   const interactionCount = Math.max(0, relationship?.interactionCount || 0);
   const firstSeenAt = relationship?.firstSeenAt ? new Date(relationship.firstSeenAt).getTime() : Date.now();
   const relationshipAgeMinutes = Number.isFinite(firstSeenAt) ? Math.max(0, (Date.now() - firstSeenAt) / 60000) : 0;
@@ -182,11 +177,11 @@ function applyTemperamentBeforeKdm(
     noveltyLoad: appraisal.novelty.value,
     repetitionLoad: 1 - appraisal.novelty.value,
     relationshipSafety,
-    currentStress: Math.max(0, Math.min(1, recoveredState.stress / 100)),
+    currentStress: Math.max(0, Math.min(1, previewState.stress / 100)),
     minutesSinceEvent: 0,
   });
   const delta = temperamentResponse.stateDelta;
-  return { ...recoveredState, anger: clamp100(recoveredState.anger + delta.anger), stress: clamp100(recoveredState.stress + delta.stress), happiness: clamp100(recoveredState.happiness + delta.happiness), calmness: clamp100(recoveredState.calmness + delta.calmness), confidence: clamp100(recoveredState.confidence + delta.confidence), surprise: clamp100(recoveredState.surprise + delta.surprise) };
+  return { ...previewState, anger: clamp100(previewState.anger + delta.anger), stress: clamp100(previewState.stress + delta.stress), happiness: clamp100(previewState.happiness + delta.happiness), calmness: clamp100(previewState.calmness + delta.calmness), confidence: clamp100(previewState.confidence + delta.confidence), surprise: clamp100(previewState.surprise + delta.surprise) };
 }
 
 export const droitChatService = {
@@ -229,7 +224,8 @@ export const droitChatService = {
     }
     const semanticEvent = languageUnderstanding.event;
     const appraisalEvent = appraisalEventFromSemantic(semanticEvent);
-    const temperamentAdjustedState = applyTemperamentBeforeKdm(semanticEvent, dynamicState);
+    const temperamentAdjustedState = projectTemperamentForBehavior(semanticEvent, dynamicState, fineTune);
+    const affectBaseline = kairaAffectBaselineFromFineTune(fineTune);
     const personalityRuntime = applyPersonalityTendencies(personality, fineTune, userMessage);
     const motivationRuntime = applyMotivations(personalityRuntime.personality, fineTune, userMessage);
     const valueRuntime = applyValues(motivationRuntime.personality, fineTune, userMessage);
@@ -262,7 +258,7 @@ export const droitChatService = {
       .reverse()
       .find((message) => message.sender === "droit" && message.activityPermissionRequestId)
       ?.activityPermissionRequestId;
-    const payload = { sessionId: resolvedSessionId, requestId, userId, userName, userMessage, semanticInterpretation: languageUnderstanding.interpretation, semanticEvent, character: characterInfo, personality, responsePersonality: runtimePersonality, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorPolicy, dynamicState: temperamentAdjustedState ?? dynamicState, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName, semanticInterpretation: m.semanticInterpretation, semanticSource: m.semanticSource })), activityPermissionRequestId, provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
+    const payload = { sessionId: resolvedSessionId, requestId, userId, userName, userMessage, semanticInterpretation: languageUnderstanding.interpretation, semanticEvent, character: characterInfo, personality, responsePersonality: runtimePersonality, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorPolicy, dynamicState, affectBaseline, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName, semanticInterpretation: m.semanticInterpretation, semanticSource: m.semanticSource })), activityPermissionRequestId, provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 35000);
     try {
