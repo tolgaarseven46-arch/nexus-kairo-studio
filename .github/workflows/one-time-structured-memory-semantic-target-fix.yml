@@ -1,0 +1,123 @@
+name: One-time Structured Memory Semantic Target Fix
+
+on:
+  push:
+    branches:
+      - fix/structured-memory-semantic-target-final
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/structured-memory-semantic-target-final
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Apply narrow semantic-memory patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('src/services/kdmPersistenceService.ts')
+          s = p.read_text()
+          s2 = s.replace(
+            "export interface KdmPersistencePayload { dynamicState: DroitDynamicState; reasoningTrace: ReasoningTrace; lastUserMessage: string; reply: string; userId?: string; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; }",
+            "export interface KdmPersistencePayload { dynamicState: DroitDynamicState; reasoningTrace: ReasoningTrace; lastUserMessage: string; reply: string; userId?: string; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; semanticInterpretation?: SemanticInterpretation; }",
+            1,
+          )
+          assert s2 != s
+          s = s2
+          old = "function extractMemoryCandidates(userMessage: string): Partial<KairoUserMemory> { const text = userMessage.trim(); const result: Partial<KairoUserMemory> = {}; const name = text.match(/(?:benim adım|adım|ismim)\\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9_-]{2,40})/i); if (name) result.userName = name[1]; if (/(?:artık .*? sevmiyorum|artık .*? ilgilenmiyorum)/i.test(text) || /(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor|ilgileniyorum|ilgimi çekiyor|daha çok .*? ilgileniyorum)/i.test(text)) result.preferences = [text]; if (/(?:istiyorum|hedefim|amacım|planım|üzerinde çalışıyorum|geliştiriyorum)/i.test(text)) result.goals = [text]; if (/(?:yaşım|yaşındayım|mesleğim|işim|şehirde yaşıyorum|yaşıyorum|çalışıyorum)/i.test(text)) result.facts = [text]; return result; }"
+          new = "function extractMemoryCandidates(userMessage: string, semanticInterpretation?: SemanticInterpretation | null): Partial<KairoUserMemory> { const text = userMessage.trim(); const result: Partial<KairoUserMemory> = {}; const name = text.match(/(?:benim adım|adım|ismim)\\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9_-]{2,40})/i); if (name) result.userName = name[1]; const dyadicAffection = Boolean(semanticInterpretation && semanticInterpretation.target === 'kaira' && (semanticInterpretation.primaryIntent === 'affection' || semanticInterpretation.affection > 0 || semanticInterpretation.secondarySocialActs.includes('affection') || semanticInterpretation.discourseFacets.relationalAct === 'closeness_bid')); if (!dyadicAffection && (/(?:artık .*? sevmiyorum|artık .*? ilgilenmiyorum)/i.test(text) || /(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor|ilgileniyorum|ilgimi çekiyor|daha çok .*? ilgileniyorum)/i.test(text))) result.preferences = [text]; if (/(?:istiyorum|hedefim|amacım|planım|üzerinde çalışıyorum|geliştiriyorum)/i.test(text)) result.goals = [text]; if (/(?:yaşım|yaşındayım|mesleğim|işim|şehirde yaşıyorum|yaşıyorum|çalışıyorum)/i.test(text)) result.facts = [text]; return result; }"
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = "async function updateStructuredUserMemory(userId: string, userMessage: string): Promise<void> { const candidate = extractMemoryCandidates(userMessage);"
+          new = "async function updateStructuredUserMemory(userId: string, userMessage: string, semanticInterpretation?: SemanticInterpretation | null): Promise<void> { const candidate = extractMemoryCandidates(userMessage, semanticInterpretation);"
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = "if (payload.memoryScope === 'durable_candidate') await updateStructuredUserMemory(userScope, payload.lastUserMessage).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));"
+          new = "if (payload.memoryScope === 'durable_candidate') await updateStructuredUserMemory(userScope, payload.lastUserMessage, payload.semanticInterpretation).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));"
+          assert old in s
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          p = Path('server.ts')
+          s = p.read_text()
+          pattern = re.compile(r'(memoryScope:\s*kairaPolicy\.persistentUserMemory\s*\?\s*dialogueAnalysis\.memoryScope\s*:\s*["\']session["\'],\n\s*dialogueAnalysis,)')
+          matches = pattern.findall(s)
+          assert len(matches) == 2, f'expected 2 saveKdmInteraction payloads, got {len(matches)}'
+          s = pattern.sub(r'\1\n          semanticInterpretation: canonicalSemantic.interpretation,', s)
+          p.write_text(s)
+          PY
+
+          cat > src/services/kairaStructuredUserMemorySemanticRegression.test.ts <<'EOF'
+          import { beforeEach, describe, expect, it, vi } from 'vitest';
+          import type { SemanticInterpretation } from '../types/semanticInterpretation';
+          const firestore = vi.hoisted(() => ({ setDoc: vi.fn(), addDoc: vi.fn(), getDocs: vi.fn() }));
+          vi.mock('../lib/firebase', () => ({ db: {} }));
+          vi.mock('firebase/firestore', () => ({
+            collection: vi.fn((...args: unknown[]) => ({ kind: 'collection', args })),
+            doc: vi.fn((...args: unknown[]) => ({ kind: 'doc', args })),
+            getDoc: vi.fn(), getDocs: firestore.getDocs, setDoc: firestore.setDoc, addDoc: firestore.addDoc,
+            deleteDoc: vi.fn(), where: vi.fn(), limit: vi.fn((value: number) => ({ kind: 'limit', value })),
+            orderBy: vi.fn((...args: unknown[]) => ({ kind: 'orderBy', args })), query: vi.fn((...args: unknown[]) => ({ kind: 'query', args })),
+          }));
+          import { saveKdmInteraction } from './kdmPersistenceService';
+          function semantic(overrides: Partial<SemanticInterpretation>): SemanticInterpretation {
+            return { schemaVersion: 'semantic-interpretation@2', raw: '', normalized: '', primaryIntent: 'other', secondarySocialActs: [], target: 'unknown', valence: 'neutral', severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 }, jokingConfidence: 0, sincerityConfidence: 1, affection: 0, support: 0, compliment: 0, emotionalLoad: 0, apology: false, repairAttempt: false, stopRequest: false, discourseFacets: { socialRoutine: 'none', discourseAct: 'none', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'none', relationalIntensity: 0, stopQuestions: false, stopTalking: false }, uncertainty: { overall: 0, intent: 0, target: 0, severity: 0 }, evidence: [], ...overrides };
+          }
+          function payload(message: string, interpretation: SemanticInterpretation) {
+            return { userId: 'fresh_semantic_memory_user', lastUserMessage: message, reply: 'ok', memoryScope: 'durable_candidate' as const, semanticInterpretation: interpretation, dynamicState: { calmness: 70, anger: 10, stress: 20, happiness: 70, confidence: 70, surprise: 10, lastStatus: 'Sakin', relationship: { warmth: 50, trust: 50, conflictScore: 0, hurtScore: 0, repairProgress: 0, repeatedNegativeCount: 0 } }, reasoningTrace: { relationship: { warmthScore: 50, trustScore: 50, conflictScore: 0, hurtScore: 0, repairProgress: 0, repeatedNegativeCount: 0 } } as any };
+          }
+          function profileWrites() { return firestore.setDoc.mock.calls.filter(([ref]) => Array.isArray(ref?.args) && ref.args.includes('kairoMemory')); }
+          describe('structured user-memory semantic ownership regression', () => {
+            beforeEach(() => { vi.clearAllMocks(); firestore.getDocs.mockResolvedValue({ empty: true, docs: [] }); firestore.setDoc.mockResolvedValue(undefined); firestore.addDoc.mockResolvedValue({ id: 'trace' }); });
+            it('does not store Kaira-directed affection as a user preference', async () => {
+              await saveKdmInteraction(payload('seni seviyorum', semantic({ raw: 'seni seviyorum', normalized: 'seni seviyorum', primaryIntent: 'affection', secondarySocialActs: ['affection'], target: 'kaira', valence: 'positive', affection: 0.95, discourseFacets: { socialRoutine: 'none', discourseAct: 'none', repairSignal: 'none', adviceRequested: false, knowledgeQuery: null, selfMemoryQuery: null, relationalAct: 'closeness_bid', relationalIntensity: 0.9, stopQuestions: false, stopTalking: false } })));
+              expect(profileWrites()).toHaveLength(0);
+            });
+            it('still stores a real non-dyadic preference statement', async () => {
+              await saveKdmInteraction(payload('kahveyi seviyorum', semantic({ raw: 'kahveyi seviyorum', normalized: 'kahveyi seviyorum', target: 'event', valence: 'positive' })));
+              expect(profileWrites()).toHaveLength(1);
+              expect(profileWrites()[0][1].preferences).toContain('kahveyi seviyorum');
+            });
+          });
+          EOF
+
+          cat > docs/adr/0014-structured-user-memory-semantic-ownership.md <<'EOF'
+          # ADR-0014: Structured user-memory extraction consumes canonical semantic target
+
+          ## Status
+          Accepted
+
+          ## Context
+          The first real chat baseline exposed `seni seviyorum` being persisted as a generic user preference. The structured-memory extractor was independently reparsing raw text even though ingestion had already produced `SemanticInterpretation@2` with a Kaira-directed affection target.
+
+          ## Decision
+          Structured user-memory extraction consumes the ingestion-time canonical semantic interpretation when deciding whether a lexical candidate belongs to preference memory. Kaira-directed affection/closeness is relational evidence, not a generic user preference. No second classifier is introduced.
+
+          ## Consequences
+          - Kaira-directed affection is not stored under `preferences`.
+          - Non-dyadic statements such as `kahveyi seviyorum` remain eligible.
+          - Self/autobiographical Kaira memory remains outside this change.
+          EOF
+
+          rm -f .github/workflows/one-time-structured-memory-semantic-target.yml
+          rm -f .github/workflows/one-time-structured-memory-semantic-target-fix.yml
+          npm test -- --run src/services/kairaStructuredUserMemorySemanticRegression.test.ts
+          npx tsc --noEmit
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(memory): respect canonical semantic target [structured-memory-applied]"
+          git push origin HEAD:fix/structured-memory-semantic-target-final
