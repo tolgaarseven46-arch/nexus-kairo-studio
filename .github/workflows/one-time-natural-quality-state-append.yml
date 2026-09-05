@@ -1,0 +1,38 @@
+name: one-time natural quality state append
+'on':
+  push:
+    branches:
+      - fix/unsolicited-advice-plan-authority
+permissions:
+  contents: write
+jobs:
+  append:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/unsolicited-advice-plan-authority
+      - name: Append measured characterization checkpoint and remove workflow
+        shell: bash
+        run: |
+          if ! grep -q "NATURAL_CONVERSATION_CHARACTERIZATION_V1_2026_09_05" PROJECT_STATE.md; then
+            cat >> PROJECT_STATE.md <<'EOF'
+
+## 2026-09-05 — Natural Conversation Quality characterization v1
+<!-- NATURAL_CONVERSATION_CHARACTERIZATION_V1_2026_09_05 -->
+- Identity/Self integrity fazı yeniden açılmadı; yeni faz fresh production natural-conversation characterization ile başlatıldı.
+- Fresh persistent `reference` instance ve izole diagnostic user ile 12 turluk canlı production sohbet matrisi çalıştırıldı. Otomatik empty/exact-repeat/robotic-assistant/persona-drift bayrakları temizdi.
+- Ölçülen ilk gerçek kalite kırığı: kullanıcı yalnız `bu arada yarın erken kalkıcam` dediğinde Kaira `erken yat biraz` diyerek istenmemiş tavsiye verdi.
+- Kök neden: canonical `SemanticEvent.adviceRequested` zaten vardı ancak BehaviorContract -> HardConstraint -> PlanResolver -> ResponsePlan WHAT hattına taşınmıyordu; dolayısıyla realizer tavsiye için bağlayıcı izin görmüyordu.
+- Karar (ADR-0051): advice transient per-turn canonical behavior permission olacak. `adviceRequested` upstream semantik otorite; BehaviorContract projection, HardConstraint hard gate, PlanResolver/ResponsePlan canonical izin; final advice recognizer yalnız plan conformance doğrular ve semantik intent üretmez.
+- RelationshipReducer, identity/self, memory, Claim/Event provenance, world truth ve persistence değiştirilmedi.
+- Bu checkpoint yeni Natural Conversation Quality fazını KAPATMAZ. Sonraki çalışma post-merge production acceptance ve yeni characterization kanıtıyla devam edecek; eski kapalı Identity/Self backlog'una regression kanıtı olmadan dönülmeyecek.
+EOF
+          fi
+          rm -f .github/workflows/one-time-natural-quality-state-append.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PROJECT_STATE.md .github/workflows/one-time-natural-quality-state-append.yml
+          git commit -m "docs: checkpoint natural conversation characterization v1"
+          git push origin HEAD:fix/unsolicited-advice-plan-authority
