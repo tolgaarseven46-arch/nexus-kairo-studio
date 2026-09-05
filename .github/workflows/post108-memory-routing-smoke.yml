@@ -1,0 +1,72 @@
+name: Post108 Memory Routing Smoke
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  post108-memory-routing-smoke:
+    if: github.head_ref == 'audit/post108-memory-routing-smoke'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify third-party recall does not enter Kaira self-memory
+        shell: bash
+        run: |
+          node <<'NODE'
+          const base = 'https://nexus-kairo-studio.onrender.com';
+          const seed = Date.now();
+          const userId = `post108_${seed}`;
+          const instanceId = `post108_welcome_${seed}`;
+          const history = [];
+          async function chat(userMessage, n) {
+            const response = await fetch(`${base}/api/chat`, {
+              method: 'POST',
+              headers: {'content-type':'application/json'},
+              body: JSON.stringify({
+                userId,
+                userName: 'Mert',
+                userMessage,
+                history,
+                provider: 'openrouter',
+                kairaInstanceId: instanceId,
+                kairaInstanceType: 'welcome',
+                suppressRecentMemory: false,
+                requestId: `${userId}_${n}`
+              })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
+            history.push({sender:'user', text:userMessage, participantName:'Mert'});
+            history.push({sender:'droit', text:String(data.reply ?? '')});
+            return data;
+          }
+
+          await chat('benim manit var', 1);
+          await chat('sarışın mavi gözlü rus asıllı 19 yaşında çok tatlı', 2);
+          const data = await chat('peki ben onda en çok hangi özelliğini seviyordum', 3);
+          const row = {
+            reply: String(data.reply ?? ''),
+            target: data?.kdm?.semanticEvent?.target,
+            relationshipScope: data?.kdm?.semanticEvent?.relationshipScope,
+            selfMemoryQuery: data?.kdm?.semanticEvent?.selfMemoryQuery ?? null,
+            selfMemoryStatus: data?.kdm?.selfMemoryRuntime?.status,
+            worldReply: data?.kdm?.worldMemoryGuard?.reply,
+            worldPolicyMode: data?.kdm?.worldReasoningPolicy?.mode,
+            mustQualify: data?.kdm?.worldReasoningPolicy?.mustQualify,
+            accepted: data?.consistency?.accepted,
+            score: data?.consistency?.score,
+            issues: data?.consistency?.issues ?? [],
+            warnings: data?.consistency?.warnings ?? []
+          };
+          console.log('POST108_MEMORY_SMOKE ' + JSON.stringify(row));
+          const failures = [];
+          if (row.target !== 'third_party') failures.push('target_not_third_party');
+          if (row.selfMemoryQuery !== null) failures.push('third_party_self_memory_query_survived');
+          if (row.selfMemoryStatus !== 'not_requested') failures.push('self_memory_runtime_invoked');
+          if (failures.length) {
+            console.error('POST108_MEMORY_SMOKE_FAILURE ' + JSON.stringify({failures,row}));
+            process.exit(1);
+          }
+          console.log('POST108_MEMORY_ROUTING_OK');
+          NODE
