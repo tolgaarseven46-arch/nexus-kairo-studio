@@ -1,0 +1,140 @@
+name: One-time Postfix 15-turn Real Chat
+
+on:
+  push:
+    branches:
+      - diag/postfix-15turn-real-chat
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: diag/postfix-15turn-real-chat
+          fetch-depth: 0
+      - name: Run fresh-user production conversation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/run-chat.mjs <<'EOF'
+          const url = 'https://nexus-kairo-studio.onrender.com/api/chat';
+          const userId = 'postfix15_user_20260905_a7f31';
+          const sessionId = 'session_postfix15_20260905_a7f31';
+          const instanceId = 'kaira_postfix15_20260905_a7f31';
+          const turns = [
+            'naber',
+            'iyi maç izliyorum',
+            'fenerbahçe oynuyor',
+            'sen nasılsın',
+            'seni sevdim',
+            'gel sarıl',
+            'sg',
+            'çok saçmalıyorsun',
+            'aynı şeyi tekrar yapma',
+            'pardon',
+            'barıştık mı',
+            'hala kızgın mısın',
+            'boşver kapatalım konuyu',
+            'yine saçmaladın',
+            'sen gerçekten salaksın'
+          ];
+          let history = [];
+          let dynamicState;
+          const rows = [];
+          for (let i = 0; i < turns.length; i++) {
+            const userMessage = turns[i];
+            const body = {
+              userId,
+              userName: 'Mert',
+              userMessage,
+              character: { name: 'Kaira' },
+              personality: {},
+              history,
+              ...(dynamicState ? { dynamicState } : {}),
+              provider: 'openrouter',
+              suppressRecentMemory: false,
+              sessionId,
+              kairaInstanceId: instanceId,
+              kairaInstanceType: 'individual',
+              requestId: `postfix15-${String(i + 1).padStart(2, '0')}`
+            };
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(body),
+              signal: AbortSignal.timeout(180000),
+            });
+            const text = await response.text();
+            if (!response.ok) throw new Error(`turn ${i + 1} HTTP ${response.status}: ${text}`);
+            const x = JSON.parse(text);
+            const reply = String(x.reply || '');
+            dynamicState = x?.kdm?.dynamicState || dynamicState;
+            history.push({ sender: 'user', text: userMessage, participantName: 'Mert' });
+            history.push({ sender: 'assistant', text: reply });
+            const e = x?.kdm?.semanticEvent || {};
+            const rel = dynamicState?.relationship || {};
+            const plan = x?.kdm?.responsePlan || {};
+            const trace = x?.kdm?.trace || {};
+            const row = {
+              turn: i + 1,
+              user: userMessage,
+              reply,
+              provider: x.providerUsed,
+              semantic: {
+                intent: e.intent,
+                valence: e.valence,
+                target: e.target,
+                relationalAct: e.relationalAct,
+                affection: e.affection,
+                severity: e.severity,
+                uncertainty: e.semanticUncertainty,
+                stopQuestions: e.stopQuestions,
+                stopTalking: e.stopTalking,
+              },
+              relationship: {
+                state: rel.conversationState,
+                warmth: rel.warmth,
+                trust: rel.trust,
+                conflict: rel.conflictScore,
+                hurt: rel.hurtScore,
+                repair: rel.repairProgress,
+                repeatedNegativeCount: rel.repeatedNegativeCount,
+                reactionMode: dynamicState?.reactionMode,
+              },
+              affect: {
+                happiness: dynamicState?.happiness,
+                confidence: dynamicState?.confidence,
+                anger: dynamicState?.anger,
+                stress: dynamicState?.stress,
+                calmness: dynamicState?.calmness,
+              },
+              plan: {
+                continueConversation: plan.continueConversation,
+                allowQuestion: plan.allowQuestion,
+                allowHumor: plan.allowHumor,
+                maxSentences: plan.maxSentences,
+                maxWords: plan.maxWords,
+                stance: plan.stance,
+              },
+              consistency: x.consistency,
+              memoryUpdate: trace?.memoryUpdate,
+            };
+            rows.push(row);
+            console.log(`TURN ${i + 1} ${JSON.stringify(row)}`);
+          }
+          console.log('===== FULL_15_TURN_RESULT =====');
+          console.log(JSON.stringify({ userId, sessionId, instanceId, rows }, null, 2));
+          EOF
+          node /tmp/run-chat.mjs
+      - name: Self-remove diagnostic workflow
+        shell: bash
+        run: |
+          git rm .github/workflows/one-time-postfix-15turn-real-chat.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: remove postfix 15-turn diagnostic'
+          git push origin HEAD:diag/postfix-15turn-real-chat
