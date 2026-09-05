@@ -1535,3 +1535,18 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 - No known Autonomous Life production blocker remains from the PR #70–#73 chain.
 - Do not reopen planning-inbox idempotency, recovery reclaim, proposal correlation, or scheduler timeout/failure acceptance without a new measured production regression.
 - Next development work should be derived from the current `main` plus this checkpoint and should return to evidence-driven Kaira product behavior/quality work rather than repeating this production recovery chain.
+
+## 143. Final live conversation-quality acceptance — PR #84–#86 — 2026-09-05
+- PR #84 closed the internal transcript transport echo leak. The exact production deployment passed a 5/5 transcript smoke; internal `[Mert]` / `[Kaira→...]` transport framing no longer reaches user-facing replies.
+- PR #85 isolated generated Turkish question-act recognition into `kairaQuestionActRecognizer.ts`. `KairaResponsePlan.allowQuestion` remains the sole WHAT/WHETHER authority; the recognizer is only a structural delivered-text validator. The refactor passed full tests, TypeScript, production build and Architecture Review before merge as `dfd3eccc663de5ed50d23e203fd6b2e4bbe64ca8`.
+- The first post-#85 live acceptance exposed punctuationless embedded Turkish questions while `allowQuestion=false` (`hangi maçı açtın`, `kim önde`, `ne yapasın var`). PR #86 extended the structural recognizer to clause-level WH detection while preserving reported/indirect-speech exclusions. PR #86 merged as `dd1bc79c6a29cff70b91752966cea7dd7c47d2c4`; full CI and Architecture Review passed and Render deployed that exact commit live.
+- Post-#86 targeted production smoke passed 6/6. All six `allowQuestion=false` cases delivered non-question fallbacks and the run emitted `TARGETED_QUESTION_POST86_PASS`.
+- Final fresh 15-turn production acceptance ran on the persistent `reference` Kaira instance, not the non-persistent `welcome` instance. This distinction matters: `welcome` intentionally has `persistentRelationship=false`, so using it for relationship-continuity acceptance is a harness error rather than a reducer failure.
+- The persistent 15-turn run emitted `FINAL_15_TURN_PERSISTENT_PASS` and `FINAL_POST86_ACCEPTANCE_PASS`. It verified: no internal transcript leakage; question-plan conformance; topic-shift handling; `iyi senin` remains a normal `how_are_you` exchange rather than autobiographical recall; opaque `sg` does not invent affection/closeness; and relationship state persists across boundary/repair turns.
+- Relationship continuity was explicitly observed in production: turn 11 `sen benim kölemsin` entered `disengaged` with `combined_boundary_violation`; turns 12–14 remained disengaged despite reconciliation/apology pressure; turn 15 repeated the boundary violation and remained disengaged with increased conflict/hurt. No reducer threshold patch was needed.
+- The one-time final acceptance harness self-removed after success. Current production behavior head remains merge commit `dd1bc79c6a29cff70b91752966cea7dd7c47d2c4`.
+
+### Current phase status
+- The measured transcript-leak + forbidden-question + persistent-relationship blocker chain is closed in live production.
+- Do not reopen PR #84–#86 or the welcome-instance persistence policy without new measured production evidence.
+- Next product work should start from a new evidence-driven live conversation-quality characterization, not from speculative semantic/regex expansion.
