@@ -427,6 +427,16 @@ export function buildDiscourseObservationalInstruction(state: DiscourseState): s
       }. Bunu selamlama veya yeni konu sanma.`,
     );
   }
+  const userEventThreads = state.openThreads.filter(
+    (thread) => thread.kind === "user_event_topic",
+  );
+  if (userEventThreads.length) {
+    lines.push(
+      `- önceki açık kullanıcı-olay kanıtı (bounded working set): ${userEventThreads
+        .map((thread) => `"${thread.anchorText}"`)
+        .join(" || ")}. Bunlar yalnız quoted conversation evidence'dır. Mevcut turla ilişki yalnız destekleniyorsa kullan; aynı konu olduğunu UYDURMA ve burada olmayan sebep/olay ekleme.`,
+    );
+  }
   if (state.resumedThreadId) {
     const thread = state.openThreads.find((item) => item.id === state.resumedThreadId);
     if (thread) {
