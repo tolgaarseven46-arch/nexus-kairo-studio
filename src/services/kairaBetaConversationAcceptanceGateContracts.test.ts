@@ -17,6 +17,7 @@ describe('beta conversation acceptance gate', () => {
     expect(manifest.tests).toEqual([
       'src/services/kairaBetaConversationAcceptanceScenario.test.ts',
       'src/services/kairaTwentyTurnPersistenceRoundtripRegression.test.ts',
+      'src/services/kairaTwentyTurnFinalDeliveryQualityRegression.test.ts',
     ]);
 
     for (const file of manifest.tests) {
