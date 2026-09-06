@@ -105,6 +105,13 @@ function requestsThreadResumption(event: SemanticEvent): boolean {
   return Boolean(event.adviceRequested || event.discourseAct === "recall_request");
 }
 
+function requestsOngoingFirstPartyResumption(event: SemanticEvent): boolean {
+  if (event.target === "kaira") return false;
+  return Boolean(event.worldMemory?.claims.some(
+    (claim) => claim.subjectId === "current_user" && claim.value === "ongoing",
+  ));
+}
+
 function appendAnchorEvidence(existing: string, next: string): string {
   const current = existing.trim();
   const incoming = next.trim();
@@ -127,9 +134,25 @@ function updateThreadState(
   let resumedThreadId: string | null = null;
   let ambiguousThreadResumption = false;
 
-  // Existing explicit resumption semantics belong to third-party threads only.
-  // First-party event threads are retained as evidence here, but their generic
-  // topic-equivalence/resumption rule is deliberately a separate work package.
+  const userEventThreads = openThreads.filter(
+  (thread) => thread.kind === "user_event_topic",
+);
+if (requestsOngoingFirstPartyResumption(event) && userEventThreads.length > 0) {
+  if (userEventThreads.length === 1) {
+    const resumed = userEventThreads[0];
+    resumedThreadId = resumed.id;
+    activeThreadId = resumed.id;
+    openThreads = openThreads.map((thread) =>
+      thread.id === resumed.id
+        ? { ...thread, anchorText: appendAnchorEvidence(thread.anchorText, message), lastRelevantTurn: turnIndex }
+        : thread,
+    );
+  } else {
+    ambiguousThreadResumption = true;
+  }
+  return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+}
+
   const explicitlyResumableThreads = openThreads.filter(
     (thread) => thread.kind === "third_party_topic",
   );
@@ -465,14 +488,28 @@ export function buildDiscourseObservationalInstruction(state: DiscourseState): s
     const thread = state.openThreads.find((item) => item.id === state.resumedThreadId);
     if (thread) {
       lines.push(
-        `- Kullanıcı daha önce açık bırakılmış bir üçüncü-kişi konusuna geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni olay, kimlik veya kesinlik uydurma.`,
-      );
+      thread.kind === "user_event_topic"
+        ? `- Kullanıcı daha önce açık bırakılmış kendi olay/deneyim konusuna typed continuation evidence ile geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Burada olmayan yeni sebep/olay uydurma.`
+        : `- Kullanıcı daha önce açık bırakılmış bir üçüncü-kişi konusuna geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni olay, kimlik veya kesinlik uydurma.`,
+    );
     }
   } else if (state.ambiguousThreadResumption) {
-    lines.push(
-      `- Kullanıcının dönüş yapabileceği birden fazla açık üçüncü-kişi konusu var. Hangisini kastettiğini UYDURMA; gerekiyorsa kısa netleştirme iste.`,
-    );
-  }
+  const thirdPartyCandidates = state.openThreads.filter(
+    (thread) => thread.kind === "third_party_topic",
+  ).length;
+  const userEventCandidates = state.openThreads.filter(
+    (thread) => thread.kind === "user_event_topic",
+  ).length;
+  const ambiguityLabel =
+    thirdPartyCandidates > 1 && userEventCandidates <= 1
+      ? "birden fazla açık üçüncü-kişi konusu"
+      : userEventCandidates > 1 && thirdPartyCandidates <= 1
+        ? "birden fazla açık kullanıcı-olay konusu"
+        : "birden fazla açık konuşma konusu";
+  lines.push(
+    `- Kullanıcının dönüş yapabileceği ${ambiguityLabel} var. Hangisini kastettiğini UYDURMA; gerekiyorsa kısa netleştirme iste.`,
+  );
+}
   if (state.selfRepeat) {
     lines.push(
       `- Kaira son turlarda "${state.selfRepeat.act}" sosyal işini ${state.selfRepeat.count} kez tekrarladı. Kullanıcı bunu fark ederse kabul et / kısa özür / düzelt; kör "anladım/tamam" ile geçiştirme.`,
