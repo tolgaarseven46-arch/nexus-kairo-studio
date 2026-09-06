@@ -1,0 +1,63 @@
+name: One-time contextual relationship harm repair v2
+
+on:
+  push:
+    branches:
+      - fix/relationship-contextual-harm-confidence
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: fix/relationship-contextual-harm-confidence
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+      - run: npm install --ignore-scripts
+      - name: Apply narrow canonical repair
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('src/services/relationshipReducer.ts')
+          s = p.read_text(encoding='utf-8')
+          old = '''  const sevLoad = severityLoad(signal.severity);\n  const negativeEvidence =\n    signal.severity.disrespect >= 0.15 ||\n    signal.severity.coercion >= 0.15 ||\n    signal.severity.manipulation >= 0.15 ||\n    signal.severity.privacy >= 0.15 ||\n    signal.severity.aggression >= 0.2;\n  // Canonical severity is the harm authority. A directly Kaira-targeted turn\n  // with real present harm stays negative even if the coarse valence projection\n  // is neutral; ambiguous/third-party harm still does not mutate the dyad.\n  const targetedHarm = signal.targetsKaira && presentSeverityOf(signal.severity) >= 0.15;\n  const rawNegative = negativeEvidence && (signal.valence === "negative" || targetedHarm);\n'''
+          new = '''  const sevLoad = severityLoad(signal.severity);\n  const negativeEvidence =\n    signal.severity.disrespect >= 0.15 ||\n    signal.severity.coercion >= 0.15 ||\n    signal.severity.manipulation >= 0.15 ||\n    signal.severity.privacy >= 0.15 ||\n    signal.severity.aggression >= 0.2;\n  // Explicit negative valence keeps the existing injury path unchanged. For a\n  // neutral/positive turn, however, low-level directly-targeted harm must be\n  // contextually credible before it can create a new dyadic injury. This uses\n  // canonical v2 context only and does not reinterpret raw text.\n  const contextualHarmConfidence = clamp01(\n    (1 - config.redline.jokingDampen * signal.jokingConfidence * (1 - signal.sincerityConfidence)) *\n      (1 - config.redline.uncertaintyDampen * signal.uncertainty),\n  );\n  const rawPresentSeverity = presentSeverityOf(signal.severity);\n  const contextualPresentSeverity = rawPresentSeverity * contextualHarmConfidence;\n  const targetedHarm =\n    signal.targetsKaira &&\n    (signal.valence === "negative" ? rawPresentSeverity >= 0.15 : contextualPresentSeverity >= 0.15);\n  rationale.push(`harm-context:${contextualHarmConfidence.toFixed(2)}`);\n  const rawNegative = negativeEvidence && (signal.valence === "negative" || targetedHarm);\n'''
+          if old not in s: raise SystemExit('reducer classification anchor missing')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+
+          Path('src/services/kairaRelationshipContextualHarmRegression.test.ts').write_text('''import { describe, expect, it } from "vitest";\nimport { reduceRelationshipTurn, type RelationshipReducerPrev, type RelationshipTurnSignal } from "./relationshipReducer";\n\nconst prev: RelationshipReducerPrev = {\n  scores: { warmth: 45, trust: 46, conflict: 5, hurt: 9, repairProgress: 3, positiveEvents: 0, negativeEvents: 2, repeatedNegativeCount: 1 },\n  conversationState: "active", reactionMode: "irritated",\n  affect: { anger: 18, stress: 20, happiness: 67, calmness: 70 },\n  firstSeenAt: "2026-09-06T09:21:39.761Z", lastInteractionAt: "2026-09-06T09:24:10.172Z",\n  lastNegativePattern: "zorlama", interactionCount: 6,\n};\n\nconst turn7: RelationshipTurnSignal = {\n  valence: "neutral", targetsKaira: true,\n  severity: { disrespect: 0.2, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 },\n  jokingConfidence: 0.8, sincerityConfidence: 0.5, apology: false, repairAttempt: false,\n  support: 0, compliment: 0, affection: 0.2, userStop: false, uncertainty: 0.32, negativePattern: "hakaret",\n};\n\ndescribe("contextual relationship harm regression", () => {\n  it("does not promote the recorded neutral/high-joking low-severity Turn 7 shape into a new injury", () => {\n    const result = reduceRelationshipTurn({ prev, signal: turn7, timing: { elapsedMinutesSincePrev: 0.7, nowIso: "2026-09-06T09:24:50.081Z" } });\n    expect(result.scores.negativeEvents).toBe(2);\n    expect(result.scores.conflict).toBeLessThanOrEqual(5);\n    expect(result.scores.hurt).toBeLessThanOrEqual(9);\n    expect(result.lastNegativePattern).toBe("zorlama");\n    expect(result.rationale.some((item) => item.startsWith("harm-context:"))).toBe(true);\n  });\n\n  it("leaves explicit negative-valence high-severity insult semantics harmful", () => {\n    const result = reduceRelationshipTurn({\n      prev,\n      signal: { ...turn7, valence: "negative", severity: { disrespect: 0.7, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 }, jokingConfidence: 0.3, sincerityConfidence: 0.8, uncertainty: 0.3, negativePattern: "hakaret" },\n      timing: { elapsedMinutesSincePrev: 0.3, nowIso: "2026-09-06T09:29:45.226Z" },\n    });\n    expect(result.scores.negativeEvents).toBe(3);\n    expect(result.scores.conflict).toBeGreaterThan(5);\n    expect(result.scores.hurt).toBeGreaterThan(9);\n    expect(result.lastNegativePattern).toBe("hakaret");\n  });\n\n  it("does not change residual-reaction or repair mathematics because no injury magnitude is rescaled", () => {\n    const neutralAfterInjury = reduceRelationshipTurn({\n      prev: { ...prev, reactionMode: "hurt", scores: { ...prev.scores, hurt: 20, conflict: 8 } },\n      signal: { ...turn7, targetsKaira: false, severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 }, jokingConfidence: 0, uncertainty: 0, negativePattern: null },\n      timing: { elapsedMinutesSincePrev: 0.5, nowIso: "2026-09-06T09:25:20.000Z" },\n    });\n    expect(neutralAfterInjury.reactionMode).toBe("hurt");\n  });\n});\n''', encoding='utf-8')
+
+          Path('docs/adr/0063-contextual-relationship-harm-confidence.md').write_text('''# ADR-0063 — Contextual credibility for low-level dyadic harm\n\n## Status\nAccepted\n\n## Context\nThe 2026-09-06 real-user Turn 7 was semantically neutral, directly addressed Kaira, had disrespect 0.20, joking confidence 0.80, uncertainty 0.32 and no explicit insult flag. The canonical reducer nevertheless created a new negative relationship event and persisted `hakaret`. Code inspection showed joking/sincerity/uncertainty already reached the reducer, but ordinary neutral-valence targeted-harm promotion ignored them.\n\nA first broader repair that scaled ordinary injury severity fixed Turn 7 but broke two existing invariants: residual hurt persistence and disengaged-to-repair recovery. That version was rejected and never merged.\n\n## Decision\n- Preserve all existing injury magnitude, residual reaction, recovery, and hard-redline mathematics.\n- Preserve the existing explicit `valence=negative` injury path unchanged.\n- Only when valence is not negative, require low-level Kaira-targeted harm to clear a contextual credibility threshold before it can promote the turn into a new negative dyadic event.\n- Contextual credibility uses only canonical v2 fields already present at the reducer boundary: joking confidence, sincerity confidence and semantic uncertainty. Existing redline dampening coefficients are reused; no second calibration source is introduced.\n- Raw semantic severity remains observable and unchanged.\n- No raw-text parse, phrase rule, regex, provider call, or second semantic authority is introduced.\n\n## Consequences\nTurn 7-style playful/uncertain low-level signals no longer become durable injury merely because Kaira is the target. Explicit negative-valence harm, residual hurt, and repair trajectories remain governed by their existing contracts. Turn 4 privacy ontology and Turn 5 boundary-decline-vs-harm remain separate work candidates.\n''', encoding='utf-8')
+
+          state = Path('PROJECT_STATE.md')
+          st = state.read_text(encoding='utf-8')
+          note = '''\n\n## 2026-09-06 — Real-user replay: contextual targeted-harm promotion\n- After PR #115, Turn 7 proved a neutral/high-joking/uncertain low-level signal could still become durable relationship injury.\n- A broad injury-rescaling attempt was rejected because full regression exposed damage to residual hurt persistence and disengaged→repair recovery; it was not merged.\n- ADR-0063 narrows the repair: explicit negative valence, injury magnitude, redline and recovery remain unchanged. Only non-negative low-level targeted-harm promotion uses canonical joking/sincerity/uncertainty credibility.\n- Turn 4 privacy ontology and Turn 5 boundary-decline-vs-harm are explicitly not claimed fixed. Development remains API-free.\n'''
+          if '## 2026-09-06 — Real-user replay: contextual targeted-harm promotion' not in st:
+              state.write_text(st.rstrip() + note + '\n', encoding='utf-8')
+
+      - name: Focused API-free verification
+        run: npx vitest run src/services/kairaRelationshipContextualHarmCharacterization.test.ts src/services/kairaRelationshipContextualHarmRegression.test.ts src/services/kairaRelationshipQualitativeReactionCharacterization.test.ts src/services/relationshipReducerGoldenSession.test.ts
+      - name: Full tests
+        run: npm test -- --run
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
+      - name: Remove one-time workflow
+        run: rm .github/workflows/one-time-contextual-harm-repair-v2.yml
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(kaira): gate low-confidence targeted relationship harm"
+          git push origin HEAD:fix/relationship-contextual-harm-confidence
