@@ -1,7 +1,7 @@
 import type { KairaSelfRevisionEvidence } from "./kairaSelfRevisionEvidence";
 
 export type KairaKnowledgeProvenance = "species_canon" | "inherited" | "learned";
-export type KairaSelfFactDomain = "preference" | "belief" | "trait" | "biography";
+export type KairaSelfFactDomain = "preference" | "belief" | "trait" | "biography" | "capability";
 export type KairaMemorySensitivity = "ordinary" | "private" | "sensitive";
 export type KairaMemoryOrigin = "inherited" | "lived";
 
