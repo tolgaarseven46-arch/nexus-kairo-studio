@@ -1614,3 +1614,10 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 - Son kullanıcı davranışı değişmez: ilişkisel/yakınlık hamlesi `tamam/peki/aynen/anladım` ile geçiştirilemez. Değişen şey kuralın sahipliğidir.
 - Pure social routine'ler obligation-free kalır. Raw-text reparse, yeni WHAT authority veya provider/API çağrısı eklenmez.
 
+## 2026-09-06 — Beta final-delivery acceptance coverage
+- PR #113 sonrası semantic-authority audit kapatıldı ve odak measurable product-facing conversation acceptance'a taşındı.
+- ADR-0005 kapsamı incelendi: beta acceptance manifesti ilişki/state recovery ile persistence/hydration senaryolarını erken çalıştırıyor, fakat mevcut 20-turn final-delivery quality regression yalnız full suite içinde kalıyordu.
+- `kairaTwentyTurnFinalDeliveryQualityRegression.test.ts` deterministic olarak canonical semantics → KDM → DialogueDecision → ResponsePlan → speech identity → local/AI routing → repair/enforcement → delivered reply zincirini, ilişki hasarı/onarımı ve repetition quality ile birlikte doğruluyor; `test:beta` içinde duplicate değil.
+- ADR-0061 kararı: bu durable cross-cutting delivered-reply invariant canonical beta acceptance manifestine promote edilir. Focused mechanism regression'ları full suite'te kalır; acceptance gate full suite kopyasına dönüştürülmez.
+- Runtime davranışı, provider routing veya model çağrısı değişmez. Provider/API/live smoke yoktur; gerçek provider kabulü kullanıcı gerçek Kaira sohbet testine ayrılmıştır.
+
