@@ -32,8 +32,12 @@ export type DialogueObligationResolution =
   | "decline_explicit"
   | "defer_explicit";
 
+export type DialogueObligationType =
+  | "answer_or_clarify"
+  | "grounded_recall";
+
 export interface DialogueObligation {
-  type: "answer_or_clarify";
+  type: DialogueObligationType;
   satisfactionCriteria: {
     forbiddenResponseClasses: Array<"acknowledgement_only">;
     allowedResolutions: DialogueObligationResolution[];
@@ -493,11 +497,11 @@ function applyRepetitionPolicy(
 }
 
 function attachDecisionOwnedObligation(plan: DialogueDecisionPlan): DialogueDecisionPlan {
-  if (plan.move !== "answer_or_clarify") return plan;
+  if (plan.move !== "answer_or_clarify" && plan.move !== "grounded_recall") return plan;
   return {
     ...plan,
     obligation: {
-      type: "answer_or_clarify",
+      type: plan.move,
       satisfactionCriteria: {
         forbiddenResponseClasses: ["acknowledgement_only"],
         allowedResolutions: [
@@ -587,12 +591,14 @@ export function findDialogueDecisionIssues(
   if (plan.move === "respond_to_relational_bid" && KAIRA_SHORT_ACK_RE.test(reply.trim())) {
     issues.push("Relational bid generic acknowledgement ile geçiştirilemez; anlamlı sosyal hareket gerekli");
   }
+  const obligationType = plan.obligation?.type;
   if (
-    plan.obligation?.satisfactionCriteria.forbiddenResponseClasses.includes("acknowledgement_only") &&
+    obligationType &&
+    plan.obligation.satisfactionCriteria.forbiddenResponseClasses.includes("acknowledgement_only") &&
     KAIRA_SHORT_ACK_RE.test(reply.trim())
   ) {
     issues.push(
-      "DialogueDecision obligation karşılanmadı: answer_or_clarify yalnız acknowledgement ile kapatılamaz",
+      `DialogueDecision obligation karşılanmadı: ${obligationType} yalnız acknowledgement ile kapatılamaz`,
     );
   }
   if (plan.repeatGuard && classifyKairaReplyAct(reply) === plan.repeatGuard.act) {

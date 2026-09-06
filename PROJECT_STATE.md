@@ -1602,3 +1602,9 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 - Onarım ilkesi (ADR-0058): tek birincil move korunur; sosyal rutin yalnız tek bağımsız işlevse ana move olur, aksi halde canonical eşzamanlı bağlam olarak korunur ve substantive obligation'ı silemez.
 - Raw-text reparse, yeni classifier veya ikinci WHAT authority eklenmez.
 
+## 2026-09-06 — Bounded downstream repair: grounded recall fulfillment
+- PR #111 sonrası downstream `DialogueDecision → final delivery` taramasında ilk yeni sistemik boşluk API-siz doğrulandı: `grounded_recall` deterministic WHAT/fallback sahibi olmasına rağmen decision-owned fulfillment obligation taşımıyordu.
+- Red characterization: grounded recall obligation `undefined`; acknowledgement-only (`tamam/peki/aynen/anladım`) final validator tarafından reddedilmiyordu; pure-social kontrol doğru biçimde geçiyordu.
+- ADR-0059 ilkesi: substantive recall ve answer hareketleri fulfillment contract'ını DialogueDecision'dan alır; downstream validator yalnız bu typed contract'ı tüketir.
+- Raw-text reparse, yeni semantic authority veya provider/API çağrısı eklenmez. Gerçek provider kabulü yalnız kullanıcı gerçek sohbet testinde yapılacaktır.
+
