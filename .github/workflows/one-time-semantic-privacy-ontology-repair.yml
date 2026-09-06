@@ -23,6 +23,17 @@ jobs:
       - run: npm install --ignore-scripts
       - name: Apply semantic privacy ontology repair
         run: python scripts/apply-semantic-privacy-ontology-repair.py
+      - name: Complete typed replay fixture
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/services/kairaSemanticPrivacyOntologyRegression.test.ts')
+          s = p.read_text(encoding='utf-8')
+          old = '  surprise: 10,\n  reactionMode: "neutral",\n'
+          new = '  surprise: 10,\n  lastStatus: "Sakin ve kontrollü",\n  reactionMode: "neutral",\n'
+          if old not in s:
+              raise SystemExit('dynamic-state fixture anchor missing')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
       - name: Focused API-free verification
         run: npx vitest run src/services/llmSemanticUnderstandingProvider.test.ts src/services/kairaSemanticPrivacyOntologyRegression.test.ts
       - name: Full tests
