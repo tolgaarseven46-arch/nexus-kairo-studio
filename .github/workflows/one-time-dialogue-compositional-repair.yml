@@ -1,0 +1,89 @@
+name: One-time dialogue compositional repair
+
+on:
+  push:
+    branches:
+      - audit/dialogue-compositional-obligations
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: audit/dialogue-compositional-obligations
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: Apply typed compositional repair
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('src/services/kairoDialogueDecisionEngine.ts')
+          s = p.read_text(encoding='utf-8')
+
+          old = '''  if (\n    event.socialRoutine === "greeting" ||\n    event.socialRoutine === "thanks" ||\n    event.socialRoutine === "agreement" ||\n    event.socialRoutine === "goodbye" ||\n    event.socialRoutine === "good_night"\n  ) {\n    return {\n      move: "complete_social_routine",\n      socialRoutine: event.socialRoutine,\n      allowFollowUpQuestion: false,\n      allowSpeculation: false,\n      maxSentences: 1,\n      maxWords: 8,\n      hasSupportedTargetClaim: false,\n      reason:\n        "Kanonik sosyal rutini aynı sosyal işlevle kısa biçimde tamamla. Yeni konu, açıklama, tahmin veya otomatik soru açma.",\n    };\n  }\n\n'''
+          if old not in s:
+              raise SystemExit('expected social-routine block not found')
+          s = s.replace(old, '', 1)
+
+          anchor = '''  if (event.intent === "question" || event.intent === "information_request") {\n    return {\n      move: "answer_or_clarify",\n      allowFollowUpQuestion: true,\n      allowSpeculation: false,\n      maxSentences: 3,\n      hasSupportedTargetClaim: false,\n      reason:\n        "Önce soruya cevap ver; yalnızca gerçekten gerekli ise tek netleştirme sorusu sor.",\n    };\n  }\n'''
+          if anchor not in s:
+              raise SystemExit('expected question branch not found')
+          routine = '''  if (\n    event.socialRoutine === "greeting" ||\n    event.socialRoutine === "thanks" ||\n    event.socialRoutine === "agreement" ||\n    event.socialRoutine === "goodbye" ||\n    event.socialRoutine === "good_night"\n  ) {\n    return {\n      move: "complete_social_routine",\n      socialRoutine: event.socialRoutine,\n      allowFollowUpQuestion: false,\n      allowSpeculation: false,\n      maxSentences: 1,\n      maxWords: 8,\n      hasSupportedTargetClaim: false,\n      reason:\n        "Bu turda sosyal rutin dışında bağımsız bir kullanıcı yükümlülüğü yok. Kanonik sosyal rutini aynı sosyal işlevle kısa biçimde tamamla; yeni konu, açıklama, tahmin veya otomatik soru açma.",\n    };\n  }\n'''
+          s = s.replace(anchor, anchor + routine, 1)
+
+          old_return = '''  const basePlan = planDialogueResponseBase(\n    history,\n    userMessage,\n    userName,\n    event,\n    currentAnalysis,\n    discourse,\n  );\n  return applyRepetitionPolicy(attachDecisionOwnedObligation(basePlan), discourse);\n'''
+          new_return = '''  const basePlan = planDialogueResponseBase(\n    history,\n    userMessage,\n    userName,\n    event,\n    currentAnalysis,\n    discourse,\n  );\n  // SemanticInterpretation is multi-facet. Keep one primary move for existing\n  // consumers, but never erase a concurrent typed social routine when a\n  // substantive obligation (answer/recall/repair/etc.) owns the primary move.\n  // The routine remains context; it is not a second WHAT authority.\n  const compositionalPlan =\n    basePlan.socialRoutine || !event.socialRoutine || event.socialRoutine === "none"\n      ? basePlan\n      : { ...basePlan, socialRoutine: event.socialRoutine };\n  return applyRepetitionPolicy(attachDecisionOwnedObligation(compositionalPlan), discourse);\n'''
+          if old_return not in s:
+              raise SystemExit('expected plan return block not found')
+          s = s.replace(old_return, new_return, 1)
+
+          old_instr = '''- Bu turdaki tek ana hareket: ${plan.move}\n- Hedef kişi: ${plan.target || "aktif konuşan/genel sohbet"}\n'''
+          new_instr = '''- Bu turdaki birincil hareket: ${plan.move}\n- Eşzamanlı sosyal rutin: ${plan.socialRoutine && plan.move !== "complete_social_routine" ? `${plan.socialRoutine} (bağlam; bağımsız yükümlülüğü silemez)` : plan.socialRoutine ?? "none"}\n- Hedef kişi: ${plan.target || "aktif konuşan/genel sohbet"}\n'''
+          if old_instr not in s:
+              raise SystemExit('expected instruction block not found')
+          s = s.replace(old_instr, new_instr, 1)
+          p.write_text(s, encoding='utf-8')
+
+          t = Path('src/services/kairaDialogueCompositionalObligationCharacterization.test.ts')
+          ts = t.read_text(encoding='utf-8')
+          insert = '''\n  it('keeps a pure thanks routine as the primary move', () => {\n    const decision = planDialogueResponse(\n      [],\n      'teşekkür ederim',\n      'Tolga',\n      event({ socialRoutine: 'thanks' }),\n    );\n    expect(decision.move).toBe('complete_social_routine');\n    expect(decision.socialRoutine).toBe('thanks');\n  });\n\n  it('keeps a plain typed information request unchanged without a routine', () => {\n    const decision = planDialogueResponse(\n      [],\n      'Mert neden gelmedi?',\n      'Tolga',\n      event({ intent: 'information_request', target: 'third_party' }),\n    );\n    expect(decision.move).toBe('answer_or_clarify');\n    expect(decision.obligation?.type).toBe('answer_or_clarify');\n    expect(decision.socialRoutine).toBeUndefined();\n  });\n'''
+          marker = '\n});\n'
+          if not ts.endswith(marker):
+              raise SystemExit('unexpected characterization test ending')
+          ts = ts[:-len(marker)] + insert + marker
+          t.write_text(ts, encoding='utf-8')
+
+          adr = Path('docs/adr/0058-dialogue-compositional-obligation-preservation.md')
+          adr.write_text('''# ADR-0058 — Dialogue compositional obligation preservation\n\n## Status\nAccepted\n\n## Context\n`SemanticEvent` can carry independent typed facets in the same turn: a social routine, advice request, information request, recall request, repair signal, relational act, and other canonical signals. `DialogueDecision` historically projected these into one primary `move`. A pure social routine branch ran before later substantive obligations, so compound turns such as `thanks + adviceRequested`, `agreement + information_request`, and `thanks + recall_request` collapsed to `complete_social_routine`.\n\nThe failure was reproduced deterministically on current `main` by `kairaDialogueCompositionalObligationCharacterization.test.ts`: all three compound classes lost their substantive obligation while the existing suite remained green.\n\n## Decision\n- Keep one primary `DialogueDecisionPlan.move` for compatibility with existing consumers.\n- A social routine is primary only when no stronger independent typed dialogue obligation owns the turn.\n- Preserve a concurrent canonical `socialRoutine` on the selected substantive plan as typed context.\n- The concurrent routine is **not** a second WHAT authority and does not automatically require a second sentence or a fixed phrase.\n- `answer_or_clarify` continues to own its existing typed fulfillment obligation.\n- No raw-text reparse, phrase-specific classifier, or downstream semantic authority is added.\n- Full weighted/compositional Social Action remains a broader model evolution; this repair only prevents loss of already-canonical concurrent facets.\n\n## Consequences\nCompound semantic turns retain their substantive obligation while preserving social context. Pure routines remain unchanged. Downstream ResponsePlan and realizer consumers continue to see one primary move.\n\n## Verification\nAPI-free deterministic regressions cover:\n- thanks + advice request,\n- agreement + information request,\n- thanks + recall request,\n- pure thanks control,\n- plain information-request control.\n''', encoding='utf-8')
+
+          state = Path('PROJECT_STATE.md')
+          st = state.read_text(encoding='utf-8')
+          note = '''\n\n## 2026-09-06 — Bounded architecture repair: compound dialogue obligations\n- Yeni çalışma disiplini: audit bütün sistemi bitirmeye çalışmaz; current code → product capability → deterministic evidence → verdict sırasıyla ilerler ve ilk kanıtlı sistemik boşlukta durur.\n- Provider/API çağrıları geliştirme, audit, regression, replay ve CI testlerinde kullanılmaz. Gerçek provider yalnız kullanıcının gerçek kullanıcı sohbet testinde çalışır.\n- Current `main` üzerinde ilk sistemik boşluk API-siz deterministik olarak doğrulandı: `DialogueDecision` saf sosyal rutini erken seçerek aynı turdaki bağımsız advice/question/recall yükümlülüğünü silebiliyordu.\n- Onarım ilkesi (ADR-0058): tek birincil move korunur; sosyal rutin yalnız tek bağımsız işlevse ana move olur, aksi halde canonical eşzamanlı bağlam olarak korunur ve substantive obligation'ı silemez.\n- Raw-text reparse, yeni classifier veya ikinci WHAT authority eklenmez.\n'''
+          if '## 2026-09-06 — Bounded architecture repair: compound dialogue obligations' not in st:
+              state.write_text(st.rstrip() + note + '\n', encoding='utf-8')
+
+      - name: Run focused deterministic tests
+        run: npx vitest run src/services/kairaDialogueCompositionalObligationCharacterization.test.ts src/services/kairoDialogueDecisionEngine.test.ts src/services/kairaTurnTakingSocialRoutineContracts.test.ts src/services/kairaDialogueAdviceTopicShiftPriority.test.ts src/services/kairaFinalDeliveryObligationRegression.test.ts
+      - name: Run full tests
+        run: npm test -- --run
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Remove one-time workflow
+        run: rm .github/workflows/one-time-dialogue-compositional-repair.yml
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kairoDialogueDecisionEngine.ts src/services/kairaDialogueCompositionalObligationCharacterization.test.ts docs/adr/0058-dialogue-compositional-obligation-preservation.md PROJECT_STATE.md .github/workflows/one-time-dialogue-compositional-repair.yml
+          git commit -m "fix(kaira): preserve compound dialogue obligations"
+          git push origin HEAD:audit/dialogue-compositional-obligations
