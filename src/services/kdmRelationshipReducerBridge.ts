@@ -68,7 +68,14 @@ export function semanticNegativePattern(interp: SemanticInterpretation): string 
     manipulation: interp.severity.manipulation * harmConfidence,
     privacy: interp.severity.privacy * harmConfidence,
   };
-  const maxSeverity = Math.max(
+  const rawMaxSeverity = Math.max(
+    interp.severity.disrespect,
+    interp.severity.coercion,
+    interp.severity.aggression,
+    interp.severity.manipulation,
+    interp.severity.privacy,
+  );
+  const contextualMaxSeverity = Math.max(
     contextualSeverity.disrespect,
     contextualSeverity.coercion,
     contextualSeverity.aggression,
@@ -78,12 +85,8 @@ export function semanticNegativePattern(interp: SemanticInterpretation): string 
   if (contextualSeverity.privacy >= 0.15 || interp.secondarySocialActs.includes("privacy_violation")) return "mahremiyet_ihlali";
   if (contextualSeverity.manipulation >= 0.15 || interp.secondarySocialActs.includes("manipulation")) return "manipulasyon";
   if (contextualSeverity.coercion >= 0.15 || interp.secondarySocialActs.includes("coercion")) return "zorlama";
-  if (
-    interp.primaryIntent === "insult" ||
-    interp.secondarySocialActs.includes("insult") ||
-    interp.secondarySocialActs.includes("mockery") ||
-    contextualSeverity.disrespect >= 0.15
-  ) return maxSeverity >= 0.75 ? "agir_hakaret" : "hakaret";
+  if (explicitInsultOrMockery) return rawMaxSeverity >= 0.75 ? "agir_hakaret" : "hakaret";
+  if (contextualSeverity.disrespect >= 0.15) return contextualMaxSeverity >= 0.75 ? "agir_hakaret" : "hakaret";
   if (interp.primaryIntent === "rejection") return "kovma_ve_reddetme";
   if (contextualSeverity.aggression >= 0.2) return "agresif_dil";
   return null;
