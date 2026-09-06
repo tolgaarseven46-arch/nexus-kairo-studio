@@ -1,0 +1,77 @@
+name: One-time Turn 25 final runtime wiring
+
+on:
+  push:
+    branches:
+      - fix/turn25-final-runtime-wiring
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: fix/turn25-final-runtime-wiring
+          fetch-depth: 0
+
+      - name: Apply bounded server wiring
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('server.ts')
+          text = path.read_text()
+
+          import_anchor = 'import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";\n'
+          import_insert = import_anchor + 'import { resolveGeneratedReplySemanticVerification } from "./src/services/kairaGeneratedReplySemanticVerification";\n'
+          if text.count(import_anchor) != 1:
+              raise SystemExit(f'import anchor count={text.count(import_anchor)}')
+          text = text.replace(import_anchor, import_insert, 1)
+
+          constraint_anchor = '''    const canonicalConstraint = runKairaResponseConstraintPass({
+          reply,
+          trace: kdm.trace,
+          plan: responsePlan,
+          worldItems: retrievedWorldEvents,
+          worldContext: worldReasoningContext,
+          selfMemoryRuntime,
+          epistemicContext: epistemicAccess,
+'''
+          if text.count(constraint_anchor) != 1:
+              raise SystemExit(f'AI constraint anchor count={text.count(constraint_anchor)}')
+
+          verification = '''    const replySemanticInterpretation = await resolveGeneratedReplySemanticVerification({
+      reply,
+      plan: responsePlan,
+      preferredProvider: provider,
+      generateText,
+    });
+    const claimEvidenceInterpretations = [
+      ...cleanHistory.flatMap((turn) =>
+        turn.semanticInterpretation ? [turn.semanticInterpretation] : [],
+      ),
+      canonicalSemantic.interpretation,
+    ];
+'''
+          text = text.replace(constraint_anchor, verification + constraint_anchor, 1)
+
+          constraint_with_semantics = constraint_anchor + '''          replySemanticInterpretation,
+          claimEvidenceInterpretations,
+'''
+          text = text.replace(constraint_anchor, constraint_with_semantics, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Remove one-time workflow and push patch
+        run: |
+          git rm .github/workflows/one-time-turn25-final-runtime-wiring.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts
+          git commit -m "fix(kaira): wire Turn 25 generated claim verification runtime"
+          git push origin HEAD:fix/turn25-final-runtime-wiring
