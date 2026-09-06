@@ -19,3 +19,5 @@ At the same time, the response-plan authority independently and correctly enforc
 
 ## Verification
 A deterministic replay pins the recorded Turn-5 semantic snapshot and proves coercion=0.40 alone reproduces `zorlama` relationship injury, while the otherwise identical typed turn with coercion=0 remains relationship-neutral. Provider-contract tests pin the corrected ontology. All verification is API-free.
+
+The accepted patch passed focused verification, the full test suite, TypeScript validation, and production build in the one-time gate. This documentation-only follow-up binds normal PR CI and architecture review to a user-authored final head; runtime behavior is unchanged.
