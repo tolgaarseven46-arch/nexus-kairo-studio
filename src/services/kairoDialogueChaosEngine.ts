@@ -1,5 +1,8 @@
 import type { ConversationTurn } from "./kairoConversationGrounding";
 import { effectivelySupportedClaims, type Claim, type DialogueClaim } from "./claimProvenance";
+import { isSemanticInterpretation } from "./semanticInterpretationSchema";
+import { projectSemanticEvent } from "./semanticInterpretationProjection";
+import { projectSemanticEventToDialogueAnalysis } from "./kairaDialogueTurnProjection";
 export type { DialogueClaim } from "./claimProvenance";
 
 export type DialogueAct =
@@ -143,6 +146,20 @@ export function analyzeDialogueTurn(text: string): DialogueTurnAnalysis {
   };
 }
 
+/**
+ * Historical replay authority: if a persisted SemanticInterpretation@2 snapshot
+ * exists, project it deterministically instead of reparsing raw historical text.
+ * Raw analysis remains only as compatibility for genuinely pre-snapshot turns.
+ */
+export function analyzeHistoricalDialogueTurn(turn: ConversationTurn): DialogueTurnAnalysis {
+  if (isSemanticInterpretation(turn.semanticInterpretation)) {
+    return projectSemanticEventToDialogueAnalysis(
+      projectSemanticEvent(turn.semanticInterpretation),
+    );
+  }
+  return analyzeDialogueTurn(String(turn.text || ""));
+}
+
 function participantInText(text: string, participant: string): boolean {
   const normalizedText = text.toLocaleLowerCase("tr-TR");
   const normalizedParticipant = participant.toLocaleLowerCase("tr-TR");
@@ -177,6 +194,7 @@ export function buildDialogueClaimLedger(
     .map((turn) => ({
       speaker: turn.participantName || "Kullanıcı",
       text: String(turn.text || ""),
+      analysis: analyzeHistoricalDialogueTurn(turn),
     }));
   const turns = [...userTurns, { speaker: userName, text: userMessage, analysis: currentAnalysis }];
   const knownPeople = new Set(
@@ -316,7 +334,7 @@ export function buildDialogueBoardInstruction(
     .map((turn) => ({
       speaker: turn.participantName || "Kullanıcı",
       text: String(turn.text || ""),
-      analysis: analyzeDialogueTurn(String(turn.text || "")),
+      analysis: analyzeHistoricalDialogueTurn(turn),
     }));
   const current = {
     speaker: userName,
