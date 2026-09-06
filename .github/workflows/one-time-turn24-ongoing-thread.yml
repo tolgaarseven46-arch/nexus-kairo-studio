@@ -21,20 +21,17 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import re
 
           reducer_path = Path("src/services/discourseStateReducer.ts")
           reducer = reducer_path.read_text()
 
-          old = '''function requestsThreadResumption(event: SemanticEvent): boolean {
+          seam = '''function requestsThreadResumption(event: SemanticEvent): boolean {
             if (event.target === "kaira") return false;
             return Boolean(event.adviceRequested || event.discourseAct === "recall_request");
           }
           '''
-          new = '''function requestsThreadResumption(event: SemanticEvent): boolean {
-            if (event.target === "kaira") return false;
-            return Boolean(event.adviceRequested || event.discourseAct === "recall_request");
-          }
-
+          replacement = seam + '''
           function requestsOngoingFirstPartyResumption(event: SemanticEvent): boolean {
             if (event.target === "kaira") return false;
             return Boolean(
@@ -47,87 +44,67 @@ jobs:
             );
           }
           '''
-          if old not in reducer:
+          if seam not in reducer:
             raise SystemExit("requestsThreadResumption seam not found")
-          reducer = reducer.replace(old, new, 1)
+          reducer = reducer.replace(seam, replacement, 1)
 
-          old = '''  // Existing explicit resumption semantics belong to third-party threads only.
-            // First-party event threads are retained as evidence here, but their generic
-            // topic-equivalence/resumption rule is deliberately a separate work package.
-            const explicitlyResumableThreads = openThreads.filter(
-              (thread) => thread.kind === "third_party_topic",
-            );
-            if (requestsThreadResumption(event) && explicitlyResumableThreads.length > 0) {
-              if (explicitlyResumableThreads.length === 1) {
-                const resumed = explicitlyResumableThreads[0];
-                resumedThreadId = resumed.id;
-                activeThreadId = resumed.id;
-                openThreads = openThreads.map((thread) =>
-                  thread.id === resumed.id ? { ...thread, lastRelevantTurn: turnIndex } : thread,
-                );
-              } else {
-                ambiguousThreadResumption = true;
-              }
-              return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
-            }
-          '''
-          new = '''  const userEventThreads = openThreads.filter(
-              (thread) => thread.kind === "user_event_topic",
-            );
-            if (requestsOngoingFirstPartyResumption(event) && userEventThreads.length > 0) {
-              if (userEventThreads.length === 1) {
-                const resumed = userEventThreads[0];
-                resumedThreadId = resumed.id;
-                activeThreadId = resumed.id;
-                openThreads = openThreads.map((thread) =>
-                  thread.id === resumed.id
-                    ? {
-                        ...thread,
-                        anchorText: appendAnchorEvidence(thread.anchorText, message),
-                        lastRelevantTurn: turnIndex,
-                      }
-                    : thread,
-                );
-              } else {
-                ambiguousThreadResumption = true;
-              }
-              return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
-            }
-
-            const explicitlyResumableThreads = openThreads.filter(
-              (thread) => thread.kind === "third_party_topic",
-            );
-            if (requestsThreadResumption(event) && explicitlyResumableThreads.length > 0) {
-              if (explicitlyResumableThreads.length === 1) {
-                const resumed = explicitlyResumableThreads[0];
-                resumedThreadId = resumed.id;
-                activeThreadId = resumed.id;
-                openThreads = openThreads.map((thread) =>
-                  thread.id === resumed.id ? { ...thread, lastRelevantTurn: turnIndex } : thread,
-                );
-              } else {
-                ambiguousThreadResumption = true;
-              }
-              return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
-            }
-          '''
-          if old not in reducer:
+          pattern = re.compile(
+            r'  // Existing explicit resumption semantics belong to third-party threads only\.\n'
+            r'  // First-party event threads are retained as evidence here, but their generic\n'
+            r'  // topic-equivalence/resumption rule is deliberately a separate work package\.\n'
+            r'(  const explicitlyResumableThreads = openThreads\.filter\(\n'
+            r'    \(thread\) => thread\.kind === "third_party_topic",\n'
+            r'  \);\n'
+            r'  if \(requestsThreadResumption\(event\) && explicitlyResumableThreads\.length > 0\) \{\n'
+            r'    if \(explicitlyResumableThreads\.length === 1\) \{\n'
+            r'      const resumed = explicitlyResumableThreads\[0\];\n'
+            r'      resumedThreadId = resumed\.id;\n'
+            r'      activeThreadId = resumed\.id;\n'
+            r'      openThreads = openThreads\.map\(\(thread\) =>\n'
+            r'        thread\.id === resumed\.id \? \{ \.\.\.thread, lastRelevantTurn: turnIndex \} : thread,\n'
+            r'      \);\n'
+            r'    \} else \{\n'
+            r'      ambiguousThreadResumption = true;\n'
+            r'    \}\n'
+            r'    return \{ openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption \};\n'
+            r'  \}\n')
+          match = pattern.search(reducer)
+          if not match:
             raise SystemExit("thread resumption seam not found")
-          reducer = reducer.replace(old, new, 1)
+          third_party_block = match.group(1)
+          first_party_block = '''  const userEventThreads = openThreads.filter(
+            (thread) => thread.kind === "user_event_topic",
+          );
+          if (requestsOngoingFirstPartyResumption(event) && userEventThreads.length > 0) {
+            if (userEventThreads.length === 1) {
+              const resumed = userEventThreads[0];
+              resumedThreadId = resumed.id;
+              activeThreadId = resumed.id;
+              openThreads = openThreads.map((thread) =>
+                thread.id === resumed.id
+                  ? {
+                      ...thread,
+                      anchorText: appendAnchorEvidence(thread.anchorText, message),
+                      lastRelevantTurn: turnIndex,
+                    }
+                  : thread,
+              );
+            } else {
+              ambiguousThreadResumption = true;
+            }
+            return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+          }
 
-          old = '''      lines.push(
-                `- Kullanıcı daha önce açık bırakılmış bir üçüncü-kişi konusuna geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni olay, kimlik veya kesinlik uydurma.`,
-              );
           '''
-          new = '''      lines.push(
-                thread.kind === "user_event_topic"
-                  ? `- Kullanıcı daha önce açık bırakılmış kendi olay/deneyim konusuna typed continuation evidence ile geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni sebep, olay veya kesinlik uydurma.`
-                  : `- Kullanıcı daha önce açık bırakılmış bir üçüncü-kişi konusuna geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni olay, kimlik veya kesinlik uydurma.`,
-              );
-          '''
-          if old not in reducer:
-            raise SystemExit("observational resumption seam not found")
-          reducer = reducer.replace(old, new, 1)
+          reducer = reducer[:match.start()] + first_party_block + third_party_block + reducer[match.end():]
+
+          old_line = '`- Kullanıcı daha önce açık bırakılmış bir üçüncü-kişi konusuna geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni olay, kimlik veya kesinlik uydurma.`'
+          if old_line not in reducer:
+            raise SystemExit("observational resumption text not found")
+          new_expr = '''thread.kind === "user_event_topic"
+                ? `- Kullanıcı daha önce açık bırakılmış kendi olay/deneyim konusuna typed continuation evidence ile geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni sebep, olay veya kesinlik uydurma.`
+                : `- Kullanıcı daha önce açık bırakılmış bir üçüncü-kişi konusuna geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni olay, kimlik veya kesinlik uydurma.`'''
+          reducer = reducer.replace(old_line, new_expr, 1)
           reducer_path.write_text(reducer)
 
           decision_path = Path("src/services/kairoDialogueDecisionEngine.ts")
