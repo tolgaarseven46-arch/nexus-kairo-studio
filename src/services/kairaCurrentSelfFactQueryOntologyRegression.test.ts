@@ -60,6 +60,6 @@ describe("current Kaira self-state vs autobiographical query ontology", () => {
     expect(capturedSystem).toContain("ilişki durumu");
     expect(capturedSystem).toContain("autobiographical_memory = Kaira'nın geçmişte gerçekten yaşadığı olay/anı");
     expect(capturedSystem).toContain("şu anki ilişki durumunu autobiographical_memory yapma");
-    expect(capturedSystem).toContain("geçmişte yaşanmış bir olayı self_fact yapma");
+    expect(capturedSystem).toContain("Geçmişte yaşanmış bir olayı self_fact yapma");
   });
 });
