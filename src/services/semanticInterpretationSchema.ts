@@ -178,6 +178,9 @@ function normalizeDiscourseFacets(value: unknown): SemanticDiscourseFacets {
     relationalIntensity: clamp01(v.relationalIntensity),
     stopQuestions: asBool(v.stopQuestions),
     stopTalking: asBool(v.stopTalking),
+    signalsAlreadyAnswered: asBool(v.signalsAlreadyAnswered),
+    answerFriction: asBool(v.answerFriction),
+    stateAnswerShape: asBool(v.stateAnswerShape),
   };
 }
 
