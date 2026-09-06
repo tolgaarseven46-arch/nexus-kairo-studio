@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { KairaResponsePlan } from "./kairaResponsePlan";
 
-const resolveServerLanguageUnderstanding = vi.fn();
+const { resolveServerLanguageUnderstanding } = vi.hoisted(() => ({
+  resolveServerLanguageUnderstanding: vi.fn(),
+}));
+
 vi.mock("./serverLanguageUnderstanding", () => ({
   resolveServerLanguageUnderstanding,
 }));
