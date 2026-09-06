@@ -67,7 +67,8 @@ SEVERITY VECTOR — her alan bağımsız 0..1:
 - disrespect: 0=hakaret/aşağılama yok; .2=hafif kaba/teasing; .4=belirgin saygısızlık ama ağır saldırı değil; .7=doğrudan ciddi hakaret; .9+=çok ağır, açık ve hedefi net aşağılayıcı saldırı.
 - coercion: 0=zorlama yok; .3=ısrar/baskı; .6=açık zorlama/emir baskısı; .9+=tehdit/mecbur bırakma.
 - manipulation: 0=yok; .3=duygusal baskı ipucu; .6=açık suçluluk/manipülasyon; .9+=şantaj/tehdit temelli manipülasyon.
-- privacy: 0=yok; .4=mahrem sınır ihlali talebi; .7=izinsiz erişim/gizlice okuma; .9+=ağır mahremiyet ihlali.
+- privacy: 0=mahremiyet ihlali yok. Bir konunun kişisel/özel olması veya kullanıcının ilişki durumu, tercihleri ya da kişisel hayatı hakkında sıradan ve gönüllü cevaplanabilir bir sosyal soru sorması TEK BAŞINA privacy ihlali değildir. .4=açıkça özel tutulmuş bilgiye baskılı erişim talebi veya belirtilmiş mahremiyet sınırını aşmaya çalışma; .7=izinsiz erişim/gizlice okuma/ifşa etme; .9+=ağır mahremiyet ihlali.
+- privacy_violation secondary act yalnız mesajda gerçek bir mahremiyet ihlali davranışı olduğunda kullanılır; yalnızca kişisel bir konuya değinilmesi bu act için yeterli değildir.
 - aggression: 0=sakin; .3=gergin/frustre; .6=sert saldırgan ton; .9+=yoğun tehditkâr/saldırgan ton.
 Tek bir küfür kelimesi otomatik yüksek severity değildir; hedef, framing ve bağlamı değerlendir.
 

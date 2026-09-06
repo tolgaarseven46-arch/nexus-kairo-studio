@@ -1633,3 +1633,10 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 - ADR-0063 narrows the repair: explicit negative valence, injury magnitude, redline and recovery remain unchanged. Only non-negative low-level targeted-harm promotion uses canonical joking/sincerity/uncertainty credibility.
 - Turn 4 privacy ontology and Turn 5 boundary-decline-vs-harm are explicitly not claimed fixed. Development remains API-free.
 
+## 2026-09-06 — Real-user Turn 4 privacy ontology repair
+- Recorded Turn 4 `senin manit falan var mı` was neutral, target=kaira, relationalAct=closeness_bid, but semantic privacyViolation=0.40. The canonical downstream path then correctly (for that input) produced `mahremiyet_ihlali`, negativeEvents +1, conflict/hurt and irritated state.
+- Current-main inspection localized the first broken boundary to the semantic-provider privacy ontology: the prompt described `.4` too broadly as a private-boundary request, allowing ordinary personal social curiosity to be treated as a violation.
+- ADR-0064 narrows the ontology: privacy severity / privacy_violation mean actual invasion evidence, not merely personal subject matter. RelationshipReducer privacy thresholds remain unchanged.
+- Deterministic Turn-4 replay proves privacy=.40 reproduces injury and the same typed turn with privacy=0 stays relationship-neutral. No provider call, raw-text parser or phrase patch is introduced.
+- Separate unresolved scopes remain explicit: Turn 4 current-self-state vs autobiographical-memory routing, and Turn 5 boundary-decline vs relationship harm.
+

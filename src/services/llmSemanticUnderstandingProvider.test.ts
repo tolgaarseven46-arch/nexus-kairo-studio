@@ -86,4 +86,21 @@ describe("llm semantic understanding provider", () => {
     });
     await expect(provider.interpret({ message: "aptal" })).rejects.toThrow(/incomplete\/invalid/i);
   });
+
+  it("defines privacy as violation evidence rather than personal-topic sensitivity", async () => {
+    let capturedSystem = "";
+    const provider = createLlmSemanticUnderstandingProvider({
+      generate: async ({ system }) => {
+        capturedSystem = system;
+        return JSON.stringify(base);
+      },
+    });
+
+    await provider.interpret({ message: "kişisel bir durum hakkında soru" });
+
+    expect(capturedSystem).toContain("kişisel/özel olması");
+    expect(capturedSystem).toContain("TEK BAŞINA privacy ihlali değildir");
+    expect(capturedSystem).toContain("belirtilmiş mahremiyet sınırını aşmaya çalışma");
+    expect(capturedSystem).toContain("privacy_violation secondary act yalnız mesajda gerçek bir mahremiyet ihlali davranışı olduğunda");
+  });
 });
