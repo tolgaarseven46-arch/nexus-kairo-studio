@@ -54,7 +54,7 @@ export interface DiscoursePreviousTurnDependency {
  */
 export interface DiscourseOpenThread {
   id: string;
-  kind: "third_party_topic";
+  kind: "third_party_topic" | "user_event_topic";
   anchorText: string;
   openedAtTurn: number;
   lastRelevantTurn: number;
