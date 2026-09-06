@@ -34,7 +34,8 @@ export type DialogueObligationResolution =
 
 export type DialogueObligationType =
   | "answer_or_clarify"
-  | "grounded_recall";
+  | "grounded_recall"
+  | "respond_to_relational_bid";
 
 export interface DialogueObligation {
   type: DialogueObligationType;
@@ -497,7 +498,11 @@ function applyRepetitionPolicy(
 }
 
 function attachDecisionOwnedObligation(plan: DialogueDecisionPlan): DialogueDecisionPlan {
-  if (plan.move !== "answer_or_clarify" && plan.move !== "grounded_recall") return plan;
+  if (
+    plan.move !== "answer_or_clarify" &&
+    plan.move !== "grounded_recall" &&
+    plan.move !== "respond_to_relational_bid"
+  ) return plan;
   return {
     ...plan,
     obligation: {
@@ -588,9 +593,6 @@ export function findDialogueDecisionIssues(
   );
   const effectiveMaxSentences = style?.maxSentences ?? plan.maxSentences;
   const effectiveMaxWords = style?.maxWords ?? plan.maxWords;
-  if (plan.move === "respond_to_relational_bid" && KAIRA_SHORT_ACK_RE.test(reply.trim())) {
-    issues.push("Relational bid generic acknowledgement ile geçiştirilemez; anlamlı sosyal hareket gerekli");
-  }
   const obligationType = plan.obligation?.type;
   if (
     obligationType &&
