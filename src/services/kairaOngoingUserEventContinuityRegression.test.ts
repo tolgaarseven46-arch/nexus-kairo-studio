@@ -111,4 +111,31 @@ describe("ongoing first-party event continuity", () => {
     const plan = planDialogueResponse([], event.raw, "Mert", event, undefined, discourse);
     expect(plan.move).toBe("invite_emotional_context");
   });
+
+  it("fails closed when typed ongoing evidence could refer to multiple open user-event threads", () => {
+    const event = emotionalEvent("ongoing");
+    const ambiguousState: DiscourseState = {
+      ...baseState,
+      openThreads: [
+        ...baseState.openThreads,
+        {
+          id: "user-event-thread-8",
+          kind: "user_event_topic",
+          anchorText: "dün bileğim de ağrıyordu",
+          openedAtTurn: 8,
+          lastRelevantTurn: 8,
+        },
+      ],
+    };
+
+    const discourse = reduceDiscourseState(ambiguousState, {
+      actor: "user",
+      message: event.raw,
+      event,
+    });
+
+    expect(discourse.resumedThreadId).toBeNull();
+    expect(discourse.activeThreadId).toBeNull();
+    expect(discourse.ambiguousThreadResumption).toBe(true);
+  });
 });
