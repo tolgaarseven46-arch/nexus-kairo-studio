@@ -297,10 +297,20 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     signal.severity.manipulation >= 0.15 ||
     signal.severity.privacy >= 0.15 ||
     signal.severity.aggression >= 0.2;
-  // Canonical severity is the harm authority. A directly Kaira-targeted turn
-  // with real present harm stays negative even if the coarse valence projection
-  // is neutral; ambiguous/third-party harm still does not mutate the dyad.
-  const targetedHarm = signal.targetsKaira && presentSeverityOf(signal.severity) >= 0.15;
+  // Explicit negative valence keeps the existing injury path unchanged. For a
+  // neutral/positive turn, low-level directly-targeted harm must be contextually
+  // credible before it creates a new dyadic injury. Only canonical v2 context
+  // is used; raw text is never reinterpreted here.
+  const contextualHarmConfidence = clamp01(
+    (1 - config.redline.jokingDampen * signal.jokingConfidence * (1 - signal.sincerityConfidence)) *
+      (1 - config.redline.uncertaintyDampen * signal.uncertainty),
+  );
+  const rawPresentSeverity = presentSeverityOf(signal.severity);
+  const contextualPresentSeverity = rawPresentSeverity * contextualHarmConfidence;
+  const targetedHarm =
+    signal.targetsKaira &&
+    (signal.valence === "negative" ? rawPresentSeverity >= 0.15 : contextualPresentSeverity >= 0.15);
+  rationale.push(`harm-context:${contextualHarmConfidence.toFixed(2)}`);
   const rawNegative = negativeEvidence && (signal.valence === "negative" || targetedHarm);
   const targetsKaira = rawNegative && signal.targetsKaira;
   const kind: "positive" | "negative" | "neutral" =

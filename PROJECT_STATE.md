@@ -1627,3 +1627,9 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 - ADR-0062 adds a deterministic final gate to both local and provider user-delivery paths. Rejected candidates remain KNT diagnostics only and are blanked from conversational persistence; the user/state event may still persist.
 - The gate invents no replacement WHAT content and adds no provider/API calls. Development/audit/CI remain API-free; provider use remains reserved for real-user acceptance.
 
+## 2026-09-06 — Real-user replay: contextual targeted-harm promotion
+- After PR #115, Turn 7 proved a neutral/high-joking/uncertain low-level signal could still become durable relationship injury.
+- A broad injury-rescaling attempt was rejected because full regression exposed damage to residual hurt persistence and disengaged→repair recovery; it was not merged.
+- ADR-0063 narrows the repair: explicit negative valence, injury magnitude, redline and recovery remain unchanged. Only non-negative low-level targeted-harm promotion uses canonical joking/sincerity/uncertainty credibility.
+- Turn 4 privacy ontology and Turn 5 boundary-decline-vs-harm are explicitly not claimed fixed. Development remains API-free.
+
