@@ -94,6 +94,13 @@ function opensThirdPartyThread(event: SemanticEvent): boolean {
   );
 }
 
+function opensFirstPartyEventThread(event: SemanticEvent): boolean {
+  if (event.target !== "event") return false;
+  return Boolean(
+    event.worldMemory?.claims.some((claim) => claim.subjectId === "current_user"),
+  );
+}
+
 function requestsThreadResumption(event: SemanticEvent): boolean {
   if (event.target === "kaira") return false;
   return Boolean(event.adviceRequested || event.discourseAct === "recall_request");
@@ -121,13 +128,15 @@ function updateThreadState(
   let resumedThreadId: string | null = null;
   let ambiguousThreadResumption = false;
 
-  // A typed resumption signal must bind to already-open discourse context
-  // before the same compound turn is considered a fresh third-party opening.
-  // Otherwise `target=third_party + adviceRequested=true` creates a duplicate
-  // thread and destroys the very continuity this state is meant to observe.
-  if (requestsThreadResumption(event) && openThreads.length > 0) {
-    if (openThreads.length === 1) {
-      const resumed = openThreads[0];
+  // Existing explicit resumption semantics belong to third-party threads only.
+  // First-party event threads are retained as evidence here, but their generic
+  // topic-equivalence/resumption rule is deliberately a separate work package.
+  const explicitlyResumableThreads = openThreads.filter(
+    (thread) => thread.kind === "third_party_topic",
+  );
+  if (requestsThreadResumption(event) && explicitlyResumableThreads.length > 0) {
+    if (explicitlyResumableThreads.length === 1) {
+      const resumed = explicitlyResumableThreads[0];
       resumedThreadId = resumed.id;
       activeThreadId = resumed.id;
       openThreads = openThreads.map((thread) =>
@@ -139,11 +148,21 @@ function updateThreadState(
     return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
   }
 
-  if (opensThirdPartyThread(event)) {
+  const openingKind: DiscourseOpenThread["kind"] | null = opensThirdPartyThread(event)
+    ? "third_party_topic"
+    : opensFirstPartyEventThread(event)
+      ? "user_event_topic"
+      : null;
+
+  if (openingKind) {
     const active = prev.activeThreadId
       ? openThreads.find((thread) => thread.id === prev.activeThreadId)
       : null;
-    if (active && event.discourseAct !== "topic_shift") {
+    if (
+      active &&
+      active.kind === openingKind &&
+      event.discourseAct !== "topic_shift"
+    ) {
       openThreads = openThreads.map((thread) =>
         thread.id === active.id
           ? {
@@ -158,8 +177,11 @@ function updateThreadState(
     }
 
     const created: DiscourseOpenThread = {
-      id: `third-party-thread-${turnIndex}`,
-      kind: "third_party_topic",
+      id:
+        openingKind === "third_party_topic"
+          ? `third-party-thread-${turnIndex}`
+          : `user-event-thread-${turnIndex}`,
+      kind: openingKind,
       anchorText: message.trim(),
       openedAtTurn: turnIndex,
       lastRelevantTurn: turnIndex,
@@ -169,7 +191,7 @@ function updateThreadState(
     return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
   }
 
-  // With no existing thread, a resumption request has nothing to bind to.
+  // With no matching existing thread, a resumption request has nothing to bind to.
   // Fail closed instead of manufacturing context.
   if (requestsThreadResumption(event)) {
     return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
