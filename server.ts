@@ -103,6 +103,7 @@ import { buildKairaRuntimeIdentityInstruction } from "./src/services/kairaRuntim
 import { resolveKairaAutobiographicalRecallRuntime } from "./src/services/kairaAutobiographicalRecallRuntime";
 import { enforceKairaAutobiographicalResponse } from "./src/services/kairaAutobiographicalResponseGuard";
 import { runKairaResponseConstraintPass } from "./src/services/kairaResponseConstraintPass";
+import { buildKairaFinalDeliveryRejectionError, resolveKairaFinalDelivery } from "./src/services/kairaFinalDeliveryGate";
 import { loadKairaKnowledgeProfileResult } from "./src/services/kairaKnowledgeProfileStore";
 import { evaluateKairaKnowledge, unavailableKairaKnowledgeDecision } from "./src/services/kairaEpistemicGate";
 import {
@@ -879,7 +880,10 @@ app.post("/api/chat", async (req, res) => {
         ...findKairoGroundingIssues(reply, cleanHistory, userMessage),
       ];
       if (localDeliveryIssues.length === 0) {
-      const userFacingReply = await attachActivityPermission(reply);
+      const finalDelivery = resolveKairaFinalDelivery(reply, consistency);
+      const userFacingReply = finalDelivery.accepted
+        ? await attachActivityPermission(reply)
+        : finalDelivery.persistedReply;
       if (kairaPolicy.persistentUserMemory && consistency.accepted) {
         learnLanguageReply(stateUserId, reply);
       }
@@ -915,7 +919,7 @@ app.post("/api/chat", async (req, res) => {
         saveKntTrace({
           userId: stateUserId,
           userMessage,
-          reply: userFacingReply,
+          reply: finalDelivery.candidateReply,
           reasoningTrace: kdm.trace,
           dynamicState: kdm.nextDynamicState,
           timings: {
@@ -1028,6 +1032,9 @@ app.post("/api/chat", async (req, res) => {
           postProcessMs,
           serverTotalMs: Math.round(now() - serverStart),
         };
+      if (!consistency.accepted) {
+        throw buildKairaFinalDeliveryRejectionError(finalDelivery);
+      }
       await sendChatPayload({
         sessionId,
         turnId: savedTurnId,
@@ -1348,7 +1355,10 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
     if (kairaPolicy.persistentUserMemory && consistency.accepted && !providerFailureFallbackUsed) {
       learnLanguageReply(stateUserId, reply);
     }
-    reply = await attachActivityPermission(reply);
+    const finalDelivery = resolveKairaFinalDelivery(reply, consistency);
+    reply = finalDelivery.accepted
+      ? await attachActivityPermission(reply)
+      : finalDelivery.persistedReply;
     const postStart = now();
     const livedMemoryRuntime = await persistWorldEventAndMaybeConsolidateLivedMemory({
       userId,
@@ -1381,7 +1391,7 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
       saveKntTrace({
         userId: stateUserId,
         userMessage,
-        reply,
+        reply: finalDelivery.candidateReply,
         reasoningTrace: kdm.trace,
         dynamicState: kdm.nextDynamicState,
         timings: { memoryMs, kdmMs, aiMs, postProcessMs: 0, serverTotalMs: 0 },
@@ -1488,6 +1498,9 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         postProcessMs,
         serverTotalMs: Math.round(now() - serverStart),
       };
+    if (!consistency.accepted) {
+      throw buildKairaFinalDeliveryRejectionError(finalDelivery);
+    }
     await sendChatPayload({
       sessionId,
       turnId: savedTurnId,

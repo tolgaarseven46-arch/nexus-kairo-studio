@@ -3,15 +3,16 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("final delivery enforcement characterization", () => {
-  it("must reject a failed final consistency result before user delivery", () => {
+  it("gates every user-facing chat payload on final consistency acceptance", () => {
     const source = readFileSync(resolve(process.cwd(), "server.ts"), "utf8");
-    const consistencyIndex = source.lastIndexOf("const consistency =");
-    const sendIndex = source.indexOf("await sendChatPayload({", consistencyIndex);
+    const gateMatches = source.match(/if\s*\(\s*!consistency\.accepted\s*\)\s*\{/gu) ?? [];
+    const sendMatches = source.match(/await sendChatPayload\(\{/gu) ?? [];
+    expect(gateMatches.length).toBe(sendMatches.length);
+    expect(gateMatches.length).toBeGreaterThanOrEqual(2);
+  });
 
-    expect(consistencyIndex).toBeGreaterThan(-1);
-    expect(sendIndex).toBeGreaterThan(consistencyIndex);
-
-    const finalDeliveryWindow = source.slice(consistencyIndex, sendIndex);
-    expect(finalDeliveryWindow).toMatch(/if\s*\(\s*!consistency\.accepted\s*\)/u);
+  it("does not persist a rejected assistant candidate as conversational memory", () => {
+    const gateSource = readFileSync(resolve(process.cwd(), "src/services/kairaFinalDeliveryGate.ts"), "utf8");
+    expect(gateSource).toContain("persistedReply: accepted ? candidateReply : \"\"");
   });
 });
