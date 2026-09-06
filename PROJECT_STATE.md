@@ -1595,3 +1595,10 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 ### Next development rule
 - Identity / Self Model integrity phase is CLOSED. The next product phase must begin with a fresh natural-conversation characterization / measured product-quality target rather than speculative semantic expansion.
 
+## 2026-09-06 — Bounded architecture repair: compound dialogue obligations
+- Yeni çalışma disiplini: audit bütün sistemi bitirmeye çalışmaz; current code → product capability → deterministic evidence → verdict sırasıyla ilerler ve ilk kanıtlı sistemik boşlukta durur.
+- Provider/API çağrıları geliştirme, audit, regression, replay ve CI testlerinde kullanılmaz. Gerçek provider yalnız kullanıcının gerçek kullanıcı sohbet testinde çalışır.
+- Current `main` üzerinde ilk sistemik boşluk API-siz deterministik olarak doğrulandı: `DialogueDecision` saf sosyal rutini erken seçerek aynı turdaki bağımsız advice/question/recall yükümlülüğünü silebiliyordu.
+- Onarım ilkesi (ADR-0058): tek birincil move korunur; sosyal rutin yalnız tek bağımsız işlevse ana move olur, aksi halde canonical eşzamanlı bağlam olarak korunur ve substantive obligation'ı silemez.
+- Raw-text reparse, yeni classifier veya ikinci WHAT authority eklenmez.
+
