@@ -7,15 +7,12 @@
  */
 
 import type { SemanticEvent } from "./semanticEventEngine";
-import type { SemanticInterpretation } from "../types/semanticInterpretation";
+import type { SemanticDiscourseProjection, SemanticInterpretation } from "../types/semanticInterpretation";
 import { projectSemanticEvent } from "./semanticInterpretationProjection";
 import {
   classifyKairaReplyAct,
   classifyUserSocialAct,
   kairaActIsQuestion,
-  userSignalsAlreadyAnswered,
-  userSignalsAnswerFriction,
-  userSignalsStateAnswer,
 } from "./discourseSocialAct";
 import {
   EMPTY_DISCOURSE_STATE,
@@ -38,10 +35,12 @@ const TRACKED_SELF_REPEAT_ACTS = new Set<DiscourseSocialAct>([
   "farewell",
 ]);
 
+type CanonicalDiscourseEvent = SemanticEvent & SemanticDiscourseProjection;
+
 export interface DiscourseUserTurn {
   actor: "user";
   message: string;
-  event: SemanticEvent;
+  event: CanonicalDiscourseEvent;
 }
 export interface DiscourseKairaTurn {
   actor: "kaira";
@@ -207,10 +206,12 @@ function updateThreadState(
  * not on one magic phrase. The per-message semantic label can legitimately be
  * `banter`/`general_chat` while the turn is still an answer to Kaira's question.
  * This is deliberately coarse: it only establishes dependency, never sentiment
- * or relationship meaning.
+ * or relationship meaning. User-text shape signals are canonical ingestion
+ * facets; this reducer never recreates them from raw text.
  */
 function answersPendingQuestion(
   pending: DiscoursePendingQuestion,
+  event: CanonicalDiscourseEvent,
   message: string,
   act: DiscourseSocialAct,
 ): boolean {
@@ -218,7 +219,7 @@ function answersPendingQuestion(
   if (!text) return false;
   if (act === "answer" || act === "agreement_ack" || act === "correction") return true;
 
-  if (pending.kind === "how_are_you") return userSignalsStateAnswer(message);
+  if (pending.kind === "how_are_you") return Boolean(event.stateAnswerShape);
   if (pending.kind === "what_doing") {
     return /^(?:tak[ıi]l|çalış|çal[ıi][şs]|otur|evde|işte|okulda|dışarı|boş|hiçbir|bi\s+şey|bir\s+şey)/iu.test(text);
   }
@@ -256,9 +257,10 @@ export function reduceDiscourseState(
     const isOwnRoutine =
       act === "greeting" || act === "farewell" || act === "thanks";
     const contextualAnswer =
-      kairaPending !== null && answersPendingQuestion(kairaPending, turn.message, act);
-    const answerFriction =
-      userSignalsAlreadyAnswered(turn.message) || userSignalsAnswerFriction(turn.message);
+      kairaPending !== null && answersPendingQuestion(kairaPending, turn.event, turn.message, act);
+    const answerFriction = Boolean(
+      turn.event.signalsAlreadyAnswered || turn.event.answerFriction,
+    );
     const explicitRepair = (turn.event.repairSignal ?? "none") !== "none";
     const explicitDependency =
       answerFriction ||
@@ -368,7 +370,7 @@ export function reduceDiscourseState(
  */
 export function deriveDiscourseState(
   history: Array<{ sender?: string; text?: string; semanticInterpretation?: SemanticInterpretation }>,
-  current?: { message: string; event: SemanticEvent },
+  current?: { message: string; event: CanonicalDiscourseEvent },
 ): DiscourseState {
   let state = EMPTY_DISCOURSE_STATE;
   for (const raw of history) {
