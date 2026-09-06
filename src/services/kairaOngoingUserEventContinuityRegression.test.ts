@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildDiscourseObservationalInstruction, reduceDiscourseState } from "./discourseStateReducer";
+import {
+  buildDiscourseObservationalInstruction,
+  reduceDiscourseState,
+} from "./discourseStateReducer";
 import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
 import type { DiscourseState } from "../types/discourseState";
 import type { SemanticEvent } from "./semanticEventEngine";
@@ -88,7 +91,14 @@ describe("ongoing first-party event continuity", () => {
     expect(discourse.resumedThreadId).toBe("user-event-thread-3");
     expect(discourse.activeThreadId).toBe("user-event-thread-3");
 
-    const plan = planDialogueResponse([], event.raw, "Mert", event, undefined, discourse);
+    const plan = planDialogueResponse(
+      [],
+      event.raw,
+      "Mert",
+      event,
+      undefined,
+      discourse,
+    );
     expect(plan.move).toBe("natural_reaction");
     expect(plan.allowFollowUpQuestion).toBe(false);
     expect(plan.reason).toContain("devam eden");
@@ -108,7 +118,14 @@ describe("ongoing first-party event continuity", () => {
     expect(discourse.resumedThreadId).toBeNull();
     expect(discourse.activeThreadId).toBeNull();
 
-    const plan = planDialogueResponse([], event.raw, "Mert", event, undefined, discourse);
+    const plan = planDialogueResponse(
+      [],
+      event.raw,
+      "Mert",
+      event,
+      undefined,
+      discourse,
+    );
     expect(plan.move).toBe("invite_emotional_context");
   });
 
@@ -138,7 +155,7 @@ describe("ongoing first-party event continuity", () => {
     expect(discourse.activeThreadId).toBeNull();
     expect(discourse.ambiguousThreadResumption).toBe(true);
     expect(buildDiscourseObservationalInstruction(discourse)).toContain(
-    "birden fazla açık kullanıcı-olay konusu",
-  );
+      "birden fazla açık kullanıcı-olay konusu",
+    );
   });
 });
