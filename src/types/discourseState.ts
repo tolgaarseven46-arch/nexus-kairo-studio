@@ -45,7 +45,12 @@ export interface DiscoursePendingQuestion {
 export interface DiscoursePreviousTurnDependency {
   /** What the current user turn is responding to. */
   on: "kaira_question" | "kaira_statement";
-  responseKind: "answer" | "answer_with_friction" | "clarification" | "correction";
+  responseKind:
+    | "answer"
+    | "answer_with_friction"
+    | "follow_up_question"
+    | "clarification"
+    | "correction";
 }
 
 /**
