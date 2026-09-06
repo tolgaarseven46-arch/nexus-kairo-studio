@@ -122,7 +122,11 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
     hard.emojiBudget > 0 && soft.warmthTendency >= 0.4 && !hard.mustAcknowledgeBoundary ? 1 : 0;
 
   let socialMove: KairaSocialMove = "none";
-  if (dialogue.move === "respond_to_relational_bid") {
+  const hasRelationalResponseContext =
+    dialogue.move === "respond_to_relational_bid" ||
+    (dialogue.move === "respond_to_action_request" &&
+      Boolean(dialogue.relationalAct && dialogue.relationalAct !== "none"));
+  if (hasRelationalResponseContext) {
     if (hard.hardDisengage) socialMove = "maintain_boundary";
     else if (hard.mustAcknowledgeBoundary || contract.stance !== "open") socialMove = "set_boundary";
     else if (dialogue.relationalAct === "reconciliation_attempt" && allowReopeningCloseness) socialMove = "accept_repair";

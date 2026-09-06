@@ -23,6 +23,7 @@ export type DialogueMove =
   | "join_banter"
   | "follow_topic_shift"
   | "complete_social_routine"
+  | "respond_to_action_request"
   | "respond_to_relational_bid"
   | "natural_reaction";
 
@@ -35,6 +36,7 @@ export type DialogueObligationResolution =
 export type DialogueObligationType =
   | "answer_or_clarify"
   | "grounded_recall"
+  | "action_request"
   | "respond_to_relational_bid";
 
 export interface DialogueObligation {
@@ -418,6 +420,20 @@ if (event.adviceRequested) {
   };
 }
 
+  if (event.intent === "command") {
+    return {
+      move: "respond_to_action_request",
+      relationalAct: event.relationalAct,
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+      maxSentences: 2,
+      maxWords: 24,
+      hasSupportedTargetClaim: false,
+      reason:
+        "Kullanıcı açıkça bir eylem/görev istiyor. İsteği yerine getir veya açıkça reddet/ertele; secondary relationalAct yalnız bağlamdır ve primary action-request yükümlülüğünü silemez.",
+    };
+  }
+
   if (event.discourseAct === "topic_shift") {
     return {
       move: "follow_topic_shift",
@@ -435,8 +451,7 @@ if (event.adviceRequested) {
       event.relationalAct === "reconciliation_attempt" ||
       event.relationalAct === "repair_probe" ||
       event.relationalAct === "reassurance_seek" ||
-      event.intent === "affection" ||
-      (event.intent === "command" && event.affection > 0));
+      event.intent === "affection");
   if (directRelationalBid) {
     return {
       move: "respond_to_relational_bid",
@@ -522,12 +537,16 @@ function attachDecisionOwnedObligation(plan: DialogueDecisionPlan): DialogueDeci
   if (
     plan.move !== "answer_or_clarify" &&
     plan.move !== "grounded_recall" &&
+    plan.move !== "respond_to_action_request" &&
     plan.move !== "respond_to_relational_bid"
   ) return plan;
   return {
     ...plan,
     obligation: {
-      type: plan.move,
+      type:
+        plan.move === "respond_to_action_request"
+          ? "action_request"
+          : plan.move,
       satisfactionCriteria: {
         forbiddenResponseClasses: ["acknowledgement_only"],
         allowedResolutions: [
