@@ -4,10 +4,11 @@ import { buildCanonicalWorldEvent, type CanonicalWorldEvent } from "./worldEvent
 import { isSemanticInterpretation, normalizeSemanticInterpretation } from "./semanticInterpretationSchema";
 import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";
 import { projectSemanticEvent } from "./semanticInterpretationProjection";
-import type { SemanticInterpretation } from "../types/semanticInterpretation";
+import { recognizeCanonicalDiscourseSignals } from "./semanticDiscourseFacetRecognizer";
+import type { SemanticDiscourseProjection, SemanticInterpretation } from "../types/semanticInterpretation";
 
 export type SemanticRelationshipScope = "kaira_user" | "third_party" | "event" | "unknown";
-export type AppraisalSemanticEvent = SemanticEvent & {
+export type AppraisalSemanticEvent = SemanticEvent & SemanticDiscourseProjection & {
   relationshipScope?: SemanticRelationshipScope;
   semanticUncertainty?: number;
 };
@@ -47,7 +48,7 @@ export interface LanguageUnderstandingOptions {
 
 export function groundSemanticEventForAppraisal(
   message: string,
-  event: SemanticEvent,
+  event: SemanticEvent & SemanticDiscourseProjection,
   entityResolution: EntityResolutionResult,
 ): { event: AppraisalSemanticEvent; worldEvent: CanonicalWorldEvent } {
   const worldEvent = buildCanonicalWorldEvent(message, event, entityResolution);
@@ -173,12 +174,45 @@ function reconcileSelfMemoryQueryOwnership(
   };
 }
 
+/**
+ * A1 authority migration: raw user text is read exactly once at ingestion for
+ * these narrow discourse cues. DiscourseState receives only the typed result.
+ */
+function attachCanonicalDiscourseSignals(
+  message: string,
+  interpretation: SemanticInterpretation,
+): SemanticInterpretation {
+  const signals = recognizeCanonicalDiscourseSignals(message);
+  const cues = Object.entries(signals).filter(([, value]) => value).map(([key]) => key);
+  return {
+    ...interpretation,
+    discourseFacets: {
+      ...interpretation.discourseFacets,
+      ...signals,
+    },
+    ...(cues.length
+      ? {
+          evidence: [
+            ...interpretation.evidence,
+            {
+              source: "reconciled" as const,
+              provider: "canonical_discourse_ingestion",
+              cues,
+              confidence: 1,
+            },
+          ].slice(-8),
+        }
+      : {}),
+  };
+}
+
 function buildResult(
   message: string,
   interpretation: SemanticInterpretation,
   entityResolution: EntityResolutionResult,
   rest: Omit<LanguageUnderstandingResult, "interpretation" | "event" | "entityResolution" | "worldEvent">,
 ): LanguageUnderstandingResult {
+  interpretation = attachCanonicalDiscourseSignals(message, interpretation);
   interpretation = reconcileSemanticTargetWithEntityResolution(interpretation, entityResolution);
   interpretation = reconcileNeutralThirdPartyEventOverread(interpretation);
   interpretation = reconcileSelfMemoryQueryOwnership(interpretation);

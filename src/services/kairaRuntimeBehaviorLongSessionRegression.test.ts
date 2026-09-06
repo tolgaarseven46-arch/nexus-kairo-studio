@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { deriveDiscourseState } from "./discourseStateReducer";
 import { interpretSemanticEvent } from "./semanticEventEngine";
 import { interpretationFromLegacyEvent } from "./semanticInterpretationLegacyProjection";
+import { recognizeCanonicalDiscourseSignals } from "./semanticDiscourseFacetRecognizer";
 import { findKairaResponsePlanIssues, type KairaResponsePlan } from "./kairaResponsePlan";
 import type { ConversationTurn } from "./kairoConversationGrounding";
 
@@ -22,9 +23,25 @@ const noQuestionPlan: KairaResponsePlan = {
   reasons: ["long-session-regression"],
 };
 
+const canonicalEvent = (message: string) => ({
+  ...interpretSemanticEvent(message),
+  ...recognizeCanonicalDiscourseSignals(message),
+});
+
+function canonicalInterpretation(message: string) {
+  const base = interpretationFromLegacyEvent(interpretSemanticEvent(message), message);
+  return {
+    ...base,
+    discourseFacets: {
+      ...base.discourseFacets,
+      ...recognizeCanonicalDiscourseSignals(message),
+    },
+  };
+}
+
 function ingestionHistory(history: Array<{ sender: string; text: string }>): ConversationTurn[] {
   return history.map((turn) => turn.sender === "user"
-    ? ({ ...turn, sender: "user", semanticInterpretation: interpretationFromLegacyEvent(interpretSemanticEvent(turn.text), turn.text) } as ConversationTurn)
+    ? ({ ...turn, sender: "user", semanticInterpretation: canonicalInterpretation(turn.text) } as ConversationTurn)
     : ({ ...turn, sender: "droit" } as ConversationTurn));
 }
 
@@ -54,7 +71,7 @@ describe("Kaira runtime behavior long-session regression", () => {
     const current = "iyi dedim ya amk";
     const withCurrent = deriveDiscourseState(
       [...ingestionHistory(history), { sender: "droit", text: "sen nasılsın peki" } as ConversationTurn],
-      { message: current, event: interpretSemanticEvent(current) },
+      { message: current, event: canonicalEvent(current) },
     );
     expect(withCurrent.previousTurnDependency?.on).toBe("kaira_question");
     expect(withCurrent.previousTurnDependency?.responseKind).toBe("answer_with_friction");
@@ -89,7 +106,7 @@ describe("Kaira runtime behavior long-session regression", () => {
       { sender: "user", text: "naber" },
       { sender: "droit", text: "iyiyim, sen nasılsın" },
     ];
-    const state = deriveDiscourseState(ingestionHistory(history), { message, event: interpretSemanticEvent(message) });
+    const state = deriveDiscourseState(ingestionHistory(history), { message, event: canonicalEvent(message) });
     expect(state.previousTurnDependency?.on).toBe("kaira_question");
     expect(["answer", "answer_with_friction", "correction"]).toContain(
       state.previousTurnDependency?.responseKind,
@@ -106,7 +123,7 @@ describe("Kaira runtime behavior long-session regression", () => {
       { sender: "user", text: "naber" },
       { sender: "droit", text: "iyiyim, sen nasılsın" },
     ];
-    const state = deriveDiscourseState(ingestionHistory(history), { message, event: interpretSemanticEvent(message) });
+    const state = deriveDiscourseState(ingestionHistory(history), { message, event: canonicalEvent(message) });
     expect(state.previousTurnDependency).toMatchObject({
       on: "kaira_question",
       responseKind: "answer_with_friction",
