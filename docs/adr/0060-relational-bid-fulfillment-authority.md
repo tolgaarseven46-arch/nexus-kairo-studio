@@ -21,4 +21,4 @@ An API-free characterization on current `main` reproduced the boundary inconsist
 The same user-visible behavior is preserved while the architecture becomes compositional: answer, recall, and relational-bid fulfillment requirements are declared upstream and consumed generically downstream. New substantive moves can extend the typed contract without adding validator-local semantic branches.
 
 ## Verification
-API-free deterministic coverage includes the original characterization, a dedicated regression, existing DialogueDecision tests, full Vitest suite, TypeScript, architecture contracts, docs guard and production build.
+The pre-repair characterization failed exactly two assertions while 1889 existing tests passed, proving the ownership gap without a broad regression. The repair workflow then passed focused deterministic tests, the full Vitest suite, TypeScript and production build. Final PR CI is required to repeat repository governance, architecture and build gates on the committed head.
