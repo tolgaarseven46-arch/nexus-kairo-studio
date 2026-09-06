@@ -5,7 +5,7 @@
  * CANONICAL_PROMPT_BUILDER on).
  *
  * This replays the real stage sequence the server uses:
- *   interpretSemanticEvent -> deriveDiscourseState -> planDialogueResponse
+ *   canonical semantic event -> deriveDiscourseState -> planDialogueResponse
  *   -> analyzeKdmInteraction -> buildBehaviorContract -> computeKairoSpeechIdentity
  *   -> buildKairaResponsePlan -> tryLocalKairoReply (renderer selection)
  *
@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 import { interpretSemanticEvent } from "./semanticEventEngine";
 import { interpretationFromLegacyEvent } from "./semanticInterpretationLegacyProjection";
+import { recognizeCanonicalDiscourseSignals } from "./semanticDiscourseFacetRecognizer";
 import { deriveDiscourseState } from "./discourseStateReducer";
 import {
   buildDiscourseObservationalInstruction,
@@ -44,6 +45,22 @@ interface TurnTrace {
   localIntent?: string;
 }
 
+function canonicalEvent(message: string) {
+  return { ...interpretSemanticEvent(message), ...recognizeCanonicalDiscourseSignals(message) };
+}
+
+function canonicalInterpretation(message: string) {
+  const baseEvent = interpretSemanticEvent(message);
+  const base = interpretationFromLegacyEvent(baseEvent, message);
+  return {
+    ...base,
+    discourseFacets: {
+      ...base.discourseFacets,
+      ...recognizeCanonicalDiscourseSignals(message),
+    },
+  };
+}
+
 function stubLlmReply(move: string): string {
   switch (move) {
     case "follow_previous_answer":
@@ -65,7 +82,7 @@ function runConversation(messages: string[]): TurnTrace[] {
   const traces: TurnTrace[] = [];
 
   for (const msg of messages) {
-    const event = interpretSemanticEvent(msg);
+    const event = canonicalEvent(msg);
     const discourse = deriveDiscourseState(history, { message: msg, event });
     const dialogue = planDialogueResponse(history, msg, "Mert", event, undefined, discourse);
     const kdm = analyzeKdmInteraction(msg, DEFAULT_PERSONALITY_TRAITS, state, event);
@@ -105,21 +122,21 @@ function runConversation(messages: string[]): TurnTrace[] {
       localIntent: local.intent,
     });
 
-    history.push({ sender: "user", text: msg, participantName: "Mert", semanticInterpretation: interpretationFromLegacyEvent(event, msg) } as ConversationTurn);
+    history.push({ sender: "user", text: msg, participantName: "Mert", semanticInterpretation: canonicalInterpretation(msg) } as ConversationTurn);
     history.push({ sender: "droit", text: reply, participantName: "Kaira" } as ConversationTurn);
   }
   return traces;
 }
 
 const CONVERSATION = [
-  "naber", // 1
-  "naber", // 2
-  "iyi be kanka nasıl olsun", // 3
-  "iyi dedim ya", // 4
-  "merhaba kanka", // 5
-  "selam", // 6
-  "ee başka bişey konuşmayacakmıydık", // 7
-  "sen sürekli merhaba diyorsun", // 8
+  "naber",
+  "naber",
+  "iyi be kanka nasıl olsun",
+  "iyi dedim ya",
+  "merhaba kanka",
+  "selam",
+  "ee başka bişey konuşmayacakmıydık",
+  "sen sürekli merhaba diyorsun",
 ];
 
 describe("first real 8-turn conversation — architectural behavior chain", () => {
@@ -132,14 +149,12 @@ describe("first real 8-turn conversation — architectural behavior chain", () =
 
   it("turn 2 'naber' again -> how_are_you routine is saturated -> NOT a blind local re-render", () => {
     expect(t[1].routineHowAreYou).toBeGreaterThanOrEqual(2);
-    expect(t[1].route).toBe("llm"); // saturated routine -> main pipeline
+    expect(t[1].route).toBe("llm");
     expect(t[1].discourseInstruction).toMatch(/nasılsın/i);
   });
 
   it("turn 3 'iyi be kanka nasıl olsun' -> Kaira does not get to re-ask 'sen nasılsın'", () => {
-    expect(t[2].routineHowAreYou).toBeGreaterThanOrEqual(2); // still saturated
-    // either the plan forbids a follow-up question, or the discourse block tells
-    // the realizer the routine is done — at minimum it is NOT a fresh local re-ask
+    expect(t[2].routineHowAreYou).toBeGreaterThanOrEqual(2);
     expect(t[2].route).toBe("llm");
     expect(t[2].discourseInstruction).toMatch(/zaten yapıldı|tekrar/i);
   });
@@ -148,7 +163,6 @@ describe("first real 8-turn conversation — architectural behavior chain", () =
     expect(t[3].dependency).toMatch(/answer_with_friction$/);
     expect(t[3].move).toBe("follow_previous_answer");
     expect(t[3].route).toBe("llm");
-    // the rendered/stub reply is not a bare greeting
     expect(t[3].reply.toLowerCase()).not.toMatch(/^\s*(merhaba|selam)\b/);
   });
 
@@ -174,7 +188,6 @@ describe("first real 8-turn conversation — architectural behavior chain", () =
 
   it("turn 8 'sen sürekli merhaba diyorsun' -> conversation-aware, not a blind YDM ack", () => {
     expect(t[7].route).toBe("llm");
-    // the discourse block is available so the realizer can acknowledge / correct
     expect(t[7].discourseInstruction).toContain("DISCOURSE DURUMU");
   });
 
@@ -184,10 +197,8 @@ describe("first real 8-turn conversation — architectural behavior chain", () =
   });
 
   it("greeting/how_are_you routines are only rendered locally on their FIRST occurrence", () => {
-    // turn 1 how_are_you -> local; turn 2 (repeat) -> not local
     expect(t[0].route).toBe("local");
     expect(t[1].route).toBe("llm");
-    // turn 5 first greeting -> local; turn 6 (repeat) -> not local
     expect(t[4].route).toBe("local");
     expect(t[5].route).toBe("llm");
   });
