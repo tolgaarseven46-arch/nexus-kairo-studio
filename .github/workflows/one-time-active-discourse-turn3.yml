@@ -1,0 +1,67 @@
+name: One-time Active Discourse Turn 3 repair
+
+on:
+  push:
+    branches:
+      - fix/active-discourse-turn3-same-turn-grounding
+    paths:
+      - .github/workflows/one-time-active-discourse-turn3.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/active-discourse-turn3-same-turn-grounding
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Apply bounded planner repair
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('src/services/kairoDialogueDecisionEngine.ts')
+          text = path.read_text(encoding='utf-8')
+          needle = '''  if (isFirstEmotionalOpening(history, event) && !event.adviceRequested) {
+            return {
+              move: "invite_emotional_context",
+'''
+          replacement = '''  if (
+            isFirstEmotionalOpening(history, event) &&
+            !event.adviceRequested &&
+            (event.worldMemory?.claims.length ?? 0) > 0
+          ) {
+            return {
+              move: "natural_reaction",
+              allowFollowUpQuestion: false,
+              allowSpeculation: false,
+              maxSentences: 1,
+              maxWords: 10,
+              hasSupportedTargetClaim: false,
+              reason:
+                "İlk duygusal açılış canonical mevcut tur içinde zaten grounded olay içeriği taşıyor. Eksik bağlam varmış gibi yeniden neden/ne oldu sorma; yalnız verilen olaya kısa doğal tepki ver.",
+            };
+          }
+          if (isFirstEmotionalOpening(history, event) && !event.adviceRequested) {
+            return {
+              move: "invite_emotional_context",
+'''
+          if needle not in text:
+            raise SystemExit('expected planner seam not found')
+          path.write_text(text.replace(needle, replacement, 1), encoding='utf-8')
+      - name: Verify targeted regression
+        run: npx vitest run src/services/kairaActiveDiscourseSameTurnGrounding.test.ts src/services/kairoDialogueDecisionEngine.test.ts
+      - name: Commit bounded repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kairoDialogueDecisionEngine.ts
+          git commit -m "fix(kaira): consume same-turn grounding before curiosity"
+          git push origin HEAD:fix/active-discourse-turn3-same-turn-grounding
