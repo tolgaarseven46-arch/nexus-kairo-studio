@@ -1,0 +1,42 @@
+name: One-time contextual relationship harm repair v4
+
+on:
+  push:
+    branches:
+      - fix/relationship-contextual-harm-confidence
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: fix/relationship-contextual-harm-confidence
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+      - run: npm install --ignore-scripts
+      - name: Apply patch
+        run: python scripts/applyContextualHarmRepair.py
+      - name: Focused API-free verification
+        run: npx vitest run src/services/kairaRelationshipContextualHarmCharacterization.test.ts src/services/kairaRelationshipContextualHarmRegression.test.ts src/services/kairaRelationshipQualitativeReactionCharacterization.test.ts src/services/relationshipReducerGoldenSession.test.ts
+      - name: Full tests
+        run: npm test -- --run
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
+      - name: Remove one-time assets
+        run: rm .github/workflows/one-time-contextual-harm-repair-v4.yml scripts/applyContextualHarmRepair.py
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(kaira): gate low-confidence targeted relationship harm"
+          git push origin HEAD:fix/relationship-contextual-harm-confidence
