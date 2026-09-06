@@ -131,6 +131,7 @@ function runOrderedPass(
   const autobiographicalGuard = enforceKairaAutobiographicalResponse(
     worldGuard.reply,
     input.selfMemoryRuntime,
+    { priorGrounding: worldGuard.provenance },
   );
   const epistemicGuard = enforceKairaEpistemicResponse(
     autobiographicalGuard.reply,
@@ -202,6 +203,10 @@ function runOrderedPass(
  * Order is fixed and explicit:
  *   world truth -> autobiographical truth -> epistemic truth -> ResponsePlan
  *   -> generated claim provenance -> mechanical enforcement -> externally-owned checks.
+ *
+ * Guard composition is provenance-aware: a generic self-memory no-evidence
+ * fallback cannot erase a response already grounded and validated by the world
+ * authority. Resolved self facts/memories remain independently authoritative.
  *
  * This boundary never writes a generic social reply. A caller-supplied legacy
  * dialogue fallback can be tried only if it independently passes the exact same

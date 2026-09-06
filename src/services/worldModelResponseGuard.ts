@@ -2,6 +2,7 @@ import type { RetrievedWorldEvent } from "./worldEventRetrieval";
 import type { WorldStateAppraisal } from "./worldStateAppraisal";
 import type { WorldReasoningPolicy } from "./worldReasoningPolicy";
 import type { SemanticWorldMemoryQuery } from "../types/semanticInterpretation";
+import type { KairaResponseGroundingProvenance } from "./kairaResponseGuardProvenance";
 
 export interface WorldModelResponseIssue {
   code:
@@ -17,6 +18,7 @@ export interface WorldModelResponseGuardResult {
   reply: string;
   changed: boolean;
   issues: WorldModelResponseIssue[];
+  provenance: KairaResponseGroundingProvenance;
   reason?: string;
 }
 
@@ -164,20 +166,59 @@ export function buildWorldModelRecallFallback(
   return `Bunu hatırlıyorum: “${raw}”.`;
 }
 
+function responseProvenance(
+  reply: string,
+  items: RetrievedWorldEvent[],
+  context: WorldModelReasoningContext,
+): KairaResponseGroundingProvenance {
+  const groundedBasis =
+    context.policy.mayAnswerFromMemory &&
+    context.appraisal.groundedEvidenceCount > 0 &&
+    grounded(items).length > 0;
+  const boundarySatisfied = findWorldModelResponseIssues(reply, items, context).length === 0;
+  return {
+    source: "world_memory",
+    grounded: groundedBasis,
+    protected: groundedBasis && boundarySatisfied,
+    ...(groundedBasis
+      ? {
+          reason: boundarySatisfied
+            ? "grounded_world_response_satisfied"
+            : "grounded_world_response_unsatisfied",
+        }
+      : {}),
+  };
+}
+
 export function enforceWorldModelRecallResponse(
   reply: string,
   items: RetrievedWorldEvent[],
   context: WorldModelReasoningContext,
 ): WorldModelResponseGuardResult {
   const issues = findWorldModelResponseIssues(reply, items, context);
-  if (!issues.length) return { reply, changed: false, issues: [] };
+  if (!issues.length) {
+    return {
+      reply,
+      changed: false,
+      issues: [],
+      provenance: responseProvenance(reply, items, context),
+    };
+  }
 
   const fallback = buildWorldModelRecallFallback(items, context);
-  if (!fallback) return { reply, changed: false, issues };
+  if (!fallback) {
+    return {
+      reply,
+      changed: false,
+      issues,
+      provenance: responseProvenance(reply, items, context),
+    };
+  }
   return {
     reply: fallback,
     changed: true,
     issues,
+    provenance: responseProvenance(fallback, items, context),
     reason: "world_reasoning_policy_guard",
   };
 }

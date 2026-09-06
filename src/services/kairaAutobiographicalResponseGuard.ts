@@ -1,9 +1,14 @@
 import type { KairaAutobiographicalRecallRuntimeResult } from "./kairaAutobiographicalRecallRuntime";
+import type { KairaResponseGroundingProvenance } from "./kairaResponseGuardProvenance";
 
 export interface KairaAutobiographicalResponseGuardResult {
   reply: string;
   changed: boolean;
   reason?: string;
+}
+
+export interface KairaAutobiographicalResponseGuardOptions {
+  priorGrounding?: KairaResponseGroundingProvenance | null;
 }
 
 function hasResolvedEvidence(runtime: KairaAutobiographicalRecallRuntimeResult): boolean {
@@ -193,6 +198,7 @@ function enforceResolvedAutobiographicalMemoryAnchor(
 export function enforceKairaAutobiographicalResponse(
   reply: string,
   runtime: KairaAutobiographicalRecallRuntimeResult,
+  options: KairaAutobiographicalResponseGuardOptions = {},
 ): KairaAutobiographicalResponseGuardResult {
   if (runtime.status === "not_requested" || runtime.status === "low_confidence") {
     return { reply, changed: false };
@@ -206,6 +212,18 @@ export function enforceKairaAutobiographicalResponse(
 
   if (hasResolvedEvidence(runtime)) {
     return { reply, changed: false };
+  }
+
+  // Guard-composition rule (A3): absence of self/autobiographical evidence is
+  // not permission to erase an independently grounded world-memory answer.
+  // This suppression applies only to the generic no-evidence fallback path;
+  // resolved self facts/memories above retain their own authority.
+  if (options.priorGrounding?.source === "world_memory" && options.priorGrounding.protected) {
+    return {
+      reply,
+      changed: false,
+      reason: "self_memory_fallback_suppressed_by_world_grounding",
+    };
   }
 
   const scope = runtime.recall?.query.scope;
