@@ -1652,3 +1652,9 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 - The remaining gap was the semantic-provider contract: `selfMemoryQuery.scope` listed both scopes without defining present/mutable self state versus historical lived episodes.
 - ADR-0066 binds provider semantics to the existing ontology. Current relationship status and other present self facts use `self_fact`; past lived episodes use `autobiographical_memory`; `any` is only genuine unresolved scope.
 - No new memory store, downstream raw-text parser, RelationshipReducer rule, provider call or second semantic authority is introduced. Development and CI remain API-free.
+
+
+## 2026-09-06 — Real-user Turn 24 ongoing first-party event continuity
+- Turns 3–6 establish the user sunburn/back-pain event and cause with canonical `current_user` claims; Turn 24 carries `back_discomfort = ongoing`, yet the old flow can ask the cause again and Turn 26 corrects Kaira.
+- First-party event resumption is now narrow: only typed `current_user` claim value `ongoing` + exactly one open `user_event_topic`. Multiple candidates fail closed; subject identity alone never links unrelated events.
+- DialogueDecision treats the resumed emotional turn as `natural_reaction` with questions closed. No `hala` regex, raw-text topic matcher, provider call, semantic reparse, memory-store change or RelationshipReducer change.

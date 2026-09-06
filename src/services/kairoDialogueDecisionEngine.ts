@@ -379,27 +379,31 @@ function planDialogueResponseBase(
         : "Sorulan kişi için etkin kayıt yok; reddedilmiş iddiayı canlandırmadan bilinmediğini söyle.",
     };
   }
-  if (
-    isFirstEmotionalOpening(history, event) &&
-    !event.adviceRequested &&
-    event.target === "event" &&
-    Boolean(
-      event.worldMemory?.claims.some(
-        (claim) => claim.subjectId === "current_user",
-      ),
-    )
-  ) {
-    return {
-      move: "natural_reaction",
-      allowFollowUpQuestion: false,
-      allowSpeculation: false,
-      maxSentences: 1,
-      maxWords: 10,
-      hasSupportedTargetClaim: false,
-      reason:
-        "İlk duygusal açılış canonical mevcut tur içinde zaten grounded olay içeriği taşıyor. Eksik bağlam varmış gibi yeniden neden/ne oldu sorma; yalnız verilen olaya kısa doğal tepki ver.",
-    };
-  }
+  const resumedUserEventThread = Boolean(
+  discourse?.resumedThreadId &&
+    discourse.openThreads.some((thread) =>
+      thread.id === discourse.resumedThreadId && thread.kind === "user_event_topic",
+    ),
+);
+if (
+  isFirstEmotionalOpening(history, event) &&
+  !event.adviceRequested &&
+  (resumedUserEventThread ||
+    (event.target === "event" &&
+      Boolean(event.worldMemory?.claims.some((claim) => claim.subjectId === "current_user"))))
+) {
+  return {
+    move: "natural_reaction",
+    allowFollowUpQuestion: false,
+    allowSpeculation: false,
+    maxSentences: 1,
+    maxWords: 10,
+    hasSupportedTargetClaim: false,
+    reason: resumedUserEventThread
+      ? "Kullanıcı canonical ongoing evidence ile daha önce açık kalan kendi olayına devam ediyor. Önceki event evidence zaten mevcut; eksik bağlam varmış gibi nedeni/ne olduğunu yeniden sorma, yalnız devam eden duruma kısa doğal tepki ver."
+      : "İlk duygusal açılış canonical mevcut tur içinde zaten grounded olay içeriği taşıyor. Eksik bağlam varmış gibi yeniden neden/ne oldu sorma; yalnız verilen olaya kısa doğal tepki ver.",
+  };
+}
   if (isFirstEmotionalOpening(history, event) && !event.adviceRequested) {
     return {
       move: "invite_emotional_context",
