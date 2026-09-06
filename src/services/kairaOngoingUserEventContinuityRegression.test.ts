@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reduceDiscourseState } from "./discourseStateReducer";
+import { buildDiscourseObservationalInstruction, reduceDiscourseState } from "./discourseStateReducer";
 import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
 import type { DiscourseState } from "../types/discourseState";
 import type { SemanticEvent } from "./semanticEventEngine";
@@ -137,5 +137,8 @@ describe("ongoing first-party event continuity", () => {
     expect(discourse.resumedThreadId).toBeNull();
     expect(discourse.activeThreadId).toBeNull();
     expect(discourse.ambiguousThreadResumption).toBe(true);
+    expect(buildDiscourseObservationalInstruction(discourse)).toContain(
+    "birden fazla açık kullanıcı-olay konusu",
+  );
   });
 });

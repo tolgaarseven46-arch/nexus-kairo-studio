@@ -494,10 +494,22 @@ export function buildDiscourseObservationalInstruction(state: DiscourseState): s
     );
     }
   } else if (state.ambiguousThreadResumption) {
-    lines.push(
-      `- Kullanıcının dönüş yapabileceği birden fazla açık konuşma konusu var. Hangisini kastettiğini UYDURMA; gerekiyorsa kısa netleştirme iste.`,
-    );
-  }
+  const thirdPartyCandidates = state.openThreads.filter(
+    (thread) => thread.kind === "third_party_topic",
+  ).length;
+  const userEventCandidates = state.openThreads.filter(
+    (thread) => thread.kind === "user_event_topic",
+  ).length;
+  const ambiguityLabel =
+    thirdPartyCandidates > 1 && userEventCandidates <= 1
+      ? "birden fazla açık üçüncü-kişi konusu"
+      : userEventCandidates > 1 && thirdPartyCandidates <= 1
+        ? "birden fazla açık kullanıcı-olay konusu"
+        : "birden fazla açık konuşma konusu";
+  lines.push(
+    `- Kullanıcının dönüş yapabileceği ${ambiguityLabel} var. Hangisini kastettiğini UYDURMA; gerekiyorsa kısa netleştirme iste.`,
+  );
+}
   if (state.selfRepeat) {
     lines.push(
       `- Kaira son turlarda "${state.selfRepeat.act}" sosyal işini ${state.selfRepeat.count} kez tekrarladı. Kullanıcı bunu fark ederse kabul et / kısa özür / düzelt; kör "anladım/tamam" ile geçiştirme.`,
