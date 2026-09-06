@@ -15,19 +15,20 @@ This is the Turn 25 failure mode from the 27-turn real-user test: an invented cl
 
 In the AI chat runtime, after generation/repair/fallback selection and before `runKairaResponseConstraintPass(...)`:
 
-1. Call `resolveGeneratedReplySemanticVerification(...)` with the final generated candidate, the canonical response plan, the selected provider, and the existing semantic-generation bridge.
+1. Call `resolveGeneratedReplySemanticVerification(...)` with the final model-generated candidate, the canonical response plan, the selected provider, and the existing semantic-generation bridge.
 2. Pass the returned `SemanticInterpretation@2` as `replySemanticInterpretation` to the final constraint pass.
 3. Pass canonical claim evidence from:
    - current turn: `canonicalSemantic.interpretation`;
-   - historical user turns that already carry persisted `semanticInterpretation` snapshots.
+   - historical turns that already carry persisted `semanticInterpretation` snapshots.
 4. Do not reparse historical raw text.
 5. Do not add reply regexes, keyword matchers, attribute-prefix heuristics, or a second semantic authority.
-6. Deterministic dialogue-owned fallback text remains outside generated-claim verification; the existing final-pass original-candidate boundary already enforces this.
+6. If the original model provider failed and the runtime selected its deterministic dialogue fallback, do not call the failed provider again merely to verify that fallback. The existing dialogue/final-delivery guards remain authoritative for that recovery path.
+7. The final constraint pass continues to apply generated-claim provenance only to its original candidate; its internal dialogue-owned fallback does not inherit the rejected candidate's semantic interpretation.
 
 ## Scope and cost boundary
 
-Generated-reply semantic verification runs only when the response plan contains `engage_user_content`. Other turns incur no additional semantic provider call.
+Generated-reply semantic verification runs only when the response plan contains `engage_user_content`, and only when the reply still comes from a functioning semantic provider path. Other turns incur no additional semantic provider call.
 
 ## Regression invariant
 
-`server.ts` must route AI-generated candidates through `resolveGeneratedReplySemanticVerification(...)` before canonical final delivery and must supply both generated reply semantics and canonical current/history evidence to `runKairaResponseConstraintPass(...)`.
+`server.ts` must route eligible AI-generated candidates through `resolveGeneratedReplySemanticVerification(...)` before canonical final delivery and must supply both generated reply semantics and canonical current/history evidence to `runKairaResponseConstraintPass(...)`.
