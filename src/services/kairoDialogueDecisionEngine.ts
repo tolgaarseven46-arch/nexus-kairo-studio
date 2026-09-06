@@ -361,7 +361,12 @@ function planDialogueResponseBase(
   if (
     isFirstEmotionalOpening(history, event) &&
     !event.adviceRequested &&
-    (event.worldMemory?.claims.length ?? 0) > 0
+    event.target === "event" &&
+    Boolean(
+      event.worldMemory?.claims.some(
+        (claim) => claim.subjectId === "current_user",
+      ),
+    )
   ) {
     return {
       move: "natural_reaction",
