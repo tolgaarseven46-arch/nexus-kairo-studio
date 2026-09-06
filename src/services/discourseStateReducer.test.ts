@@ -7,11 +7,26 @@
 import { describe, expect, it } from "vitest";
 import { interpretSemanticEvent } from "./semanticEventEngine";
 import { interpretationFromLegacyEvent } from "./semanticInterpretationLegacyProjection";
+import { recognizeCanonicalDiscourseSignals } from "./semanticDiscourseFacetRecognizer";
 import { deriveDiscourseState, reduceDiscourseState } from "./discourseStateReducer";
 import { EMPTY_DISCOURSE_STATE } from "../types/discourseState";
 
+const canonicalEvent = (message: string) => ({
+  ...interpretSemanticEvent(message),
+  ...recognizeCanonicalDiscourseSignals(message),
+});
+const canonicalInterpretation = (message: string) => {
+  const base = interpretationFromLegacyEvent(interpretSemanticEvent(message), message);
+  return {
+    ...base,
+    discourseFacets: {
+      ...base.discourseFacets,
+      ...recognizeCanonicalDiscourseSignals(message),
+    },
+  };
+};
 const u = (message: string) =>
-  ({ actor: "user" as const, message, event: interpretSemanticEvent(message) });
+  ({ actor: "user" as const, message, event: canonicalEvent(message) });
 const k = (reply: string) => ({ actor: "kaira" as const, reply });
 
 function fold(...turns: Array<ReturnType<typeof u> | ReturnType<typeof k>>) {
@@ -34,7 +49,7 @@ describe("routine saturation", () => {
       k("takılıyorum"),
       u("iyi be"),
       k("he anladım"),
-      u("selam"), // a fresh greeting many turns later
+      u("selam"),
     );
     expect(s.routines.greeting.count).toBe(1);
   });
@@ -66,7 +81,7 @@ describe("previous-turn dependency", () => {
   it("closes a pending how-are-you question without swallowing substantive mixed-turn content", () => {
     const asked = fold(u("naber"), k("iyi valla sen nasılsın"));
     const message = "iyi ben de kahveyi döktüm masaya az önce";
-    const base = interpretSemanticEvent(message);
+    const base = canonicalEvent(message);
     const mixed = reduceDiscourseState(asked, {
       actor: "user",
       message,
@@ -122,10 +137,10 @@ describe("Kaira self-repetition", () => {
 describe("deriveDiscourseState folds history + current turn", () => {
   it("replays the request history and the current user message with no persistence", () => {
     const history = [
-      { sender: "user", text: "naber", semanticInterpretation: interpretationFromLegacyEvent(interpretSemanticEvent("naber"), "naber") },
+      { sender: "user", text: "naber", semanticInterpretation: canonicalInterpretation("naber") },
       { sender: "droit", text: "iyi valla sen nasılsın" },
     ];
-    const s = deriveDiscourseState(history, { message: "iyi dedim ya", event: interpretSemanticEvent("iyi dedim ya") });
+    const s = deriveDiscourseState(history, { message: "iyi dedim ya", event: canonicalEvent("iyi dedim ya") });
     expect(s.previousTurnDependency?.on).toBe("kaira_question");
     expect(s.turnIndex).toBe(3);
   });
