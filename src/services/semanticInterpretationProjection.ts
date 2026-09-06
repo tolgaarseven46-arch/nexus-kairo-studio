@@ -1,5 +1,5 @@
 import type { SemanticEvent, RelationalAct } from "./semanticEventEngine";
-import type { SemanticInterpretation } from "../types/semanticInterpretation";
+import type { SemanticDiscourseProjection, SemanticInterpretation } from "../types/semanticInterpretation";
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
@@ -35,6 +35,8 @@ function relationalAct(interp: SemanticInterpretation): RelationalAct {
   return "none";
 }
 
+export type ProjectedSemanticEvent = SemanticEvent & SemanticDiscourseProjection;
+
 /**
  * Deterministic compatibility projection only.
  *
@@ -42,7 +44,7 @@ function relationalAct(interp: SemanticInterpretation): RelationalAct {
  * semantic reading. `SemanticInterpretation@2` is the only authority; the legacy
  * `SemanticEvent` shape exists solely for consumers not yet migrated.
  */
-export function projectSemanticEvent(interp: SemanticInterpretation): SemanticEvent {
+export function projectSemanticEvent(interp: SemanticInterpretation): ProjectedSemanticEvent {
   const insult =
     interp.primaryIntent === "insult" ||
     interp.secondarySocialActs.includes("insult") ||
@@ -73,6 +75,9 @@ export function projectSemanticEvent(interp: SemanticInterpretation): SemanticEv
     knowledgeQuery: interp.discourseFacets.knowledgeQuery,
     selfMemoryQuery: interp.discourseFacets.selfMemoryQuery,
     ...(interp.worldMemory ? { worldMemory: interp.worldMemory } : {}),
+    signalsAlreadyAnswered: Boolean(interp.discourseFacets.signalsAlreadyAnswered),
+    answerFriction: Boolean(interp.discourseFacets.answerFriction),
+    stateAnswerShape: Boolean(interp.discourseFacets.stateAnswerShape),
     valence: interp.valence,
     target,
     relationalAct: relationalAct(interp),
