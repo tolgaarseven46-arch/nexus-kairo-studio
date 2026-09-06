@@ -97,7 +97,12 @@ discourseAct = none | correction | topic_shift | recall_request | confusion_or_c
 repairSignal = none | clarification_request | relevance_challenge
 adviceRequested = yalnız açık tavsiye/öneri isteniyorsa true
 knowledgeQuery = null veya {surface, conceptId?, confidence}; yalnız genel kavram/bilgi erişim sorusu
-selfMemoryQuery = null veya {surface, scope:self_fact|autobiographical_memory|any, factKey?, retrievalMode:targeted|broad, confidence}; yalnız Kaira'nın kendi özelliği/geçmişi/anısı soruluyorsa
+selfMemoryQuery = null veya {surface, scope:self_fact|autobiographical_memory|any, factKey?, retrievalMode:targeted|broad, confidence}; yalnız Kaira'nın kendi self gerçeği/geçmişi/anısı soruluyorsa. Scope mevcut memory ontology ile aynı anlamı taşır:
+- self_fact = Kaira'nın mevcut/şimdiki self gerçeği veya durable attribute/value gerçeği. Mevcut ilişki durumu, tercih, kimlik özelliği ve kanıtla revize edilebilen güncel self state burada kalır.
+- autobiographical_memory = Kaira'nın geçmişte gerçekten yaşadığı olay/anı veya o yaşanmış geçmişi geri çağırma isteği. Bu scope append-only lived history içindir.
+- any = yalnız current-vs-historical scope gerçekten çözülemiyorsa; varsayılan kaçış yolu değildir.
+- Kaira'nın şu anki ilişki durumunu autobiographical_memory yapma; kişisel konu olması geçmiş anı olduğu anlamına gelmez.
+- Geçmişte yaşanmış bir olayı self_fact yapma; Kaira'nın özne olması tek başına current self fact anlamına gelmez.
 
 WORLD MEMORY SEMANTICS:
 worldMemory = {claims, query}. Bu alan yalnız persistent dış-dünya/kişi bilgisinin typed fact kimliğini taşır; cevap/policy değildir.

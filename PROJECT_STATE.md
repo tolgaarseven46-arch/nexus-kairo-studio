@@ -1646,3 +1646,9 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 - ADR-0065 narrows coercion to actual pressure/constraint evidence. Command grammar or a first direct affection bid alone is not coercion. Genuine persistence after refusal, pressure, boundary crossing and threats remain coercive.
 - Deterministic replay proves coercion=.40 causes the injury and the same typed bid with coercion=0 remains relationship-neutral. No provider call or phrase patch is introduced.
 
+## 2026-09-06 — Real-user Turn 4 current-self query ontology
+- The privacy false positive for `senin manit falan var mı` was already closed by PR #117, but that PR explicitly left current-self-state vs autobiographical self-memory routing unresolved.
+- Current-main inspection proved the memory architecture already has the correct distinction: `self_fact` is Kaira-owned self truth with evidence-revision mutability, while `autobiographical_memory` is append-only lived self history.
+- The remaining gap was the semantic-provider contract: `selfMemoryQuery.scope` listed both scopes without defining present/mutable self state versus historical lived episodes.
+- ADR-0066 binds provider semantics to the existing ontology. Current relationship status and other present self facts use `self_fact`; past lived episodes use `autobiographical_memory`; `any` is only genuine unresolved scope.
+- No new memory store, downstream raw-text parser, RelationshipReducer rule, provider call or second semantic authority is introduced. Development and CI remain API-free.
