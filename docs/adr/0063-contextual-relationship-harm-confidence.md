@@ -18,3 +18,6 @@ A first broader repair that scaled ordinary injury severity fixed Turn 7 but bro
 
 ## Consequences
 Turn 7-style playful/uncertain low-level signals no longer become durable injury merely because Kaira is the target. Explicit negative-valence harm, residual hurt, and repair trajectories remain governed by their existing contracts. Turn 4 privacy ontology and Turn 5 boundary-decline-vs-harm remain separate work candidates.
+
+## Verification
+The accepted narrow patch was exercised API-free by the one-time v4 gate with focused characterization/regression coverage, the full test suite, TypeScript validation, and production build all green before the patch commit was written. This documentation-only follow-up exists to bind normal PR CI and architecture review to a user-authored final head without changing runtime behavior.
