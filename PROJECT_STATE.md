@@ -1608,3 +1608,9 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 - ADR-0059 ilkesi: substantive recall ve answer hareketleri fulfillment contract'ını DialogueDecision'dan alır; downstream validator yalnız bu typed contract'ı tüketir.
 - Raw-text reparse, yeni semantic authority veya provider/API çağrısı eklenmez. Gerçek provider kabulü yalnız kullanıcı gerçek sohbet testinde yapılacaktır.
 
+## 2026-09-06 — DialogueDecision fulfillment authority consolidation
+- PR #112 sonrası API-siz downstream audit'te `respond_to_relational_bid` için ikinci bir semantic-authority izi bulundu: generic acknowledgement yasağı doğru davranışı üretiyor fakat `DialogueDecision.obligation` yerine doğrudan final validator içinde move-specific kural olarak tutuluyordu.
+- ADR-0060 ile ilişkisel bid de typed `DialogueObligation` kapsamına alındı; `findDialogueDecisionIssues` yalnız generic obligation contract'ını tüketir.
+- Son kullanıcı davranışı değişmez: ilişkisel/yakınlık hamlesi `tamam/peki/aynen/anladım` ile geçiştirilemez. Değişen şey kuralın sahipliğidir.
+- Pure social routine'ler obligation-free kalır. Raw-text reparse, yeni WHAT authority veya provider/API çağrısı eklenmez.
+
