@@ -248,6 +248,18 @@ function planDialogueResponseBase(
           "Kullanıcı Kaira'nın önceki turunu düzeltiyor. Düzeltmeyi kabul et; selamlama, yeni konu, savunma veya soru ekleme.",
       };
     }
+    if (dep.responseKind === "follow_up_question") {
+      return {
+        move: "answer_or_clarify",
+        allowFollowUpQuestion: false,
+        allowSpeculation: false,
+        maxSentences: 2,
+        maxWords: 24,
+        hasSupportedTargetClaim: false,
+        reason:
+          "Kullanıcının kısa sorusu Kaira'nın hemen önceki sözüne bağlı bir takip sorusudur. Soruyu o önceki söz bağlamında doğrudan yanıtla; yeni konu gibi davranma, kör acknowledgement verme ve ilgisiz takip sorusu açma.",
+      };
+    }
     if (
       dep.responseKind === "clarification" &&
       (event.repairSignal ?? "none") !== "none"
@@ -412,20 +424,20 @@ function planDialogueResponseBase(
     };
   }
   // A typed advice request is a user-facing conversational obligation. A
-// simultaneous topic-shift facet describes the transition, but cannot erase
-// the request. Keep recall/correction/repair authorities above this seam;
-// otherwise advice owns the move and receives the normal answer obligation.
-if (event.adviceRequested) {
-  return {
-    move: "answer_or_clarify",
-    allowFollowUpQuestion: true,
-    allowSpeculation: false,
-    maxSentences: 3,
-    hasSupportedTargetClaim: false,
-    reason:
-      "Kullanıcı açıkça görüş/tavsiye istiyor. Konu değişimi sinyali bu cevap yükümlülüğünü silemez; önce isteği yanıtla, yalnız gerçekten gerekli ise tek netleştirme sorusu sor.",
-  };
-}
+  // simultaneous topic-shift facet describes the transition, but cannot erase
+  // the request. Keep recall/correction/repair authorities above this seam;
+  // otherwise advice owns the move and receives the normal answer obligation.
+  if (event.adviceRequested) {
+    return {
+      move: "answer_or_clarify",
+      allowFollowUpQuestion: true,
+      allowSpeculation: false,
+      maxSentences: 3,
+      hasSupportedTargetClaim: false,
+      reason:
+        "Kullanıcı açıkça görüş/tavsiye istiyor. Konu değişimi sinyali bu cevap yükümlülüğünü silemez; önce isteği yanıtla, yalnız gerçekten gerekli ise tek netleştirme sorusu sor.",
+    };
+  }
 
   if (event.intent === "command") {
     return {
@@ -605,19 +617,7 @@ export function buildDialogueDecisionInstruction(
     plan.move === "invite_emotional_context" && !effectiveAllowQuestion
       ? "İlk duygusal açılışta soru sorma; yalnızca tek kısa kabul tepkisi üret: hmm, anladım veya hee. Teselli, tavsiye, lakap, espri, fiziksel yakınlık veya yeni sosyal anlam ekleme."
       : plan.reason;
-  return `DİYALOG KARARI:
-- Bu turdaki birincil hareket: ${plan.move}
-- Eşzamanlı sosyal rutin: ${plan.socialRoutine && plan.move !== "complete_social_routine" ? `${plan.socialRoutine} (bağlam; bağımsız yükümlülüğü silemez)` : plan.socialRoutine ?? "none"}
-- Hedef kişi: ${plan.target || "aktif konuşan/genel sohbet"}
-- Takip sorusu: ${effectiveAllowQuestion ? "gerekiyorsa en fazla bir tane" : "yasak"}
-- Desteksiz tahmin: ${plan.allowSpeculation ? "yalnızca açık şaka bağlamında" : "yasak"}
-- Uzunluk bütçesi: en fazla ${effectiveMaxSentences} kısa cümle
-- Kelime bütçesi: ${effectiveMaxWords ? `en fazla ${effectiveMaxWords} kelime` : "özel sınır yok"}
-- Tekrar koruması: ${plan.repeatGuard ? `"${plan.repeatGuard.act}" sosyal işini yeniden üretme` : "yok"}
-- Obligation: ${plan.obligation ? `${plan.obligation.type}; yalnız acknowledgement ile kapanamaz` : "yok"}
-- Relational act: ${plan.relationalAct ?? "none"}
-- Gerekçe: ${effectiveReason}
-Doğru cevabı verdikten sonra ikinci bir tahmin, seçenek listesi, yeni şaka veya otomatik soru ekleyerek cevabın mantığını BOZMA.`;
+  return `DİYALOG KARARI:\n- Bu turdaki birincil hareket: ${plan.move}\n- Eşzamanlı sosyal rutin: ${plan.socialRoutine && plan.move !== "complete_social_routine" ? `${plan.socialRoutine} (bağlam; bağımsız yükümlülüğü silemez)` : plan.socialRoutine ?? "none"}\n- Hedef kişi: ${plan.target || "aktif konuşan/genel sohbet"}\n- Takip sorusu: ${effectiveAllowQuestion ? "gerekiyorsa en fazla bir tane" : "yasak"}\n- Desteksiz tahmin: ${plan.allowSpeculation ? "yalnızca açık şaka bağlamında" : "yasak"}\n- Uzunluk bütçesi: en fazla ${effectiveMaxSentences} kısa cümle\n- Kelime bütçesi: ${effectiveMaxWords ? `en fazla ${effectiveMaxWords} kelime` : "özel sınır yok"}\n- Tekrar koruması: ${plan.repeatGuard ? `"${plan.repeatGuard.act}" sosyal işini yeniden üretme` : "yok"}\n- Obligation: ${plan.obligation ? `${plan.obligation.type}; yalnız acknowledgement ile kapanamaz` : "yok"}\n- Relational act: ${plan.relationalAct ?? "none"}\n- Gerekçe: ${effectiveReason}\nDoğru cevabı verdikten sonra ikinci bir tahmin, seçenek listesi, yeni şaka veya otomatik soru ekleyerek cevabın mantığını BOZMA.`;
 }
 
 export function findDialogueDecisionIssues(
