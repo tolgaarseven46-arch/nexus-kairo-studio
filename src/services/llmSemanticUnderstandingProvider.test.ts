@@ -103,4 +103,21 @@ describe("llm semantic understanding provider", () => {
     expect(capturedSystem).toContain("belirtilmiş mahremiyet sınırını aşmaya çalışma");
     expect(capturedSystem).toContain("privacy_violation secondary act yalnız mesajda gerçek bir mahremiyet ihlali davranışı olduğunda");
   });
+
+  it("defines coercion as pressure evidence rather than command grammar", async () => {
+    let capturedSystem = "";
+    const provider = createLlmSemanticUnderstandingProvider({
+      generate: async ({ system }) => {
+        capturedSystem = system;
+        return JSON.stringify(base);
+      },
+    });
+
+    await provider.interpret({ message: "doğrudan bir istek" });
+
+    expect(capturedSystem).toContain("Dilbilgisel emir kipi");
+    expect(capturedSystem).toContain("tek seferlik yakınlık/flört talebi TEK BAŞINA coercion değildir");
+    expect(capturedSystem).toContain("reddi kabul etmeme");
+    expect(capturedSystem).toContain("command intent tek başına coercion act veya severity üretmez");
+  });
 });

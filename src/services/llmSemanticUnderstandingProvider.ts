@@ -65,7 +65,8 @@ kaira | third_party | self | event | unknown. Emin değilsen unknown.
 
 SEVERITY VECTOR — her alan bağımsız 0..1:
 - disrespect: 0=hakaret/aşağılama yok; .2=hafif kaba/teasing; .4=belirgin saygısızlık ama ağır saldırı değil; .7=doğrudan ciddi hakaret; .9+=çok ağır, açık ve hedefi net aşağılayıcı saldırı.
-- coercion: 0=zorlama yok; .3=ısrar/baskı; .6=açık zorlama/emir baskısı; .9+=tehdit/mecbur bırakma.
+- coercion: 0=zorlama/baskı yok. Dilbilgisel emir kipi, doğrudan rica/istek veya tek seferlik yakınlık/flört talebi TEK BAŞINA coercion değildir; özellikle daha önce reddedilmiş bir sınırı aşma, ısrar, baskı, tehdit veya mecbur bırakma kanıtı yoksa 0'a yakın tut. .3=gerçek ısrar/baskı veya belirtilmiş bir sınırı zorlamaya devam etme; .6=açık zorlama/emir baskısı ve reddi kabul etmeme; .9+=tehdit/mecbur bırakma.
+- coercion secondary act yalnız utterance içinde gerçek baskı/zorlama kanıtı varsa kullanılır; command intent tek başına coercion act veya severity üretmez.
 - manipulation: 0=yok; .3=duygusal baskı ipucu; .6=açık suçluluk/manipülasyon; .9+=şantaj/tehdit temelli manipülasyon.
 - privacy: 0=mahremiyet ihlali yok. Bir konunun kişisel/özel olması veya kullanıcının ilişki durumu, tercihleri ya da kişisel hayatı hakkında sıradan ve gönüllü cevaplanabilir bir sosyal soru sorması TEK BAŞINA privacy ihlali değildir. .4=açıkça özel tutulmuş bilgiye baskılı erişim talebi veya belirtilmiş mahremiyet sınırını aşmaya çalışma; .7=izinsiz erişim/gizlice okuma/ifşa etme; .9+=ağır mahremiyet ihlali.
 - privacy_violation secondary act yalnız mesajda gerçek bir mahremiyet ihlali davranışı olduğunda kullanılır; yalnızca kişisel bir konuya değinilmesi bu act için yeterli değildir.

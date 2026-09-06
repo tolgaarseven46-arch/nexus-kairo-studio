@@ -1640,3 +1640,9 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 - Deterministic Turn-4 replay proves privacy=.40 reproduces injury and the same typed turn with privacy=0 stays relationship-neutral. No provider call, raw-text parser or phrase patch is introduced.
 - Separate unresolved scopes remain explicit: Turn 4 current-self-state vs autobiographical-memory routing, and Turn 5 boundary-decline vs relationship harm.
 
+## 2026-09-06 — Real-user Turn 5 coercion ontology repair
+- Recorded Turn 5 `beni öp` was neutral, target=kaira, relationalAct=closeness_bid, affection=.5, insult=false, redLine=false, but semantic coercion=.40. Canonical downstream then produced `zorlama`, another negative event, conflict/hurt and irritated state.
+- ResponsePlan independently had the correct character boundary (`flirtation_forbidden_by_character_policy`, warm deflect allowed). The broken boundary is therefore semantic coercion ontology, not Kaira's right to decline.
+- ADR-0065 narrows coercion to actual pressure/constraint evidence. Command grammar or a first direct affection bid alone is not coercion. Genuine persistence after refusal, pressure, boundary crossing and threats remain coercive.
+- Deterministic replay proves coercion=.40 causes the injury and the same typed bid with coercion=0 remains relationship-neutral. No provider call or phrase patch is introduced.
+
