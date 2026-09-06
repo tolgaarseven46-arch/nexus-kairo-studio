@@ -19,3 +19,6 @@ This is not a regression in an existing gate. The enforcement point did not exis
 
 ## Consequences
 A response known to violate canonical final constraints can no longer be delivered as if valid. If all existing repair/fallback paths still fail, the request fails explicitly instead of leaking a known-invalid Kaira message.
+
+## Verification
+The bounded repair was verified without provider/API calls: focused final-delivery characterization and regression tests passed, the existing 20-turn final-delivery quality regression passed, the full test suite passed, TypeScript passed, and the production build passed. Final PR CI and Architecture Review remain required before merge.
