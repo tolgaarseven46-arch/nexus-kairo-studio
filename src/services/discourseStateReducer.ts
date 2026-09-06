@@ -266,7 +266,25 @@ export function reduceDiscourseState(
       answerFriction ||
       act === "correction" ||
       explicitRepair;
-    const responseEvidence = contextualAnswer || (!isOwnRoutine && explicitDependency);
+    // A short unresolved canonical question immediately after a Kaira statement
+    // is a discourse-level elliptical follow-up. This does not reinterpret the
+    // words or infer a hidden proposition; it only binds the question to the
+    // adjacent Kaira turn so DialogueDecision can fulfill it in context.
+    const contextualFollowUpQuestion = Boolean(
+      !kairaPending &&
+      prev.lastKairaAct !== null &&
+      act === "question" &&
+      isShort(turn.message) &&
+      turn.event.target === "unknown" &&
+      (turn.event.socialRoutine ?? "none") === "none" &&
+      (turn.event.discourseAct ?? "none") === "none" &&
+      !turn.event.adviceRequested &&
+      !turn.event.knowledgeQuery,
+    );
+    const responseEvidence =
+      contextualAnswer ||
+      contextualFollowUpQuestion ||
+      (!isOwnRoutine && explicitDependency);
     // A state-shaped prefix may answer Kaira's pending question while the same
     // turn also carries independently substantive canonical content. In that
     // mixed case, close the pending question but do not let turn-taking context
@@ -297,9 +315,11 @@ export function reduceDiscourseState(
             ? "correction"
             : explicitRepair
               ? "clarification"
-              : friction
-                ? "answer_with_friction"
-                : "answer",
+              : contextualFollowUpQuestion
+                ? "follow_up_question"
+                : friction
+                  ? "answer_with_friction"
+                  : "answer",
       };
     }
 
@@ -425,7 +445,9 @@ export function buildDiscourseObservationalInstruction(state: DiscourseState): s
             ? "düzeltme"
             : d.responseKind === "clarification"
               ? "anlamama/itiraz"
-              : "cevap"
+              : d.responseKind === "follow_up_question"
+                ? "kısa bağlamsal takip sorusu"
+                : "cevap"
       }. Bunu selamlama veya yeni konu sanma.`,
     );
   }
