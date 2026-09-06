@@ -8,6 +8,7 @@ import { normalizeKairaAffectBaseline } from "./src/services/kairaAffectBaseline
 import { claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";
 import { normalizeDroitPersonality } from "./src/services/droitPersonalityNormalizer";
 import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
+import { resolveGeneratedReplySemanticVerification } from "./src/services/kairaGeneratedReplySemanticVerification";
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
 import { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";
 import { buildKairaResponsePlan, findKairaResponsePlanIssues, kairaResponsePlanInstruction, kairaSocialMoveFallback } from "./src/services/kairaResponsePlan";
@@ -1222,6 +1223,20 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
         }
       }
     }
+    const replySemanticInterpretation = providerFailureFallbackUsed
+      ? null
+      : await resolveGeneratedReplySemanticVerification({
+          reply,
+          plan: responsePlan,
+          preferredProvider: provider,
+          generateText,
+        });
+    const claimEvidenceInterpretations = [
+      ...cleanHistory.flatMap((turn: any) =>
+        turn.semanticInterpretation ? [turn.semanticInterpretation] : [],
+      ),
+      canonicalSemantic.interpretation,
+    ];
     const canonicalConstraint = runKairaResponseConstraintPass({
           reply,
           trace: kdm.trace,
@@ -1230,6 +1245,8 @@ ${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kair
           worldContext: worldReasoningContext,
           selfMemoryRuntime,
           epistemicContext: epistemicAccess,
+          replySemanticInterpretation,
+          claimEvidenceInterpretations,
           additionalIssueFinder: (candidateReply) => [
             ...findKairoTranscriptEchoIssues(candidateReply),
             ...findKairoGroundingIssues(candidateReply, cleanHistory, userMessage),
