@@ -21,3 +21,5 @@ Turn 4 also exposed a separate `current self state` vs `autobiographical self-me
 
 ## Verification
 A deterministic replay pins the recorded Turn-4 semantic snapshot and proves privacy=0.40 alone reproduces the relationship injury, while an otherwise identical typed interpretation with privacy=0 remains relationship-neutral. A provider-contract test pins the tightened privacy ontology in the semantic parser system instruction. All verification is API-free.
+
+The accepted patch then passed focused verification, the complete 1908-test suite, TypeScript validation, and production build in the one-time gate. This documentation-only follow-up binds normal PR CI and architecture review to a user-authored final head; it does not alter runtime behavior.
