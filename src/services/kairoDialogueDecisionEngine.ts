@@ -1,5 +1,5 @@
 import type { ConversationTurn } from "./kairoConversationGrounding";
-import { buildDialogueClaimLedger } from "./kairoDialogueChaosEngine";
+import { analyzeHistoricalDialogueTurn, buildDialogueClaimLedger } from "./kairoDialogueChaosEngine";
 import { effectivelySupportedClaims, type DialogueClaim } from "./claimProvenance";
 import {
   interpretSemanticEvent,
@@ -168,8 +168,15 @@ function isFirstEmotionalOpening(
     .filter((turn) => turn.sender === "user")
     .slice(-4)
     .some((turn) => {
-      const previous = interpretSemanticEvent(String(turn.text || ""));
-      return previous.socialRoutine === "emotional_opening" || previous.intent === "emotional_share";
+      const previous = analyzeHistoricalDialogueTurn(turn);
+      return previous.acts.includes("statement") &&
+        Boolean(turn.semanticInterpretation) &&
+        ((turn.semanticInterpretation as any).discourseFacets?.socialRoutine === "emotional_opening" ||
+          (turn.semanticInterpretation as any).primaryIntent === "emotional_share")
+        ? true
+        : !turn.semanticInterpretation &&
+            (interpretSemanticEvent(String(turn.text || "")).socialRoutine === "emotional_opening" ||
+              interpretSemanticEvent(String(turn.text || "")).intent === "emotional_share");
     });
 }
 
