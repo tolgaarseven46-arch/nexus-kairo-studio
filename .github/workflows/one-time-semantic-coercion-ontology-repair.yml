@@ -1,0 +1,42 @@
+name: One-time semantic coercion ontology repair
+
+on:
+  push:
+    branches:
+      - fix/semantic-coercion-ontology-affection-bid
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: fix/semantic-coercion-ontology-affection-bid
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+      - run: npm install --ignore-scripts
+      - name: Apply semantic coercion ontology repair
+        run: python scripts/apply-semantic-coercion-ontology-repair.py
+      - name: Focused API-free verification
+        run: npx vitest run src/services/llmSemanticUnderstandingProvider.test.ts src/services/kairaSemanticCoercionOntologyRegression.test.ts src/services/kairaFlirtationBoundaryRegression.test.ts
+      - name: Full tests
+        run: npm test -- --run
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
+      - name: Remove one-time repair scaffolding
+        run: rm .github/workflows/one-time-semantic-coercion-ontology-repair.yml scripts/apply-semantic-coercion-ontology-repair.py
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(kaira): distinguish coercion from direct affection bids"
+          git push origin HEAD:fix/semantic-coercion-ontology-affection-bid
