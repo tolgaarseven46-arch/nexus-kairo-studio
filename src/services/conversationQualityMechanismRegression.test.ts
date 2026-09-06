@@ -29,15 +29,17 @@ function interpretation(overrides: Partial<SemanticInterpretation> = {}): Semant
 }
 
 describe('conversation-quality mechanism regressions', () => {
-  it('turns a Kaira-directed closeness bid into an explicit social move instead of generic acknowledgement', () => {
+  it('keeps a Kaira-directed closeness command action-owned while preserving the relational social move', () => {
     const d = planDialogueResponse([], 'beni öp', 'Mert', event({ intent: 'command', target: 'kaira', relationalAct: 'closeness_bid', relationalIntensity: 0.8, affection: 0.8 }));
-    expect(d.move).toBe('respond_to_relational_bid');
+    expect(d.move).toBe('respond_to_action_request');
+    expect(d.relationalAct).toBe('closeness_bid');
+    expect(d.obligation?.type).toBe('action_request');
     const plan = buildKairaResponsePlan({ conversationState:'active', continueConversation:true, playfulness:'allowed', affection:'allowed', questions:'allowed', forgivenessGranted:true, repairStatus:'repaired', reopeningCloseness:'allowed', stance:'open', maxResponseLength:'medium', reasons:[], semanticUncertainty:0.2 } as any, d, { register:'balanced', relationshipLevel:'new', emojiLevel:0 } as any);
     expect(plan.socialMove).toBe('warm_deflect');
     expect(findKairaResponsePlanIssues('he anladım', plan)).toContain('response_plan_social_move_missing');
     const fallback = kairaSocialMoveFallback(plan);
     expect(fallback).not.toBe('he anladım');
-    expect(buildGroundedDialogueFallback(d, [], 'beni öp', 'Mert', undefined, false, fallback)).toBe(fallback);
+    expect(buildGroundedDialogueFallback(d, [], 'beni öp', 'Mert', undefined, false, fallback)).toBeNull();
   });
 
   it('keeps a non-romantic reconciliation attempt meaningful when reopening is allowed', () => {
