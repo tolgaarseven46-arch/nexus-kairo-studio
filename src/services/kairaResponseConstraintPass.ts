@@ -1,4 +1,5 @@
 import type { ReasoningTrace } from "../types/nexus";
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import type { KairaResponsePlan } from "./kairaResponsePlan";
 import {
   findKairaResponsePlanIssues,
@@ -26,6 +27,7 @@ import {
 import { findKairaAmbiguityPreservationIssues } from "./kairaAmbiguityPreservation";
 import { findKairaSelfCorrectionAccountabilityIssues } from "./kairaSelfCorrectionAccountability";
 import { removeForbiddenQuestionUnits } from "./kairaDeliveredQuestionConstraint";
+import { findGeneratedClaimProvenanceIssues } from "./kairaGeneratedClaimProvenance";
 
 export type KairaConstraintWorldItems = Parameters<typeof enforceWorldModelRecallResponse>[1];
 export type KairaConstraintWorldContext = Parameters<typeof enforceWorldModelRecallResponse>[2];
@@ -40,6 +42,10 @@ export interface KairaResponseConstraintPassInput {
   worldContext: KairaConstraintWorldContext;
   selfMemoryRuntime: KairaConstraintSelfMemoryRuntime;
   epistemicContext?: KairaConstraintEpistemicContext;
+  /** Canonical semantics of the generated candidate, when server verification ran. */
+  replySemanticInterpretation?: SemanticInterpretation | null;
+  /** Canonical semantic evidence admitted to the response context. */
+  claimEvidenceInterpretations?: SemanticInterpretation[];
   /**
    * Lower-authority delivery-quality checks (grounding / attribution / dialogue
    * move / rhythm) that must also hold on the final delivered text. The
@@ -131,10 +137,6 @@ function runOrderedPass(
     input.epistemicContext,
   );
 
-  // Mechanical enforcement may trim length/emoji/humor. Question permission is
-  // still owned by KairaResponsePlan; this pass may only delete structurally
-  // recognized forbidden question units from a multi-unit candidate when valid
-  // non-question content remains. It never invents a canned replacement.
   const planEnforcement = enforceKairoResponse(epistemicGuard.reply, input.trace, {
     continueConversation: input.plan.continueConversation,
     humorAllowed: input.plan.allowHumor,
@@ -149,11 +151,19 @@ function runOrderedPass(
   );
   const delivered = mechanicallyConformed.trim();
   const questionUnitRemoved = delivered !== planEnforcement.reply.trim();
+  const isOriginalCandidate = original === String(input.reply ?? "").trim();
 
   const issues = [
     ...findKairaResponsePlanIssues(delivered, input.plan),
     ...findKairaAmbiguityPreservationIssues(delivered, input.plan),
     ...findKairaSelfCorrectionAccountabilityIssues(delivered, input.plan),
+    ...(isOriginalCandidate
+      ? findGeneratedClaimProvenanceIssues({
+          plan: input.plan,
+          replyInterpretation: input.replySemanticInterpretation,
+          evidenceInterpretations: input.claimEvidenceInterpretations,
+        })
+      : []),
     ...findWorldModelResponseIssues(delivered, input.worldItems, input.worldContext).map(
       (issue) => issue.message,
     ),
@@ -191,7 +201,7 @@ function runOrderedPass(
  *
  * Order is fixed and explicit:
  *   world truth -> autobiographical truth -> epistemic truth -> ResponsePlan
- *   deterministic mechanical enforcement -> externally-owned dialogue/grounding checks.
+ *   -> generated claim provenance -> mechanical enforcement -> externally-owned checks.
  *
  * This boundary never writes a generic social reply. A caller-supplied legacy
  * dialogue fallback can be tried only if it independently passes the exact same
