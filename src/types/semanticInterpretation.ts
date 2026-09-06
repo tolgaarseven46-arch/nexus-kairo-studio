@@ -124,6 +124,23 @@ export interface SemanticDiscourseFacets {
   relationalIntensity: number;
   stopQuestions: boolean;
   stopTalking: boolean;
+  /** Canonical utterance cue: user explicitly says this was already answered. */
+  signalsAlreadyAnswered?: boolean;
+  /** Canonical utterance cue: user refers back to a prior answer with friction. */
+  answerFriction?: boolean;
+  /** Canonical utterance shape: message can begin as a state/how-are-you answer. */
+  stateAnswerShape?: boolean;
+}
+
+/**
+ * Optional compatibility projection carried by SemanticEvent consumers.
+ * New canonical ingestions populate all fields; optionality preserves persisted
+ * SemanticInterpretation@2 snapshots created before this schema extension.
+ */
+export interface SemanticDiscourseProjection {
+  signalsAlreadyAnswered?: boolean;
+  answerFriction?: boolean;
+  stateAnswerShape?: boolean;
 }
 
 /** Each component is 0..1 and orthogonal. */
