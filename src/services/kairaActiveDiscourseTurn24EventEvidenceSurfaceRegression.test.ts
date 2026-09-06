@@ -43,7 +43,6 @@ function neutralTurn(message: string): SemanticEvent {
     normalized: message,
     intent: "general_chat",
     socialRoutine: "none",
-    target: "none",
     valence: "neutral",
     worldMemory: { claims: [], query: null },
   };
