@@ -24,8 +24,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Apply bounded planner repair
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
           path = Path('src/services/kairoDialogueDecisionEngine.ts')
           text = path.read_text(encoding='utf-8')
@@ -56,6 +57,7 @@ jobs:
           if needle not in text:
             raise SystemExit('expected planner seam not found')
           path.write_text(text.replace(needle, replacement, 1), encoding='utf-8')
+          PY
       - name: Verify targeted regression
         run: npx vitest run src/services/kairaActiveDiscourseSameTurnGrounding.test.ts src/services/kairoDialogueDecisionEngine.test.ts
       - name: Commit bounded repair
