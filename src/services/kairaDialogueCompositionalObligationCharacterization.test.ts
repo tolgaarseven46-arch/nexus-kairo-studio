@@ -92,4 +92,27 @@ describe('DialogueDecision compound obligation characterization', () => {
     expect(decision.move).toBe('grounded_recall');
     expect(decision.socialRoutine).toBe('thanks');
   });
+  it('keeps a pure thanks routine as the primary move', () => {
+    const decision = planDialogueResponse(
+      [],
+      'teşekkür ederim',
+      'Tolga',
+      event({ socialRoutine: 'thanks' }),
+    );
+    expect(decision.move).toBe('complete_social_routine');
+    expect(decision.socialRoutine).toBe('thanks');
+  });
+
+  it('keeps a plain typed information request unchanged without a routine', () => {
+    const decision = planDialogueResponse(
+      [],
+      'Mert neden gelmedi?',
+      'Tolga',
+      event({ intent: 'information_request', target: 'third_party' }),
+    );
+    expect(decision.move).toBe('answer_or_clarify');
+    expect(decision.obligation?.type).toBe('answer_or_clarify');
+    expect(decision.socialRoutine).toBeUndefined();
+  });
+
 });

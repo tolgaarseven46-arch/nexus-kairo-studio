@@ -340,26 +340,6 @@ function planDialogueResponseBase(
     };
   }
 
-  if (
-    event.socialRoutine === "greeting" ||
-    event.socialRoutine === "thanks" ||
-    event.socialRoutine === "agreement" ||
-    event.socialRoutine === "goodbye" ||
-    event.socialRoutine === "good_night"
-  ) {
-    return {
-      move: "complete_social_routine",
-      socialRoutine: event.socialRoutine,
-      allowFollowUpQuestion: false,
-      allowSpeculation: false,
-      maxSentences: 1,
-      maxWords: 8,
-      hasSupportedTargetClaim: false,
-      reason:
-        "Kanonik sosyal rutini aynı sosyal işlevle kısa biçimde tamamla. Yeni konu, açıklama, tahmin veya otomatik soru açma.",
-    };
-  }
-
   if (event.discourseAct === "recall_request") {
     return {
       move: "grounded_recall",
@@ -468,6 +448,25 @@ if (event.adviceRequested) {
         "Önce soruya cevap ver; yalnızca gerçekten gerekli ise tek netleştirme sorusu sor.",
     };
   }
+  if (
+    event.socialRoutine === "greeting" ||
+    event.socialRoutine === "thanks" ||
+    event.socialRoutine === "agreement" ||
+    event.socialRoutine === "goodbye" ||
+    event.socialRoutine === "good_night"
+  ) {
+    return {
+      move: "complete_social_routine",
+      socialRoutine: event.socialRoutine,
+      allowFollowUpQuestion: false,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 8,
+      hasSupportedTargetClaim: false,
+      reason:
+        "Bu turda sosyal rutin dışında bağımsız bir kullanıcı yükümlülüğü yok. Kanonik sosyal rutini aynı sosyal işlevle kısa biçimde tamamla; yeni konu, açıklama, tahmin veya otomatik soru açma.",
+    };
+  }
   return {
     move: "natural_reaction",
     allowFollowUpQuestion: false,
@@ -529,7 +528,15 @@ export function planDialogueResponse(
     currentAnalysis,
     discourse,
   );
-  return applyRepetitionPolicy(attachDecisionOwnedObligation(basePlan), discourse);
+  // SemanticInterpretation is multi-facet. Keep one primary move for existing
+  // consumers, but never erase a concurrent typed social routine when a
+  // substantive obligation (answer/recall/repair/etc.) owns the primary move.
+  // The routine remains context; it is not a second WHAT authority.
+  const compositionalPlan =
+    basePlan.socialRoutine || !event.socialRoutine || event.socialRoutine === "none"
+      ? basePlan
+      : { ...basePlan, socialRoutine: event.socialRoutine };
+  return applyRepetitionPolicy(attachDecisionOwnedObligation(compositionalPlan), discourse);
 }
 
 export function buildDialogueDecisionInstruction(
@@ -543,7 +550,8 @@ export function buildDialogueDecisionInstruction(
       ? "İlk duygusal açılışta soru sorma; yalnızca tek kısa kabul tepkisi üret: hmm, anladım veya hee. Teselli, tavsiye, lakap, espri, fiziksel yakınlık veya yeni sosyal anlam ekleme."
       : plan.reason;
   return `DİYALOG KARARI:
-- Bu turdaki tek ana hareket: ${plan.move}
+- Bu turdaki birincil hareket: ${plan.move}
+- Eşzamanlı sosyal rutin: ${plan.socialRoutine && plan.move !== "complete_social_routine" ? `${plan.socialRoutine} (bağlam; bağımsız yükümlülüğü silemez)` : plan.socialRoutine ?? "none"}
 - Hedef kişi: ${plan.target || "aktif konuşan/genel sohbet"}
 - Takip sorusu: ${effectiveAllowQuestion ? "gerekiyorsa en fazla bir tane" : "yasak"}
 - Desteksiz tahmin: ${plan.allowSpeculation ? "yalnızca açık şaka bağlamında" : "yasak"}
