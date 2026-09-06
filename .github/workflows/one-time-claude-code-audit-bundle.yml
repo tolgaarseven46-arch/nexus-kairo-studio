@@ -1,0 +1,89 @@
+name: One-time Claude code audit bundle
+
+on:
+  push:
+    branches:
+      - chore/claude-code-audit-bundle
+    paths:
+      - .github/workflows/one-time-claude-code-audit-bundle.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build-audit-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout audit snapshot
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: chore/claude-code-audit-bundle
+          fetch-depth: 0
+
+      - name: Build source audit bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="audit_bundle"
+          mkdir -p "$ROOT/repo/src" "$ROOT/meta"
+
+          cp server.ts "$ROOT/repo/server.ts"
+          cp -R src/services "$ROOT/repo/src/services"
+          cp -R src/types "$ROOT/repo/src/types"
+
+          if [ -d tests ]; then cp -R tests "$ROOT/repo/tests"; fi
+          if [ -d src/__tests__ ]; then cp -R src/__tests__ "$ROOT/repo/src/__tests__"; fi
+
+          cat > "$ROOT/meta/AUDIT_MANIFEST.md" <<'EOF'
+          # Kaira Claude Code Audit Bundle
+
+          This bundle is generated from repository `tolgaarseven46-arch/nexus-kairo-studio`.
+          Snapshot source commit: `4c6d1b1792fbb0c185355cb04002e060dedc3903`.
+
+          Included code scope:
+          - `server.ts`: production chat/runtime wiring and final-delivery consumers.
+          - `src/services/**`: complete service-layer logic, including DialogueDecision, ResponsePlan, final consistency/delivery guards, relationship reducers, memory services, activity permission/context logic, semantic interpretation/projection, and all colocated service tests.
+          - `src/types/**`: relevant canonical and runtime types/schemas.
+          - root `tests/**` and `src/__tests__/**` when present.
+
+          The final user-facing ZIP adds selected real KNT traces separately after this source artifact is downloaded.
+
+          Secrets are intentionally excluded: no `.env`, credential, key, secret, or deployment environment files are copied.
+          EOF
+
+          {
+            echo '# Directory Map'
+            echo
+            echo '- `repo/server.ts` — production API/chat orchestration and runtime wiring.'
+            echo '- `repo/src/services/` — behavior, dialogue, response planning, validation, relationship, memory, semantic, discourse and associated regression tests.'
+            echo '- `repo/src/types/` — typed contracts and canonical schemas used by the services.'
+            echo '- `repo/tests/` — root-level tests, if the repository has any.'
+            echo '- `meta/SYMBOL_INDEX.txt` — grep index for the audit questions, with file and line numbers.'
+            echo '- `meta/FILE_INVENTORY.txt` — exact files included.'
+          } > "$ROOT/meta/TREE_MAP.md"
+
+          find "$ROOT/repo" -type f | sort > "$ROOT/meta/FILE_INVENTORY.txt"
+
+          rg -n --no-heading \
+            'runKairaResponseConstraintPass|accepted|score|ResponsePlan|responsePlan|lastNegativePattern|RelationshipReducer|relationshipReducer|self_memory_missing_fallback|selfMemoryQuery|worldMemory|activityPermission|claimEvidenceInterpretations|replySemanticInterpretation|engage_user_content|attribution|jok|banter' \
+            "$ROOT/repo" > "$ROOT/meta/SYMBOL_INDEX.txt" || true
+
+          # Fail closed on obvious embedded credentials. Environment-variable *names*
+          # are allowed; assignments to actual credential-looking values are not.
+          if rg -n --hidden \
+            '(-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,}|(?:API_KEY|SECRET|TOKEN|PASSWORD)\s*=\s*["'"'][^"'"']{8,}["'"'])' \
+            "$ROOT/repo"; then
+            echo 'Potential embedded credential found; refusing to package.' >&2
+            exit 1
+          fi
+
+          (cd "$ROOT" && zip -qr ../kaira_claude_code_audit_source.zip .)
+          unzip -t kaira_claude_code_audit_source.zip
+
+      - name: Upload source audit bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: kaira-claude-code-audit-source
+          path: kaira_claude_code_audit_source.zip
+          if-no-files-found: error
+          retention-days: 1
