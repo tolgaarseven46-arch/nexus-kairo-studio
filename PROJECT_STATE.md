@@ -1621,3 +1621,9 @@ PHASE 3 CLOSED. Do not reopen PR #68 / Claim provenance work unless a new indepe
 - ADR-0061 kararı: bu durable cross-cutting delivered-reply invariant canonical beta acceptance manifestine promote edilir. Focused mechanism regression'ları full suite'te kalır; acceptance gate full suite kopyasına dönüştürülmez.
 - Runtime davranışı, provider routing veya model çağrısı değişmez. Provider/API/live smoke yoktur; gerçek provider kabulü kullanıcı gerçek Kaira sohbet testine ayrılmıştır.
 
+## 2026-09-06 — Real-user acceptance: final delivery enforcement
+- 16-turn real-user KNT Turn 14 exposed the first bounded post-acceptance systemic gap: `consistency.accepted=false` (`response_plan_content_engagement_missing`) was diagnostic only and the invalid reply still reached `sendChatPayload`.
+- Current-main code inspection proved there was no existing fail-closed final-delivery gate; `consistency.accepted` only gated language learning/metrics.
+- ADR-0062 adds a deterministic final gate to both local and provider user-delivery paths. Rejected candidates remain KNT diagnostics only and are blanked from conversational persistence; the user/state event may still persist.
+- The gate invents no replacement WHAT content and adds no provider/API calls. Development/audit/CI remain API-free; provider use remains reserved for real-user acceptance.
+
