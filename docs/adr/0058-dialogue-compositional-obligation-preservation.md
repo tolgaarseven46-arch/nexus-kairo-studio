@@ -21,7 +21,9 @@ The failure was reproduced deterministically on current `main` by `kairaDialogue
 Compound semantic turns retain their substantive obligation while preserving social context. Pure routines remain unchanged. Downstream ResponsePlan and realizer consumers continue to see one primary move.
 
 ## Verification
-API-free deterministic regressions cover:
+Verification is API-free/deterministic; no provider call is part of development or CI acceptance.
+
+Regressions cover:
 - thanks + advice request,
 - agreement + information request,
 - thanks + recall request,
