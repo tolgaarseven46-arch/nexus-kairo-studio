@@ -20,4 +20,4 @@ An API-free characterization on current `main` reproduced the gap: the recall ob
 A grounded recall can no longer silently collapse to a generic acknowledgement at final delivery. Existing answer obligations retain their exact behavior and social-only turns remain unchanged.
 
 ## Verification
-API-free deterministic coverage includes the original red characterization, a dedicated regression, existing final-delivery obligation regression, full test suite, TypeScript and production build.
+API-free deterministic coverage includes the original red characterization, a dedicated regression, existing final-delivery obligation regression, full test suite, TypeScript and production build. Final PR CI is required to repeat repository governance and build gates on the committed repair.
