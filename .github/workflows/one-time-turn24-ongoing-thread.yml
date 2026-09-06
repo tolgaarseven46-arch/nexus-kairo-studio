@@ -1,0 +1,210 @@
+name: One-time Turn24 ongoing user-event continuity patch
+
+on:
+  push:
+    branches:
+      - codex/turn24-ongoing-user-event-continuity
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: codex/turn24-ongoing-user-event-continuity
+          fetch-depth: 0
+      - name: Apply bounded source patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          reducer_path = Path("src/services/discourseStateReducer.ts")
+          reducer = reducer_path.read_text()
+
+          old = '''function requestsThreadResumption(event: SemanticEvent): boolean {
+            if (event.target === "kaira") return false;
+            return Boolean(event.adviceRequested || event.discourseAct === "recall_request");
+          }
+          '''
+          new = '''function requestsThreadResumption(event: SemanticEvent): boolean {
+            if (event.target === "kaira") return false;
+            return Boolean(event.adviceRequested || event.discourseAct === "recall_request");
+          }
+
+          function requestsOngoingFirstPartyResumption(event: SemanticEvent): boolean {
+            if (event.target === "kaira") return false;
+            return Boolean(
+              event.worldMemory?.claims.some(
+                (claim) =>
+                  claim.subjectId === "current_user" &&
+                  typeof claim.value === "string" &&
+                  claim.value.toLocaleLowerCase("en-US") === "ongoing",
+              ),
+            );
+          }
+          '''
+          if old not in reducer:
+            raise SystemExit("requestsThreadResumption seam not found")
+          reducer = reducer.replace(old, new, 1)
+
+          old = '''  // Existing explicit resumption semantics belong to third-party threads only.
+            // First-party event threads are retained as evidence here, but their generic
+            // topic-equivalence/resumption rule is deliberately a separate work package.
+            const explicitlyResumableThreads = openThreads.filter(
+              (thread) => thread.kind === "third_party_topic",
+            );
+            if (requestsThreadResumption(event) && explicitlyResumableThreads.length > 0) {
+              if (explicitlyResumableThreads.length === 1) {
+                const resumed = explicitlyResumableThreads[0];
+                resumedThreadId = resumed.id;
+                activeThreadId = resumed.id;
+                openThreads = openThreads.map((thread) =>
+                  thread.id === resumed.id ? { ...thread, lastRelevantTurn: turnIndex } : thread,
+                );
+              } else {
+                ambiguousThreadResumption = true;
+              }
+              return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+            }
+          '''
+          new = '''  const userEventThreads = openThreads.filter(
+              (thread) => thread.kind === "user_event_topic",
+            );
+            if (requestsOngoingFirstPartyResumption(event) && userEventThreads.length > 0) {
+              if (userEventThreads.length === 1) {
+                const resumed = userEventThreads[0];
+                resumedThreadId = resumed.id;
+                activeThreadId = resumed.id;
+                openThreads = openThreads.map((thread) =>
+                  thread.id === resumed.id
+                    ? {
+                        ...thread,
+                        anchorText: appendAnchorEvidence(thread.anchorText, message),
+                        lastRelevantTurn: turnIndex,
+                      }
+                    : thread,
+                );
+              } else {
+                ambiguousThreadResumption = true;
+              }
+              return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+            }
+
+            const explicitlyResumableThreads = openThreads.filter(
+              (thread) => thread.kind === "third_party_topic",
+            );
+            if (requestsThreadResumption(event) && explicitlyResumableThreads.length > 0) {
+              if (explicitlyResumableThreads.length === 1) {
+                const resumed = explicitlyResumableThreads[0];
+                resumedThreadId = resumed.id;
+                activeThreadId = resumed.id;
+                openThreads = openThreads.map((thread) =>
+                  thread.id === resumed.id ? { ...thread, lastRelevantTurn: turnIndex } : thread,
+                );
+              } else {
+                ambiguousThreadResumption = true;
+              }
+              return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+            }
+          '''
+          if old not in reducer:
+            raise SystemExit("thread resumption seam not found")
+          reducer = reducer.replace(old, new, 1)
+
+          old = '''      lines.push(
+                `- Kullanıcı daha önce açık bırakılmış bir üçüncü-kişi konusuna geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni olay, kimlik veya kesinlik uydurma.`,
+              );
+          '''
+          new = '''      lines.push(
+                thread.kind === "user_event_topic"
+                  ? `- Kullanıcı daha önce açık bırakılmış kendi olay/deneyim konusuna typed continuation evidence ile geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni sebep, olay veya kesinlik uydurma.`
+                  : `- Kullanıcı daha önce açık bırakılmış bir üçüncü-kişi konusuna geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni olay, kimlik veya kesinlik uydurma.`,
+              );
+          '''
+          if old not in reducer:
+            raise SystemExit("observational resumption seam not found")
+          reducer = reducer.replace(old, new, 1)
+          reducer_path.write_text(reducer)
+
+          decision_path = Path("src/services/kairoDialogueDecisionEngine.ts")
+          decision = decision_path.read_text()
+          old = '''  if (
+            isFirstEmotionalOpening(history, event) &&
+            !event.adviceRequested &&
+            event.target === "event" &&
+            Boolean(
+              event.worldMemory?.claims.some(
+                (claim) => claim.subjectId === "current_user",
+              ),
+            )
+          ) {
+            return {
+              move: "natural_reaction",
+              allowFollowUpQuestion: false,
+              allowSpeculation: false,
+              maxSentences: 1,
+              maxWords: 10,
+              hasSupportedTargetClaim: false,
+              reason:
+                "İlk duygusal açılış canonical mevcut tur içinde zaten grounded olay içeriği taşıyor. Eksik bağlam varmış gibi yeniden neden/ne oldu sorma; yalnız verilen olaya kısa doğal tepki ver.",
+            };
+          }
+          '''
+          new = '''  const resumedUserEventThread = Boolean(
+            discourse?.resumedThreadId &&
+              discourse.openThreads.some(
+                (thread) =>
+                  thread.id === discourse.resumedThreadId &&
+                  thread.kind === "user_event_topic",
+              ),
+          );
+          if (
+            isFirstEmotionalOpening(history, event) &&
+            !event.adviceRequested &&
+            (resumedUserEventThread ||
+              (event.target === "event" &&
+                Boolean(
+                  event.worldMemory?.claims.some(
+                    (claim) => claim.subjectId === "current_user",
+                  ),
+                )))
+          ) {
+            return {
+              move: "natural_reaction",
+              allowFollowUpQuestion: false,
+              allowSpeculation: false,
+              maxSentences: 1,
+              maxWords: 10,
+              hasSupportedTargetClaim: false,
+              reason: resumedUserEventThread
+                ? "Kullanıcı canonical ongoing evidence ile daha önce açık kalan kendi olayına devam ediyor. Önceki event evidence zaten mevcut; eksik bağlam varmış gibi nedeni/ne olduğunu yeniden sorma, yalnız devam eden duruma kısa doğal tepki ver."
+                : "İlk duygusal açılış canonical mevcut tur içinde zaten grounded olay içeriği taşıyor. Eksik bağlam varmış gibi yeniden neden/ne oldu sorma; yalnız verilen olaya kısa doğal tepki ver.",
+            };
+          }
+          '''
+          if old not in decision:
+            raise SystemExit("emotional opening seam not found")
+          decision = decision.replace(old, new, 1)
+          decision_path.write_text(decision)
+
+          state_path = Path("PROJECT_STATE.md")
+          state = state_path.read_text()
+          marker = "## 2026-09-06 — Real-user Turn 24 ongoing first-party event continuity"
+          if marker not in state:
+            state += '''\n\n## 2026-09-06 — Real-user Turn 24 ongoing first-party event continuity\n- Archived 27-turn session exposes a long-range continuity miss: Turns 3–6 establish the user's sunburn/back-pain event and cause with canonical `current_user` world-memory claims; Turn 24 carries `current_user.back_discomfort = ongoing`, yet the old flow can ask for the cause again and Turn 26 corrects Kaira for forgetting it.\n- Existing `DiscourseState` already owns bounded `user_event_topic` evidence, but only third-party threads had an explicit resumption path.\n- ADR-0067 keeps the repair narrow: a first-party event may resume only from typed canonical continuation evidence (`current_user` claim value `ongoing`) and only when exactly one open `user_event_topic` exists. Multiple candidates fail closed; subject identity alone never links unrelated events.\n- `DialogueDecision` treats the resumed emotional turn as `natural_reaction` with questions closed instead of `invite_emotional_context`, preventing redundant cause reopening. No `hala` regex, raw-text topic matcher, provider call, semantic reparse, memory-store change or RelationshipReducer change is introduced.\n'''
+            state_path.write_text(state)
+
+          workflow = Path(".github/workflows/one-time-turn24-ongoing-thread.yml")
+          if workflow.exists():
+            workflow.unlink()
+      - name: Commit patch and self-remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/discourseStateReducer.ts src/services/kairoDialogueDecisionEngine.ts PROJECT_STATE.md .github/workflows/one-time-turn24-ongoing-thread.yml
+          git commit -m "fix(dialogue): resume typed ongoing user-event threads"
+          git push origin HEAD:codex/turn24-ongoing-user-event-continuity
