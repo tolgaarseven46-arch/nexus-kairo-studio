@@ -1,0 +1,127 @@
+name: One-time Turn24 ongoing thread patch v2
+on:
+  push:
+    branches: [codex/turn24-ongoing-user-event-continuity]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: codex/turn24-ongoing-user-event-continuity
+          fetch-depth: 0
+      - shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('src/services/discourseStateReducer.ts')
+          s = p.read_text()
+          seam = '''function requestsThreadResumption(event: SemanticEvent): boolean {
+            if (event.target === "kaira") return false;
+            return Boolean(event.adviceRequested || event.discourseAct === "recall_request");
+          }
+          '''
+          helper = '''
+          function requestsOngoingFirstPartyResumption(event: SemanticEvent): boolean {
+            if (event.target === "kaira") return false;
+            return Boolean(event.worldMemory?.claims.some(
+              (claim) => claim.subjectId === "current_user" && claim.value === "ongoing",
+            ));
+          }
+          '''
+          if seam not in s: raise SystemExit('helper seam missing')
+          s = s.replace(seam, seam + helper, 1)
+
+          start = s.index('  // Existing explicit resumption semantics belong to third-party threads only.\n')
+          third = s.index('  const explicitlyResumableThreads = openThreads.filter(\n', start)
+          end_marker = '    return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };\n  }\n'
+          end = s.index(end_marker, third) + len(end_marker)
+          third_block = s[third:end]
+          first_block = '''  const userEventThreads = openThreads.filter(
+            (thread) => thread.kind === "user_event_topic",
+          );
+          if (requestsOngoingFirstPartyResumption(event) && userEventThreads.length > 0) {
+            if (userEventThreads.length === 1) {
+              const resumed = userEventThreads[0];
+              resumedThreadId = resumed.id;
+              activeThreadId = resumed.id;
+              openThreads = openThreads.map((thread) =>
+                thread.id === resumed.id
+                  ? { ...thread, anchorText: appendAnchorEvidence(thread.anchorText, message), lastRelevantTurn: turnIndex }
+                  : thread,
+              );
+            } else {
+              ambiguousThreadResumption = true;
+            }
+            return { openThreads, activeThreadId, resumedThreadId, ambiguousThreadResumption };
+          }
+
+          '''
+          s = s[:start] + first_block + third_block + s[end:]
+          old = '`- Kullanıcı daha önce açık bırakılmış bir üçüncü-kişi konusuna geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni olay, kimlik veya kesinlik uydurma.`'
+          pos = s.index(old)
+          a = s.rfind('      lines.push(\n', 0, pos)
+          b = s.index('      );', pos) + len('      );')
+          repl = '''      lines.push(
+                thread.kind === "user_event_topic"
+                  ? `- Kullanıcı daha önce açık bırakılmış kendi olay/deneyim konusuna typed continuation evidence ile geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Burada olmayan yeni sebep/olay uydurma.`
+                  : `- Kullanıcı daha önce açık bırakılmış bir üçüncü-kişi konusuna geri dönüyor. Önceki konuşma kanıtı: "${thread.anchorText}". Bu metni yalnız bağlam/evidence olarak kullan; burada yazmayan yeni olay, kimlik veya kesinlik uydurma.`,
+              );'''
+          s = s[:a] + repl + s[b:]
+          s = s.replace('birden fazla açık üçüncü-kişi konusu var', 'birden fazla açık konuşma konusu var', 1)
+          p.write_text(s)
+
+          p = Path('src/services/kairoDialogueDecisionEngine.ts')
+          s = p.read_text()
+          a = s.index('  if (\n    isFirstEmotionalOpening(history, event) &&\n    !event.adviceRequested &&\n    event.target === "event" &&')
+          b = s.index('  if (isFirstEmotionalOpening(history, event) && !event.adviceRequested) {', a)
+          block = '''  const resumedUserEventThread = Boolean(
+            discourse?.resumedThreadId &&
+              discourse.openThreads.some((thread) =>
+                thread.id === discourse.resumedThreadId && thread.kind === "user_event_topic",
+              ),
+          );
+          if (
+            isFirstEmotionalOpening(history, event) &&
+            !event.adviceRequested &&
+            (resumedUserEventThread ||
+              (event.target === "event" &&
+                Boolean(event.worldMemory?.claims.some((claim) => claim.subjectId === "current_user"))))
+          ) {
+            return {
+              move: "natural_reaction",
+              allowFollowUpQuestion: false,
+              allowSpeculation: false,
+              maxSentences: 1,
+              maxWords: 10,
+              hasSupportedTargetClaim: false,
+              reason: resumedUserEventThread
+                ? "Kullanıcı canonical ongoing evidence ile daha önce açık kalan kendi olayına devam ediyor. Önceki event evidence zaten mevcut; eksik bağlam varmış gibi nedeni/ne olduğunu yeniden sorma, yalnız devam eden duruma kısa doğal tepki ver."
+                : "İlk duygusal açılış canonical mevcut tur içinde zaten grounded olay içeriği taşıyor. Eksik bağlam varmış gibi yeniden neden/ne oldu sorma; yalnız verilen olaya kısa doğal tepki ver.",
+            };
+          }
+          '''
+          p.write_text(s[:a] + block + s[b:])
+
+          p = Path('PROJECT_STATE.md')
+          s = p.read_text()
+          marker = '## 2026-09-06 — Real-user Turn 24 ongoing first-party event continuity'
+          if marker not in s:
+            s += '''\n\n## 2026-09-06 — Real-user Turn 24 ongoing first-party event continuity\n- Turns 3–6 establish the user sunburn/back-pain event and cause with canonical `current_user` claims; Turn 24 carries `back_discomfort = ongoing`, yet the old flow can ask the cause again and Turn 26 corrects Kaira.\n- First-party event resumption is now narrow: only typed `current_user` claim value `ongoing` + exactly one open `user_event_topic`. Multiple candidates fail closed; subject identity alone never links unrelated events.\n- DialogueDecision treats the resumed emotional turn as `natural_reaction` with questions closed. No `hala` regex, raw-text topic matcher, provider call, semantic reparse, memory-store change or RelationshipReducer change.\n'''
+            p.write_text(s)
+
+          for wf in [
+            '.github/workflows/one-time-turn24-ongoing-thread.yml',
+            '.github/workflows/one-time-turn24-ongoing-thread-v2.yml',
+          ]:
+            q = Path(wf)
+            if q.exists(): q.unlink()
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(dialogue): resume typed ongoing user-event threads"
+          git push origin HEAD:codex/turn24-ongoing-user-event-continuity
