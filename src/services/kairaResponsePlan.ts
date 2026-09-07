@@ -2,6 +2,7 @@ import type { BehaviorContract } from "./behaviorContract";
 import type { DialogueDecisionPlan } from "./kairoDialogueDecisionEngine";
 import type { KairoSpeechIdentity } from "./kairoSpeechIdentity";
 import type { KairaPlanProjections, KairaPlanUncertainty, KairaSocialMove } from "../types/kairaBehaviorPlan";
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import { deriveHardConstraints } from "./kairaHardConstraints";
 import { deriveSoftTendencies } from "./kairaSoftTendencies";
 import { resolveKairaResponsePlan } from "./kairaPlanResolver";
@@ -55,6 +56,18 @@ const REOPEN_RE = /(hadi\s+(?:konuş|devam)|konuşalım|devam edelim|eski halimi
 const DIALOGUE_FOCUSED_MOVES = new Set<DialogueDecisionPlan["move"]>([
   "grounded_recall", "invite_emotional_context", "repair_or_rephrase", "follow_previous_answer", "acknowledge_correction",
 ]);
+
+function canonicalReplyIsQuestion(interpretation?: SemanticInterpretation | null): boolean {
+  if (!interpretation) return false;
+  return interpretation.primaryIntent === "question" || interpretation.primaryIntent === "information_request";
+}
+
+function canonicalReplyHasAffection(interpretation?: SemanticInterpretation | null): boolean {
+  if (!interpretation) return false;
+  return interpretation.primaryIntent === "affection" ||
+    interpretation.secondarySocialActs.includes("affection") ||
+    interpretation.affection >= 0.5;
+}
 
 export function buildKairaResponsePlan(contract: BehaviorContract, dialogue: DialogueDecisionPlan, speech: KairoSpeechIdentity): KairaResponsePlan {
   const continueConversation = contract.continueConversation;
@@ -127,23 +140,29 @@ export function kairaResponsePlanInstruction(plan: KairaResponsePlan): string {
   ].filter(Boolean).join("\n");
 }
 
-export function findKairaResponsePlanIssues(reply: string, plan: KairaResponsePlan): string[] {
+export function findKairaResponsePlanIssues(
+  reply: string,
+  plan: KairaResponsePlan,
+  replySemanticInterpretation?: SemanticInterpretation | null,
+): string[] {
   const text = String(reply ?? "").trim();
   if (!text) return ["response_plan_empty_reply"];
   const issues: string[] = [];
-  if (!plan.allowQuestion && looksLikeKairaQuestionAct(text)) issues.push("response_plan_question_blocked");
+  const questionAct = looksLikeKairaQuestionAct(text) || canonicalReplyIsQuestion(replySemanticInterpretation);
+  const affectionAct = AFFECTION_RE.test(text) || canonicalReplyHasAffection(replySemanticInterpretation);
+  if (!plan.allowQuestion && questionAct) issues.push("response_plan_question_blocked");
   if (plan.allowAdvice !== true && looksLikeKairaAdviceAct(text)) issues.push("response_plan_unsolicited_advice_blocked");
   if (plan.socialMove && plan.socialMove !== "none" && SOCIAL_ACK_ONLY_RE.test(text)) issues.push("response_plan_social_move_missing");
   if (plan.requiredContent?.includes("engage_user_content") && SOCIAL_ACK_ONLY_RE.test(text)) issues.push("response_plan_content_engagement_missing");
   if (!plan.allowHumor && HUMOR_RE.test(text)) issues.push("response_plan_humor_blocked");
-  if (!plan.allowAffection && AFFECTION_RE.test(text)) issues.push("response_plan_affection_blocked");
+  if (!plan.allowAffection && affectionAct) issues.push("response_plan_affection_blocked");
   if (plan.counterFlirtAllowed === false && COUNTER_FLIRT_RE.test(text)) issues.push("response_plan_counter_flirt_blocked");
   if (!plan.allowForgiveness && FORGIVENESS_RE.test(text)) issues.push("response_plan_forgiveness_blocked");
   if (!plan.allowReopeningCloseness && REOPEN_RE.test(text)) issues.push("response_plan_reopening_blocked");
   if (responseUnitCount(text) > plan.maxSentences) issues.push("response_plan_sentence_budget_exceeded");
   if (wordCount(text) > plan.maxWords) issues.push("response_plan_word_budget_exceeded");
   if (countEmoji(text) > plan.emojiBudget) issues.push("response_plan_emoji_budget_exceeded");
-  return issues;
+  return [...new Set(issues)];
 }
 
 export function kairaSocialMoveFallback(plan: KairaResponsePlan): string | null {
