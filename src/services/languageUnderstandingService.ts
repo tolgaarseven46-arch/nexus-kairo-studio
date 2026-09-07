@@ -141,22 +141,50 @@ function reconcileNeutralThirdPartyEventOverread(
 
 /**
  * `how_are_you` / `what_doing` are reciprocal Kaira-facing social routines.
- * They are coherent only when the canonical semantic target is Kaira. A
- * provider may recognize a reciprocal surface while independently resolving
- * the utterance target to a third party, the current user, an event, or unknown;
- * those fields cannot all remain authoritative at once.
+ * The final canonical interpretation must therefore satisfy:
  *
- * Reconcile the typed contradiction at the canonical LU gateway rather than
- * teaching DialogueDecision to reinterpret the routine downstream. This uses no
- * raw-text rule and preserves genuine Kaira-directed reciprocal routines.
+ *   reciprocal routine => target === "kaira"
+ *
+ * Explicit non-Kaira targets are contradictions and lose the routine. An
+ * `unknown` target is different: it can be the normal implicit addressee of a
+ * dyadic chat. If the same interpretation carries a canonical current-user
+ * state claim / state-answer shape, the routine is an over-read and is cleared;
+ * otherwise the implicit reciprocal addressee is resolved to Kaira.
+ *
+ * This consumes only canonical fields and does not reparse raw text.
  */
 function reconcileReciprocalRoutineTargetInvariant(
   interpretation: SemanticInterpretation,
 ): SemanticInterpretation {
   const routine = interpretation.discourseFacets.socialRoutine;
   const reciprocalRoutine = routine === "how_are_you" || routine === "what_doing";
-  const contradictoryRoutine = reciprocalRoutine && interpretation.target !== "kaira";
-  if (!contradictoryRoutine) return interpretation;
+  if (!reciprocalRoutine || interpretation.target === "kaira") return interpretation;
+
+  const currentUserStateClaim = interpretation.worldMemory?.claims.some(
+    (claim) => claim.subjectId === "current_user",
+  ) === true;
+  const currentUserStateShare =
+    interpretation.discourseFacets.stateAnswerShape === true || currentUserStateClaim;
+
+  if (interpretation.target === "unknown" && !currentUserStateShare) {
+    return {
+      ...interpretation,
+      target: "kaira",
+      uncertainty: {
+        ...interpretation.uncertainty,
+        target: Math.min(interpretation.uncertainty.target, 0.25),
+      },
+      evidence: [
+        ...interpretation.evidence,
+        {
+          source: "reconciled",
+          provider: "canonical_language_gateway",
+          cues: ["implicit_reciprocal_routine_resolves_kaira_target"],
+          confidence: Math.max(0.75, 1 - interpretation.uncertainty.target),
+        },
+      ],
+    };
+  }
 
   return {
     ...interpretation,
