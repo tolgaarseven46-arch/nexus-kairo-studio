@@ -1,0 +1,77 @@
+name: One-time canonical behavior seriousness migration
+
+on:
+  push:
+    branches:
+      - codex/behavior-serious-context-e2
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/behavior-serious-context-e2
+          fetch-depth: 0
+
+      - name: Patch canonical behavior context wiring
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          behavior = Path('src/services/droitBehaviorEngine.ts')
+          text = behavior.read_text()
+
+          anchor = '''export interface EngineInteractionResult {\n  replyText: string;\n  nextExpression: DroitExpressionMode;\n  dynamicStateUpdates: Partial<DroitDynamicState>;\n  behaviorProfile: BehaviorLayerProfile;\n}\n'''
+          addition = anchor + '''\nexport interface BehaviorProfileContext {\n  /** Canonical/appraisal-owned seriousness signal. */\n  seriousContext?: boolean;\n}\n'''
+          if text.count(anchor) != 1:
+              raise SystemExit('droitBehaviorEngine: interface anchor mismatch')
+          text = text.replace(anchor, addition, 1)
+
+          old_sig = '''export function computeBehaviorProfile(\n  traits?: Partial<DroitPersonalityTraits> | null,\n  userMessage: string = ''\n): BehaviorLayerProfile {'''
+          new_sig = '''export function computeBehaviorProfile(\n  traits?: Partial<DroitPersonalityTraits> | null,\n  userMessage: string = '',\n  context?: BehaviorProfileContext,\n): BehaviorLayerProfile {'''
+          if text.count(old_sig) != 1:
+              raise SystemExit('droitBehaviorEngine: signature mismatch')
+          text = text.replace(old_sig, new_sig, 1)
+
+          old_block = '''  const lowerMsg = userMessage.toLowerCase();\n  const isDistressOrEmergency =\n    lowerMsg.includes('acil') ||\n    lowerMsg.includes('üzgün') ||\n    lowerMsg.includes('kötü') ||\n    lowerMsg.includes('ağla') ||\n    lowerMsg.includes('tehlike') ||\n    lowerMsg.includes('çök') ||\n    lowerMsg.includes('saldır');\n'''
+          new_block = '''  // Legacy callers may still omit structured context. Production canonical KDM\n  // always supplies SocialAppraisal seriousness and therefore never uses this\n  // raw-text compatibility fallback as semantic authority.\n  const lowerMsg = userMessage.toLowerCase();\n  const legacyRawDistressFallback =\n    lowerMsg.includes('acil') ||\n    lowerMsg.includes('üzgün') ||\n    lowerMsg.includes('kötü') ||\n    lowerMsg.includes('ağla') ||\n    lowerMsg.includes('tehlike') ||\n    lowerMsg.includes('çök') ||\n    lowerMsg.includes('saldır');\n  const isDistressOrEmergency = context?.seriousContext ?? legacyRawDistressFallback;\n'''
+          if text.count(old_block) != 1:
+              raise SystemExit('droitBehaviorEngine: distress block mismatch')
+          text = text.replace(old_block, new_block, 1)
+          behavior.write_text(text)
+
+          kdm = Path('src/services/kdmConsistencyEngine.ts')
+          text = kdm.read_text()
+          import_anchor = 'import { computeBehaviorProfile } from "./droitBehaviorEngine";\n'
+          shared_import = 'import { appraiseBehaviorSeriousContext } from "./socialAppraisalEngine";\n'
+          if shared_import not in text:
+              if text.count(import_anchor) != 1:
+                  raise SystemExit('kdmConsistencyEngine: behavior import anchor mismatch')
+              text = text.replace(import_anchor, import_anchor + shared_import, 1)
+
+          old_call = '  const baseBehaviorProfile = computeBehaviorProfile(normalizedPersonality, userMessage);'
+          new_call = '''  const baseBehaviorProfile = computeBehaviorProfile(\n    normalizedPersonality,\n    userMessage,\n    appraiseBehaviorSeriousContext(semanticInterpretation),\n  );'''
+          if text.count(old_call) != 1:
+              raise SystemExit('kdmConsistencyEngine: canonical behavior call mismatch')
+          text = text.replace(old_call, new_call, 1)
+          kdm.write_text(text)
+
+          if 'appraiseBehaviorSeriousContext(semanticInterpretation)' not in text:
+              raise SystemExit('canonical appraisal wiring missing')
+          PY
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/droitBehaviorEngine.ts src/services/kdmConsistencyEngine.ts
+          git diff --cached --check
+          git commit -m "refactor(appraisal): route behavior seriousness through canonical context"
+          git push origin HEAD:codex/behavior-serious-context-e2
