@@ -11,8 +11,10 @@ describe("final delivery enforcement characterization", () => {
     expect(gateMatches.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("does not persist a rejected assistant candidate as conversational memory", () => {
+  it("does not persist a rejected assistant candidate but keeps conversational persistence non-empty", () => {
     const gateSource = readFileSync(resolve(process.cwd(), "src/services/kairaFinalDeliveryGate.ts"), "utf8");
-    expect(gateSource).toContain("persistedReply: accepted ? candidateReply : \"\"");
+    expect(gateSource).toContain("export const KAIRA_FINAL_REJECTION_FALLBACK");
+    expect(gateSource).toContain("persistedReply: accepted ? candidate : KAIRA_FINAL_REJECTION_FALLBACK");
+    expect(gateSource).not.toContain("persistedReply: accepted ? candidate : \"\"");
   });
 });

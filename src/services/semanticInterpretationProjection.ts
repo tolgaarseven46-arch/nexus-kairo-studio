@@ -1,5 +1,9 @@
 import type { SemanticEvent, RelationalAct } from "./semanticEventEngine";
-import type { SemanticDiscourseProjection, SemanticInterpretation } from "../types/semanticInterpretation";
+import type {
+  SemanticDiscourseProjection,
+  SemanticInterpretation,
+  SemanticSocialRoutine,
+} from "../types/semanticInterpretation";
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
@@ -35,6 +39,27 @@ function relationalAct(interp: SemanticInterpretation): RelationalAct {
   return "none";
 }
 
+function hasCurrentUserStateEvidence(interp: SemanticInterpretation): boolean {
+  return Boolean(
+    interp.worldMemory?.claims?.some((claim) => claim.subjectId === "current_user"),
+  );
+}
+
+function projectedSocialRoutine(interp: SemanticInterpretation): SemanticSocialRoutine {
+  const routine = interp.discourseFacets.socialRoutine;
+  const reciprocalRoutine = routine === "how_are_you" || routine === "what_doing";
+  if (!reciprocalRoutine || interp.target === "kaira") return routine;
+
+  // Explicit non-Kaira targets are incompatible with a Kaira-facing reciprocal
+  // routine. `unknown` alone is not enough to suppress the routine because short
+  // greetings such as “naber şimdi” may legitimately remain unresolved at the
+  // target field. For unknown targets we fail closed only when the same canonical
+  // interpretation contains first-party state/activity evidence, proving the turn
+  // is describing the user's state rather than asking for Kaira's.
+  if (interp.target !== "unknown" || hasCurrentUserStateEvidence(interp)) return "none";
+  return routine;
+}
+
 export type ProjectedSemanticEvent = SemanticEvent & SemanticDiscourseProjection;
 
 /**
@@ -68,7 +93,7 @@ export function projectSemanticEvent(interp: SemanticInterpretation): ProjectedS
     raw: interp.raw,
     normalized: interp.normalized,
     intent: INTENT_MAP[interp.primaryIntent],
-    socialRoutine: interp.discourseFacets.socialRoutine,
+    socialRoutine: projectedSocialRoutine(interp),
     discourseAct: interp.discourseFacets.discourseAct,
     repairSignal: interp.discourseFacets.repairSignal,
     adviceRequested: interp.discourseFacets.adviceRequested,

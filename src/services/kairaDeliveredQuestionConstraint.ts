@@ -3,7 +3,7 @@ import { isTurkishQuestionAct } from "./kairaQuestionActRecognizer";
 function responseUnits(text: string): string[] {
   return String(text ?? "")
     .trim()
-    .split(/\n+|(?<=[.!?…])\s+/u)
+    .split(/\n+|(?<=[.!?…;:])\s+/u)
     .map((part) => part.trim())
     .filter(Boolean);
 }
@@ -12,11 +12,14 @@ function responseUnits(text: string): string[] {
  * Deterministic final-delivery enforcement for an already-owned plan decision.
  *
  * This does NOT decide whether a question is appropriate and does not parse user
- * semantics. KairaResponsePlan owns allowQuestion. We only remove question units
- * from a multi-unit candidate when the existing Turkish question-act recognizer
- * can identify them and at least one non-question unit remains. If the whole
- * candidate is a question, leave it untouched so normal repair/fallback remains
- * responsible instead of manufacturing a replacement here.
+ * semantics. KairaResponsePlan owns allowQuestion. We remove question units from
+ * a multi-unit candidate when at least one non-question unit survives. Sentence
+ * boundaries plus semicolon/colon clause boundaries are treated as removable
+ * units so a valid social reaction is not lost merely because a forbidden
+ * follow-up question shares the same orthographic sentence.
+ *
+ * If the whole candidate is a question, leave it untouched so normal
+ * repair/fallback remains responsible instead of manufacturing a replacement.
  */
 export function removeForbiddenQuestionUnits(
   reply: string,
