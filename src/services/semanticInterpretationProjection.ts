@@ -35,12 +35,27 @@ function relationalAct(interp: SemanticInterpretation): RelationalAct {
   return "none";
 }
 
+function hasCurrentUserStateEvidence(interp: SemanticInterpretation): boolean {
+  return Boolean(
+    interp.worldMemory?.claims?.some((claim) => claim.subjectId === "current_user"),
+  );
+}
+
 function projectedSocialRoutine(
   interp: SemanticInterpretation,
 ): SemanticDiscourseProjection["socialRoutine"] {
   const routine = interp.discourseFacets.socialRoutine;
   const reciprocalRoutine = routine === "how_are_you" || routine === "what_doing";
-  return reciprocalRoutine && interp.target !== "kaira" ? "none" : routine;
+  if (!reciprocalRoutine || interp.target === "kaira") return routine;
+
+  // Explicit non-Kaira targets are incompatible with a Kaira-facing reciprocal
+  // routine. `unknown` alone is not enough to suppress the routine because short
+  // greetings such as “naber şimdi” may legitimately remain unresolved at the
+  // target field. For unknown targets we fail closed only when the same canonical
+  // interpretation contains first-party state/activity evidence, proving the turn
+  // is describing the user's state rather than asking for Kaira's.
+  if (interp.target !== "unknown" || hasCurrentUserStateEvidence(interp)) return "none";
+  return routine;
 }
 
 export type ProjectedSemanticEvent = SemanticEvent & SemanticDiscourseProjection;
@@ -51,12 +66,6 @@ export type ProjectedSemanticEvent = SemanticEvent & SemanticDiscourseProjection
  * This function MUST NOT inspect raw text, call a parser, use regex, or widen the
  * semantic reading. `SemanticInterpretation@2` is the only authority; the legacy
  * `SemanticEvent` shape exists solely for consumers not yet migrated.
- *
- * Cross-field invariant: reciprocal `how_are_you` / `what_doing` routines are
- * Kaira-facing by definition and therefore may be projected only when the
- * canonical target is Kaira. `third_party`, `current_user`, `event`, and
- * `unknown` targets fail closed to `socialRoutine=none` without inventing a
- * replacement interpretation.
  */
 export function projectSemanticEvent(interp: SemanticInterpretation): ProjectedSemanticEvent {
   const insult =
