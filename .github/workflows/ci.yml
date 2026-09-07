@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -30,8 +32,14 @@ jobs:
       - name: Beta runtime regression gate
         run: npm run test:beta
 
-      - name: Beta conversation acceptance
+      - name: Beta conversation acceptance + captured KNT replay
         run: node scripts/run-beta-conversation-acceptance.mjs
+
+      - name: Validate behavior bug-class proof manifest
+        run: node scripts/validate-behavior-regression-proof.mjs
+
+      - name: Historical RED to GREEN behavior proof
+        run: node scripts/run-behavior-red-green-proof.mjs
 
       - name: Tests
         run: npm test -- --run
@@ -74,7 +82,7 @@ jobs:
 
   behavior-guard:
     # AI_CONTEXT.md §8 Hata Azaltma Protokolü — behavior-critical bir path'e dokunan PR
-    # bir test dosyası VE bir golden/long-session regression testi içermeli.
+    # test + golden regression zorunlu; fix(...) PR'ları ayrıca machine-readable bug-class proof taşır.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -83,7 +91,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Enforce test + golden regression for behavior changes
+      - name: Enforce test + golden + bug-class proof for behavior changes
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
           BASE="origin/${{ github.base_ref }}"
@@ -102,7 +112,19 @@ jobs:
               echo "::error::AI_CONTEXT.md §8.5 — davranis degisti ama golden/long-session regression testi eklenmedi/guncellendi (*Regression* / *GoldenSession* / *LongSession*)."
               FAIL=1
             fi
-            [ "$FAIL" -eq 0 ] && echo "OK: behavior change carries a test + a golden/long-session regression."
+
+            if [[ "$PR_TITLE" == fix\(* ]]; then
+              if ! echo "$CHANGED" | grep -Fxq 'config/behavior-regression-proof.json'; then
+                echo "::error::Bug-fix PR behavior-critical kodu degistirdi ama config/behavior-regression-proof.json guncellenmedi."
+                FAIL=1
+              fi
+              if ! echo "$CHANGED" | grep -Eq 'NeighborProofRegression\.test\.tsx?$'; then
+                echo "::error::Bug-fix PR reported + en az 2 neighbor + counterexample proof regression tasimiyor."
+                FAIL=1
+              fi
+            fi
+
+            [ "$FAIL" -eq 0 ] && echo "OK: behavior change carries required regression evidence."
             exit "$FAIL"
           else
             echo "No behavior-critical paths touched; behavior-guard passes."

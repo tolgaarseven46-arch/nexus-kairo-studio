@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "clusters": [
+    {
+      "id": "reciprocal-routine-state-share",
+      "invariant": "A reciprocal Kaira-facing social routine must not survive when canonical evidence says the user is merely sharing their own current state; genuinely unresolved greetings remain legal.",
+      "redSha": "cb2ed308cb896ab0926eb3b141d3c4011f06de58",
+      "testFile": "src/services/kairaReciprocalRoutineNeighborProofRegression.test.ts",
+      "reported": "reported: suppresses unknown-target reciprocal routine for captured tea state-share",
+      "neighbors": [
+        "neighbor-1: suppresses the same stale routine for a coffee state-share",
+        "neighbor-2: suppresses the same stale routine for an at-home activity state-share"
+      ],
+      "counterexamples": [
+        "counterexample: preserves a genuinely unresolved unknown-target reciprocal greeting"
+      ]
+    },
+    {
+      "id": "question-act-bare-ne-second-person",
+      "invariant": "Generated Turkish output that structurally asks bare-ne plus a second-person predicate is a question act, while exclamatory/non-interrogative bare-ne phrases are not.",
+      "redSha": "cb2ed308cb896ab0926eb3b141d3c4011f06de58",
+      "testFile": "src/services/kairaQuestionActNeighborProofRegression.test.ts",
+      "reported": "reported: recognizes captured bare-ne second-person question",
+      "neighbors": [
+        "neighbor-1: recognizes a neighboring bare-ne second-person music question",
+        "neighbor-2: recognizes a neighboring bare-ne second-person selection question"
+      ],
+      "counterexamples": [
+        "counterexample: does not treat an exclamatory bare-ne phrase as a question"
+      ]
+    },
+    {
+      "id": "final-delivery-non-silent-rejection",
+      "invariant": "Fail-closed final rejection must remain rejected but must never persist an empty assistant turn.",
+      "redSha": "cb2ed308cb896ab0926eb3b141d3c4011f06de58",
+      "testFile": "src/services/kairaFinalDeliveryNeighborProofRegression.test.ts",
+      "reported": "reported: rejected question candidate still persists a non-empty assistant reply",
+      "neighbors": [
+        "neighbor-1: rejected affection candidate still persists a non-empty assistant reply",
+        "neighbor-2: multiply rejected candidate still persists a non-empty assistant reply"
+      ],
+      "counterexamples": [
+        "counterexample: accepted candidate remains accepted and unchanged"
+      ]
+    },
+    {
+      "id": "low-confidence-world-query-fail-closed",
+      "invariant": "A present typed world-memory query below canonical admission confidence may not reopen lower-authority lexical/general retrieval.",
+      "redSha": "676de062f496241d2609ca3b0924a21ae422a812",
+      "testFile": "src/services/kairaLowConfidenceWorldMemoryNeighborProofRegression.test.ts",
+      "reported": "reported: confidence 0.70 typed query fails closed",
+      "neighbors": [
+        "neighbor-1: confidence 0.69 typed query fails closed",
+        "neighbor-2: confidence 0.71 typed query fails closed"
+      ],
+      "counterexamples": [
+        "counterexample: query-less legacy/general recall remains available"
+      ]
+    },
+    {
+      "id": "action-obligation-clarification-realizability",
+      "invariant": "If an action_request obligation explicitly allows clarify and the hard question boundary allows questions, ResponsePlan must make at least one clarification realization possible without opening free-form question drive.",
+      "redSha": "640df36398944272dfd0dd5af3d08bb48f3b384d",
+      "testFile": "src/services/kairaActionClarificationNeighborProofRegression.test.ts",
+      "reported": "reported: captured play-together request authorizes a coordination question",
+      "neighbors": [
+        "neighbor-1: another collaborative action request authorizes clarification",
+        "neighbor-2: a joint selection action request authorizes clarification"
+      ],
+      "counterexamples": [
+        "counterexample: ordinary natural reaction with no obligation remains governed by normal question drive"
+      ]
+    }
+  ]
+}
