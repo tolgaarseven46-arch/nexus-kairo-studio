@@ -12,6 +12,7 @@ import {
   buildCanonicalDialogueMoveContext,
   buildCanonicalObservationalContext,
 } from "./kairaCanonicalPromptBuilder";
+import { buildKairaFinalProviderSystemPrompt } from "./kairaFinalProviderPrompt";
 import { auditKairaFinalProviderPrompt, type KairaPreAiAuditSnapshot } from "./kairaPreAiAudit";
 import type { DroitDynamicState } from "../types/nexus";
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
@@ -110,26 +111,39 @@ function buildCoreFinalProviderPrompt(input: {
     hurt: relationship.hurtScore ?? 0,
     reactionMode: input.dynamicState.reactionMode ?? null,
   });
-  return [
-    "=== PRE-AI PRODUCTION-CORE PROMPT SNAPSHOT ===",
-    speechIdentityPrompt(input.speech),
-    buildDiscourseObservationalInstruction(input.discourse),
-    buildCanonicalDialogueMoveContext(
+
+  // The Phase 0 harness now uses the exact same final-provider serializer as
+  // production. It still supplies a deterministic context subset because Phase 0
+  // intentionally does not hydrate provider-dependent/persistent production
+  // services. Assembly parity and context fidelity are reported separately.
+  return buildKairaFinalProviderSystemPrompt({
+    runtimeIdentityInstruction: "=== PRE-AI PRODUCTION-CORE PROMPT SNAPSHOT ===",
+    speechIdentityInstruction: speechIdentityPrompt(input.speech),
+    languageStyleMemoryInstruction: "",
+    dyadicLanguageAlignmentInstruction: "",
+    socialStyle: "",
+    groundingInstruction: `CANONICAL SEMANTIC SNAPSHOT:\n${JSON.stringify(input.interpretation)}`,
+    activeParticipantInstruction: "",
+    entityGroundingInstruction: `ENTITY RESOLUTION SNAPSHOT:\n${JSON.stringify(input.entityResolution)}`,
+    worldEventInstruction: `WORLD EVENT SNAPSHOT:\n${JSON.stringify(input.worldEvent)}`,
+    worldEventMemoryInstruction: "",
+    worldStateAppraisalInstruction: "",
+    worldReasoningPolicyInstruction: "",
+    epistemicInstruction: "",
+    selfMemoryInstruction: "",
+    dialogueInstruction: `CURRENT USER TURN: ${input.userMessage}`,
+    discourseInstruction: buildDiscourseObservationalInstruction(input.discourse),
+    dialogueDecisionInstruction: buildCanonicalDialogueMoveContext(
       input.dialogueDecision.move,
       input.dialogueDecision.target,
       input.dialogueDecision.reason,
     ),
-    buildCanonicalBehaviorBlock(input.responsePlan),
-    observational,
-    "CANONICAL SEMANTIC SNAPSHOT:",
-    JSON.stringify(input.interpretation),
-    "ENTITY RESOLUTION SNAPSHOT:",
-    JSON.stringify(input.entityResolution),
-    "WORLD EVENT SNAPSHOT:",
-    JSON.stringify(input.worldEvent),
-    `CURRENT USER TURN: ${input.userMessage}`,
-    "=== STOP: FINAL PROVIDER PROMPT BOUNDARY / NO MODEL CALL ===",
-  ].join("\n");
+    responsePlanInstruction: buildCanonicalBehaviorBlock(input.responsePlan),
+    canonicalObservationalContext: observational,
+    sessionWorkingMemory: "Phase 0 user-turn-only history; generation is intentionally disabled.",
+    memoryContext: "Phase 0 persistent-memory hydration disabled.",
+    tone: input.trace?.decision?.chosenTone || "confident",
+  });
 }
 
 /**
@@ -138,9 +152,9 @@ function buildCoreFinalProviderPrompt(input: {
  * No morphology/semantic/model provider is supplied to understandTurkishMessage,
  * so ingestion uses the repository's explicit deterministic regex-floor fallback.
  * This deliberately audits the no-AI core/composition path. It MUST NOT be used
- * as evidence about semantic-provider quality. The production final-prompt seam
- * still needs a later exact server adapter before this harness may claim full
- * byte-identical server-prompt coverage.
+ * as evidence about semantic-provider quality. Production and the harness share
+ * the same final-provider serializer; production-context fidelity remains a
+ * separate, explicit coverage dimension.
  */
 export async function runKairaPreAiPhase0Scenario(
   scenario: KairaPreAiScenarioDefinition,
@@ -270,7 +284,8 @@ export async function runKairaPreAiPhase0Scenario(
       "no_ai_provider_called",
       "semantic_ingestion=deterministic_regex_floor",
       "history_fidelity=user_turns_only_until_generation_phase",
-      "prompt_coverage=production_core_not_yet_byte_identical_server_template",
+      "prompt_assembly=shared_production_final_provider_serializer",
+      "prompt_context_fidelity=deterministic_phase0_subset_not_full_production_runtime",
     ],
   };
 }
