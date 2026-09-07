@@ -40,3 +40,10 @@ jobs:
           echo "===== KAIRA_RANDOMIZED_BETA_REPORT_BEGIN ====="
           cat artifacts/kaira-randomized-beta-exploration.json
           echo "===== KAIRA_RANDOMIZED_BETA_REPORT_END ====="
+
+      - name: Upload randomized KNT report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: kaira-randomized-beta-exploration
+          path: artifacts/kaira-randomized-beta-exploration.json
+          if-no-files-found: error
