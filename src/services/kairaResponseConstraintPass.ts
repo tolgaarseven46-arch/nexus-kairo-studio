@@ -126,9 +126,6 @@ function runOrderedPass(
   const original = String(reply ?? "").trim();
   const originalInputReply = String(input.reply ?? "").trim();
   const isOriginalCandidate = original === originalInputReply;
-  const candidateSemanticInterpretation = isOriginalCandidate
-    ? input.replySemanticInterpretation
-    : null;
 
   const worldGuard = enforceWorldModelRecallResponse(
     original,
@@ -153,6 +150,12 @@ function runOrderedPass(
     maxSentences: input.plan.maxSentences,
     maxWords: input.plan.maxWords,
   });
+  const semanticSnapshotStillApplies =
+    isOriginalCandidate && planEnforcement.reply.trim() === original;
+  const candidateSemanticInterpretation = semanticSnapshotStillApplies
+    ? input.replySemanticInterpretation
+    : null;
+
   const questionConformed = removeForbiddenQuestionUnits(
     planEnforcement.reply,
     input.plan.allowQuestion,
@@ -166,7 +169,7 @@ function runOrderedPass(
   const questionUnitRemoved = questionConformed.trim() !== planEnforcement.reply.trim();
   const affectionVocativeRemoved = mechanicallyConformed.trim() !== questionConformed.trim();
   const semanticEvidenceAppliesToDelivered =
-    isOriginalCandidate && delivered === original;
+    semanticSnapshotStillApplies && delivered === original;
 
   const issues = [
     ...findKairaResponsePlanIssues(
@@ -176,7 +179,7 @@ function runOrderedPass(
     ),
     ...findKairaAmbiguityPreservationIssues(delivered, input.plan),
     ...findKairaSelfCorrectionAccountabilityIssues(delivered, input.plan),
-    ...(isOriginalCandidate
+    ...(semanticEvidenceAppliesToDelivered
       ? findGeneratedClaimProvenanceIssues({
           plan: input.plan,
           replyInterpretation: input.replySemanticInterpretation,
