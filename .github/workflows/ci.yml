@@ -32,6 +32,9 @@ jobs:
       - name: Beta runtime regression gate
         run: npm run test:beta
 
+      - name: Pre-AI Phase 0 deterministic scenario harness
+        run: npm run test:preai:phase0
+
       - name: Beta conversation acceptance + captured KNT replay
         run: node scripts/run-beta-conversation-acceptance.mjs
 
