@@ -1,5 +1,6 @@
 import { DroitDynamicState } from '../types/nexus';
 import { BehaviorLayerProfile } from './droitBehaviorEngine';
+import { appraiseRelationshipContext } from './socialAppraisalEngine';
 
 export function applyRelationshipContext(
   profile: BehaviorLayerProfile,
@@ -9,31 +10,21 @@ export function applyRelationshipContext(
   if (!relationship) return profile;
   const reactionMode = dynamicState?.reactionMode ?? 'neutral';
 
-  const familiarity = Math.max(0, Math.min(1, relationship.familiarityDays / 30));
-  const interactionFamiliarity = Math.max(0, Math.min(1, relationship.interactionCount / 40));
-  const warmth = Math.max(0, Math.min(1, relationship.warmth / 100));
-  const trust = Math.max(0, Math.min(1, (relationship.trust ?? 50) / 100));
-  const conflict = Math.max(0, Math.min(1, (relationship.conflictScore ?? 0) / 100));
-  const hurt = Math.max(0, Math.min(1, (relationship.hurtScore ?? 0) / 100));
-  const repair = Math.max(0, Math.min(1, (relationship.repairProgress ?? 0) / 100));
-  const historyQuality = Math.max(0, Math.min(1, (50 + (relationship.positiveEvents ?? 0) * 3 - (relationship.negativeEvents ?? 0) * 5) / 100));
-
-  const closeness = Math.max(0, Math.min(1,
-    familiarity * 0.27 +
-    interactionFamiliarity * 0.13 +
-    warmth * 0.18 +
-    trust * 0.24 +
-    historyQuality * 0.10 +
-    repair * 0.08 -
-    conflict * 0.25 -
-    hurt * 0.22,
-  ));
-
-  const establishedRelationship = relationship.familiarityDays >= 14 || relationship.interactionCount >= 20;
-  const friendlyRelationship = closeness >= 0.55 && trust >= 0.55 && conflict < 0.45 && hurt < 0.35;
-  const damagedRelationship = conflict >= 0.35 || trust < 0.42 || hurt >= 0.30 || warmth < 0.35;
-  const severelyDamagedRelationship = conflict >= 0.55 || trust < 0.32 || hurt >= 0.50 || warmth < 0.25;
-  const healingRelationship = !damagedRelationship && (hurt >= 0.2 || conflict >= 0.2) && repair >= 0.1;
+  const appraisal = appraiseRelationshipContext(relationship);
+  const {
+    closeness,
+    warmth,
+    trust,
+    conflict,
+    hurt,
+    repair,
+    historyQuality,
+    establishedRelationship,
+    friendlyRelationship,
+    damagedRelationship,
+    severelyDamagedRelationship,
+    healingRelationship,
+  } = appraisal;
 
   const patienceLevel = Math.min(1, profile.patienceLevel + closeness * 0.22);
   const temperLevel = Math.max(0, profile.temperLevel - closeness * 0.18 + conflict * 0.14 + hurt * 0.14);
