@@ -81,7 +81,8 @@ describe("Kaira epistemic runtime contracts", () => {
     const pass = unifiedPassSource();
     expect(pass).toContain('const candidate = runOrderedPass(preferredFallback, input)');
     expect(pass).not.toContain('runOrderedPass("tamam", input)');
-    expect(pass).toContain('findKairaResponsePlanIssues(delivered, input.plan)');
+    expect(pass).toContain('findKairaResponsePlanIssues(');
+    expect(pass).toContain('semanticEvidenceAppliesToDelivered ? candidateSemanticInterpretation : null');
     expect(pass).toContain('findKairaEpistemicResponseIssues(delivered, input.epistemicContext)');
   });
 
