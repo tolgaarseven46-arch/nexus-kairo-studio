@@ -5,7 +5,6 @@ const rejected = {
   accepted: false,
   score: 70,
   issues: ["response_plan_question_blocked"],
-  warnings: [],
 };
 
 describe("final-delivery fail-silent bug-class neighbor proof", () => {
@@ -39,7 +38,6 @@ describe("final-delivery fail-silent bug-class neighbor proof", () => {
       accepted: true,
       score: 100,
       issues: [],
-      warnings: [],
     });
     expect(result.accepted).toBe(true);
     expect(result.persistedReply).toBe("tamam, olur");
