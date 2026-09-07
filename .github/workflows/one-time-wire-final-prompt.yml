@@ -10,19 +10,15 @@ permissions:
 
 jobs:
   wire:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: codex/final-prompt-byte-parity
           fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
       - name: Wire server to shared serializer
-        shell: python
         run: |
+          python3 <<'PY'
           from pathlib import Path
 
           path = Path("server.ts")
@@ -34,45 +30,57 @@ jobs:
             buildCanonicalDialogueMoveContext,
           } from "./src/services/kairaCanonicalPromptBuilder";'''.replace("          ", "")
           import_replacement = import_anchor + '\nimport { buildKairaFinalProviderSystemPrompt } from "./src/services/kairaFinalProviderPrompt";'
-          if text.count(import_anchor) != 1:
-              raise SystemExit(f"expected exactly one canonical prompt import anchor, got {text.count(import_anchor)}")
-          text = text.replace(import_anchor, import_replacement, 1)
+          if 'buildKairaFinalProviderSystemPrompt' not in text:
+              if text.count(import_anchor) != 1:
+                  raise SystemExit(f"expected exactly one canonical prompt import anchor, got {text.count(import_anchor)}")
+              text = text.replace(import_anchor, import_replacement, 1)
 
-          old = '''    const system = `${buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character)}\\n${speechIdentityPrompt(speech)}\\n${languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)}\\
-${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\\n${socialStyle}\\n${groundingInstruction}\\n${activeParticipantInstruction}\\n${entityGroundingInstruction}\\n${worldEventInstruction}\\n${worldEventMemoryInstruction}\\n${worldStateAppraisalInstruction}\\n${worldReasoningPolicyInstruction}\\n${epistemicInstruction}\\n${selfMemoryInstruction}\\n${dialogueInstruction}\\n${discourseInstruction}\\n${dialogueDecisionInstruction}\\n${`${responsePlanInstruction}\\n${canonicalObservationalContext}`}\\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\\n${sessionWorkingMemory}\\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\\n${memoryContext}\\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;'''
+          start_marker = '    const system = `${buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character)}\\n'
+          end_marker = ' Yalnızca Kaira\'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;'
+          start = text.find(start_marker)
+          if start < 0:
+              raise SystemExit("production inline system prompt start marker not found")
+          end = text.find(end_marker, start)
+          if end < 0:
+              raise SystemExit("production inline system prompt end marker not found")
+          end += len(end_marker)
+
           new = '''    const system = buildKairaFinalProviderSystemPrompt({
-      runtimeIdentityInstruction: buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character),
-      speechIdentityInstruction: speechIdentityPrompt(speech),
-      languageStyleMemoryInstruction: languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory),
-      dyadicLanguageAlignmentInstruction: dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory),
-      socialStyle,
-      groundingInstruction,
-      activeParticipantInstruction,
-      entityGroundingInstruction,
-      worldEventInstruction,
-      worldEventMemoryInstruction,
-      worldStateAppraisalInstruction,
-      worldReasoningPolicyInstruction,
-      epistemicInstruction,
-      selfMemoryInstruction,
-      dialogueInstruction,
-      discourseInstruction,
-      dialogueDecisionInstruction,
-      responsePlanInstruction,
-      canonicalObservationalContext,
-      sessionWorkingMemory,
-      memoryContext,
-      tone: behaviorProfile?.tone || "confident",
-    });'''
-          if text.count(old) != 1:
-              raise SystemExit(f"expected exactly one production inline system prompt, got {text.count(old)}")
-          text = text.replace(old, new, 1)
+              runtimeIdentityInstruction: buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character),
+              speechIdentityInstruction: speechIdentityPrompt(speech),
+              languageStyleMemoryInstruction: languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory),
+              dyadicLanguageAlignmentInstruction: dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory),
+              socialStyle,
+              groundingInstruction,
+              activeParticipantInstruction,
+              entityGroundingInstruction,
+              worldEventInstruction,
+              worldEventMemoryInstruction,
+              worldStateAppraisalInstruction,
+              worldReasoningPolicyInstruction,
+              epistemicInstruction,
+              selfMemoryInstruction,
+              dialogueInstruction,
+              discourseInstruction,
+              dialogueDecisionInstruction,
+              responsePlanInstruction,
+              canonicalObservationalContext,
+              sessionWorkingMemory,
+              memoryContext,
+              tone: behaviorProfile?.tone || "confident",
+            });'''
+          text = text[:start] + new + text[end:]
           path.write_text(text, encoding="utf-8")
+          PY
       - name: Commit wiring
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server.ts
           git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No wiring change needed"
+            exit 0
+          fi
           git commit -m "refactor(prompt): wire production to shared final serializer"
           git push origin HEAD:codex/final-prompt-byte-parity
