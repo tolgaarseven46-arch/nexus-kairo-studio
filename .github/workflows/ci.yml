@@ -35,6 +35,13 @@ jobs:
       - name: Pre-AI Phase 0 deterministic scenario harness
         run: npm run test:preai:phase0
 
+      - name: Pre-AI Phase 0 machine-readable report
+        run: |
+          npx tsx scripts/run-kaira-preai-phase0-report.ts artifacts/kaira-preai-phase0-report.json
+          echo "===== KAIRA_PREAI_PHASE0_REPORT_BEGIN ====="
+          cat artifacts/kaira-preai-phase0-report.json
+          echo "===== KAIRA_PREAI_PHASE0_REPORT_END ====="
+
       - name: Beta conversation acceptance + captured KNT replay
         run: node scripts/run-beta-conversation-acceptance.mjs
 
