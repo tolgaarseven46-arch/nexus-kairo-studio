@@ -5,6 +5,7 @@ import {
   computeExpectedness,
   type AppraisalContextObservation,
 } from "./appraisalEngine";
+import { isKdmSalientEmotionalLoad } from "./emotionalLoadPolicy";
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
@@ -141,6 +142,35 @@ export function appraiseRelationshipContext(
     damagedRelationship,
     severelyDamagedRelationship,
     healingRelationship,
+  };
+}
+
+export interface BehaviorSeriousContextAppraisal {
+  seriousContext: boolean;
+  emotionalLoadSalient: boolean;
+  severityPressure: number;
+}
+
+/**
+ * Behavior-facing seriousness appraisal derived only from canonical semantic
+ * evidence. This replaces production raw-message keyword inspection; it does
+ * not choose tone itself.
+ */
+export function appraiseBehaviorSeriousContext(
+  interp: SemanticInterpretation,
+): BehaviorSeriousContextAppraisal {
+  const emotionalLoadSalient = isKdmSalientEmotionalLoad(interp.emotionalLoad);
+  const severityPressure = clamp01(Math.max(
+    interp.severity.aggression,
+    interp.severity.coercion,
+    interp.severity.manipulation,
+    interp.severity.privacy,
+    interp.severity.disrespect * 0.75,
+  ));
+  return {
+    seriousContext: emotionalLoadSalient || severityPressure >= 0.6,
+    emotionalLoadSalient,
+    severityPressure,
   };
 }
 
