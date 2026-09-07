@@ -9,9 +9,9 @@ import {
 } from "./kairaFinalDeliveryGate";
 
 describe("cross-layer composition invariants", () => {
-  it("projects reciprocal routines only for Kaira-targeted semantics", () => {
-    const base = interpretationFromRegexFloor("iyi beya çay içiyom");
-    for (const target of ["current_user", "third_party", "event", "unknown"] as const) {
+  it("suppresses reciprocal routines for explicit non-Kaira targets", () => {
+    const base = interpretationFromRegexFloor("test");
+    for (const target of ["current_user", "third_party", "event"] as const) {
       const interpretation = {
         ...base,
         target,
@@ -22,6 +22,44 @@ describe("cross-layer composition invariants", () => {
       };
       expect(projectSemanticEvent(interpretation).socialRoutine).toBe("none");
     }
+  });
+
+  it("suppresses an unknown-target reciprocal routine when canonical first-party state evidence is present", () => {
+    const base = interpretationFromRegexFloor("iyi beya çay içiyom");
+    const interpretation = {
+      ...base,
+      target: "unknown",
+      discourseFacets: {
+        ...base.discourseFacets,
+        socialRoutine: "what_doing",
+      },
+      worldMemory: {
+        claims: [
+          {
+            subjectId: "current_user",
+            attributeKey: "current_activity",
+            value: "drinking_tea",
+            confidence: 0.95,
+          },
+        ],
+        query: null,
+      },
+    } as any;
+
+    expect(projectSemanticEvent(interpretation).socialRoutine).toBe("none");
+  });
+
+  it("preserves a genuinely unresolved reciprocal greeting and a Kaira-targeted routine", () => {
+    const base = interpretationFromRegexFloor("naber şimdi");
+    const unresolved = {
+      ...base,
+      target: "unknown" as const,
+      discourseFacets: {
+        ...base.discourseFacets,
+        socialRoutine: "how_are_you" as const,
+      },
+    };
+    expect(projectSemanticEvent(unresolved).socialRoutine).toBe("how_are_you");
 
     const kairaDirected = {
       ...base,
