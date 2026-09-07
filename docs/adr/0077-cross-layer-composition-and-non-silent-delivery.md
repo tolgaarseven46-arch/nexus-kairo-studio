@@ -18,9 +18,17 @@ The root-cause audit concluded that the core architecture remains valid, but cro
 
 ### 1. Reciprocal social routines have a general target invariant
 
-`how_are_you` and `what_doing` are reciprocal Kaira-facing routines and are valid only when canonical `target === "kaira"`.
+`how_are_you` and `what_doing` are reciprocal Kaira-facing routines. The final canonical interpretation must satisfy:
 
-At the canonical language-understanding gateway, a reciprocal routine on any other target (`third_party`, `self`, `event`, `unknown`) is reconciled to `none` without reparsing raw text.
+`socialRoutine in {how_are_you, what_doing} => target === kaira`.
+
+The language-understanding gateway resolves contradictions using typed canonical evidence only:
+
+- explicit non-Kaira targets (`third_party`, `self`, `event`) lose the reciprocal routine;
+- `target=unknown` plus a canonical current-user state/share signal (for example a `current_user` world-memory claim or `stateAnswerShape`) also loses the routine because the user is describing themself rather than asking Kaira;
+- `target=unknown` with a reciprocal routine and no current-user state/share evidence is resolved to `target=kaira`, representing the implicit addressee of the dyadic chat.
+
+This preserves ordinary `naber şimdi`-style implicit address while closing the measured Turn 2 state-share over-read. No raw-text reparsing is added.
 
 This supersedes the narrower PR #136 implementation that only reconciled `third_party`.
 
@@ -59,19 +67,21 @@ If only a narrow fix is justified, the PR must say `NARROW FIX — GENERALIZATIO
 
 ## Invariants
 
-1. `socialRoutine in {how_are_you, what_doing} => target === kaira`.
-2. A canonical generated-reply question cannot pass `allowQuestion=false` merely because the structural recognizer missed its surface form.
-3. A mechanically removable forbidden facet must not force rejection of an independently valid facet in the same candidate.
-4. `resolveKairaFinalDelivery(...).persistedReply` is non-empty for both accepted and rejected decisions.
-5. `accepted=false` remains visible in metrics/KNT even when the non-silent recovery surface is delivered.
-6. Mechanical delivery repair never invents a new semantic claim.
+1. Any surviving reciprocal `how_are_you/what_doing` routine has canonical `target=kaira`.
+2. A current-user state/share signal cannot be reinterpreted as a reciprocal Kaira routine merely because target is unresolved.
+3. A canonical generated-reply question cannot pass `allowQuestion=false` merely because the structural recognizer missed its surface form.
+4. A mechanically removable forbidden facet must not force rejection of an independently valid facet in the same candidate.
+5. `resolveKairaFinalDelivery(...).persistedReply` is non-empty for both accepted and rejected decisions.
+6. `accepted=false` remains visible in metrics/KNT even when the non-silent recovery surface is delivered.
+7. Mechanical delivery repair never invents a new semantic claim.
 
 ## Verification
 
 Required regression coverage:
 
-- reciprocal social-routine target matrix including `kaira`, `third_party`, `self`, `event`, and `unknown`;
-- measured Test B Turn 2 neighbor (`target=unknown + what_doing`);
+- explicit reciprocal-routine target matrix (`kaira`, `third_party`, `self`, `event`);
+- unresolved implicit reciprocal addressee (`naber şimdi`) resolves to Kaira;
+- measured Test B Turn 2 current-user state-share (`target=unknown + what_doing`) clears the routine;
 - measured Turn 5 question surface with structural-fast-path miss plus canonical reply semantics;
 - measured Turn 6 semicolon-separated reaction + forbidden question salvage;
 - action + forbidden affectionate vocative partial repair;
