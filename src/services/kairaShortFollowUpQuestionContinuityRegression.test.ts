@@ -35,6 +35,11 @@ function canonicalQuestion(overrides: Partial<SemanticEvent> = {}): SemanticEven
     affection: 0,
     support: 0,
     compliment: 0,
+    // This fixture represents the canonical ingestion result for the archived
+    // one-word Turn 15 follow-up. Downstream discourse must consume the typed
+    // shape facet rather than re-counting words from raw user text.
+    shortUtteranceShape: true,
+    activityAnswerShape: false,
     ...overrides,
   };
 }
