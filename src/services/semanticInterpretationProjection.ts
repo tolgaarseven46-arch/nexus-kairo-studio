@@ -103,6 +103,8 @@ export function projectSemanticEvent(interp: SemanticInterpretation): ProjectedS
     signalsAlreadyAnswered: Boolean(interp.discourseFacets.signalsAlreadyAnswered),
     answerFriction: Boolean(interp.discourseFacets.answerFriction),
     stateAnswerShape: Boolean(interp.discourseFacets.stateAnswerShape),
+    shortUtteranceShape: Boolean(interp.discourseFacets.shortUtteranceShape),
+    activityAnswerShape: Boolean(interp.discourseFacets.activityAnswerShape),
     valence: interp.valence,
     target,
     relationalAct: relationalAct(interp),

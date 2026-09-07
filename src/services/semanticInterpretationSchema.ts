@@ -181,6 +181,8 @@ function normalizeDiscourseFacets(value: unknown): SemanticDiscourseFacets {
     signalsAlreadyAnswered: asBool(v.signalsAlreadyAnswered),
     answerFriction: asBool(v.answerFriction),
     stateAnswerShape: asBool(v.stateAnswerShape),
+    shortUtteranceShape: asBool(v.shortUtteranceShape),
+    activityAnswerShape: asBool(v.activityAnswerShape),
   };
 }
 

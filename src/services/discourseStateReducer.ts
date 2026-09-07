@@ -56,25 +56,21 @@ function bumpRoutine(counter: RoutineCounter, turnIndex: number): RoutineCounter
   };
 }
 
-function isShort(message: string): boolean {
-  return (message.trim().match(/\S+/gu) ?? []).length <= 4;
-}
-
-function startsNewTopic(event: SemanticEvent, message: string): boolean {
+function startsNewTopic(event: CanonicalDiscourseEvent): boolean {
   return (
     event.discourseAct === "topic_shift" ||
     event.intent === "information_request" ||
     event.intent === "emotional_share" ||
     ((event.socialRoutine ?? "none") === "none" &&
       event.discourseAct === "none" &&
-      !isShortIntent(event, message))
+      !isShortIntent(event))
   );
 }
 
-function isShortIntent(event: SemanticEvent, message: string): boolean {
+function isShortIntent(event: CanonicalDiscourseEvent): boolean {
   return (
     event.intent === "greeting" ||
-    (event.intent === "general_chat" && isShort(message)) ||
+    (event.intent === "general_chat" && Boolean(event.shortUtteranceShape)) ||
     (event.socialRoutine ?? "none") !== "none"
   );
 }
@@ -238,16 +234,13 @@ function answersPendingQuestion(
   message: string,
   act: DiscourseSocialAct,
 ): boolean {
-  const text = message.trim().toLocaleLowerCase("tr-TR");
-  if (!text) return false;
+  if (!message.trim()) return false;
   if (act === "answer" || act === "agreement_ack" || act === "correction") return true;
 
   if (pending.kind === "how_are_you") return Boolean(event.stateAnswerShape);
-  if (pending.kind === "what_doing") {
-    return /^(?:tak[ıi]l|çalış|çal[ıi][şs]|otur|evde|işte|okulda|dışarı|boş|hiçbir|bi\s+şey|bir\s+şey)/iu.test(text);
-  }
+  if (pending.kind === "what_doing") return Boolean(event.activityAnswerShape);
 
-  return isShort(message) && act !== "greeting" && act !== "farewell";
+  return Boolean(event.shortUtteranceShape) && act !== "greeting" && act !== "farewell";
 }
 
 export function reduceDiscourseState(
@@ -297,7 +290,7 @@ export function reduceDiscourseState(
       !kairaPending &&
       prev.lastKairaAct !== null &&
       act === "question" &&
-      isShort(turn.message) &&
+      Boolean(turn.event.shortUtteranceShape) &&
       turn.event.target === "unknown" &&
       (turn.event.socialRoutine ?? "none") === "none" &&
       (turn.event.discourseAct ?? "none") === "none" &&
@@ -316,9 +309,9 @@ export function reduceDiscourseState(
     const mixedAnswerCarriesIndependentContent =
       contextualAnswer &&
       !explicitDependency &&
-      startsNewTopic(turn.event, turn.message);
+      startsNewTopic(turn.event);
     const unambiguousNewTopic =
-      startsNewTopic(turn.event, turn.message) &&
+      startsNewTopic(turn.event) &&
       (!responseEvidence || mixedAnswerCarriesIndependentContent);
     const respondsToKaira =
       prev.lastKairaAct !== null &&
