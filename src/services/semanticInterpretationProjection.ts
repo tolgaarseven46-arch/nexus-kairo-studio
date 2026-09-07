@@ -1,5 +1,9 @@
 import type { SemanticEvent, RelationalAct } from "./semanticEventEngine";
-import type { SemanticDiscourseProjection, SemanticInterpretation } from "../types/semanticInterpretation";
+import type {
+  SemanticDiscourseProjection,
+  SemanticInterpretation,
+  SemanticSocialRoutine,
+} from "../types/semanticInterpretation";
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
@@ -41,9 +45,7 @@ function hasCurrentUserStateEvidence(interp: SemanticInterpretation): boolean {
   );
 }
 
-function projectedSocialRoutine(
-  interp: SemanticInterpretation,
-): SemanticDiscourseProjection["socialRoutine"] {
+function projectedSocialRoutine(interp: SemanticInterpretation): SemanticSocialRoutine {
   const routine = interp.discourseFacets.socialRoutine;
   const reciprocalRoutine = routine === "how_are_you" || routine === "what_doing";
   if (!reciprocalRoutine || interp.target === "kaira") return routine;
