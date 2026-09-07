@@ -32,11 +32,12 @@ type CapturedKntExport = {
   session: { turns: CapturedTurn[] };
 };
 
-function loadCapturedFixture(fileName: string, expectedSha256: string): CapturedKntExport {
-  const encoded = readFileSync(
-    path.resolve(process.cwd(), "test/fixtures/knt", fileName),
-    "utf8",
-  ).trim();
+function loadCapturedFixture(fileNames: string[], expectedSha256: string): CapturedKntExport {
+  const encoded = fileNames
+    .map((fileName) =>
+      readFileSync(path.resolve(process.cwd(), "test/fixtures/knt", fileName), "utf8").trim(),
+    )
+    .join("");
   const raw = gunzipSync(Buffer.from(encoded, "base64"));
   const sha = createHash("sha256").update(raw).digest("hex");
   expect(sha).toBe(expectedSha256);
@@ -50,11 +51,18 @@ function turn(session: CapturedKntExport, turnNumber: number): CapturedTurn {
 }
 
 const testA = loadCapturedFixture(
-  "test-a-13-turn.raw.json.gz.b64",
+  [
+    "test-a-13-turn.raw.json.gz.b64.part01",
+    "test-a-13-turn.raw.json.gz.b64.part02",
+    "test-a-13-turn.raw.json.gz.b64.part03",
+    "test-a-13-turn.raw.json.gz.b64.part04",
+    "test-a-13-turn.raw.json.gz.b64.part05",
+    "test-a-13-turn.raw.json.gz.b64.part06",
+  ],
   "298a5677d26d61213d6e996fec29318d8053b483b357cf4127a19195faf40106",
 );
 const testB = loadCapturedFixture(
-  "test-b-6-turn.raw.json.gz.b64",
+  ["test-b-6-turn.raw.json.gz.b64"],
   "11bf07cd30011b4deb500450a18692b04880757ede542864b877736a89362627",
 );
 
