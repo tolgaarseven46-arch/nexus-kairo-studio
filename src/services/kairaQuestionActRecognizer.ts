@@ -27,6 +27,13 @@ const DIRECT_SOCIAL_QUESTION_RE =
 const INTERROGATIVE_PREDICATE_RE =
   /(?<![\p{L}\p{N}_])(?:ne\s+durumda|neyden(?:\s+bu\s+kadar)?|neye\s+göre|neyi\s+kast(?:ediyorsun|ettin)|ne\s+oldu|ne\s+oluyor|ne\s+olacak|ne\s+zaman|ne\s+kadar\s+(?:sürüyor|sürecek|var)|ne\s+yapas[ıi]n\s+var|ne\s+var(?:\s+(?:şu\s+an|şimdi))?)(?![\p{L}\p{N}_])/iu;
 
+// Bare `ne` is too ambiguous to classify by itself. Recognize it only when it
+// heads a short phrase whose predicate is morphologically second-person. This
+// captures natural surfaces such as “ne tarz açıyosun şimdi” without turning
+// exclamations like “ne güzel” or idioms like “ne bileyim” into questions.
+const NE_SECOND_PERSON_PREDICATE_RE =
+  /(?<![\p{L}\p{N}_])ne(?:\s+[\p{L}\p{N}_-]+){0,3}\s+[\p{L}\p{N}_-]+(?:yorsun|iyorsun|ıyorsun|uyorsun|üyorsun|yosun|yon|s[ıiuü]n)(?![\p{L}\p{N}_])/iu;
+
 const SUBJECT_NE_NOW_RE =
   /(?<![\p{L}\p{N}_])[\p{L}\p{N}_-]+\s+ne(?:\s+(?:şu\s+an|şimdi))?\s*[.!…]*\s*$/iu;
 
@@ -74,6 +81,7 @@ export function isTurkishQuestionAct(text: string): boolean {
     CASE_MARKED_INTERROGATIVE_RE.test(value) ||
     DIRECT_SOCIAL_QUESTION_RE.test(value) ||
     INTERROGATIVE_PREDICATE_RE.test(value) ||
+    NE_SECOND_PERSON_PREDICATE_RE.test(value) ||
     SUBJECT_NE_NOW_RE.test(value) ||
     SUBJECT_NASIL_RE.test(value)
   );
