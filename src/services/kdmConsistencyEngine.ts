@@ -8,6 +8,7 @@ import {
   computeBehaviorProfile,
   BehaviorLayerProfile,
 } from "./droitBehaviorEngine";
+import { appraiseBehaviorSeriousContext } from "./socialAppraisalEngine";
 import { normalizeDroitPersonality } from "./droitPersonalityNormalizer";
 import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
 import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";
@@ -193,7 +194,11 @@ export function analyzeKdmInteractionCanonicalTurn(
 ): KdmAnalysisResult {
   const state: DroitDynamicState = { ...DEFAULT_DYNAMIC_STATE, ...(currentDynamicState || {}) };
   const normalizedPersonality = normalizeDroitPersonality(personality);
-  const baseBehaviorProfile = computeBehaviorProfile(normalizedPersonality, userMessage);
+  const baseBehaviorProfile = computeBehaviorProfile(
+    normalizedPersonality,
+    userMessage,
+    appraiseBehaviorSeriousContext(semanticInterpretation),
+  );
   return analyzeKdmInteractionCanonical({
     state,
     semanticInterpretation,
