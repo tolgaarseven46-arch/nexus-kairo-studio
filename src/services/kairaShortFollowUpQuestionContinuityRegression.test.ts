@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_DISCOURSE_STATE } from "../types/discourseState";
+import type { SemanticDiscourseProjection } from "../types/semanticInterpretation";
 import { reduceDiscourseState } from "./discourseStateReducer";
 import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
 import type { SemanticEvent } from "./semanticEventEngine";
 
-function canonicalQuestion(overrides: Partial<SemanticEvent> = {}): SemanticEvent {
+type CanonicalQuestionEvent = SemanticEvent & SemanticDiscourseProjection;
+
+function canonicalQuestion(
+  overrides: Partial<CanonicalQuestionEvent> = {},
+): CanonicalQuestionEvent {
   return {
     raw: "neden",
     normalized: "neden",
@@ -35,6 +40,11 @@ function canonicalQuestion(overrides: Partial<SemanticEvent> = {}): SemanticEven
     affection: 0,
     support: 0,
     compliment: 0,
+    // This fixture represents the canonical ingestion result for the archived
+    // one-word Turn 15 follow-up. Downstream discourse must consume the typed
+    // shape facet rather than re-counting words from raw user text.
+    shortUtteranceShape: true,
+    activityAnswerShape: false,
     ...overrides,
   };
 }

@@ -130,6 +130,10 @@ export interface SemanticDiscourseFacets {
   answerFriction?: boolean;
   /** Canonical utterance shape: message can begin as a state/how-are-you answer. */
   stateAnswerShape?: boolean;
+  /** Canonical utterance shape: compact turn used only for discourse dependency. */
+  shortUtteranceShape?: boolean;
+  /** Canonical utterance shape: message can answer a pending what-doing question. */
+  activityAnswerShape?: boolean;
 }
 
 /**
@@ -141,6 +145,8 @@ export interface SemanticDiscourseProjection {
   signalsAlreadyAnswered?: boolean;
   answerFriction?: boolean;
   stateAnswerShape?: boolean;
+  shortUtteranceShape?: boolean;
+  activityAnswerShape?: boolean;
 }
 
 /** Each component is 0..1 and orthogonal. */
