@@ -27,6 +27,7 @@ import {
 import { findKairaAmbiguityPreservationIssues } from "./kairaAmbiguityPreservation";
 import { findKairaSelfCorrectionAccountabilityIssues } from "./kairaSelfCorrectionAccountability";
 import { removeForbiddenQuestionUnits } from "./kairaDeliveredQuestionConstraint";
+import { removeForbiddenAffectionVocatives } from "./kairaDeliveredAffectionConstraint";
 import { findGeneratedClaimProvenanceIssues } from "./kairaGeneratedClaimProvenance";
 
 export type KairaConstraintWorldItems = Parameters<typeof enforceWorldModelRecallResponse>[1];
@@ -123,6 +124,12 @@ function runOrderedPass(
   input: KairaResponseConstraintPassInput,
 ): Omit<KairaResponseConstraintPassResult, "consistency" | "fallbackUsed"> {
   const original = String(reply ?? "").trim();
+  const originalInputReply = String(input.reply ?? "").trim();
+  const isOriginalCandidate = original === originalInputReply;
+  const candidateSemanticInterpretation = isOriginalCandidate
+    ? input.replySemanticInterpretation
+    : null;
+
   const worldGuard = enforceWorldModelRecallResponse(
     original,
     input.worldItems,
@@ -146,16 +153,27 @@ function runOrderedPass(
     maxSentences: input.plan.maxSentences,
     maxWords: input.plan.maxWords,
   });
-  const mechanicallyConformed = removeForbiddenQuestionUnits(
+  const questionConformed = removeForbiddenQuestionUnits(
     planEnforcement.reply,
     input.plan.allowQuestion,
+    candidateSemanticInterpretation,
+  );
+  const mechanicallyConformed = removeForbiddenAffectionVocatives(
+    questionConformed,
+    input.plan.allowAffection,
   );
   const delivered = mechanicallyConformed.trim();
-  const questionUnitRemoved = delivered !== planEnforcement.reply.trim();
-  const isOriginalCandidate = original === String(input.reply ?? "").trim();
+  const questionUnitRemoved = questionConformed.trim() !== planEnforcement.reply.trim();
+  const affectionVocativeRemoved = mechanicallyConformed.trim() !== questionConformed.trim();
+  const semanticEvidenceAppliesToDelivered =
+    isOriginalCandidate && delivered === original;
 
   const issues = [
-    ...findKairaResponsePlanIssues(delivered, input.plan),
+    ...findKairaResponsePlanIssues(
+      delivered,
+      input.plan,
+      semanticEvidenceAppliesToDelivered ? candidateSemanticInterpretation : null,
+    ),
     ...findKairaAmbiguityPreservationIssues(delivered, input.plan),
     ...findKairaSelfCorrectionAccountabilityIssues(delivered, input.plan),
     ...(isOriginalCandidate
@@ -177,6 +195,7 @@ function runOrderedPass(
     ...(epistemicGuard.reason ? [epistemicGuard.reason] : []),
     ...planEnforcement.reasons,
     ...(questionUnitRemoved ? ["response_plan_forbidden_question_unit_removed"] : []),
+    ...(affectionVocativeRemoved ? ["response_plan_forbidden_affection_vocative_removed"] : []),
   ];
 
   return {
@@ -187,7 +206,8 @@ function runOrderedPass(
       autobiographicalGuard.changed ||
       epistemicGuard.changed ||
       planEnforcement.changed ||
-      questionUnitRemoved,
+      questionUnitRemoved ||
+      affectionVocativeRemoved,
     reasons: [...new Set(reasons)],
     issues: [...new Set(issues)],
     worldGuard,
@@ -208,11 +228,15 @@ function runOrderedPass(
  * fallback cannot erase a response already grounded and validated by the world
  * authority. Resolved self facts/memories remain independently authoritative.
  *
+ * Mechanical partial repair is facet-scoped: if the plan already forbids a
+ * question or affectionate vocative, only a structurally separable forbidden
+ * facet may be removed. The remaining candidate must pass the exact same final
+ * checks. No new semantic WHAT decision is invented here.
+ *
  * This boundary never writes a generic social reply. A caller-supplied legacy
  * dialogue fallback can be tried only if it independently passes the exact same
- * ordered constraints. Otherwise the original candidate and its issues are kept
- * visible so a normal DialogueDecision -> ResponsePlan -> Realizer repair can
- * own recovery instead of a hidden guard author.
+ * ordered constraints. Otherwise the candidate and its issues remain visible so
+ * a normal DialogueDecision -> ResponsePlan -> Realizer repair can own recovery.
  */
 export function runKairaResponseConstraintPass(
   input: KairaResponseConstraintPassInput,
