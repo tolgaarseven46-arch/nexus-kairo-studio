@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const server = fs.readFileSync(path.resolve(process.cwd(), "server.ts"), "utf8");
+const finalPrompt = fs.readFileSync(path.resolve(process.cwd(), "src/services/kairaFinalProviderPrompt.ts"), "utf8");
 
 describe("world reasoning policy runtime integration contract", () => {
   it("derives reasoning policy from read-only world-state appraisal", () => {
@@ -12,12 +13,20 @@ describe("world reasoning policy runtime integration contract", () => {
   });
 
   it("injects reasoning policy after appraisal and before canonical dialogue/behavior authority", () => {
-    const appraisalIndex = server.indexOf("${worldStateAppraisalInstruction}");
-    const policyIndex = server.indexOf("${worldReasoningPolicyInstruction}");
-    const dialogueIndex = server.indexOf("${dialogueInstruction}");
-    const dialogueDecisionIndex = server.indexOf("${dialogueDecisionInstruction}");
-    const responsePlanIndex = server.indexOf("${responsePlanInstruction}");
-    const observationalIndex = server.indexOf("${canonicalObservationalContext}", responsePlanIndex);
+    expect(server).toContain("buildKairaFinalProviderSystemPrompt({");
+    expect(server).toContain("worldStateAppraisalInstruction,");
+    expect(server).toContain("worldReasoningPolicyInstruction,");
+    expect(server).toContain("dialogueInstruction,");
+    expect(server).toContain("dialogueDecisionInstruction,");
+    expect(server).toContain("responsePlanInstruction,");
+    expect(server).toContain("canonicalObservationalContext,");
+
+    const appraisalIndex = finalPrompt.indexOf("${parts.worldStateAppraisalInstruction}");
+    const policyIndex = finalPrompt.indexOf("${parts.worldReasoningPolicyInstruction}");
+    const dialogueIndex = finalPrompt.indexOf("${parts.dialogueInstruction}");
+    const dialogueDecisionIndex = finalPrompt.indexOf("${parts.dialogueDecisionInstruction}");
+    const responsePlanIndex = finalPrompt.indexOf("${parts.responsePlanInstruction}");
+    const observationalIndex = finalPrompt.indexOf("${parts.canonicalObservationalContext}", responsePlanIndex);
 
     expect(appraisalIndex).toBeGreaterThan(0);
     expect(policyIndex).toBeGreaterThan(appraisalIndex);
@@ -26,6 +35,7 @@ describe("world reasoning policy runtime integration contract", () => {
     expect(responsePlanIndex).toBeGreaterThan(dialogueDecisionIndex);
     expect(observationalIndex).toBeGreaterThan(responsePlanIndex);
     expect(server).not.toContain("${behaviorContractInstruction(behaviorContract)}");
+    expect(finalPrompt).not.toContain("${parts.behaviorContractInstruction}");
   });
 
   it("passes the canonical reasoning policy and typed memory query to deterministic final enforcement", () => {

@@ -17,6 +17,7 @@ import {
   buildCanonicalObservationalContext,
   buildCanonicalDialogueMoveContext,
 } from "./src/services/kairaCanonicalPromptBuilder";
+import { buildKairaFinalProviderSystemPrompt } from "./src/services/kairaFinalProviderPrompt";
 import {
   deriveDiscourseState,
   reduceDiscourseState,
@@ -1096,8 +1097,30 @@ app.post("/api/chat", async (req, res) => {
     // "KDM ... bağlayıcıdır" line are dropped — the canonical block is the only
     // place a social decision is stated.
     const discourseInstruction = buildDiscourseObservationalInstruction(discourseState);
-    const system = `${buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character)}\n${speechIdentityPrompt(speech)}\n${languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)}\
-${dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory)}\n${socialStyle}\n${groundingInstruction}\n${activeParticipantInstruction}\n${entityGroundingInstruction}\n${worldEventInstruction}\n${worldEventMemoryInstruction}\n${worldStateAppraisalInstruction}\n${worldReasoningPolicyInstruction}\n${epistemicInstruction}\n${selfMemoryInstruction}\n${dialogueInstruction}\n${discourseInstruction}\n${dialogueDecisionInstruction}\n${`${responsePlanInstruction}\n${canonicalObservationalContext}`}\nAYNI OTURUM ÇALIŞMA HAFIZASI (yüksek güven):\n${sessionWorkingMemory}\nDOĞRULANMIŞ GEÇMİŞ HAFIZA:\n${memoryContext}\nTon:${behaviorProfile?.tone || "confident"}. Yalnızca Kaira'nın göndereceği doğal Türkçe mesajı üret; açıklama veya analiz ekleme.`;
+    const system = buildKairaFinalProviderSystemPrompt({
+    runtimeIdentityInstruction: buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character),
+    speechIdentityInstruction: speechIdentityPrompt(speech),
+    languageStyleMemoryInstruction: languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory),
+    dyadicLanguageAlignmentInstruction: dyadicLanguageAlignmentInstruction(stateUserId, speech.relationshipLevel, kairaPolicy.persistentUserMemory),
+    socialStyle,
+    groundingInstruction,
+    activeParticipantInstruction,
+    entityGroundingInstruction,
+    worldEventInstruction,
+    worldEventMemoryInstruction,
+    worldStateAppraisalInstruction,
+    worldReasoningPolicyInstruction,
+    epistemicInstruction,
+    selfMemoryInstruction,
+    dialogueInstruction,
+    discourseInstruction,
+    dialogueDecisionInstruction,
+    responsePlanInstruction,
+    canonicalObservationalContext,
+    sessionWorkingMemory,
+    memoryContext,
+    tone: behaviorProfile?.tone || "confident",
+  });
     const msgs = formatKairoHistoryForModel(cleanHistory);
     msgs.push({ role: "user", content: `[${userName}]: ${userMessage}` });
     const aiStart = now();

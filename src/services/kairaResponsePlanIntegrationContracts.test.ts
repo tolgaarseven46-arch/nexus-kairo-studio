@@ -10,6 +10,7 @@ const nexus = fs.readFileSync(path.resolve(process.cwd(), "src/types/nexus.ts"),
 const layout = fs.readFileSync(path.resolve(process.cwd(), "src/components/studio/NexusStudioLayout.tsx"), "utf8");
 const mindMap = fs.readFileSync(path.resolve(process.cwd(), "src/components/studio/tabs/MindMapTab.tsx"), "utf8");
 const unifiedPass = fs.readFileSync(path.resolve(process.cwd(), "src/services/kairaResponseConstraintPass.ts"), "utf8");
+const finalPrompt = fs.readFileSync(path.resolve(process.cwd(), "src/services/kairaFinalProviderPrompt.ts"), "utf8");
 
 describe("canonical KairaResponsePlan runtime integration", () => {
   it("builds one response plan from contract, dialogue and HOW-only speech", () => {
@@ -21,8 +22,15 @@ describe("canonical KairaResponsePlan runtime integration", () => {
   it("feeds the same plan to local and canonical AI verbalizers", () => {
     expect(local).toContain("responsePlan?: KairaResponsePlan");
     expect(server).toMatch(/dialogueDecision\.move,\s*responsePlan,\s*languageUnderstanding\.event,\s*kairaPolicy\.persistentUserMemory,\s*discourseState,\s*\)/u);
-    expect(server).toContain("${responsePlanInstruction}\\n${canonicalObservationalContext}");
-    expect(server).not.toContain("${responsePlanInstruction}\\nKDM:");
+    expect(server).toContain("buildKairaFinalProviderSystemPrompt({");
+    expect(server).toContain("responsePlanInstruction,");
+    expect(server).toContain("canonicalObservationalContext,");
+
+    const responsePlanIndex = finalPrompt.indexOf("${parts.responsePlanInstruction}");
+    const observationalIndex = finalPrompt.indexOf("${parts.canonicalObservationalContext}", responsePlanIndex);
+    expect(responsePlanIndex).toBeGreaterThan(0);
+    expect(observationalIndex).toBeGreaterThan(responsePlanIndex);
+    expect(finalPrompt).not.toContain("${parts.responsePlanInstruction}\\nKDM:");
   });
 
   it("validates legacy repair/fallback and canonical final-delivery outputs", () => {

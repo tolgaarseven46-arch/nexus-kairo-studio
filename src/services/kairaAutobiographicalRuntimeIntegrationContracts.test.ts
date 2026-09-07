@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 describe("Kaira autobiographical runtime integration contracts", () => {
   const server = readFileSync("server.ts", "utf8");
   const unifiedPass = readFileSync("src/services/kairaResponseConstraintPass.ts", "utf8");
+  const finalPrompt = readFileSync("src/services/kairaFinalProviderPrompt.ts", "utf8");
 
   it("consumes only the canonical semantic self-memory facet", () => {
     expect(server).toContain('from "./src/services/kairaAutobiographicalRecallRuntime"');
@@ -17,8 +18,12 @@ describe("Kaira autobiographical runtime integration contracts", () => {
 
   it("bypasses local short-circuit and places self-memory grounding before dialogue grounding", () => {
     expect(server).toContain("if (!selfMemoryInstruction && local.handled && local.reply) {");
-    const selfMemoryIndex = server.indexOf("${selfMemoryInstruction}");
-    const dialogueIndex = server.indexOf("${dialogueInstruction}", selfMemoryIndex);
+    expect(server).toContain("buildKairaFinalProviderSystemPrompt({");
+    expect(server).toContain("selfMemoryInstruction,");
+    expect(server).toContain("dialogueInstruction,");
+
+    const selfMemoryIndex = finalPrompt.indexOf("${parts.selfMemoryInstruction}");
+    const dialogueIndex = finalPrompt.indexOf("${parts.dialogueInstruction}", selfMemoryIndex);
     expect(selfMemoryIndex).toBeGreaterThan(-1);
     expect(dialogueIndex).toBeGreaterThan(selfMemoryIndex);
   });
