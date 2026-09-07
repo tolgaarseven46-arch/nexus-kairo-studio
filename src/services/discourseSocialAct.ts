@@ -14,7 +14,13 @@ import type { DiscourseSocialAct } from "../types/discourseState";
 
 type CanonicalDiscourseEvent = SemanticEvent & SemanticDiscourseProjection;
 
-/** Classify a user message from the shared semantic event. */
+/**
+ * Classify a user message strictly from the shared canonical event.
+ *
+ * `message` remains in the compatibility signature while callers migrate, but
+ * it is intentionally ignored: downstream discourse code must never recreate
+ * user semantics from raw text.
+ */
 export function classifyUserSocialAct(
   event: Pick<
     CanonicalDiscourseEvent,
@@ -24,10 +30,8 @@ export function classifyUserSocialAct(
     | "repairSignal"
     | "stateAnswerShape"
   >,
-  message: string,
+  _message: string,
 ): DiscourseSocialAct {
-  const text = message.trim().toLocaleLowerCase("tr-TR");
-
   switch (event.socialRoutine) {
     case "greeting":
       return "greeting";
@@ -72,8 +76,6 @@ export function classifyUserSocialAct(
   }
 
   if (event.stateAnswerShape) return "answer";
-  if (/^(?:he|hee|hı?hı|evet|aynen|tamam(?:d[ıi]r)?|peki|olur|yok|hayır)\b[.!?…]*$/iu.test(text))
-    return "agreement_ack";
   return "statement";
 }
 
