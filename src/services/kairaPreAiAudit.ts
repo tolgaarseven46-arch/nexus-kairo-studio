@@ -214,6 +214,13 @@ function defaultCoverage(input: KairaPreAiAuditInput): KairaPreAiDetectorCoverag
   ];
 }
 
+function realizerInstructionSurface(systemPrompt: string) {
+  return systemPrompt
+    .split("\n")
+    .filter((line) => !/^\s*DEBUG_ONLY\b/iu.test(line))
+    .join("\n");
+}
+
 export function auditKairaFinalProviderPrompt(input: KairaPreAiAuditInput): KairaPreAiAuditSnapshot {
   const violations: KairaPreAiInvariantViolation[] = [];
   const realizability = obligationRealizability(input);
@@ -251,11 +258,12 @@ export function auditKairaFinalProviderPrompt(input: KairaPreAiAuditInput): Kair
     }
   }
 
-  // General C-family detector: every question-authorizing serialized instruction
-  // is checked against the effective hard permission. This is intentionally not
-  // tied to C4 wording or to one dialogue move.
-  if (!input.responsePlan.allowQuestion && /(?:soru sor|sorabilirsin|clarify|netleştir)/iu.test(input.systemPrompt)) {
-    const explicitOverride = /clarification-question-authorized-by-obligation|obligation-owned clarification/iu.test(input.systemPrompt);
+  // General C-family detector: every realizer-facing question authorization is
+  // checked against the effective hard permission. DEBUG_ONLY metadata is kept
+  // for diagnostics but deliberately excluded from the instruction surface.
+  const realizerSurface = realizerInstructionSurface(input.systemPrompt);
+  if (!input.responsePlan.allowQuestion && /(?:soru sor|sorabilirsin|clarify|netleştir)/iu.test(realizerSurface)) {
+    const explicitOverride = /clarification-question-authorized-by-obligation|obligation-owned clarification/iu.test(realizerSurface);
     if (!explicitOverride) {
       violations.push({
         code: "prompt_instruction_contradiction",
