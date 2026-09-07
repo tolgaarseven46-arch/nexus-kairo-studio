@@ -48,7 +48,8 @@ for (const result of scenarioResults) {
   cluster.scenarioCount += 1;
   cluster.turnCount += result.turns.length;
 
-  for (const [code, count] of Object.entries(result.failureClassCounts)) {
+  for (const [code, rawCount] of Object.entries(result.failureClassCounts as Record<string, number>)) {
+    const count = Number(rawCount);
     cluster.auditViolationCounts[code] = (cluster.auditViolationCounts[code] ?? 0) + count;
     globalViolationCounts[code] = (globalViolationCounts[code] ?? 0) + count;
   }
@@ -60,7 +61,7 @@ for (const result of scenarioResults) {
     scenarioId: result.scenarioId,
     title: result.title,
     turnCount: result.turns.length,
-    auditViolationCounts: result.failureClassCounts,
+    auditViolationCounts: result.failureClassCounts as Record<string, number>,
     declaredFailureClasses,
     toolingNotes: result.toolingNotes,
   });
