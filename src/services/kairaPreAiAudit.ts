@@ -4,6 +4,8 @@ export interface KairaPreAiConsumptionTraceEntry {
   canonicalField: string;
   consumer: string;
   consumed: boolean;
+  value?: unknown;
+  source?: string;
   note?: string;
 }
 
@@ -11,6 +13,7 @@ export interface KairaPreAiFactProvenanceEntry {
   key: string;
   source: "current_turn" | "session_history" | "world_memory" | "self_memory" | "lived_memory" | "identity" | "unknown";
   grounded: boolean;
+  confidence?: number;
   detail?: string;
 }
 
@@ -21,10 +24,60 @@ export interface KairaPreAiSessionIsolationCheck {
   reasons: string[];
 }
 
+export type KairaPreAiClusterId = "A" | "B" | "C" | "D" | "E";
+
+export interface KairaPreAiDetectorCoverageEntry {
+  cluster: KairaPreAiClusterId;
+  detector: string;
+  active: boolean;
+  observable: boolean;
+  reason: string;
+}
+
+export interface KairaPreAiSelfEpistemicCheck {
+  factualSelfClaimRequired: boolean;
+  groundedProvenanceKey?: string | null;
+  epistemicQualificationActive: boolean;
+  groundedConfidence?: number | null;
+  epistemicRefusalActive?: boolean;
+}
+
+export interface KairaPreAiSemanticCompletenessCheck {
+  causeKnown?: boolean | null;
+  selectedMove?: string | null;
+  correctedFacts?: Array<{
+    key: string;
+    previousValue: unknown;
+    currentValue: unknown;
+    previousValueStillActive: boolean;
+    supersededMarked: boolean;
+  }>;
+}
+
+export interface KairaPreAiHowStateAlignmentCheck {
+  internalReaction?: string | null;
+  projectedRegister?: string | null;
+  diverges: boolean;
+  policyReason?: string | null;
+}
+
+export interface KairaPreAiRepairRecoveryCheck {
+  repairProgressBefore: number;
+  repairProgressAfter: number;
+  repairAttempt: boolean;
+  recoverySource?: string | null;
+}
+
 export interface KairaPreAiInvariantViolation {
   code:
     | "prompt_instruction_contradiction"
     | "prompt_fact_without_provenance"
+    | "grounded_fact_blocked_by_epistemic_refusal"
+    | "self_epistemic_grounding_gap"
+    | "semantic_completeness_miss"
+    | "corrected_fact_resurfaced"
+    | "how_state_unexplained_divergence"
+    | "repair_recovery_without_source"
     | "dialogue_obligation_plan_unrealizable"
     | "forbidden_required_content_conflict"
     | "prompt_budget_exceeded"
@@ -54,6 +107,11 @@ export interface KairaPreAiAuditInput {
   } | null;
   factProvenance?: KairaPreAiFactProvenanceEntry[];
   consumptionTrace?: KairaPreAiConsumptionTraceEntry[];
+  selfEpistemic?: KairaPreAiSelfEpistemicCheck | null;
+  semanticCompleteness?: KairaPreAiSemanticCompletenessCheck | null;
+  howStateAlignment?: KairaPreAiHowStateAlignmentCheck | null;
+  repairRecovery?: KairaPreAiRepairRecoveryCheck | null;
+  detectorCoverage?: KairaPreAiDetectorCoverageEntry[];
   expectedUserIdPrefix?: string;
   expectedSessionIdPrefix?: string;
   maxPromptChars?: number;
@@ -74,6 +132,7 @@ export interface KairaPreAiAuditSnapshot {
     realizable: boolean;
     reasons: string[];
   };
+  detectorCoverage: KairaPreAiDetectorCoverageEntry[];
   sessionIsolationCheck: KairaPreAiSessionIsolationCheck;
   invariantViolations: KairaPreAiInvariantViolation[];
   noAiStopMarker: "FINAL_PROVIDER_PROMPT_BUILT_NO_PROVIDER_CALL";
@@ -113,11 +172,61 @@ function sessionIsolation(input: KairaPreAiAuditInput): KairaPreAiSessionIsolati
   return { isolated: reasons.length === 0, userId: input.userId, sessionId: input.sessionId, reasons };
 }
 
+function defaultCoverage(input: KairaPreAiAuditInput): KairaPreAiDetectorCoverageEntry[] {
+  return [
+    {
+      cluster: "A",
+      detector: "self_epistemic_provenance",
+      active: Boolean(input.selfEpistemic),
+      observable: Boolean(input.selfEpistemic),
+      reason: input.selfEpistemic ? "typed_self_epistemic_snapshot_available" : "typed_self_epistemic_snapshot_missing",
+    },
+    {
+      cluster: "B",
+      detector: "semantic_completeness_and_correction",
+      active: Boolean(input.semanticCompleteness),
+      observable: input.semanticCompleteness?.causeKnown != null || Boolean(input.semanticCompleteness?.correctedFacts?.length),
+      reason: input.semanticCompleteness
+        ? "typed_completeness_snapshot_partially_or_fully_available"
+        : "canonical_causeKnown_or_correction_snapshot_missing",
+    },
+    {
+      cluster: "C",
+      detector: "effective_permission_prompt_reconciliation",
+      active: true,
+      observable: true,
+      reason: "response_plan_and_final_prompt_available",
+    },
+    {
+      cluster: "D",
+      detector: "how_state_explained_divergence",
+      active: Boolean(input.howStateAlignment),
+      observable: Boolean(input.howStateAlignment),
+      reason: input.howStateAlignment ? "typed_alignment_snapshot_available" : "typed_alignment_snapshot_missing",
+    },
+    {
+      cluster: "E",
+      detector: "repair_recovery_provenance",
+      active: Boolean(input.repairRecovery),
+      observable: Boolean(input.repairRecovery),
+      reason: input.repairRecovery ? "typed_repair_recovery_snapshot_available" : "typed_repair_recovery_snapshot_missing",
+    },
+  ];
+}
+
+function realizerInstructionSurface(systemPrompt: string) {
+  return systemPrompt
+    .split("\n")
+    .filter((line) => !/^\s*DEBUG_ONLY\b/iu.test(line))
+    .join("\n");
+}
+
 export function auditKairaFinalProviderPrompt(input: KairaPreAiAuditInput): KairaPreAiAuditSnapshot {
   const violations: KairaPreAiInvariantViolation[] = [];
   const realizability = obligationRealizability(input);
   const isolation = sessionIsolation(input);
   const promptChars = input.systemPrompt.length + input.messages.reduce((sum, item) => sum + item.content.length, 0);
+  const coverage = input.detectorCoverage ?? defaultCoverage(input);
 
   if (!realizability.realizable) {
     violations.push({
@@ -149,8 +258,12 @@ export function auditKairaFinalProviderPrompt(input: KairaPreAiAuditInput): Kair
     }
   }
 
-  if (!input.responsePlan.allowQuestion && /(?:soru sor|sorabilirsin|clarify|netleştir)/iu.test(input.systemPrompt)) {
-    const explicitOverride = /clarification-question-authorized-by-obligation|obligation-owned clarification/iu.test(input.systemPrompt);
+  // General C-family detector: every realizer-facing question authorization is
+  // checked against the effective hard permission. DEBUG_ONLY metadata is kept
+  // for diagnostics but deliberately excluded from the instruction surface.
+  const realizerSurface = realizerInstructionSurface(input.systemPrompt);
+  if (!input.responsePlan.allowQuestion && /(?:soru sor|sorabilirsin|clarify|netleştir)/iu.test(realizerSurface)) {
+    const explicitOverride = /clarification-question-authorized-by-obligation|obligation-owned clarification/iu.test(realizerSurface);
     if (!explicitOverride) {
       violations.push({
         code: "prompt_instruction_contradiction",
@@ -164,6 +277,57 @@ export function auditKairaFinalProviderPrompt(input: KairaPreAiAuditInput): Kair
       violations.push({
         code: "prompt_fact_without_provenance",
         message: `fact ${fact.key} has no grounded provenance`,
+      });
+    }
+  }
+
+  if (input.selfEpistemic?.factualSelfClaimRequired) {
+    const provenance = input.selfEpistemic.groundedProvenanceKey
+      ? (input.factProvenance ?? []).find((fact) => fact.key === input.selfEpistemic?.groundedProvenanceKey)
+      : null;
+    const grounded = Boolean(provenance?.grounded) || Number(input.selfEpistemic.groundedConfidence ?? 0) >= 0.72;
+    if (!grounded && !input.selfEpistemic.epistemicQualificationActive) {
+      violations.push({
+        code: "self_epistemic_grounding_gap",
+        message: "a factual Kaira self-claim is required but neither grounded provenance nor an epistemic qualification is active",
+      });
+    }
+    if (grounded && input.selfEpistemic.epistemicRefusalActive) {
+      violations.push({
+        code: "grounded_fact_blocked_by_epistemic_refusal",
+        message: "grounded self evidence is available but an epistemic refusal is still active",
+      });
+    }
+  }
+
+  const completeness = input.semanticCompleteness;
+  if (completeness?.causeKnown === true && /^(?:clarify|invite_emotional_context|invite_context)$/iu.test(String(completeness.selectedMove ?? ""))) {
+    violations.push({
+      code: "semantic_completeness_miss",
+      message: `causeKnown=true but dialogue move ${completeness.selectedMove} still requests context`,
+    });
+  }
+  for (const corrected of completeness?.correctedFacts ?? []) {
+    if (corrected.previousValueStillActive && !corrected.supersededMarked) {
+      violations.push({
+        code: "corrected_fact_resurfaced",
+        message: `corrected fact ${corrected.key} still exposes the previous value without a superseded marker`,
+      });
+    }
+  }
+
+  if (input.howStateAlignment?.diverges && !input.howStateAlignment.policyReason?.trim()) {
+    violations.push({
+      code: "how_state_unexplained_divergence",
+      message: `internal reaction ${input.howStateAlignment.internalReaction ?? "unknown"} diverges from projected register ${input.howStateAlignment.projectedRegister ?? "unknown"} without an explicit policy reason`,
+    });
+  }
+
+  if (input.repairRecovery && input.repairRecovery.repairProgressAfter > input.repairRecovery.repairProgressBefore) {
+    if (!input.repairRecovery.repairAttempt && !input.repairRecovery.recoverySource?.trim()) {
+      violations.push({
+        code: "repair_recovery_without_source",
+        message: "repair/recovery progress increased without repairAttempt or an explicit recoverySource",
       });
     }
   }
@@ -183,6 +347,7 @@ export function auditKairaFinalProviderPrompt(input: KairaPreAiAuditInput): Kair
     factProvenance: input.factProvenance ?? [],
     activeObligations: input.dialogueObligation?.type ? [input.dialogueObligation.type] : [],
     permissionRealizability: realizability,
+    detectorCoverage: coverage,
     sessionIsolationCheck: isolation,
     invariantViolations: violations,
     noAiStopMarker: "FINAL_PROVIDER_PROMPT_BUILT_NO_PROVIDER_CALL",

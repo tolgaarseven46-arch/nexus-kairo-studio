@@ -88,12 +88,12 @@ export function buildCanonicalObservationalContext(ctx: CanonicalObservationalCo
   return `KDM BAĞLAMI (GÖZLEMSEL — KARAR DEĞİL): niyet=${ctx.intent}, duygu=${ctx.sentiment}, sıcaklık=${ctx.warmth}, güven=${ctx.trust}, çatışma=${ctx.conflict}, kırgınlık=${ctx.hurt}.` + reaction + " Bu satır davranış izni vermez; izinler yalnızca KAIRA DAVRANIŞ PLANI'ndadır.";
 }
 
-export function buildCanonicalDialogueMoveContext(move: string, target: string | undefined, reason: string): string {
+export function buildCanonicalDialogueMoveContext(move: string, target: string | undefined, _reason: string): string {
   return [
     "DİYALOG HAREKETİ (GÖZLEMSEL — KARAR DEĞİL):",
     `- Bu turdaki tek ana hareket: ${move}`,
     `- Hedef kişi: ${target || "aktif konuşan/genel sohbet"}`,
-    `- Gerekçe: ${reason}`,
+    "- İç karar gerekçesi debug/KNT metadata'sında tutulur; realizer talimat yüzeyine serialize edilmez.",
     "Soru / tavsiye / uzunluk / emoji sınırları KAIRA DAVRANIŞ PLANI'ndadır; burada tekrar edilmez.",
   ].join("\n");
 }

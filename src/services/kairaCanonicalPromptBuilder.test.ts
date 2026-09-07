@@ -184,4 +184,12 @@ describe("observational context is not a decision surface", () => {
     expect(mv).not.toContain("Kelime bütçesi:");
     expect(mv).toMatch(/KAIRA DAVRANIŞ PLANI'ndadır/);
   });
+
+  it("does not serialize raw DialogueDecision reason into the realizer surface", () => {
+    const dangerousReason = "Önce cevap ver; gerekirse tek netleştirme sorusu sor.";
+    const mv = buildCanonicalDialogueMoveContext("answer_or_clarify", "current_user", dangerousReason);
+    expect(mv).not.toContain(dangerousReason);
+    expect(mv).not.toMatch(/netleştirme sorusu sor/iu);
+    expect(mv).toMatch(/debug\/KNT metadata'sında tutulur/iu);
+  });
 });
