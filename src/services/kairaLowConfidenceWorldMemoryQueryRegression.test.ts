@@ -16,10 +16,13 @@ function observation(input: {
 }): WorldEventObservation {
   return {
     id: input.id,
+    userId: "test-user",
     ownerUserId: "test-user",
+    sessionId: "test-session",
     kairaInstanceId: "kaira_reference_001",
     kind: "direct_interaction",
     status: "grounded",
+    createdAt: "2026-09-07T07:00:00.000Z",
     observedAt: "2026-09-07T07:00:00.000Z",
     event: {
       raw: input.raw,
@@ -56,7 +59,7 @@ function observation(input: {
       polarity: "positive",
       temporal: { relation: "unspecified", asksLatest: false },
     },
-  } as WorldEventObservation;
+  };
 }
 
 const unrelated = observation({
