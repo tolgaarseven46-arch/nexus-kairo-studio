@@ -140,6 +140,43 @@ function reconcileNeutralThirdPartyEventOverread(
 }
 
 /**
+ * `how_are_you` / `what_doing` are reciprocal Kaira-facing social routines.
+ * A provider can recognize the surface shape while independently resolving the
+ * utterance target to a third party (for example a question about another
+ * person's current activity). Those fields cannot both be authoritative.
+ *
+ * Reconcile the typed contradiction at the canonical LU gateway rather than
+ * teaching DialogueDecision to reinterpret the routine downstream. This uses no
+ * raw-text rule and preserves genuine Kaira-directed reciprocal routines.
+ */
+function reconcileThirdPartyReciprocalRoutineOverread(
+  interpretation: SemanticInterpretation,
+): SemanticInterpretation {
+  const routine = interpretation.discourseFacets.socialRoutine;
+  const contradictoryRoutine =
+    interpretation.target === "third_party" &&
+    (routine === "how_are_you" || routine === "what_doing");
+  if (!contradictoryRoutine) return interpretation;
+
+  return {
+    ...interpretation,
+    discourseFacets: {
+      ...interpretation.discourseFacets,
+      socialRoutine: "none",
+    },
+    evidence: [
+      ...interpretation.evidence,
+      {
+        source: "reconciled",
+        provider: "canonical_language_gateway",
+        cues: ["reciprocal_social_routine_requires_kaira_target"],
+        confidence: Math.max(0.8, 1 - interpretation.uncertainty.target),
+      },
+    ],
+  };
+}
+
+/**
  * Self/autobiographical memory belongs only to Kaira. A semantic provider may
  * emit a syntactically valid selfMemoryQuery while simultaneously resolving the
  * message target to the current user, a third party, an event, or unknown. That
@@ -215,6 +252,7 @@ function buildResult(
   interpretation = attachCanonicalDiscourseSignals(message, interpretation);
   interpretation = reconcileSemanticTargetWithEntityResolution(interpretation, entityResolution);
   interpretation = reconcileNeutralThirdPartyEventOverread(interpretation);
+  interpretation = reconcileThirdPartyReciprocalRoutineOverread(interpretation);
   interpretation = reconcileSelfMemoryQueryOwnership(interpretation);
   const projected = projectSemanticEvent(interpretation);
   const grounded = groundSemanticEventForAppraisal(message, projected, entityResolution);
