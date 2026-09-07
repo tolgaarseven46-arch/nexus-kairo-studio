@@ -7,19 +7,26 @@
 
 Fresh post-PR138 KNT characterization exposed three neighboring failures after individually-correct fixes had already landed:
 
-1. a reciprocal `what_doing` facet could still survive with `target=unknown`, even though PR136 had closed only the `third_party` case;
+1. a reciprocal `what_doing` facet could still survive with `target=unknown` while the same canonical turn carried first-party state evidence (`current_user.current_activity=drinking_tea`);
 2. `allowQuestion=false` could miss a natural Turkish surface such as `ne tarz açıyosun şimdi`, while a neighboring `mi/mı` question was detected;
 3. when final delivery rejected the surviving candidate, the persisted assistant reply was an empty string.
 
 The common failure is not a broken semantic core. It is incomplete cross-field and cross-layer composition: a narrow repair encoded one observed value combination while the invariant itself remained implicit.
 
+During validation, beta acceptance also proved that `target=unknown` by itself cannot invalidate a reciprocal routine: short greetings such as `naber şimdi` may legitimately remain unresolved at the target field. The invariant therefore depends on canonical evidence, not merely one enum value.
+
 ## Decisions
 
-### 1. Reciprocal routine projection is target-invariant
+### 1. Reciprocal routine projection is evidence-coherent
 
-`how_are_you` and `what_doing` are Kaira-facing reciprocal routines. They may be projected downstream only when canonical `target === kaira`. Every other target class (`current_user`, `third_party`, `event`, `unknown`) fails closed to `socialRoutine=none`.
+`how_are_you` and `what_doing` are Kaira-facing reciprocal routines.
 
-This is a deterministic projection constraint. It does not reparse raw text or invent a new intent.
+- Explicit non-Kaira targets (`current_user`, `third_party`, `event`) suppress the reciprocal routine.
+- `target=unknown` remains allowed when the turn is genuinely unresolved.
+- `target=unknown` suppresses the routine when the same canonical interpretation carries first-party world-memory evidence, because the turn is describing the user's state/activity rather than asking for Kaira's.
+- `target=kaira` preserves the routine.
+
+This is a deterministic projection constraint using only canonical fields. It does not reparse raw text or invent a new intent.
 
 ### 2. Question realization uses structural morphology, not bare-token widening
 
@@ -35,11 +42,13 @@ When questions are forbidden, an otherwise-valid social reaction must not be dis
 
 Final delivery remains fail-closed: rejected candidates stay rejected and their issues remain visible. However, after all normal repair/fallback paths are exhausted, the delivery gate persists a neutral operational fallback rather than an empty string.
 
-The fallback must contain no domain/world/relationship claim, no question, no advice, no affection, and no humor. It is operational resilience, not semantic recovery.
+The fallback contains no domain/world/relationship claim, no question, no advice, no affection, and no humor. It is operational resilience, not semantic recovery.
 
 ## Invariants
 
-- Reciprocal social routine => canonical target must be Kaira at downstream projection.
+- Explicit non-Kaira target => no reciprocal Kaira-facing routine downstream.
+- Unknown target + canonical first-party state evidence => no reciprocal Kaira-facing routine downstream.
+- Unknown target without contradictory canonical evidence may retain a reciprocal greeting/routine.
 - `allowQuestion=false` => recognized question units must not survive if a valid non-question unit exists.
 - Final `accepted=false` must never imply `persistedReply.trim() === ""`.
 - Rejection fallback does not change `accepted=false` to true.
@@ -50,10 +59,11 @@ The fallback must contain no domain/world/relationship claim, no question, no ad
 
 `kairaCompositionInvariantRegression.test.ts` locks:
 
-1. all non-Kaira targets suppress reciprocal routines;
-2. Kaira target preserves them;
-3. `ne + short phrase + second-person predicate` is recognized without treating all bare `ne` surfaces as questions;
-4. valid social reaction survives removal of a semicolon-separated forbidden question;
-5. rejected final delivery persists a non-empty neutral fallback while staying rejected.
+1. explicit non-Kaira targets suppress reciprocal routines;
+2. `unknown + current_user state evidence` suppresses the routine;
+3. genuinely unresolved `naber`-style unknown target and Kaira target preserve legitimate routines;
+4. `ne + short phrase + second-person predicate` is recognized without treating all bare `ne` surfaces as questions;
+5. valid social reaction survives removal of a semicolon-separated forbidden question;
+6. rejected final delivery persists a non-empty neutral fallback while staying rejected.
 
 The PR must pass architecture contracts, autonomous runtime contracts, beta gates, full Vitest, TypeScript, production build, docs/behavior guards and Architecture Review before merge.
