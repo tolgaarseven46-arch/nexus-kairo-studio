@@ -336,7 +336,7 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
     const observation = item.observation;
     const event = observation.event;
     const actor = event.actor?.name || "çözülmedi";
-    const target = event.target?.name || event.target?.id || "çözülmedi";
+    const target = event.target?.name || "çözülmedi";
     const epistemic = observation.kind === "reported_claim"
       ? "KULLANICININ AKTARDIĞI İDDİA"
       : "DOĞRUDAN ETKİLEŞİM";
