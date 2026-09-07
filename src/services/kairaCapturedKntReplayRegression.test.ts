@@ -62,7 +62,12 @@ const testA = loadCapturedFixture(
   "298a5677d26d61213d6e996fec29318d8053b483b357cf4127a19195faf40106",
 );
 const testB = loadCapturedFixture(
-  ["test-b-6-turn.raw.json.gz.b64"],
+  [
+    "test-b-6-turn.raw.json.gz.b64.part01",
+    "test-b-6-turn.raw.json.gz.b64.part02",
+    "test-b-6-turn.raw.json.gz.b64.part03",
+    "test-b-6-turn.raw.json.gz.b64.part04",
+  ],
   "11bf07cd30011b4deb500450a18692b04880757ede542864b877736a89362627",
 );
 
