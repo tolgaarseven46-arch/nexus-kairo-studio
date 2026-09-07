@@ -35,6 +35,8 @@
 - [ ] **Minimal repro + karşı-örnek:** bug en küçük senaryoda üretildi; düzeltme ters/komşu örneklerle çürütülmeye çalışıldı ve dayandı
 - [ ] **Tek karar kaynağı:** davranışı belirleyen yetkili karar yazılı (ADR / `PROJECT_STATE` state / kullanıcı talimatı) — hangisi: __________
 - [ ] **Etki haritası:** güncel dependency/consumer haritasına dayanıyor (kim import ediyor / kimin çıktısını tüketiyor) — özet: __________
+- [ ] **Cross-field genelleme kontrolü:** fix yalnız gözlenen değer kombinasyonunu değil, kanıtın desteklediği genel invariant'ı ifade ediyor. Genel invariant henüz kanıtlanamıyorsa PR açıklamasında `NARROW FIX — GENERALIZATION OWED` ve takip kapsamı açıkça yazıldı.
+- [ ] **Komşu değer matrisi:** değişen canonical alanların en az bir komşu/ters değer kombinasyonu test edildi (ör. `target=kaira` kadar `third_party/unknown` da).
 - [ ] **Golden long-session regression** eklendi/güncellendi ve yeşil (state/relationship/behavior değişikliğinde)
 - [ ] **İkinci göz:** `architecture-review-required` alındı, `/arch-approve <head-sha>` bekleniyor
 - [ ] **Tekrar eden bug sınıfı** ise: patch'ten önce root-cause incelemesi yapıldı ve `PROJECT_STATE.md`'ye yazıldı
