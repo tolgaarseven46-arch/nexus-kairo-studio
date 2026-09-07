@@ -2,10 +2,6 @@ const QUESTION_PUNCTUATION_RE = /[?？]/u;
 const QUESTION_CLITIC_RE =
   /(?<![\p{L}\p{N}_])(?:m[ıiuü]|misin|m[ıi]s[ıi]n|musun|m[üu]s[üu]n|m[ıi]y[ıi]m|muyum|m[üu]y[üu]m|m[ıi]yd[ıi]|m[ıi]yd[ıi]n|m[ıi]yd[ıi]k|m[ıi]yd[ıi]lar)(?![\p{L}\p{N}_])/iu;
 
-// Reaction-shaped Turkish clitics such as “vay yine mi ya” are not requests
-// for information. Suppress only the clitic signal itself; any independent
-// interrogative cue elsewhere in the same text still makes the output a
-// question act through the remaining structural recognizers below.
 const RHETORICAL_REACTION_CLITIC_RE =
   /^\s*(?:(?:vay|of|oha|yaa?|hadi\s+ya)\s+)?(?:yine|harbi|cidden)\s+m[ıiuü]\s+ya\b/iu;
 
@@ -28,11 +24,11 @@ const INTERROGATIVE_PREDICATE_RE =
   /(?<![\p{L}\p{N}_])(?:ne\s+durumda|neyden(?:\s+bu\s+kadar)?|neye\s+göre|neyi\s+kast(?:ediyorsun|ettin)|ne\s+oldu|ne\s+oluyor|ne\s+olacak|ne\s+zaman|ne\s+kadar\s+(?:sürüyor|sürecek|var)|ne\s+yapas[ıi]n\s+var|ne\s+var(?:\s+(?:şu\s+an|şimdi))?)(?![\p{L}\p{N}_])/iu;
 
 // Bare `ne` is too ambiguous to classify by itself. Recognize it only when it
-// heads a short phrase whose predicate is morphologically second-person. This
-// captures natural surfaces such as “ne tarz açıyosun şimdi” without turning
-// exclamations like “ne güzel” or idioms like “ne bileyim” into questions.
-const NE_SECOND_PERSON_PREDICATE_RE =
-  /(?<![\p{L}\p{N}_])ne(?:\s+[\p{L}\p{N}_-]+){0,3}\s+[\p{L}\p{N}_-]+(?:yorsun|iyorsun|ıyorsun|uyorsun|üyorsun|yosun|yon|s[ıiuü]n)(?![\p{L}\p{N}_])/iu;
+// heads a short phrase with a present/progressive second-person predicate. This
+// captures natural questions such as “ne tarz açıyosun şimdi” while avoiding
+// exclamatory evidential/past surfaces such as “ne güzel açmışsın”.
+const NE_SECOND_PERSON_PROGRESSIVE_RE =
+  /(?<![\p{L}\p{N}_])ne(?:\s+[\p{L}\p{N}_-]+){0,3}\s+[\p{L}\p{N}_-]+(?:yorsun|iyorsun|ıyorsun|uyorsun|üyorsun|yosun|yon)(?![\p{L}\p{N}_])/iu;
 
 const SUBJECT_NE_NOW_RE =
   /(?<![\p{L}\p{N}_])[\p{L}\p{N}_-]+\s+ne(?:\s+(?:şu\s+an|şimdi))?\s*[.!…]*\s*$/iu;
@@ -52,13 +48,6 @@ const REPORTED_DIRECT_QUESTION_RE =
 const REPORTED_INDIRECT_QUESTION_RE =
   /(?<![\p{L}\p{N}_])(?:kim(?:le|in|den|de|e|i)?|hangi(?:si|leri)?|nerede|nereye|nereden|neden|niye|nas[ıi]l|kaç(?:ta|a|tan)?|ne)(?![\p{L}\p{N}_]).{0,50}(?<![\p{L}\p{N}_])(?:olduğunu|olacağını|yaptığını|oynadığını|dediğini|istediğini|gittiğini|geldiğini|açtığını)(?![\p{L}\p{N}_]).{0,30}(?<![\p{L}\p{N}_])(?:anlatt[ıi]|söyledi|dedi|biliyorum|biliyorsun|öğrendim)(?![\p{L}\p{N}_])/iu;
 
-/**
- * Structural recognizer for whether generated Turkish text performs a question act.
- *
- * This module does not decide whether Kaira MAY ask a question. That WHAT/WHETHER
- * decision belongs exclusively to ResponsePlan. It only measures the realized
- * output so the final contract boundary can validate plan conformance.
- */
 export function isTurkishQuestionAct(text: string): boolean {
   const value = String(text ?? "").trim();
   if (!value) return false;
@@ -81,7 +70,7 @@ export function isTurkishQuestionAct(text: string): boolean {
     CASE_MARKED_INTERROGATIVE_RE.test(value) ||
     DIRECT_SOCIAL_QUESTION_RE.test(value) ||
     INTERROGATIVE_PREDICATE_RE.test(value) ||
-    NE_SECOND_PERSON_PREDICATE_RE.test(value) ||
+    NE_SECOND_PERSON_PROGRESSIVE_RE.test(value) ||
     SUBJECT_NE_NOW_RE.test(value) ||
     SUBJECT_NASIL_RE.test(value)
   );
