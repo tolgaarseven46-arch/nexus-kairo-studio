@@ -141,21 +141,21 @@ function reconcileNeutralThirdPartyEventOverread(
 
 /**
  * `how_are_you` / `what_doing` are reciprocal Kaira-facing social routines.
- * A provider can recognize the surface shape while independently resolving the
- * utterance target to a third party (for example a question about another
- * person's current activity). Those fields cannot both be authoritative.
+ * They are coherent only when the canonical semantic target is Kaira. A
+ * provider may recognize a reciprocal surface while independently resolving
+ * the utterance target to a third party, the current user, an event, or unknown;
+ * those fields cannot all remain authoritative at once.
  *
  * Reconcile the typed contradiction at the canonical LU gateway rather than
  * teaching DialogueDecision to reinterpret the routine downstream. This uses no
  * raw-text rule and preserves genuine Kaira-directed reciprocal routines.
  */
-function reconcileThirdPartyReciprocalRoutineOverread(
+function reconcileReciprocalRoutineTargetInvariant(
   interpretation: SemanticInterpretation,
 ): SemanticInterpretation {
   const routine = interpretation.discourseFacets.socialRoutine;
-  const contradictoryRoutine =
-    interpretation.target === "third_party" &&
-    (routine === "how_are_you" || routine === "what_doing");
+  const reciprocalRoutine = routine === "how_are_you" || routine === "what_doing";
+  const contradictoryRoutine = reciprocalRoutine && interpretation.target !== "kaira";
   if (!contradictoryRoutine) return interpretation;
 
   return {
@@ -252,7 +252,7 @@ function buildResult(
   interpretation = attachCanonicalDiscourseSignals(message, interpretation);
   interpretation = reconcileSemanticTargetWithEntityResolution(interpretation, entityResolution);
   interpretation = reconcileNeutralThirdPartyEventOverread(interpretation);
-  interpretation = reconcileThirdPartyReciprocalRoutineOverread(interpretation);
+  interpretation = reconcileReciprocalRoutineTargetInvariant(interpretation);
   interpretation = reconcileSelfMemoryQueryOwnership(interpretation);
   const projected = projectSemanticEvent(interpretation);
   const grounded = groundSemanticEventForAppraisal(message, projected, entityResolution);
