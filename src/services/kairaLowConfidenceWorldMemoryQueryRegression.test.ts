@@ -17,7 +17,6 @@ function observation(input: {
   return {
     id: input.id,
     userId: "test-user",
-    ownerUserId: "test-user",
     sessionId: "test-session",
     kairaInstanceId: "kaira_reference_001",
     kind: "direct_interaction",
