@@ -35,7 +35,8 @@ describe("canonical KairaResponsePlan runtime integration", () => {
     expect(server).toContain("const finalIssues = canonicalConstraint");
     expect(server).toContain("...canonicalExternalIssues, ...finalPlanIssues");
     expect(server).toContain("...groundingIssues, ...finalPlanIssues, ...finalEpistemicIssues");
-    expect(unifiedPass).toContain("findKairaResponsePlanIssues(delivered, input.plan)");
+    expect(unifiedPass).toContain("findKairaResponsePlanIssues(");
+    expect(unifiedPass).toContain("semanticEvidenceAppliesToDelivered ? candidateSemanticInterpretation : null");
     expect(unifiedPass).not.toContain('runOrderedPass("tamam", input)');
   });
 
