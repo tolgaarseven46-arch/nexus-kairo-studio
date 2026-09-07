@@ -1,0 +1,42 @@
+name: Randomized Beta Exploration
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: Reproducible randomized beta seed
+        required: false
+        default: kaira-beta-manual
+      scenarios:
+        description: Number of 8-turn randomized sessions
+        required: false
+        default: "24"
+
+jobs:
+  randomized-beta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Run seedable randomized beta exploration
+        env:
+          KAIRA_RANDOM_BETA_SEED: ${{ github.event.inputs.seed || format('pr-{0}-run-{1}', github.event.pull_request.number || 'main', github.run_number) }}
+          KAIRA_RANDOM_BETA_SCENARIOS: ${{ github.event.inputs.scenarios || '24' }}
+        run: |
+          npx tsx scripts/run-kaira-randomized-beta-exploration.ts artifacts/kaira-randomized-beta-exploration.json
+          echo "===== KAIRA_RANDOMIZED_BETA_REPORT_BEGIN ====="
+          cat artifacts/kaira-randomized-beta-exploration.json
+          echo "===== KAIRA_RANDOMIZED_BETA_REPORT_END ====="
