@@ -50,6 +50,7 @@ const REPORTED_SPEECH_RE = /\b(?:ne demişti|ne dedi|demişti|dedi|söylemişti|
 const STORED_QUERY_RE = /[?？]\s*$|\b(?:ne demişti|ne dedi|ne olmuştu|ne oldu|hatırlıyor musun|hatırladın mı|hakkında ne biliyorsun)\b|\b(?:mi|mı|mu|mü)\b.*\b(?:demişti|dedi|söylemişti|söyledi)\b/iu;
 const LATEST_RECALL_RE = /\ben\s+son\b/iu;
 const CURRENT_STATE_RE = /\b(?:şu\s+an|şimdiki|şimdi\s+durum|durum\s+ne|hâlâ|hala|hakkında\s+ne\s+biliyorsun)\b/iu;
+const CANONICAL_MEMORY_QUERY_CONFIDENCE = 0.72;
 
 /**
  * World-event retrieval is an authority decision, not a lexical inference.
@@ -152,6 +153,18 @@ export function rankWorldEventObservations(
   queryAnchorAt = new Date().toISOString(),
   memoryQuery?: SemanticWorldMemoryQuery | null,
 ): RetrievedWorldEvent[] {
+  const canonicalMemoryQuery =
+    memoryQuery && memoryQuery.confidence >= CANONICAL_MEMORY_QUERY_CONFIDENCE
+      ? memoryQuery
+      : null;
+
+  // A typed query with insufficient confidence is not permission to broaden
+  // retrieval back into lexical/temporal inference. The canonical producer has
+  // expressed the intended subject/attribute but not strongly enough for fact
+  // admission, so this seam must fail closed instead of returning unrelated
+  // world events under a looser raw-text ranking path.
+  if (memoryQuery && !canonicalMemoryQuery) return [];
+
   const discourseResults = temporalDiscourseResults(message, observations, maxItems);
   if (discourseResults !== undefined) return discourseResults;
 
@@ -161,7 +174,6 @@ export function rankWorldEventObservations(
   const asksLatest = LATEST_RECALL_RE.test(normalizedMessage);
   const asksCurrentState = CURRENT_STATE_RE.test(normalizedMessage);
   const temporalCandidates = temporalQueryCandidates(message, observations, queryAnchorAt);
-  const canonicalMemoryQuery = memoryQuery && memoryQuery.confidence >= 0.72 ? memoryQuery : null;
   const projection = asksCurrentState ? projectWorldModel(temporalCandidates.observations) : [];
   const projectionByKey = new Map(
     projection.map((state) => [
@@ -324,7 +336,7 @@ export function buildWorldEventMemoryInstruction(items: RetrievedWorldEvent[]): 
     const observation = item.observation;
     const event = observation.event;
     const actor = event.actor?.name || "çözülmedi";
-    const target = event.target?.name || "çözülmedi";
+    const target = event.target?.name || event.target?.id || "çözülmedi";
     const epistemic = observation.kind === "reported_claim"
       ? "KULLANICININ AKTARDIĞI İDDİA"
       : "DOĞRUDAN ETKİLEŞİM";
