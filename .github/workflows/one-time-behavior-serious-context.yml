@@ -23,6 +23,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           behavior = Path('src/services/droitBehaviorEngine.ts')
           text = behavior.read_text()
@@ -48,12 +49,12 @@ jobs:
 
           kdm = Path('src/services/kdmConsistencyEngine.ts')
           text = kdm.read_text()
-          import_anchor = 'import { computeBehaviorProfile } from "./droitBehaviorEngine";\n'
           shared_import = 'import { appraiseBehaviorSeriousContext } from "./socialAppraisalEngine";\n'
           if shared_import not in text:
-              if text.count(import_anchor) != 1:
-                  raise SystemExit('kdmConsistencyEngine: behavior import anchor mismatch')
-              text = text.replace(import_anchor, import_anchor + shared_import, 1)
+              pattern = re.compile(r'(import \{\n  computeBehaviorProfile,\n  BehaviorLayerProfile,\n\} from "\./droitBehaviorEngine";\n)')
+              text, n = pattern.subn(r'\1' + shared_import, text, count=1)
+              if n != 1:
+                  raise SystemExit(f'kdmConsistencyEngine: behavior import block mismatch ({n})')
 
           old_call = '  const baseBehaviorProfile = computeBehaviorProfile(normalizedPersonality, userMessage);'
           new_call = '''  const baseBehaviorProfile = computeBehaviorProfile(\n    normalizedPersonality,\n    userMessage,\n    appraiseBehaviorSeriousContext(semanticInterpretation),\n  );'''
