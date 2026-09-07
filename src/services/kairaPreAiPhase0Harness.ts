@@ -117,7 +117,7 @@ function buildCoreFinalProviderPrompt(input: {
   // intentionally does not hydrate provider-dependent/persistent production
   // services. Assembly parity and context fidelity are reported separately.
   return buildKairaFinalProviderSystemPrompt({
-    runtimeIdentityInstruction: "=== PRE-AI PRODUCTION-CORE PROMPT SNAPSHOT ===",
+    runtimeIdentityInstruction: "=== PRE-AI PRODUCTION-CORE PROMPT SNAPSHOT ===\nSTOP: FINAL PROVIDER PROMPT BOUNDARY / NO MODEL CALL",
     speechIdentityInstruction: speechIdentityPrompt(input.speech),
     languageStyleMemoryInstruction: "",
     dyadicLanguageAlignmentInstruction: "",
