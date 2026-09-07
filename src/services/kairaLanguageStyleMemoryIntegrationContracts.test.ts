@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const server = readFileSync('server.ts', 'utf8');
+const finalPrompt = readFileSync('src/services/kairaFinalProviderPrompt.ts', 'utf8');
 const persistence = readFileSync('src/services/kdmPersistenceService.ts', 'utf8');
 const languageMemory = readFileSync('src/services/kairoLanguageMemory.ts', 'utf8');
 
@@ -9,12 +10,15 @@ describe('learned language HOW server integration contracts', () => {
   it('derives the signal only after policy-gated language-memory hydration and injects HOW below SpeechIdentity', () => {
     const hydrate = server.indexOf('hydrateLanguageMemory(stateUserId)');
     const signal = server.indexOf('languageStyleMemory = languageStyleMemorySignal(stateUserId, kairaPolicy.persistentUserMemory)');
-    const speechPrompt = server.indexOf('${speechIdentityPrompt(speech)}');
-    const learnedPrompt = server.indexOf('${languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory)}');
-    const socialStyle = server.indexOf('${socialStyle}');
+    const speechPrompt = finalPrompt.indexOf('${parts.speechIdentityInstruction}');
+    const learnedPrompt = finalPrompt.indexOf('${parts.languageStyleMemoryInstruction}', speechPrompt);
+    const socialStyle = finalPrompt.indexOf('${parts.socialStyle}', learnedPrompt);
 
     expect(hydrate).toBeGreaterThan(-1);
     expect(signal).toBeGreaterThan(hydrate);
+    expect(server).toContain('buildKairaFinalProviderSystemPrompt({');
+    expect(server).toContain('speechIdentityInstruction: speechIdentityPrompt(speech),');
+    expect(server).toContain('languageStyleMemoryInstruction: languageStyleMemoryInstruction(stateUserId, kairaPolicy.persistentUserMemory),');
     expect(speechPrompt).toBeGreaterThan(-1);
     expect(learnedPrompt).toBeGreaterThan(speechPrompt);
     expect(socialStyle).toBeGreaterThan(learnedPrompt);
