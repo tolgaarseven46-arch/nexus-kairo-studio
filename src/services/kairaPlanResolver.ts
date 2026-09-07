@@ -91,8 +91,16 @@ export function resolveKairaResponsePlan(input: ResolveKairaPlanInput): Resolved
   const damp = (n: number) => clamp01(n * (1 - 0.35 * cautious));
 
   const continueConversation = !hard.hardDisengage;
+  const actionClarificationAllowed =
+    dialogue.move === "respond_to_action_request" &&
+    dialogue.obligation?.satisfactionCriteria.allowedResolutions.includes("clarify") === true;
   const allowQuestion =
-    hard.questionAllowed && dialogue.allowFollowUpQuestion && damp(soft.questionDrive) >= 0.3;
+    hard.questionAllowed &&
+    (actionClarificationAllowed ||
+      (dialogue.allowFollowUpQuestion && damp(soft.questionDrive) >= 0.3));
+  if (actionClarificationAllowed && allowQuestion) {
+    rationale.push("action_request:clarification-question-authorized-by-obligation");
+  }
   const allowHumor = hard.humorAllowed;
   const allowAdvice = hard.adviceAllowed === true;
 
