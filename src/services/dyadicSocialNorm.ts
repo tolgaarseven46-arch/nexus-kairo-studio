@@ -137,14 +137,11 @@ export function readDyadicNorm(
   };
 }
 
-const SUPPORTED_ACTS: ReadonlySet<SemanticSocialAct> = new Set([
+const SECONDARY_NORM_KEYS: ReadonlySet<SemanticSocialAct> = new Set([
   "insult",
   "mockery",
-  "compliment",
-  "support",
   "affection",
   "apology",
-  "rejection",
   "coercion",
   "manipulation",
   "privacy_violation",
@@ -152,15 +149,25 @@ const SUPPORTED_ACTS: ReadonlySet<SemanticSocialAct> = new Set([
 
 /**
  * Maps canonical semantic evidence to a norm key. No raw-text parsing is allowed.
- * Returns null when the current turn has no dyadic-norm-relevant social act.
+ * Primary intent and secondary social acts retain their canonical distinction.
  */
 export function dyadicNormKeyForInterpretation(
   interpretation: Readonly<SemanticInterpretation>,
 ): DyadicNormKey | null {
-  const ordered: SemanticSocialAct[] = [
-    ...interpretation.secondarySocialActs,
-    interpretation.primaryIntent as SemanticSocialAct,
-  ];
-  const found = ordered.find((act) => SUPPORTED_ACTS.has(act));
-  return (found as DyadicNormKey | undefined) ?? null;
+  const secondary = interpretation.secondarySocialActs.find((act) =>
+    SECONDARY_NORM_KEYS.has(act),
+  );
+  if (secondary) return secondary as DyadicNormKey;
+
+  switch (interpretation.primaryIntent) {
+    case "insult":
+    case "compliment":
+    case "support":
+    case "affection":
+    case "apology":
+    case "rejection":
+      return interpretation.primaryIntent;
+    default:
+      return null;
+  }
 }
