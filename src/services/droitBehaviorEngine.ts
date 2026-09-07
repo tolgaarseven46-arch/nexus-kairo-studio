@@ -39,13 +39,19 @@ export interface EngineInteractionResult {
   behaviorProfile: BehaviorLayerProfile;
 }
 
+export interface BehaviorProfileContext {
+  /** Canonical/appraisal-owned seriousness signal. */
+  seriousContext?: boolean;
+}
+
 /**
  * Evaluates combined personality traits to create a synthesized behavior profile.
  * Traits are evaluated synergistically (e.g. Humor + Seriousness + Empathy).
  */
 export function computeBehaviorProfile(
   traits?: Partial<DroitPersonalityTraits> | null,
-  userMessage: string = ''
+  userMessage: string = '',
+  context?: BehaviorProfileContext,
 ): BehaviorLayerProfile {
   const safeTraits = normalizeDroitPersonality(traits);
   // Extract canonical normalized trait values (0 to 100, default 50)
@@ -65,8 +71,11 @@ export function computeBehaviorProfile(
   const loyalty = Number(safeTraits.loyalty ?? 50);
   const initiative = Number(safeTraits.initiative ?? 50);
 
+  // Legacy callers may still omit structured context. Production canonical KDM
+  // always supplies SocialAppraisal seriousness and therefore never uses this
+  // raw-text compatibility fallback as semantic authority.
   const lowerMsg = userMessage.toLowerCase();
-  const isDistressOrEmergency =
+  const legacyRawDistressFallback =
     lowerMsg.includes('acil') ||
     lowerMsg.includes('üzgün') ||
     lowerMsg.includes('kötü') ||
@@ -74,6 +83,7 @@ export function computeBehaviorProfile(
     lowerMsg.includes('tehlike') ||
     lowerMsg.includes('çök') ||
     lowerMsg.includes('saldır');
+  const isDistressOrEmergency = context?.seriousContext ?? legacyRawDistressFallback;
 
   // ── 1. HUMOR SYNTHESIS ──
   // If seriousness or user message indicates serious distress, humor is suppressed
