@@ -18,6 +18,7 @@ describe('beta conversation acceptance gate', () => {
       'src/services/kairaBetaConversationAcceptanceScenario.test.ts',
       'src/services/kairaTwentyTurnPersistenceRoundtripRegression.test.ts',
       'src/services/kairaTwentyTurnFinalDeliveryQualityRegression.test.ts',
+      'src/services/kairaCapturedKntReplayRegression.test.ts',
     ]);
 
     for (const file of manifest.tests) {
