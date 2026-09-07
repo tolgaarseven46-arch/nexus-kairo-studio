@@ -22,7 +22,6 @@ function observation(input: {
     kind: "direct_interaction",
     status: "grounded",
     createdAt: "2026-09-07T07:00:00.000Z",
-    observedAt: "2026-09-07T07:00:00.000Z",
     event: {
       raw: input.raw,
       eventType: "general",
