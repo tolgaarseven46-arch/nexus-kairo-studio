@@ -17,6 +17,7 @@ import { reduceRelationshipTurn, type RelationshipReducerResult, type Relationsh
 import { DEFAULT_RELATIONSHIP_REDUCER_CONFIG } from "./relationshipReducerConfig";
 import { isRelationshipNeutralTurn, relationshipSeverityForInterpretation } from "./kairaQuestionOnlyStopRelationshipPolicy";
 import type { KairaAffectBaseline } from "./kairaAffectBaseline";
+import { socialNegativePattern } from "./socialAppraisalEngine";
 
 type GroundedSemanticEvent = SemanticEvent & { relationshipScope?: SemanticRelationshipScope };
 
@@ -34,7 +35,6 @@ export interface KdmCanonicalInput {
 }
 export interface KdmCanonicalResult { trace: ReasoningTrace; behaviorProfile: BehaviorLayerProfile; nextDynamicState: DroitDynamicState; }
 
-const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 const clamp100 = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 function minutesBetween(fromIso: string | undefined, toIso: string) {
   if (!fromIso) return 0;
@@ -44,52 +44,9 @@ function minutesBetween(fromIso: string | undefined, toIso: string) {
   return Math.max(0, (to - from) / 60000);
 }
 
-/** Canonical context credibility shared with RelationshipReducer semantics. */
-function relationshipHarmConfidence(interp: SemanticInterpretation): number {
-  const rl = DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline;
-  return clamp01(
-    (1 - rl.jokingDampen * interp.jokingConfidence * (1 - interp.sincerityConfidence)) *
-      (1 - rl.uncertaintyDampen * interp.uncertainty.overall),
-  );
-}
-
-/** Stable repeat label derived only from canonical v2 fields. No raw-text parse. */
+/** Compatibility export; shared SocialAppraisal is the sole negative-pattern authority. */
 export function semanticNegativePattern(interp: SemanticInterpretation): string | null {
-  const explicitInsultOrMockery =
-    interp.primaryIntent === "insult" ||
-    interp.secondarySocialActs.includes("insult") ||
-    interp.secondarySocialActs.includes("mockery");
-  if (interp.primaryIntent === "complaint" && !explicitInsultOrMockery) return null;
-  const harmConfidence = relationshipHarmConfidence(interp);
-  const contextualSeverity = {
-    disrespect: interp.severity.disrespect * harmConfidence,
-    coercion: interp.severity.coercion * harmConfidence,
-    aggression: interp.severity.aggression * harmConfidence,
-    manipulation: interp.severity.manipulation * harmConfidence,
-    privacy: interp.severity.privacy * harmConfidence,
-  };
-  const rawMaxSeverity = Math.max(
-    interp.severity.disrespect,
-    interp.severity.coercion,
-    interp.severity.aggression,
-    interp.severity.manipulation,
-    interp.severity.privacy,
-  );
-  const contextualMaxSeverity = Math.max(
-    contextualSeverity.disrespect,
-    contextualSeverity.coercion,
-    contextualSeverity.aggression,
-    contextualSeverity.manipulation,
-    contextualSeverity.privacy,
-  );
-  if (contextualSeverity.privacy >= 0.15 || interp.secondarySocialActs.includes("privacy_violation")) return "mahremiyet_ihlali";
-  if (contextualSeverity.manipulation >= 0.15 || interp.secondarySocialActs.includes("manipulation")) return "manipulasyon";
-  if (contextualSeverity.coercion >= 0.15 || interp.secondarySocialActs.includes("coercion")) return "zorlama";
-  if (explicitInsultOrMockery) return rawMaxSeverity >= 0.75 ? "agir_hakaret" : "hakaret";
-  if (contextualSeverity.disrespect >= 0.15) return contextualMaxSeverity >= 0.75 ? "agir_hakaret" : "hakaret";
-  if (interp.primaryIntent === "rejection") return "kovma_ve_reddetme";
-  if (contextualSeverity.aggression >= 0.2) return "agresif_dil";
-  return null;
+  return socialNegativePattern(interp);
 }
 
 function buildTurnSignal(
