@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_DISCOURSE_STATE } from "../types/discourseState";
+import type { SemanticDiscourseProjection } from "../types/semanticInterpretation";
 import { reduceDiscourseState } from "./discourseStateReducer";
 import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
 import type { SemanticEvent } from "./semanticEventEngine";
 
-function canonicalQuestion(overrides: Partial<SemanticEvent> = {}): SemanticEvent {
+type CanonicalQuestionEvent = SemanticEvent & SemanticDiscourseProjection;
+
+function canonicalQuestion(
+  overrides: Partial<CanonicalQuestionEvent> = {},
+): CanonicalQuestionEvent {
   return {
     raw: "neden",
     normalized: "neden",
