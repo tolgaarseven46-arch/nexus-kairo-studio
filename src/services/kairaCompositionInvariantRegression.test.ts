@@ -11,7 +11,7 @@ import {
 describe("cross-layer composition invariants", () => {
   it("suppresses reciprocal routines for explicit non-Kaira targets", () => {
     const base = interpretationFromRegexFloor("test");
-    for (const target of ["current_user", "third_party", "event"] as const) {
+    for (const target of ["self", "third_party", "event"] as const) {
       const interpretation = {
         ...base,
         target,
