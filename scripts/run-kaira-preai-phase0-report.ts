@@ -33,11 +33,21 @@ type ViolationDetail = {
   promptExcerpt: string;
 };
 
+type DetectorCoverageAggregate = {
+  detector: string;
+  totalTurns: number;
+  activeTurns: number;
+  observableTurns: number;
+  unobservableTurns: number;
+  reasons: Record<string, number>;
+};
+
 type ClusterAggregate = {
   scenarioCount: number;
   turnCount: number;
   auditViolationCounts: Record<string, number>;
   declaredFailureClasses: string[];
+  detectorCoverage: Record<string, DetectorCoverageAggregate>;
   violatingTurns: ViolationDetail[];
   scenarios: Array<{
     scenarioId: string;
@@ -60,6 +70,7 @@ for (const scenario of matrix.scenarios as KairaPreAiScenarioDefinition[]) {
 
 const clusters: Record<string, ClusterAggregate> = {};
 const globalViolationCounts: Record<string, number> = {};
+const globalDetectorCoverage: Record<string, DetectorCoverageAggregate> = {};
 const violatingTurns: ViolationDetail[] = [];
 let totalTurns = 0;
 let isolationFailures = 0;
@@ -73,6 +84,30 @@ function compactPromptExcerpt(systemPrompt: string) {
   return (relevant.length ? relevant : lines.slice(0, 18)).join("\n").slice(0, 4000);
 }
 
+function mergeCoverage(
+  target: Record<string, DetectorCoverageAggregate>,
+  clusterId: string,
+  detector: string,
+  active: boolean,
+  observable: boolean,
+  reason: string,
+) {
+  const key = `${clusterId}:${detector}`;
+  const row = target[key] ??= {
+    detector,
+    totalTurns: 0,
+    activeTurns: 0,
+    observableTurns: 0,
+    unobservableTurns: 0,
+    reasons: {},
+  };
+  row.totalTurns += 1;
+  if (active) row.activeTurns += 1;
+  if (observable) row.observableTurns += 1;
+  else row.unobservableTurns += 1;
+  row.reasons[reason] = (row.reasons[reason] ?? 0) + 1;
+}
+
 for (const result of scenarioResults) {
   totalTurns += result.turns.length;
   const cluster = clusters[result.cluster] ??= {
@@ -80,6 +115,7 @@ for (const result of scenarioResults) {
     turnCount: 0,
     auditViolationCounts: {},
     declaredFailureClasses: [],
+    detectorCoverage: {},
     violatingTurns: [],
     scenarios: [],
   };
@@ -107,6 +143,27 @@ for (const result of scenarioResults) {
   for (const turn of result.turns) {
     if (!turn.audit.sessionIsolationCheck.isolated) isolationFailures += 1;
     if (turn.audit.noAiStopMarker !== "FINAL_PROVIDER_PROMPT_BUILT_NO_PROVIDER_CALL") noAiBoundaryFailures += 1;
+
+    for (const coverage of turn.audit.detectorCoverage ?? []) {
+      mergeCoverage(
+        globalDetectorCoverage,
+        coverage.cluster,
+        coverage.detector,
+        coverage.active,
+        coverage.observable,
+        coverage.reason,
+      );
+      if (coverage.cluster === result.cluster) {
+        mergeCoverage(
+          cluster.detectorCoverage,
+          coverage.cluster,
+          coverage.detector,
+          coverage.active,
+          coverage.observable,
+          coverage.reason,
+        );
+      }
+    }
 
     if (turn.audit.invariantViolations.length > 0) {
       const obligation = turn.dialogueDecision?.obligation;
@@ -142,15 +199,27 @@ for (const result of scenarioResults) {
   }
 }
 
+const clusterReadiness = Object.entries(clusters).map(([clusterId, cluster]) => {
+  const relevant = Object.values(cluster.detectorCoverage);
+  const hasObservableDetector = relevant.some((row) => row.observableTurns > 0);
+  return {
+    cluster: clusterId,
+    hasObservableDetector,
+    detectorCoverage: relevant,
+  };
+});
+
+const everyClusterObservable = clusterReadiness.length === 5 && clusterReadiness.every((item) => item.hasObservableDetector);
+
 const report = {
   reportType: "KAIRA_PREAI_PHASE0_TOOLING_REPORT",
-  version: 2,
+  version: 3,
   generatedAt: new Date().toISOString(),
   matrixVersion: matrix.version,
   aiBoundary: matrix.aiBoundary,
   branchTrackType: "regression",
   semanticIngress: "deterministic_regex_floor",
-  promptCoverage: "production_core_not_yet_byte_identical_server_template",
+  promptCoverage: "shared_canonical_blocks_but_full_server_template_parity_not_yet_proven",
   summary: {
     scenarioCount: scenarioResults.length,
     turnCount: totalTurns,
@@ -159,14 +228,18 @@ const report = {
     noAiBoundaryFailures,
     violatingTurnCount: violatingTurns.length,
     auditViolationCounts: globalViolationCounts,
+    everyClusterObservable,
   },
+  detectorCoverage: globalDetectorCoverage,
+  clusterReadiness,
   violatingTurns,
   clusters,
   scaleGate: {
     phase1Allowed: false,
     reasons: [
       "Phase 0 machine report must be jointly reviewed by user + ChatGPT + Cloud.",
-      "Exact server final-provider-prompt seam is not yet shared with this harness.",
+      ...(everyClusterObservable ? [] : ["At least one Phase 0 cluster still has no observable automatic detector on real scenario turns."]),
+      "Full server final-provider-prompt template parity with the harness has not yet been proven byte-identical.",
       "This run audits deterministic regex-floor ingestion, not production semantic-provider quality.",
     ],
   },
@@ -175,6 +248,8 @@ const report = {
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 console.log(JSON.stringify(report.summary, null, 2));
+console.log("Phase 0 detector coverage:");
+console.log(JSON.stringify(globalDetectorCoverage, null, 2));
 if (violatingTurns.length) {
   console.log("Phase 0 violating turns:");
   console.log(JSON.stringify(violatingTurns, null, 2));
