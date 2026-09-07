@@ -35,6 +35,14 @@ function relationalAct(interp: SemanticInterpretation): RelationalAct {
   return "none";
 }
 
+function projectedSocialRoutine(
+  interp: SemanticInterpretation,
+): SemanticDiscourseProjection["socialRoutine"] {
+  const routine = interp.discourseFacets.socialRoutine;
+  const reciprocalRoutine = routine === "how_are_you" || routine === "what_doing";
+  return reciprocalRoutine && interp.target !== "kaira" ? "none" : routine;
+}
+
 export type ProjectedSemanticEvent = SemanticEvent & SemanticDiscourseProjection;
 
 /**
@@ -43,6 +51,12 @@ export type ProjectedSemanticEvent = SemanticEvent & SemanticDiscourseProjection
  * This function MUST NOT inspect raw text, call a parser, use regex, or widen the
  * semantic reading. `SemanticInterpretation@2` is the only authority; the legacy
  * `SemanticEvent` shape exists solely for consumers not yet migrated.
+ *
+ * Cross-field invariant: reciprocal `how_are_you` / `what_doing` routines are
+ * Kaira-facing by definition and therefore may be projected only when the
+ * canonical target is Kaira. `third_party`, `current_user`, `event`, and
+ * `unknown` targets fail closed to `socialRoutine=none` without inventing a
+ * replacement interpretation.
  */
 export function projectSemanticEvent(interp: SemanticInterpretation): ProjectedSemanticEvent {
   const insult =
@@ -68,7 +82,7 @@ export function projectSemanticEvent(interp: SemanticInterpretation): ProjectedS
     raw: interp.raw,
     normalized: interp.normalized,
     intent: INTENT_MAP[interp.primaryIntent],
-    socialRoutine: interp.discourseFacets.socialRoutine,
+    socialRoutine: projectedSocialRoutine(interp),
     discourseAct: interp.discourseFacets.discourseAct,
     repairSignal: interp.discourseFacets.repairSignal,
     adviceRequested: interp.discourseFacets.adviceRequested,
