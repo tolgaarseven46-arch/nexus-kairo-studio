@@ -21,10 +21,10 @@ describe("explicit behavior policy boundary", () => {
     expect(client).not.toContain("behaviorDecision: integrationRuntime.decision, behaviorPressures: integrationRuntime.pressures");
   });
 
-  it("validates the explicit policy at the server boundary and passes it to KDM before the separate affect baseline seam", () => {
+  it("validates the explicit policy at the server boundary and passes it to KDM before the separate affect baseline and bounded memory seams", () => {
     expect(server).toContain("normalizeBehaviorPolicyInput(incomingBehaviorPolicy)");
     expect(server).toContain("behaviorPolicy: incomingBehaviorPolicy");
-    expect(server).toMatch(/analyzeKdmInteractionCanonicalTurn\([\s\S]*canonicalSemantic\.interpretation,\s*canonicalSemantic\.event,\s*behaviorPolicy,\s*affectBaseline,\s*\)/u);
+    expect(server).toMatch(/analyzeKdmInteractionCanonicalTurn\([\s\S]*canonicalSemantic\.interpretation,\s*canonicalSemantic\.event,\s*behaviorPolicy,\s*affectBaseline,\s*socialAppraisalMemoryRuntime\.memory,\s*\)/u);
   });
 
   it("does not recover live integrated decisions from personality runtime fields inside KDM", () => {

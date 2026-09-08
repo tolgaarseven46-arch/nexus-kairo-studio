@@ -4,6 +4,7 @@ import {
   ReasoningTrace,
 } from "../types/nexus";
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
+import type { SocialAppraisalMemoryContext } from "../types/socialAppraisal";
 import {
   computeBehaviorProfile,
   BehaviorLayerProfile,
@@ -191,6 +192,7 @@ export function analyzeKdmInteractionCanonicalTurn(
   semanticEvent: SemanticEvent,
   behaviorPolicy?: BehaviorPolicyInput | null,
   affectBaseline?: Partial<KairaAffectBaseline> | null,
+  memory?: Readonly<SocialAppraisalMemoryContext>,
 ): KdmAnalysisResult {
   const state: DroitDynamicState = { ...DEFAULT_DYNAMIC_STATE, ...(currentDynamicState || {}) };
   const normalizedPersonality = normalizeDroitPersonality(personality);
@@ -207,6 +209,7 @@ export function analyzeKdmInteractionCanonicalTurn(
     baseBehaviorProfile,
     behaviorPolicy: behaviorPolicy ?? null,
     affectBaseline: affectBaseline ?? null,
+    memory,
     applyIntegrated: applyIntegratedBehaviorPolicy,
     semanticIntentToKdm,
     semanticSentimentToKdm,

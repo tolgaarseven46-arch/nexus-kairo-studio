@@ -13,6 +13,7 @@
  */
 import type { AffectiveReactionMode, DroitDynamicState, DroitPersonalityTraits, ReasoningTrace, RelationshipState } from "../types/nexus";
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
+import type { SocialAppraisalMemoryContext } from "../types/socialAppraisal";
 import type { BehaviorLayerProfile } from "./droitBehaviorEngine";
 import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 import type { SemanticEvent } from "./semanticEventEngine";
@@ -41,6 +42,8 @@ export interface KdmCanonicalInput {
   baseBehaviorProfile: BehaviorLayerProfile;
   behaviorPolicy: BehaviorPolicyInput | null;
   affectBaseline?: Partial<KairaAffectBaseline> | null;
+  /** Bounded active-user autobiographical context prepared upstream. */
+  memory?: Readonly<SocialAppraisalMemoryContext>;
   applyIntegrated: (profile: BehaviorLayerProfile, behaviorPolicy?: BehaviorPolicyInput | null) => BehaviorLayerProfile;
   semanticIntentToKdm: (event: SemanticEvent) => string;
   semanticSentimentToKdm: (event: SemanticEvent) => string;
@@ -99,6 +102,7 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
     relationshipScope: semanticEvent.relationshipScope,
     relationship: prevRel,
     dyadicNorm: priorDyadicNorm,
+    memory: input.memory,
     currentState: state,
     personality: input.normalizedPersonality,
   });
