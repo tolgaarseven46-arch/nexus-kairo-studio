@@ -1,23 +1,10 @@
 import type { SemanticInterpretation } from "./semanticInterpretation";
+import type { DyadicSocialNormProfile } from "./dyadicSocialNorm";
 import type {
   DroitDynamicState,
   DroitPersonalityTraits,
   RelationshipState,
 } from "./nexus";
-
-/**
- * Minimal observed dyadic social-norm snapshot.
- * Persistence/learning is introduced in a later migration slice; PR-B only
- * freezes the appraisal input contract.
- */
-export interface DyadicSocialNormSnapshot {
-  /** How normal informal/slang interaction is inside this Kaira-user dyad. */
-  informalityBaseline: number;
-  /** How established reciprocal teasing/banter is inside this dyad. */
-  teasingReciprocity: number;
-  /** Evidence strength behind the learned norm; cold-start dyads stay low. */
-  normConfidence: number;
-}
 
 export interface SocialAppraisalMemoryContext {
   /** Structured summaries only. SocialAppraisal must never reparse raw history. */
@@ -31,8 +18,8 @@ export interface SocialAppraisalInput {
   semantic: SemanticInterpretation;
   /** Existing slow relationship projection for the active Kaira-user dyad. */
   relationship: Readonly<RelationshipState>;
-  /** Learned dyadic social norm; optional until PR-F wires persistence/learning. */
-  dyadicNorm?: Readonly<DyadicSocialNormSnapshot>;
+  /** Canonical learned social-context profile for this active Kaira-user dyad. */
+  dyadicNorm?: Readonly<DyadicSocialNormProfile>;
   /** Current Kaira state may modulate sensitivity only through bounded appraisal rules. */
   currentState: Readonly<DroitDynamicState>;
   /** Stable character traits/boundaries. */
