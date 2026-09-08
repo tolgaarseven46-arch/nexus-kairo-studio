@@ -196,14 +196,23 @@ describe("RelationshipReducer — typed repair magnitude authority", () => {
   });
 
   it("does not let apology booleans manufacture repair when repairStrength is zero", () => {
-    const result = reduceRelationshipTurn({
+    const timing = { elapsedMinutesSincePrev: 0, nowIso: "2026-09-01T00:05:00.000Z" };
+    const flagged = reduceRelationshipTurn({
       prev: injuredPrev(),
       signal: baseSignal({ valence: "neutral", targetsKaira: true, apology: true, repairAttempt: true, repairStrength: 0 }),
-      timing: { elapsedMinutesSincePrev: 0, nowIso: "2026-09-01T00:05:00.000Z" },
+      timing,
       config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG,
     });
-    expect(result.scores.repairProgress).toBeLessThanOrEqual(5);
-    expect(result.reactionMode).not.toBe("repairing");
+    const control = reduceRelationshipTurn({
+      prev: injuredPrev(),
+      signal: baseSignal({ valence: "neutral", targetsKaira: true, apology: false, repairAttempt: false, repairStrength: 0 }),
+      timing,
+      config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG,
+    });
+    expect(flagged.scores.repairProgress).toBe(control.scores.repairProgress);
+    expect(flagged.scores.trust).toBe(control.scores.trust);
+    expect(flagged.recovery.interactionComponent).toBe(control.recovery.interactionComponent);
+    expect(flagged.reactionMode).not.toBe("repairing");
   });
 });
 
