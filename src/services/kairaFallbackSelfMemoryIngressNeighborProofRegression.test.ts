@@ -6,7 +6,7 @@ function interpretation(message: string) {
 }
 
 describe("fallback self-memory ingress bug-class neighbor proof", () => {
-  it("reported: preserves a direct Kaira favorite self-fact query and ownership at regex-floor ingress", () => {
+  it("reported: preserves a direct Kaira favorite self-fact query at regex-floor ingress", () => {
     const result = interpretation("senin en sevdiğin çiçek ne?");
     expect(result.target).toBe("kaira");
     expect(result.discourseFacets.selfMemoryQuery).toMatchObject({
@@ -15,7 +15,7 @@ describe("fallback self-memory ingress bug-class neighbor proof", () => {
     });
   });
 
-  it("neighbor-1: preserves a direct Kaira preference self-fact query and ownership at regex-floor ingress", () => {
+  it("neighbor-1: preserves a direct Kaira preference self-fact query at regex-floor ingress", () => {
     const result = interpretation("sen hangi müziği seversin?");
     expect(result.target).toBe("kaira");
     expect(result.discourseFacets.selfMemoryQuery).toMatchObject({
@@ -23,7 +23,7 @@ describe("fallback self-memory ingress bug-class neighbor proof", () => {
     });
   });
 
-  it("neighbor-2: preserves targeted Kaira autobiography and ownership at regex-floor ingress", () => {
+  it("neighbor-2: preserves targeted autobiographical recall at regex-floor ingress", () => {
     const result = interpretation("senin geçmişinde başına gelen o yağmur olayını hatırlıyor musun?");
     expect(result.target).toBe("kaira");
     expect(result.discourseFacets.selfMemoryQuery).toMatchObject({
@@ -32,7 +32,7 @@ describe("fallback self-memory ingress bug-class neighbor proof", () => {
     });
   });
 
-  it("counterexample: does not manufacture Kaira self-memory or ownership for a third-party recall question", () => {
+  it("counterexample: does not manufacture Kaira self-memory for a third-party recall question", () => {
     const result = interpretation("Mert'in başına gelen olayı hatırlıyor musun?");
     expect(result.discourseFacets.selfMemoryQuery).toBeNull();
     expect(result.target).not.toBe("kaira");
