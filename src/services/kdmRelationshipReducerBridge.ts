@@ -23,6 +23,8 @@ import { DEFAULT_RELATIONSHIP_REDUCER_CONFIG } from "./relationshipReducerConfig
 import { isRelationshipNeutralTurn } from "./kairaQuestionOnlyStopRelationshipPolicy";
 import type { KairaAffectBaseline } from "./kairaAffectBaseline";
 import { socialNegativePattern } from "./socialAppraisalEngine";
+import { emptyDyadicSocialNorm } from "./dyadicSocialNorm";
+import { observeCanonicalDyadicNorm } from "./dyadicSocialNormObservation";
 import {
   affectDeltaFromRuntimeAppraisal,
   relationshipSignalFromRuntimeAppraisal,
@@ -76,6 +78,9 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
   const { state, semanticInterpretation, semanticEvent, baseBehaviorProfile, behaviorPolicy, applyIntegrated } = input;
   const nowIso = new Date().toISOString();
   const prevRel: RelationshipState = state.relationship ?? {};
+  const priorDyadicNorm = prevRel.dyadicNorm?.subjectId === "active-interlocutor"
+    ? prevRel.dyadicNorm
+    : emptyDyadicSocialNorm("active-interlocutor");
   const rawNegativePattern = isRelationshipNeutralTurn(semanticInterpretation) ? null : semanticNegativePattern(semanticInterpretation);
   const negativePattern = semanticEvent.relationshipScope === "third_party" ? null : rawNegativePattern;
   const samePattern = !!negativePattern && prevRel.lastNegativePattern === negativePattern;
@@ -93,9 +98,16 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
     semantic: semanticInterpretation,
     relationshipScope: semanticEvent.relationshipScope,
     relationship: prevRel,
+    dyadicNorm: priorDyadicNorm,
     currentState: state,
     personality: input.normalizedPersonality,
   });
+  const nextDyadicNorm = observeCanonicalDyadicNorm(
+    priorDyadicNorm,
+    semanticInterpretation,
+    semanticEvent.relationshipScope,
+    nowIso,
+  );
   const signal = relationshipSignalFromRuntimeAppraisal(
     semanticInterpretation,
     semanticEvent.relationshipScope,
@@ -178,6 +190,7 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
     conflictScore: projectedResult.scores.conflict,
     hurtScore: projectedResult.scores.hurt,
     repairProgress: projectedResult.scores.repairProgress,
+    dyadicNorm: nextDyadicNorm,
     repeatedNegativeCount: projectedResult.scores.repeatedNegativeCount,
     conversationState: projectedResult.conversationState,
     repairAttempts: projectedResult.repairAttempts,
