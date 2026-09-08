@@ -17,6 +17,8 @@ export type {
 } from "../types/dyadicSocialNorm";
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+const NON_NEGATIVE_COUNT = (value: unknown): number =>
+  typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 
 export function emptyDyadicSocialNorm(subjectId: string): DyadicSocialNormProfile {
   return {
@@ -24,6 +26,64 @@ export function emptyDyadicSocialNorm(subjectId: string): DyadicSocialNormProfil
     subjectId,
     totalObservedTurns: 0,
     evidence: {},
+  };
+}
+
+const DYADIC_NORM_KEYS: readonly DyadicNormKey[] = [
+  "insult",
+  "mockery",
+  "compliment",
+  "support",
+  "affection",
+  "apology",
+  "rejection",
+  "coercion",
+  "manipulation",
+  "privacy_violation",
+];
+
+/** Fail closed when hydrating the learned dyadic prior from persistence. */
+export function normalizeDyadicSocialNormProfile(
+  value: unknown,
+  expectedSubjectId = "active-interlocutor",
+): DyadicSocialNormProfile | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const source = value as Partial<DyadicSocialNormProfile>;
+  if (source.version !== 0 || source.subjectId !== expectedSubjectId) return undefined;
+
+  const rawEvidence = source.evidence && typeof source.evidence === "object"
+    ? source.evidence as Partial<Record<DyadicNormKey, Partial<DyadicNormEvidence>>>
+    : {};
+  const evidence: Partial<Record<DyadicNormKey, DyadicNormEvidence>> = {};
+  for (const key of DYADIC_NORM_KEYS) {
+    const raw = rawEvidence[key];
+    if (!raw || typeof raw !== "object") continue;
+    const observedCount = NON_NEGATIVE_COUNT(raw.observedCount);
+    const benignCount = NON_NEGATIVE_COUNT(raw.benignCount);
+    const harmfulCount = NON_NEGATIVE_COUNT(raw.harmfulCount);
+    const mixedCount = NON_NEGATIVE_COUNT(raw.mixedCount);
+    const unknownCount = NON_NEGATIVE_COUNT(raw.unknownCount);
+    const accounted = benignCount + harmfulCount + mixedCount + unknownCount;
+    evidence[key] = {
+      observedCount: Math.max(observedCount, accounted),
+      benignCount,
+      harmfulCount,
+      mixedCount,
+      unknownCount,
+      ...(typeof raw.lastObservedAt === "string" && raw.lastObservedAt
+        ? { lastObservedAt: raw.lastObservedAt }
+        : {}),
+    };
+  }
+
+  return {
+    version: 0,
+    subjectId: expectedSubjectId,
+    totalObservedTurns: Math.max(
+      NON_NEGATIVE_COUNT(source.totalObservedTurns),
+      Object.values(evidence).reduce((sum, item) => sum + (item?.observedCount ?? 0), 0),
+    ),
+    evidence,
   };
 }
 

@@ -98,6 +98,20 @@
       "counterexamples": [
         "counterexample: identical repair context remains deterministic"
       ]
+    },
+    {
+      "id": "dyadic-norm-runtime-wiring",
+      "invariant": "Persisted learned social evidence for the active user-Kaira dyad must reach G2/G3/G4 as a prior, producing person-specific appraisal pressure without allowing mismatched dyad ownership to alter the baseline.",
+      "redSha": "bac793829b88fc787c892618c49034a817d2ac24",
+      "testFile": "src/services/dyadicSocialNormRuntimeNeighborProofRegression.test.ts",
+      "reported": "reported: persisted benign dyad evidence reaches runtime appraisal",
+      "neighbors": [
+        "neighbor-1: persisted benign and harmful histories produce different harm pressure",
+        "neighbor-2: established persisted history produces nonzero expectedness"
+      ],
+      "counterexamples": [
+        "counterexample: mismatched dyad ownership remains equivalent to no dyad prior"
+      ]
     }
   ]
 }
