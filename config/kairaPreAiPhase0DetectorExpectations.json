@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "defaultExpectation": "observable_required",
+  "scenarios": {
+    "A4": "not_applicable"
+  }
+}
