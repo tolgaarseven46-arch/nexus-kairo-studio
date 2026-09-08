@@ -2,6 +2,7 @@ import { addDoc, collection, doc, getDocs, limit, orderBy, query, runTransaction
 import { db } from "../lib/firebase";
 import {
   DEFAULT_KAIRA_INSTANCE_ID,
+  persistentUserIdentityScope,
   resolveKairaInstanceContext,
   worldModelOwnerScope,
 } from "./kairaInstanceContext";
@@ -39,6 +40,7 @@ export interface KairaActivityWorldObservation {
 
 export interface WorldEventObservation {
   id?: string;
+  /** Injective persistent user identity scope, not a turn-local entity alias. */
   userId: string;
   /** Legacy observations may omit this; omission means the reference Kaira. */
   kairaInstanceId?: string;
@@ -52,9 +54,6 @@ export interface WorldEventObservation {
   createdAt: string;
   temporalReferenceObservationId?: string;
 }
-
-const scope = (value?: string) =>
-  (value || "anonymous").replace(/[^a-zA-Z0-9_-]/g, "_");
 
 const canonicalActivityKey = (value: string) =>
   String(value || "")
@@ -129,9 +128,13 @@ export function classifyWorldEventObservation(
   const isQuestionLike = QUESTION_LIKE_RE.test(event.raw || "");
   const hasParticipant = Boolean(event.actor || event.target);
   const meaningfulType = event.eventType !== "general";
-  const persist = !event.reportedSpeech && !isQuestionLike && event.certainty >= 0.45 && (meaningfulType || hasParticipant);
+  const persist = !event.reportedSpeech && !isQuestionLike && inputSafeCertainty(event.certainty) >= 0.45 && (meaningfulType || hasParticipant);
 
   return { persist, kind, status };
+}
+
+function inputSafeCertainty(value: number): number {
+  return Number.isFinite(value) ? value : 0;
 }
 
 export function enrichWorldEventTemporalAtPersistence(
@@ -200,12 +203,12 @@ export async function saveWorldEventObservation(input: {
   if (!classification.persist) return null;
 
   const createdAt = new Date().toISOString();
-  const userId = scope(input.userId);
+  const userId = persistentUserIdentityScope(input.userId);
   const instance = resolveKairaInstanceContext({ instanceId: input.kairaInstanceId });
   const parent = doc(
     db,
     WORLD_MODEL_COLLECTION,
-    worldModelOwnerScope(userId, instance.instanceId),
+    worldModelOwnerScope(input.userId, instance.instanceId),
   );
   const needsPreviousEvent = input.event.temporal?.dependency?.anchor === "previous_event";
   const referenceObservation = needsPreviousEvent
@@ -269,11 +272,11 @@ export async function saveKairaActivityWorldObservation(input: {
   }
 
   const createdAt = new Date().toISOString();
-  const userId = scope(input.userId);
+  const userId = persistentUserIdentityScope(input.userId);
   const parent = doc(
     db,
     WORLD_MODEL_COLLECTION,
-    worldModelOwnerScope(userId, instance.instanceId),
+    worldModelOwnerScope(input.userId, instance.instanceId),
   );
   const activity: KairaActivityWorldObservation = {
     activityId,

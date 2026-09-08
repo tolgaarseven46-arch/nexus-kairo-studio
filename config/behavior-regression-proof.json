@@ -126,6 +126,20 @@
       "counterexamples": [
         "counterexample: named third-party participant identity remains unchanged"
       ]
+    },
+    {
+      "id": "world-observation-injective-user-identity",
+      "invariant": "World observation persistence must preserve an injective user identity provenance so distinct unsafe raw user ids cannot collapse before world ownership or lived-memory projection, while safe legacy ids remain byte-compatible.",
+      "redSha": "917d7b1b9aa71d548a57cab43c1f9ec9b66bd1da",
+      "testFile": "src/services/worldObservationUserIdentityNeighborProofRegression.test.ts",
+      "reported": "reported: slash and question-mark user ids do not collapse in persisted observation provenance",
+      "neighbors": [
+        "neighbor-1: email-like and plus-form user ids do not collapse in persisted observation provenance",
+        "neighbor-2: colon and slash user ids do not collapse in persisted observation provenance"
+      ],
+      "counterexamples": [
+        "counterexample: legacy-safe user ids remain byte-compatible"
+      ]
     }
   ]
 }
