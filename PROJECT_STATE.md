@@ -12,7 +12,7 @@
 
 ## 2. Değişmez mimari kurallar
 - `SemanticInterpretation@2` current-turn sınıflandırmasının tek canonical semantik otoritesidir. Downstream katmanlar raw kullanıcı metnini tekrar parse ederek ikinci semantic authority oluşturamaz.
-- `RelationshipReducer` canonical ilişki-state transition otoritesidir.
+- `RelationshipReducer` canonical relationship-state transition otoritesidir.
 - `KairaResponsePlan` final WHAT/WHETHER davranış otoritesidir; speech/persona/style katmanları HOW-only'dir ve kapalı bir izni yeniden açamaz.
 - Final delivery world truth → autobiographical truth → epistemic truth → ResponsePlan enforcement → final conformance sırasındaki canonical constraint zincirinden geçer.
 - Claim, WorldEvent, self_fact, autobiographical_memory, language_style, relationship_state ve discourse_state ayrı ownership sınırlarına sahiptir; birbirine sessizce factual truth olarak promote edilemez.
@@ -31,82 +31,55 @@
 - Dialogue obligations / fulfillment authority ve final-delivery fail-closed zinciri kapatıldı.
 - Privacy/coercion ontology ile current-self vs autobiographical-self routing sınırları typed semantics üzerinden daraltıldı; downstream raw-text patch eklenmedi.
 - First-party ongoing event continuity typed claims + discourse working set üzerinden kuruldu; raw topic regex'i eklenmedi.
+- Phase-0 A-cluster authority observability kapatıldı; unavailable authority varmış gibi gösterilmez.
 
 ## 4. Social Appraisal canonical architecture — G1 → G4 — CLOSED (2026-09-08)
-Bu fazın amacı aynı sosyal olayı kişilik, ilişki, dyadic norm ve autobiographical bağlama göre farklı değerlendirebilen; fakat neutral bir olaydan kendi başına ilişki anlamı icat etmeyen tek canonical appraisal zinciri kurmaktı.
+- G1 exact-zero gate: semantik olarak anlamlı sosyal etki yoksa appraisal exact-zero kalır.
+- G2 candidate readings + dyadic reweight: ilişki/norm bağlamı yalnız candidate ağırlığını değiştirir; yeni semantic fact icat etmez.
+- G3 single resolution: tek resolved social appraisal üretilir; downstream ikinci appraisal üretmez.
+- G4 bounded context modulation: personality, relationship state, dyadic norms ve bounded autobiographical context yalnız **zaten anlamlı olan** sosyal etkinin magnitude/nitelik yorumunu modüle eder.
+- Neutral bir turdan injury/reward/repair yaratılamaz.
+- Full/raw autobiography G4'e verilmez; yalnız instance-owned canonical autobiography'den aktif kullanıcı için türetilen bounded typed summary kullanılır.
+- Production wiring PR #170 ile kapatıldı; main merge SHA `3511f62a9bb0af37c1551cc0cb1e10845057fd80`.
+- Yeni ölçülmüş regression olmadan G1/G2/G3/G4, dyadic norm authority, participant identity veya bounded autobiographical-context sınırı yeniden açılmaz.
 
-### G1 — exact-zero / meaningful-social-effect gate
-- Semantik olarak anlamlı sosyal etki yoksa appraisal etkisi exact-zero kalır.
-- Neutral/event/third-party bağlamı sırf downstream heuristic yüzünden dyadic injury/reward üretemez.
+## 5. Phase-0 authority observability — CLOSED
+- PR #174 merge edildi; main merge SHA `780a19193de861f6bbe6da5e01b985f20342a6a1`.
+- Current-self/world, autobiography ve session provenance ayrı typed facet'lerdir.
+- Authority yoksa Phase-0 açıkça `unavailable` kalır; raw-text parser veya fabricated snapshot ile coverage üretilmez.
+- Persistent production memory hydration Phase-0 kapsamı değildir; persistent-memory davranışı gerçek production typed seam'inde ayrıca characterize edilir.
 
-### G2 — candidate readings + dyadic reweight
-- Aynı typed sosyal olay için alternatif candidate readings üretilebilir.
-- Dyadic relationship/norm bağlamı bu adayların ağırlığını değiştirebilir; yeni semantic fact icat edemez.
-- Dyadic norm tek authority olarak canonical runtime'a bağlanmıştır.
+## 6. Natural-conversation characterization acceptance — CLOSED (2026-09-08)
+- PR #176 `test(kaira): close natural conversation characterization acceptance` merge edildi.
+- Final PR head: `e6ba9073c4cf9f5c31da82cebd22c9d3a420af76`.
+- Main merge SHA: `ec7be842e433b8c84b2a47a42ed82a934847ccb9`.
+- Final acceptance şunları doğruluyor:
+  - maximally deep autobiography neutral bir turdan effect üretemiyor;
+  - autobiographical context relational meaning'i değiştiremiyor;
+  - explicit third-party scope deep active-user autobiography olsa bile relationship-neutral kalıyor;
+  - aynı typed mild social injury fragile ve established relationship history arasında farklı magnitude üretiyor fakat insult immunity yaratmıyor;
+  - gerçek çok-turlu Türkçe Phase-0 C3/C4/D1/D2 senaryoları canonical semantics → G4/KDM → relationship → BehaviorContract/DialogueDecision → canonical ResponsePlan hattında replay ediliyor ve plan/WHY-HOW tutarlılık invariants'ları korunuyor.
+- Final acceptance testi C3/C4/D1/D2 replay'ini **aktif** tutar; diagnostic izolasyon sırasında yapılan geçici skip/daraltmalar final main'de yoktur.
+- CI sırasında bulunan tek sorun production runtime bug'ı değil, acceptance ölçüm hatasıydı: `1.12` sınırı toplam `affectiveNegative` / `activation` context factor'üne değil, autobiographical katkının **incremental multiplier**'ına aittir. Test bu nedenle `withHistory / withoutHistory <= 1.12` oranını ölçer.
+- Production behavior, semantic authority, appraisal authority veya memory authority değiştirilmedi; yeni heuristic/classifier eklenmedi.
+- Final head için CI run #2597 ve Architecture Review #745 PASS oldu.
 
-### G3 — single resolution
-- Candidate readings tek resolved social appraisal'a indirgenir.
-- Downstream relationship projection ikinci kez bağımsız appraisal üretmez.
+**Sonuç:** post-G4 natural-conversation characterization mevcut main üzerinde production regression göstermedi. Bu faz yeni patch üretmeden kapatılmıştır.
 
-### G4 — bounded context modulation
-- Personality, relationship state, dyadic norms ve bounded autobiographical context yalnız **zaten anlamlı olan** sosyal etkinin nitelik/magnitude yorumunu modüle eder.
-- Context modulation neutral bir turdan injury/reward/repair yaratamaz.
-- Repair magnitude tek appraisal authority'den gelir; eski paralel magnitude yolları authority değildir.
-
-### Identity + memory prerequisites
-- Autobiographical participant identity stable ve injective hale getirildi; farklı katılımcılar aynı memory identity'ye çökemez.
-- World-observation user identity de injective hale getirildi.
-- G4'e full/raw autobiography verilmez. Yalnız instance-owned canonical autobiography'den aktif kullanıcıya göre türetilmiş, bounded ve typed appraisal context verilir.
-- Autobiographical kayıtlar semantic truth veya ikinci appraisal engine değildir; sadece mevcut canonical appraisal için bağlamsal evidence'tır.
-
-### Production-path wiring — PR #170
-- PR #170 `feat(appraisal): wire canonical autobiography into production G4` 2026-09-08'de merge edildi.
-- PR final head: `95a9ea6a22fa62bf386bbb40dd176a18f7fa2ed2`.
-- Main merge commit: `3511f62a9bb0af37c1551cc0cb1e10845057fd80`.
-- `server.ts` artık instance-owned canonical autobiography'yı production chat path'inde yükler, yalnız aktif kullanıcıya ait bounded social-appraisal summary üretir ve bunu KDM'ye explicit typed seam üzerinden verir.
-- Canonical KDM çağrı sırası korunur: semantic interpretation → grounded event → behavior policy → affect baseline → bounded social-appraisal memory.
-- `analyzeKdmInteractionCanonicalTurn(...)` memory context'i `kdmRelationshipReducerBridge` üzerinden mevcut tek G4 resolution/modulation zincirine taşır; ikinci appraisal çağrısı eklenmez.
-- ADR: `docs/adr/0088-production-g4-autobiographical-runtime-wiring.md`.
-- Permanent neighbor regression: `src/services/socialAppraisalAutobiographicalRuntimeWiringNeighborProofRegression.test.ts`.
-
-### G4 doğrulama sonucu
-PR #170 final head için aşağıdaki kapılar PASS oldu:
-- Architecture contracts
-- Autonomous runtime contracts
-- Beta runtime regression
-- Pre-AI Phase0 harness/report
-- Beta conversation acceptance
-- Behavior proof manifest
-- Historical RED→GREEN proof
-- Full tests
-- TypeScript
-- Production build
-- docs-guard
-- behavior-guard
-- Architecture Review
-
-**Sonuç:** G1→G4 social-appraisal authority ve production runtime wiring fazı kapalıdır. Yeni ölçülmüş bir regression olmadan G1/G2/G3/G4, dyadic norm authority, participant identity veya bounded autobiographical-context sınırı yeniden açılmaz.
-
-## 5. Repo temizliği — 2026-09-08
-- PR #170 merge edildi.
-- Eski PR #139 `fix(kaira): generalize composition invariants and non-silent delivery` current main tarafından supersede edildiği ve artık non-mergeable/stale olduğu için kapatıldı; branch wholesale revive edilmez.
-- Eski PR #147 `test(beta): add seedable randomized beta exploration` current main'den 120 commit geride kaldığı ve G4/bugünkü canonical-core öncesi varsayımlar taşıdığı için kapatıldı. Randomized exploration fikri gerekirse **current main'den yeniden** tasarlanır; eski branch merge edilmez.
-
-## 6. Şu anki canonical runtime özeti
-Canlı kodun kavramsal akışı:
+## 7. Şu anki canonical runtime özeti
 1. canonical language understanding → immutable `SemanticInterpretation@2`;
 2. grounded event/entity projection;
 3. instance/self/world/autobiographical authorities gerektiği kadar typed evidence sağlar;
 4. single Social Appraisal G1→G4 zinciri dyadic relationship effect'i çözer;
-5. RelationshipReducer dynamic relationship/affect state'i günceller;
+5. `RelationshipReducer` dynamic relationship/affect state'i günceller;
 6. BehaviorContract + DialogueDecision + HOW-only SpeechIdentity → canonical `KairaResponsePlan`;
 7. local renderer veya provider yalnız planı realize eder;
 8. canonical truth/plan/final-delivery gates user-facing cevabı doğrular;
 9. accepted turn state, trace, memory ve observability sınırlarına persist edilir.
 
-Bu zincirde semantic interpretation, appraisal resolution, relationship transition ve final behavior permission ayrı fakat tekil authority'lerdir; aynı kavramın paralel consumer-local yorumu kabul edilmez.
+Semantic interpretation, appraisal resolution, relationship transition ve final behavior permission ayrı fakat tekil authority'lerdir; aynı kavramın paralel consumer-local yorumu kabul edilmez.
 
-## 7. Çalışma protokolü
+## 8. Çalışma protokolü
 Yeni sohbet veya yeni geliştirme turunda:
 1. GitHub `main` SHA doğrulanır.
 2. Açık PR, issue ve CI gerçekliği kontrol edilir.
@@ -119,42 +92,26 @@ Yeni sohbet veya yeni geliştirme turunda:
 
 Eski tamamlanmış işlere dönülmez; "daha iyi olabilir" tek başına patch sebebi değildir.
 
-## 8. Next verified development question
-G4 wiring sonrasında sıradaki iş **yeni mimari katman eklemek değil**, current `main` üzerinde evidence-driven end-to-end natural conversation characterization'dır.
+## 9. Next verified development mode
+Şu anda doğrulanmış açık production regression yoktur. Bu nedenle sıradaki iş **yeni mimari katman veya speculative G4 patch'i eklemek değildir**.
 
-Özellikle ölçülecek yeni hedef:
-- bounded autobiographical context gerçek çok-turlu ilişkide continuity'yi doğru yönde etkiliyor mu;
-- eski/stale autobiographical evidence güncel neutral veya düşük-anlamlı sosyal turları aşırı amplify ediyor mu;
-- aynı typed sosyal olay farklı kişi/ilişki geçmişinde beklenen nitel farkı üretirken exact-zero ve third-party neutrality korunuyor mu;
-- final delivered reply, resolved appraisal + relationship state + ResponsePlan ile doğal ve tutarlı kalıyor mu.
+Bir sonraki geliştirme yalnız şu durumda açılır:
+- gerçek kullanıcı / deterministic characterization / production evidence yeni, reproducible bir user-facing failure gösterirse;
+- failure current main üzerinde yeniden üretilebilirse;
+- ilk kırık canonical authority boundary lokalize edilebilirse.
 
-Yeni patch yalnız bu characterization'da reproducible bir failure bulunursa açılacak. Failure yoksa G4 üzerine ek heuristic/classifier/memory katmanı eklenmeyecek.
+Yeni failure gelirse önce characterization yazılır; ardından minimum architecture-correct patch uygulanır. Failure yoksa semantic/appraisal/relationship/memory/ResponsePlan zincirine yeni heuristic eklenmez.
 
-## 9. Latest checkpoint
+## 10. Latest checkpoint
 - Date: 2026-09-08
 - G4 production wiring: **CLOSED**
-- PR #170: **MERGED**
-- Feature merge SHA: `3511f62a9bb0af37c1551cc0cb1e10845057fd80`
-- Stale PR #139: **CLOSED / superseded**
-- Stale PR #147: **CLOSED / rebuild-from-main if ever needed**
 - Phase-0 A authority observability: **CLOSED**
-- PR #174: **MERGED**
-- A authority merge SHA: `780a19193de861f6bbe6da5e01b985f20342a6a1`
-- Immediate next mode: **measured natural-conversation characterization on current main**
-
-## 10. Phase-0 A-cluster authority observability — CLOSED (2026-09-08)
-- PR #173 ile Phase-0 typed detector observability tabanı main'e alındı; merge commit `06a5ebbfd9b004154191bb3d3f7f9383bbd6848b`.
-- A-cluster characterization sonucu tek bir generic `selfMemoryQuery` gate'inin A1/A2/A3/A5'i temsil etmediği doğrulandı.
-- A1/A3 current-self/world/autonomous-state sorularıdır. Phase-0 harness'ta canonical current activity/location/environment authority bağlı olmadığı için typed observation açıkça `unavailable` kalır; boş/fabricated snapshot veya raw-text parser ile coverage üretilmez.
-- A2 autobiographical authority'dir ve `kairaAutobiographicalRecallRuntime` status/provenance'ından projekte edilir.
-- A5 session/discourse provenance'dır ve yalnız gerçek önceki Phase-0 user turns üzerinden gözlemlenir; söylenmemiş saat/yer gibi ayrıntılar authoritative fact değildir.
-- A4 grounding gerektirmeyen persona dili negatif kontrolüdür ve A authority detector için `not_applicable`/inactive kalır.
-- PR #174 `feat(preai): make A-cluster authority seams observable` merge edildi; final head `aff7eaf56d1078a647afa22d05b6599f17612c97`, main merge commit `780a19193de861f6bbe6da5e01b985f20342a6a1`.
-- `current_self_world`, `autobiography`, `session_provenance` typed facet'leri tek Phase-0 observability adapter'ında ayrıldı.
-- Phase-0 final prompt'taki placeholder session memory kaldırıldı; gerçek önceki user-turn history provenance olarak serialize ediliyor.
-- A1/A3 için final-provider boundary'ye açık fail-closed `STATUS=unavailable` talimatı taşınıyor; canonical authority yokken current activity/location/environment fact'i uydurulamıyor.
-- A2 canonical autobiographical recall runtime status'unu kullanıyor; A5 gerçek session history provenance'ını kullanıyor; A4'e sahte detector coverage verilmedi.
-- PR #174 final head üzerinde Architecture contracts, Autonomous runtime contracts, Beta runtime regression, Pre-AI Phase0 harness/report, machine-readable report, Beta conversation acceptance, behavior proof manifest, historical RED→GREEN proof, full tests, TypeScript, production build, docs-guard, behavior-guard ve Architecture Review PASS oldu.
-- Değişmez kural: yeni semantic classifier/regex eklenmedi ve unavailable authority varmış gibi gösterilmedi.
-
-**Sonuç:** A-cluster authority observability fazı kapalıdır. Yeni ölçülmüş bir regression olmadan A detector/seam yeniden açılmaz; sıradaki çalışma current main üzerinde ölçülen natural-conversation characterization'dır.
+- Natural-conversation characterization acceptance: **CLOSED**
+- PR #176: **MERGED**
+- PR #176 final head: `e6ba9073c4cf9f5c31da82cebd22c9d3a420af76`
+- PR #176 main merge SHA: `ec7be842e433b8c84b2a47a42ed82a934847ccb9`
+- CI #2597: **PASS**
+- Architecture Review #745: **PASS**
+- Open PRs at checkpoint: **none**
+- Open issues at checkpoint: **none**
+- Immediate next mode: **no speculative patch; wait for and characterize the next measurable product regression on current main**
