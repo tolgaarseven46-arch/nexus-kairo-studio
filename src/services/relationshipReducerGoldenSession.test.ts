@@ -42,6 +42,7 @@ function toSignal(raw: GoldenTurn["signal"]): RelationshipTurnSignal {
     sincerityConfidence: raw.sincerityConfidence ?? 0.5,
     apology: raw.apology ?? false,
     repairAttempt: raw.repairAttempt ?? false,
+    repairStrength: raw.repairStrength ?? 0,
     support: raw.support ?? 0,
     compliment: raw.compliment ?? 0,
     affection: raw.affection ?? 0,
@@ -128,12 +129,12 @@ describe("RelationshipReducer golden session — knt_test_user_x_new", () => {
   });
 
   it("S9: the session is not permanently absorbing — repair turns move it out of disengaged", () => {
-    // simulate two sincere repair turns appended after turn 18
+    // simulate three sincere repair turns appended after turn 18
     let p = prev;
     for (let k = 0; k < 3; k += 1) {
       const r = reduceRelationshipTurn({
         prev: p,
-        signal: toSignal({ valence: "positive", apology: true, sincerityConfidence: 0.9, support: 0.4, uncertainty: 0.2 }),
+        signal: toSignal({ valence: "positive", apology: true, repairAttempt: true, repairStrength: 0.96, sincerityConfidence: 0.9, support: 0.4, uncertainty: 0.2 }),
         timing: { elapsedMinutesSincePrev: 1, nowIso: "2026-09-02T11:0" + (6 + k) + ":00.000Z" },
       });
       p = {
