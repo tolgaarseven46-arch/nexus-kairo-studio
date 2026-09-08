@@ -25,6 +25,7 @@ function signalOf(message: string): RelationshipTurnSignal {
     sincerityConfidence: i.sincerityConfidence,
     apology: i.apology,
     repairAttempt: i.repairAttempt,
+    repairStrength: 0,
     support: i.support,
     compliment: i.compliment,
     affection: i.affection,
