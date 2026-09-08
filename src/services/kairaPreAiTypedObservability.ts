@@ -22,8 +22,12 @@ export function projectPreAiSelfEpistemicCheck(
   const resolvedConfidence = runtime.status === "resolved" && runtime.recall
     ? Math.max(
         0,
-        ...runtime.recall.selfFacts.map((item) => Number(item.confidence ?? 0)),
-        ...runtime.recall.memories.map((item) => Number(item.confidence ?? 0)),
+        ...runtime.recall.selfFacts.map((item) => Number(item.fact.confidence ?? 0)),
+        // Ranked autobiographical memories do not carry an epistemic-confidence
+        // scalar. Their presence here already means a canonical ordinary-memory
+        // record survived typed recall selection; retrieval score is relevance,
+        // not truth confidence, so do not reinterpret it as epistemic confidence.
+        ...(runtime.recall.memories.length ? [1] : []),
       )
     : 0;
   return {
