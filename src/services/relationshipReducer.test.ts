@@ -5,7 +5,7 @@ import { computeFamiliarity, evaluateRedline, reduceRelationshipTurn, type Relat
 const zeroSeverity = { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 };
 const baseSignal = (overrides: Partial<RelationshipTurnSignal> = {}): RelationshipTurnSignal => ({
   valence: "neutral", targetsKaira: false, severity: zeroSeverity, jokingConfidence: 0, sincerityConfidence: 0.8,
-  apology: false, repairAttempt: false, support: 0, compliment: 0, affection: 0, userStop: false, uncertainty: 0.2, negativePattern: null,
+  apology: false, repairAttempt: false, repairStrength: 1, support: 0, compliment: 0, affection: 0, userStop: false, uncertainty: 0.2, negativePattern: null,
   ...overrides,
 });
 const basePrev = (): RelationshipReducerInput["prev"] => ({
@@ -84,7 +84,6 @@ describe("RelationshipReducer — combined-signal redline, config-driven (RC-2 /
   });
 
   it("thresholds are config-driven: lowering hardStopThreshold flips the borderline case", () => {
-    // Two independent harm contributors clear the signal-count gate; only the score threshold differs.
     const borderline = baseSignal({ valence: "negative", targetsKaira: true, severity: { disrespect: 0.73, coercion: 0, manipulation: 0, privacy: 0, aggression: 0.56 }, sincerityConfidence: 0.8, uncertainty: 0.25 });
     const prev = { scores: { repeatedNegativeCount: 0 }, conversationState: "active" as const, reactionMode: "neutral" as const, affect: { anger: 10, stress: 20, happiness: 70, calmness: 70 } };
     const strict = evaluateRedline(borderline, prev, DEFAULT_RELATIONSHIP_REDUCER_CONFIG);
@@ -151,7 +150,7 @@ describe("RelationshipReducer — K2: conversationState is not the sole determin
 describe("RelationshipReducer — in-session exit from disengaged (RC-3 / S9)", () => {
   it("interaction-based repair can move disengaged -> repairing without elapsed time", () => {
     const prev = { ...basePrev(), scores: { ...basePrev().scores, conflict: 30, hurt: 35, repairProgress: 15 }, conversationState: "disengaged" as const, reactionMode: "withdrawn" as const, disengageReason: "combined_boundary_violation", repairAttempts: 1 };
-    const result = reduceRelationshipTurn({ prev, signal: baseSignal({ valence: "positive", apology: true, repairAttempt: true, sincerityConfidence: 0.95 }), timing: { elapsedMinutesSincePrev: 0, nowIso: "2026-09-01T00:05:00.000Z" }, config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG });
+    const result = reduceRelationshipTurn({ prev, signal: baseSignal({ valence: "positive", apology: true, repairAttempt: true, repairStrength: 1, sincerityConfidence: 0.95 }), timing: { elapsedMinutesSincePrev: 0, nowIso: "2026-09-01T00:05:00.000Z" }, config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG });
     expect(result.conversationState).toBe("repairing");
   });
 });
@@ -165,8 +164,55 @@ describe("RelationshipReducer — repairProgress requires real injury (PR1-revie
   it("decays toward 0 once injury drops below the floor, then grows again if injury returns", () => {
     const below = turn({ ...basePrev(), scores: { ...basePrev().scores, repairProgress: 20, hurt: 1, conflict: 1 } }, baseSignal());
     expect(below.scores.repairProgress).toBeLessThan(20);
-    const injured = turn({ ...basePrev(), scores: { ...basePrev().scores, repairProgress: 5, hurt: 20, conflict: 20 } }, baseSignal({ valence: "positive", apology: true, repairAttempt: true }));
+    const injured = turn({ ...basePrev(), scores: { ...basePrev().scores, repairProgress: 5, hurt: 20, conflict: 20 } }, baseSignal({ valence: "positive", apology: true, repairAttempt: true, repairStrength: 1 }));
     expect(injured.scores.repairProgress).toBeGreaterThan(5);
+  });
+});
+
+describe("RelationshipReducer — typed repair magnitude authority", () => {
+  const injuredPrev = () => ({
+    ...basePrev(),
+    scores: { ...basePrev().scores, hurt: 30, conflict: 25, repairProgress: 5 },
+    conversationState: "distancing" as const,
+    reactionMode: "hurt" as const,
+  });
+
+  it("scales recovery and repair progress from repairStrength", () => {
+    const weak = reduceRelationshipTurn({
+      prev: injuredPrev(),
+      signal: baseSignal({ valence: "positive", targetsKaira: true, apology: true, repairAttempt: true, repairStrength: 0.35 }),
+      timing: { elapsedMinutesSincePrev: 0, nowIso: "2026-09-01T00:05:00.000Z" },
+      config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG,
+    });
+    const strong = reduceRelationshipTurn({
+      prev: injuredPrev(),
+      signal: baseSignal({ valence: "positive", targetsKaira: true, apology: true, repairAttempt: true, repairStrength: 0.95 }),
+      timing: { elapsedMinutesSincePrev: 0, nowIso: "2026-09-01T00:05:00.000Z" },
+      config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG,
+    });
+    expect(strong.recovery.interactionComponent).toBeGreaterThan(weak.recovery.interactionComponent);
+    expect(strong.scores.repairProgress).toBeGreaterThan(weak.scores.repairProgress);
+    expect(strong.scores.trust).toBeGreaterThanOrEqual(weak.scores.trust);
+  });
+
+  it("does not let apology booleans manufacture repair when repairStrength is zero", () => {
+    const timing = { elapsedMinutesSincePrev: 0, nowIso: "2026-09-01T00:05:00.000Z" };
+    const flagged = reduceRelationshipTurn({
+      prev: injuredPrev(),
+      signal: baseSignal({ valence: "neutral", targetsKaira: true, apology: true, repairAttempt: true, repairStrength: 0 }),
+      timing,
+      config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG,
+    });
+    const control = reduceRelationshipTurn({
+      prev: injuredPrev(),
+      signal: baseSignal({ valence: "neutral", targetsKaira: true, apology: false, repairAttempt: false, repairStrength: 0 }),
+      timing,
+      config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG,
+    });
+    expect(flagged.scores.repairProgress).toBe(control.scores.repairProgress);
+    expect(flagged.scores.trust).toBe(control.scores.trust);
+    expect(flagged.recovery.interactionComponent).toBe(control.recovery.interactionComponent);
+    expect(flagged.reactionMode).not.toBe("repairing");
   });
 });
 

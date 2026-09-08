@@ -10,6 +10,7 @@ const signal = (apology: boolean) => ({
   sincerityConfidence: 0.9,
   apology,
   repairAttempt: false,
+  repairStrength: apology ? 0.96 : 0,
   support: 0,
   compliment: 0,
   affection: 0,

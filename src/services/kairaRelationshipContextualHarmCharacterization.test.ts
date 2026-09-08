@@ -30,6 +30,7 @@ function signal(overrides: Partial<RelationshipTurnSignal> = {}): RelationshipTu
     sincerityConfidence: 0.5,
     apology: false,
     repairAttempt: false,
+    repairStrength: 0,
     support: 0,
     compliment: 0,
     affection: 0.2,

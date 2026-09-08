@@ -98,11 +98,10 @@ function projectSeverityMagnitude(
 }
 
 /**
- * Project canonical G4 relational meaning into the legacy reducer signal shape.
+ * Project canonical G4 relational meaning into the reducer signal shape.
  * Candidate-reading plausibility is evidence for appraisal direction/materiality,
- * not a severity magnitude. Canonical severity owns the harm-vector magnitude;
- * G4 owns its bounded contextual modulation. This prevents a low canonical
- * severity from being inflated by a candidate's non-probabilistic plausibility.
+ * not a severity or repair magnitude. Canonical semantic evidence owns the base
+ * magnitude; G4 owns bounded contextual modulation.
  */
 export function relationshipSignalFromRuntimeAppraisal(
   interp: SemanticInterpretation,
@@ -126,7 +125,13 @@ export function relationshipSignalFromRuntimeAppraisal(
 
   const relationalMaterial = dyadic && appraisal.relational.significance > 0;
   const harmMaterial = relationalMaterial && appraisal.relational.harmEvidence > 0;
-  const repairMaterial = relationalMaterial && appraisal.relational.repairEvidence > 0;
+  // Repair is permitted only when the resolved relational direction is positive.
+  // A hostile continuation that also carries apology flags must not manufacture
+  // repair merely because a repair candidate exists.
+  const repairMaterial =
+    relationalMaterial &&
+    appraisal.relational.repairEvidence > 0 &&
+    appraisal.relational.valence === "positive";
   const affiliationMaterial =
     relationalMaterial &&
     appraisal.relational.valence === "positive" &&
@@ -143,6 +148,14 @@ export function relationshipSignalFromRuntimeAppraisal(
       : clamp01(baseHarmMagnitude * resolution.contextFactors.relationalHarm)
     : 0;
 
+  const canonicalRepairEvidence = interp.apology || interp.repairAttempt;
+  const baseRepairStrength = canonicalRepairEvidence
+    ? clamp01(0.6 + interp.sincerityConfidence * 0.4)
+    : 0;
+  const repairStrength = repairMaterial
+    ? clamp01(baseRepairStrength * resolution.contextFactors.relationalRepair)
+    : 0;
+
   const affiliationFactor = affiliationMaterial
     ? resolution.contextFactors.relationalAffiliation
     : 0;
@@ -155,6 +168,7 @@ export function relationshipSignalFromRuntimeAppraisal(
     sincerityConfidence: interp.sincerityConfidence,
     apology: repairMaterial && interp.apology,
     repairAttempt: repairMaterial && interp.repairAttempt,
+    repairStrength,
     support: affiliationMaterial ? clamp01(interp.support * affiliationFactor) : 0,
     compliment: affiliationMaterial ? clamp01(interp.compliment * affiliationFactor) : 0,
     affection: affiliationMaterial ? clamp01(interp.affection * affiliationFactor) : 0,

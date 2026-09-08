@@ -12,7 +12,7 @@ const prev: RelationshipReducerPrev = {
 const turn7: RelationshipTurnSignal = {
   valence: "neutral", targetsKaira: true,
   severity: { disrespect: 0.2, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 },
-  jokingConfidence: 0.8, sincerityConfidence: 0.5, apology: false, repairAttempt: false,
+  jokingConfidence: 0.8, sincerityConfidence: 0.5, apology: false, repairAttempt: false, repairStrength: 0,
   support: 0, compliment: 0, affection: 0.2, userStop: false, uncertainty: 0.32, negativePattern: "hakaret",
 };
 

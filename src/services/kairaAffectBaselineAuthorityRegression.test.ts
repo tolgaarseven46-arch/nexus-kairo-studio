@@ -22,6 +22,7 @@ const neutralSignal: RelationshipTurnSignal = {
   sincerityConfidence: 0.9,
   apology: false,
   repairAttempt: false,
+  repairStrength: 0,
   support: 0,
   compliment: 0,
   affection: 0,

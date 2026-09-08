@@ -22,8 +22,6 @@
  *     floors: a neutral turn while withdrawn produces ~0 extra stress.
  *   - K2: conversationState is ONE input to the axes. Outside a hard-stop reason
  *     it does not zero opennessAxis/warmthAxis; uncertainty softens the collapse.
- *
- * This module is standalone in PR1 (no runtime consumes it authoritatively yet).
  */
 
 import type { AffectiveReactionMode, ConversationRelationshipState } from "../types/nexus";
@@ -43,16 +41,12 @@ export interface RelationshipScores {
   positiveEvents: number;
   negativeEvents: number;
   repeatedNegativeCount: number;
-  /** Continuous 0..1 (replaces integer familiarityDays). */
   familiarity: number;
 }
 
 export interface RelationshipAxes {
-  /** Willingness to engage / continue. 0 = closed, 1 = fully open. */
   openness: number;
-  /** Affective closeness that colours HOW (not WHETHER). */
   warmth: number;
-  /** Defensive posture. 0 = relaxed, 1 = fully guarded. */
   guardedness: number;
 }
 
@@ -87,14 +81,13 @@ export interface RelationshipTurnSignal {
   sincerityConfidence: number;
   apology: boolean;
   repairAttempt: boolean;
+  /** Canonical contextual repair magnitude, 0..1. Reducer must not derive it again. */
+  repairStrength: number;
   support: number;
   compliment: number;
   affection: number;
-  /** explicit "stop / I'm done" from the user. */
   userStop: boolean;
-  /** aggregate interpretation uncertainty 0..1. */
   uncertainty: number;
-  /** stable label for repeat detection ("insult" | "coercion" | ...). */
   negativePattern?: string | null;
 }
 
@@ -116,7 +109,6 @@ export interface RelationshipReducerResult {
   conversationState: ConversationRelationshipState;
   reactionMode: AffectiveReactionMode;
   axes: RelationshipAxes;
-  /** K2: only a hard reason forces a closed posture. */
   hard: { disengage: boolean; reason: string | null };
   recovery: {
     applied: boolean;
@@ -152,7 +144,6 @@ function elapsedDays(fromIso: string | undefined, nowIso: string): number {
   return Math.max(0, (now - from) / 86_400_000);
 }
 
-/** Continuous familiarity in 0..1 from age + interaction count. Sub-day resolution. */
 export function computeFamiliarity(
   firstSeenAt: string | undefined,
   nowIso: string,
@@ -174,22 +165,10 @@ interface RedlineEvaluation {
   reason: string | null;
 }
 
-/** Highest actual-harm dimension in THIS turn's message. */
 function presentSeverityOf(s: SeverityVector): number {
   return Math.max(s.disrespect, s.coercion, s.aggression, s.manipulation, s.privacy);
 }
 
-/**
- * Combined-signal hard-stop decision. Config-driven.
- *
- * Fixed (was the critical PR1-review bug): historical traces
- * (`repeatedNegativeCount`, `boundarySetByKaira`) can no longer create a
- * hard-stop on their own. They are AMPLIFIERS of harm that is actually present
- * in the current turn — never independent contributors. A message whose
- * present-turn severity is below `minPresentSeverity` (e.g. an apology, a benign
- * remark) can never hard-stop, regardless of history. Only an explicit user stop
- * bypasses the severity gate.
- */
 export function evaluateRedline(
   signal: RelationshipTurnSignal,
   prev: RelationshipReducerPrev,
@@ -217,10 +196,6 @@ export function evaluateRedline(
     ["manipulation", w.manipulation * s.manipulation],
     ["privacy", w.privacy * s.privacy],
   ];
-  // Targeting raises the score, but it is context rather than a second harm
-  // dimension. Low lexical aggression commonly co-occurs with an insult and is
-  // also correlated evidence, so it only becomes an independent contributor
-  // when its raw present-turn severity clears the hard-stop severity gate.
   const contributors = harmContributors.filter(([name, v]) =>
     v >= floor && (name !== "aggression" || s.aggression >= rl.minPresentSeverity)
   ).length;
@@ -254,7 +229,10 @@ export function computeRecovery(
 
   let interaction = 0;
   const rationale: string[] = [];
-  if (signal.apology) { interaction += r.apologyStrength; rationale.push("apology"); }
+  if (signal.apology && signal.repairStrength > 0) {
+    interaction += r.apologyStrength * clamp01(signal.repairStrength);
+    rationale.push(`apology:${clamp01(signal.repairStrength).toFixed(2)}`);
+  }
   if (calmTurn) { interaction += r.calmTurnStrength; rationale.push("calm-turn"); }
   if (positiveTurn) { interaction += r.positiveTurnStrength; rationale.push("positive-turn"); }
   if (nonRepetition) { interaction += r.nonRepetitionStrength; rationale.push("no-repeat"); }
@@ -297,10 +275,6 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     signal.severity.manipulation >= 0.15 ||
     signal.severity.privacy >= 0.15 ||
     signal.severity.aggression >= 0.2;
-  // Explicit negative valence keeps the existing injury path unchanged. For a
-  // neutral/positive turn, low-level directly-targeted harm must be contextually
-  // credible before it creates a new dyadic injury. Only canonical v2 context
-  // is used; raw text is never reinterpreted here.
   const contextualHarmConfidence = clamp01(
     (1 - config.redline.jokingDampen * signal.jokingConfidence * (1 - signal.sincerityConfidence)) *
       (1 - config.redline.uncertaintyDampen * signal.uncertainty),
@@ -368,20 +342,19 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     conflict = clamp100(conflict - recoveredConflictDrop);
     hurt = clamp100(hurt - recoveredHurtDrop);
 
-    // Hard-boundary repair context survives both disengaged and repairing states.
-    // Otherwise strong prior-history damping can leave numeric scores below the
-    // repair floor and make either FSM transition permanently unreachable.
     const hardBoundaryToRepair =
       (prev.conversationState === "disengaged" || prev.conversationState === "repairing") &&
       Boolean(prev.disengageReason);
     const injuryToRepair = hardBoundaryToRepair || Math.max(conflictBefore, hurtBefore) >= config.recovery.repairInjuryFloor;
-    const explicitRepairAct = Boolean(signal.apology || signal.repairAttempt);
+    const explicitRepairAct = Boolean((signal.apology || signal.repairAttempt) && signal.repairStrength > 0);
+    const repairStrength = explicitRepairAct ? clamp01(signal.repairStrength) : 0;
     if (!injuryToRepair) {
       repairProgress = Math.max(0, repairProgress - config.recovery.repairDecayNoInjury);
-      if (explicitRepairAct || kind === "positive") trust = clamp100(trust + (signal.apology ? 1.5 : 1));
+      if (explicitRepairAct) trust = clamp100(trust + 1.5 * repairStrength);
+      else if (kind === "positive") trust = clamp100(trust + 1);
     } else if (explicitRepairAct) {
-      repairProgress = clamp100(repairProgress + config.recovery.repairGainApology * (0.6 + signal.sincerityConfidence * 0.4));
-      trust = clamp100(trust + 1.5);
+      repairProgress = clamp100(repairProgress + config.recovery.repairGainApology * repairStrength);
+      trust = clamp100(trust + 1.5 * repairStrength);
     } else if (prev.conversationState === "disengaged") {
       repairProgress = clamp100(repairProgress);
     } else if (kind === "positive") {
@@ -410,7 +383,7 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   let disengagedAt = prev.disengagedAt;
   let disengageReason = prev.disengageReason;
   let repairAttempts = Math.max(0, num(prev.repairAttempts, 0));
-  const repairSignal = signal.apology || signal.repairAttempt;
+  const repairSignal = (signal.apology || signal.repairAttempt) && signal.repairStrength > 0;
 
   if (redline.disengage) {
     conversationState = "disengaged";
