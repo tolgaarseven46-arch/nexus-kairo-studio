@@ -127,6 +127,10 @@ function resolve(
   });
 }
 
+const maxSignalSeverity = (
+  signal: ReturnType<typeof relationshipSignalFromRuntimeAppraisal>,
+) => Math.max(...Object.values(signal.severity));
+
 describe("runtime SocialAppraisal projection authority", () => {
   it("vetoes third-party relationship mutation while preserving independent affect", () => {
     const event = insult(0.7);
@@ -148,12 +152,12 @@ describe("runtime SocialAppraisal projection authority", () => {
     expect(resolution.runtimeAppraisal.affective.significance).toBeGreaterThan(0);
     expect(signal.valence).toBe("neutral");
     expect(signal.targetsKaira).toBe(false);
-    expect(Math.max(...Object.values(signal.severity))).toBe(0);
+    expect(maxSignalSeverity(signal)).toBe(0);
     expect(signal.negativePattern).toBeNull();
     expect(affect.stress).toBeGreaterThan(0);
   });
 
-  it("preserves exact zero through the relationship projection seam", () => {
+  it("preserves exact zero through both relationship and affect projection seams", () => {
     const event = semantic();
     const resolution = resolve(event);
     const signal = relationshipSignalFromRuntimeAppraisal(
@@ -162,17 +166,47 @@ describe("runtime SocialAppraisal projection authority", () => {
       null,
       resolution,
     );
+    const affect = affectDeltaFromRuntimeAppraisal(
+      { stress: 9, happiness: -9, calmness: -9, anger: 9 },
+      resolution.runtimeAppraisal,
+      "irritated",
+    );
 
     expect(resolution.runtimeAppraisal.noMaterialEffect).toBe(true);
     expect(resolution.runtimeAppraisal.relational.significance).toBe(0);
     expect(resolution.runtimeAppraisal.affective.significance).toBe(0);
     expect(signal.valence).toBe("neutral");
-    expect(Math.max(...Object.values(signal.severity))).toBe(0);
+    expect(maxSignalSeverity(signal)).toBe(0);
     expect(signal.apology).toBe(false);
     expect(signal.repairAttempt).toBe(false);
     expect(signal.support).toBe(0);
     expect(signal.compliment).toBe(0);
     expect(signal.affection).toBe(0);
+    expect(affect).toEqual({ stress: 0, happiness: 0, calmness: 0, anger: 0 });
+  });
+
+  it("uses G4 relational harm magnitude for reducer severity while preserving vector shape", () => {
+    const event = insult(0.3);
+    const cold = resolve(
+      event,
+      "kaira_user",
+      relationship({ warmthScore: 10, trustScore: 10, toleranceMultiplier: 0.7 }),
+    );
+    const warm = resolve(
+      event,
+      "kaira_user",
+      relationship({ warmthScore: 95, trustScore: 95, toleranceMultiplier: 1.5, familiarityDays: 90 }),
+    );
+    const coldSignal = relationshipSignalFromRuntimeAppraisal(event, "kaira_user", "insult", cold);
+    const warmSignal = relationshipSignalFromRuntimeAppraisal(event, "kaira_user", "insult", warm);
+
+    expect(maxSignalSeverity(coldSignal)).toBeCloseTo(cold.runtimeAppraisal.relational.harmEvidence, 6);
+    expect(maxSignalSeverity(warmSignal)).toBeCloseTo(warm.runtimeAppraisal.relational.harmEvidence, 6);
+    expect(maxSignalSeverity(warmSignal)).toBeLessThan(maxSignalSeverity(coldSignal));
+    expect(warmSignal.severity.aggression / warmSignal.severity.disrespect).toBeCloseTo(
+      coldSignal.severity.aggression / coldSignal.severity.disrespect,
+      6,
+    );
   });
 
   it("does not let semantic apology flags manufacture repair after a grounded third-party veto", () => {
