@@ -17,6 +17,12 @@ import {
   type DyadicReweightedCandidateReading,
 } from "./dyadicCandidateReweight";
 
+export type SocialAppraisalRelationshipScope =
+  | "kaira_user"
+  | "third_party"
+  | "event"
+  | "unknown";
+
 export interface SocialAppraisalResolutionG3 {
   appraisal: SocialAppraisalResult;
   candidates: readonly DyadicReweightedCandidateReading[];
@@ -77,11 +83,16 @@ function dominantReading(
  * affective projections but does not mutate RelationshipState, mood, memory, or
  * behavior. Personality/current-state modulation and reducer wiring remain later
  * seams.
+ *
+ * Grounding may resolve an otherwise-unknown semantic target to the active dyad.
+ * It may not override an explicit self/third-party/event target. This keeps
+ * entity/world grounding useful without creating a second semantic interpreter.
  */
 export function resolveSocialAppraisalG3(
   semantic: Readonly<SemanticInterpretation>,
   subjectId: string,
   profile?: Readonly<DyadicSocialNormProfile>,
+  relationshipScope?: SocialAppraisalRelationshipScope,
 ): SocialAppraisalResolutionG3 {
   const exactZero = appraiseExactZeroIfNoMaterialEvidence(semantic);
   if (exactZero) {
@@ -108,7 +119,9 @@ export function resolveSocialAppraisalG3(
   const affiliative = maxCandidate(candidates, (candidate) => candidate.kind === "affiliative");
   const playful = maxCandidate(candidates, (candidate) => candidate.kind === "playful_banter");
 
-  const targetsKaira = semantic.target === "kaira";
+  const targetsKaira =
+    semantic.target === "kaira" ||
+    (semantic.target === "unknown" && relationshipScope === "kaira_user");
   const relationalHarm = targetsKaira ? harm : 0;
   const relationalRepair = targetsKaira ? repair : 0;
   const relationalPositive = targetsKaira ? affiliative : 0;
@@ -163,6 +176,9 @@ export function resolveSocialAppraisalG3(
       ...dyadic.reasons,
       `dominant-reading:${dominantReading(candidates) ?? "none"}`,
       targetsKaira ? "relational-target:kaira" : "relational-target:not-kaira",
+      semantic.target === "unknown" && relationshipScope === "kaira_user"
+        ? "relational-target:grounded-active-dyad"
+        : "relational-target:semantic",
     ],
   };
 
