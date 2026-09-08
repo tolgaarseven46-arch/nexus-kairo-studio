@@ -16,7 +16,7 @@ const hurt: DroitDynamicState = {
 
 describe("Phase 0 cross-cluster authority isolation", () => {
   it("keeps self-memory semantics identical while affective state changes downstream appraisal", async () => {
-    const message = "hiç aşık oldun mu";
+    const message = "senin en sevdiğin çiçek ne?";
     const language = await understandTurkishMessage(message);
     expect(language.interpretation.discourseFacets.selfMemoryQuery).not.toBeNull();
 
