@@ -86,6 +86,7 @@ function scaleSeverity(
 export function relationshipSignalFromRuntimeAppraisal(
   interp: SemanticInterpretation,
   relationshipScope: SemanticRelationshipScope | undefined,
+  hardBoundary: boolean,
   negativePattern: string | null,
   resolution: Readonly<RuntimeSocialAppraisalResolution>,
 ): RelationshipTurnSignal {
@@ -110,7 +111,7 @@ export function relationshipSignalFromRuntimeAppraisal(
 
   // A hard boundary is a canonical policy fact, not a tolerance-sensitive injury
   // magnitude. Ordinary relationship injury uses the bounded G4 harm factor.
-  const severityFactor = interp.redLine
+  const severityFactor = hardBoundary
     ? 1
     : harmMaterial
       ? resolution.contextFactors.relationalHarm
@@ -118,9 +119,6 @@ export function relationshipSignalFromRuntimeAppraisal(
 
   const affiliationFactor = affiliationMaterial
     ? resolution.contextFactors.relationalAffiliation
-    : 0;
-  const repairFactor = repairMaterial
-    ? resolution.contextFactors.relationalRepair
     : 0;
 
   return {
