@@ -1,7 +1,7 @@
 import type { SemanticInterpretation } from './semanticInterpretation';
+import type { DyadicSocialNormProfile } from './dyadicSocialNorm';
 
 export type NexusTab = 'KARAKTER' | 'TEST' | 'IC_SISTEMLER' | 'AYARLAR';
-
 export type ConversationRelationshipState = 'active' | 'distancing' | 'disengaged' | 'repairing';
 export type AffectiveReactionMode = 'neutral' | 'irritated' | 'hurt' | 'withdrawn' | 'repairing';
 
@@ -30,6 +30,8 @@ export interface RelationshipState {
   disengagedAt?: string;
   disengageReason?: string;
   repairAttempts?: number;
+  /** Learned social-context prior owned by this already user×Kaira-instance-scoped relationship state. */
+  dyadicNorm?: DyadicSocialNormProfile;
 }
 
 export interface ReasoningTrace {
