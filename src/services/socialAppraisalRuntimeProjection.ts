@@ -26,6 +26,7 @@ export interface RuntimeSocialAppraisalResolution extends SocialAppraisalResolut
 }
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+const ZERO_AFFECT: RelationshipAffect = { anger: 0, stress: 0, happiness: 0, calmness: 0 };
 
 function relationshipScopeGate(
   appraisal: Readonly<SocialAppraisalResult>,
@@ -67,19 +68,6 @@ export function resolveRuntimeSocialAppraisal(
   };
 }
 
-function scaleSeverity(
-  severity: RelationshipTurnSignal["severity"],
-  factor: number,
-): RelationshipTurnSignal["severity"] {
-  return {
-    disrespect: clamp01(severity.disrespect * factor),
-    coercion: clamp01(severity.coercion * factor),
-    manipulation: clamp01(severity.manipulation * factor),
-    privacy: clamp01(severity.privacy * factor),
-    aggression: clamp01(severity.aggression * factor),
-  };
-}
-
 function maxSeverity(severity: RelationshipTurnSignal["severity"]): number {
   return Math.max(
     severity.disrespect,
@@ -90,10 +78,28 @@ function maxSeverity(severity: RelationshipTurnSignal["severity"]): number {
   );
 }
 
+function projectSeverityMagnitude(
+  severity: RelationshipTurnSignal["severity"],
+  targetMagnitude: number,
+): RelationshipTurnSignal["severity"] {
+  const sourceMagnitude = maxSeverity(severity);
+  if (sourceMagnitude <= 0 || targetMagnitude <= 0) {
+    return { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 };
+  }
+  const factor = clamp01(targetMagnitude) / sourceMagnitude;
+  return {
+    disrespect: clamp01(severity.disrespect * factor),
+    coercion: clamp01(severity.coercion * factor),
+    manipulation: clamp01(severity.manipulation * factor),
+    privacy: clamp01(severity.privacy * factor),
+    aggression: clamp01(severity.aggression * factor),
+  };
+}
+
 /**
  * Project canonical G4 relational meaning into the legacy reducer signal shape.
- * The reducer may transition relationship state, but it no longer chooses the
- * event's relational direction or context magnitude itself.
+ * Semantic severity contributes only the category/vector shape. G4 owns the
+ * resulting magnitude and relational direction consumed by the reducer.
  */
 export function relationshipSignalFromRuntimeAppraisal(
   interp: SemanticInterpretation,
@@ -125,16 +131,16 @@ export function relationshipSignalFromRuntimeAppraisal(
     !repairMaterial;
 
   const baseSeverity = relationshipSeverityForInterpretation(interp);
-  // Once this turn already reaches the reducer's canonical hard-boundary
-  // present-severity floor, relationship warmth/tolerance may not push it below
-  // that policy gate. G4 still modulates ordinary injury below the hard floor.
   const hardSeverityCandidate =
     maxSeverity(baseSeverity) >= DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline.minPresentSeverity;
-  const severityFactor = hardSeverityCandidate
-    ? 1
-    : harmMaterial
-      ? resolution.contextFactors.relationalHarm
-      : 0;
+  const projectedHarmMagnitude = harmMaterial
+    ? hardSeverityCandidate
+      ? Math.max(
+          appraisal.relational.harmEvidence,
+          DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline.minPresentSeverity,
+        )
+      : appraisal.relational.harmEvidence
+    : 0;
 
   const affiliationFactor = affiliationMaterial
     ? resolution.contextFactors.relationalAffiliation
@@ -143,11 +149,12 @@ export function relationshipSignalFromRuntimeAppraisal(
   return {
     valence: relationalMaterial ? appraisal.relational.valence : "neutral",
     targetsKaira: dyadic,
-    severity: scaleSeverity(baseSeverity, severityFactor),
+    severity: projectSeverityMagnitude(baseSeverity, projectedHarmMagnitude),
     jokingConfidence: interp.jokingConfidence,
     sincerityConfidence: interp.sincerityConfidence,
     apology: repairMaterial && interp.apology,
     repairAttempt: repairMaterial && interp.repairAttempt,
+    repairStrength: repairMaterial ? clamp01(appraisal.relational.repairEvidence) : 0,
     support: affiliationMaterial ? clamp01(interp.support * affiliationFactor) : 0,
     compliment: affiliationMaterial ? clamp01(interp.compliment * affiliationFactor) : 0,
     affection: affiliationMaterial ? clamp01(interp.affection * affiliationFactor) : 0,
@@ -159,16 +166,15 @@ export function relationshipSignalFromRuntimeAppraisal(
 
 /**
  * Convert G4's independent affective projection into state-transition deltas.
- * Constants deliberately reuse the canonical reducer's existing per-turn affect
- * cap; this seam changes authority, not the global affect scale.
+ * Exact-zero stays exact-zero: legacy reducer affect is intentionally not used as
+ * a fallback because that would create a second affective authority.
  */
 export function affectDeltaFromRuntimeAppraisal(
-  fallback: Readonly<RelationshipAffect>,
   appraisal: Readonly<SocialAppraisalResult>,
   reactionMode: AffectiveReactionMode,
 ): RelationshipAffect {
   if (appraisal.affective.significance <= 0 || appraisal.affective.valence === "neutral") {
-    return { ...fallback };
+    return { ...ZERO_AFFECT };
   }
 
   const magnitude = clamp01(
@@ -191,6 +197,6 @@ export function affectDeltaFromRuntimeAppraisal(
     stress: -Math.max(1, Math.round(scaled * 0.5)),
     happiness: Math.max(1, Math.round(scaled * 0.5)),
     calmness: Math.max(1, Math.round(scaled * 0.25)),
-    anger: Math.min(0, fallback.anger),
+    anger: 0,
   };
 }
