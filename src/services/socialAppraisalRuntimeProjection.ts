@@ -17,10 +17,11 @@ export interface RuntimeSocialAppraisalInput {
 
 export interface RuntimeSocialAppraisalResolution extends SocialAppraisalResolutionG4 {
   /**
-   * Runtime projection after deterministic entity/world grounding. G4 remains the
-   * magnitude authority; grounding may resolve an unknown target to the active
-   * dyad or veto a projection for explicit third-party/event scope, but it cannot
-   * override an explicit semantic self/third-party/event target.
+   * Runtime projection after deterministic entity/world grounding. G4 owns
+   * relational direction/materiality and bounded context modulation; grounding
+   * may resolve an unknown target to the active dyad or veto a projection for
+   * explicit third-party/event scope, but it cannot override an explicit
+   * semantic self/third-party/event target.
    */
   runtimeAppraisal: SocialAppraisalResult;
 }
@@ -98,8 +99,10 @@ function projectSeverityMagnitude(
 
 /**
  * Project canonical G4 relational meaning into the legacy reducer signal shape.
- * Semantic severity contributes only the category/vector shape. G4 owns the
- * resulting magnitude and relational direction consumed by the reducer.
+ * Candidate-reading plausibility is evidence for appraisal direction/materiality,
+ * not a severity magnitude. Canonical severity owns the harm-vector magnitude;
+ * G4 owns its bounded contextual modulation. This prevents a low canonical
+ * severity from being inflated by a candidate's non-probabilistic plausibility.
  */
 export function relationshipSignalFromRuntimeAppraisal(
   interp: SemanticInterpretation,
@@ -131,15 +134,13 @@ export function relationshipSignalFromRuntimeAppraisal(
     !repairMaterial;
 
   const baseSeverity = relationshipSeverityForInterpretation(interp);
+  const baseHarmMagnitude = maxSeverity(baseSeverity);
   const hardSeverityCandidate =
-    maxSeverity(baseSeverity) >= DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline.minPresentSeverity;
+    baseHarmMagnitude >= DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline.minPresentSeverity;
   const projectedHarmMagnitude = harmMaterial
     ? hardSeverityCandidate
-      ? Math.max(
-          appraisal.relational.harmEvidence,
-          DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline.minPresentSeverity,
-        )
-      : appraisal.relational.harmEvidence
+      ? baseHarmMagnitude
+      : clamp01(baseHarmMagnitude * resolution.contextFactors.relationalHarm)
     : 0;
 
   const affiliationFactor = affiliationMaterial
