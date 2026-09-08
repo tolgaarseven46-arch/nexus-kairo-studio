@@ -104,6 +104,21 @@ function compactFacts(observation: WorldEventObservation): string[] {
   return [...facts];
 }
 
+/**
+ * `current_user` is a turn-local grounding alias, never a durable person id.
+ * Autobiographical memory is Kaira-instance-wide, so the observation owner must
+ * be encoded before the participant enters persistent identity state.
+ */
+export function autobiographicalParticipantId(
+  entityId: string | undefined,
+  observationUserId: string,
+): string | null {
+  if (!entityId) return null;
+  return entityId.toLocaleLowerCase("tr-TR") === "current_user"
+    ? `user:${observationUserId}`
+    : entityId;
+}
+
 export function appraiseLivedMemoryCandidate(input: {
   instance: Pick<KairaInstanceContext, "instanceId" | "instanceType">;
   observation: WorldEventObservation;
@@ -156,12 +171,15 @@ export function appraiseLivedMemoryCandidate(input: {
     "kaira",
     "current_kaira",
   ]);
+  const participantIds = [event.actor?.id, event.target?.id]
+    .filter((value): value is string => Boolean(value && !selfIds.has(value.toLocaleLowerCase("tr-TR"))))
+    .map((value) => autobiographicalParticipantId(value, observation.userId))
+    .filter((value): value is string => Boolean(value));
   const memory: KairaAutobiographicalMemory = {
     id: `lived_${observationId}`,
     origin: "lived",
     occurredAt: observation.createdAt,
-    participantIds: [event.actor?.id, event.target?.id]
-      .filter((value): value is string => Boolean(value && !selfIds.has(value.toLocaleLowerCase("tr-TR")))),
+    participantIds: [...new Set(participantIds)],
     eventType: event.eventType,
     facts: compactFacts(observation),
     emotions: memoryEmotions(input.dynamicStateAfter),

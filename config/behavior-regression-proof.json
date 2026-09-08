@@ -112,6 +112,20 @@
       "counterexamples": [
         "counterexample: mismatched dyad ownership remains equivalent to no dyad prior"
       ]
+    },
+    {
+      "id": "autobiographical-participant-user-scope",
+      "invariant": "Turn-local current_user grounding must be converted to a stable user-scoped participant id before entering Kaira-instance-wide autobiographical memory; distinct users must never collapse into the same persistent participant identity.",
+      "redSha": "a8cc3a990a9a10510645758ed647c4dbb6d4fdae",
+      "testFile": "src/services/kairaLivedMemoryParticipantIdentityNeighborProofRegression.test.ts",
+      "reported": "reported: two users do not collapse to current_user in autobiographical memory",
+      "neighbors": [
+        "neighbor-1: current_user actor is scoped to the observation owner",
+        "neighbor-2: current_user target is scoped to the observation owner"
+      ],
+      "counterexamples": [
+        "counterexample: named third-party participant identity remains unchanged"
+      ]
     }
   ]
 }
