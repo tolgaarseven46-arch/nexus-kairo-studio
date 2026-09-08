@@ -3,6 +3,7 @@ import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import type { KairaResponsePlan } from "./kairaResponsePlan";
 import {
   findKairaResponsePlanIssues,
+  kairaSocialMoveFallback,
 } from "./kairaResponsePlan";
 import {
   enforceKairoResponse,
@@ -55,9 +56,9 @@ export interface KairaResponseConstraintPassInput {
   additionalIssueFinder?: (reply: string) => string[];
   /**
    * Legacy dialogue-owned deterministic fallback hook for non-obligation moves.
-   * The final boundary may validate it, but never manufactures a replacement of
-   * its own. For answer/clarify obligations the dialogue fallback is null, so
-   * recovery remains in the normal generation/repair pipeline.
+   * The final boundary may validate it, but never treats it as authoritative.
+   * If it fails, an already-resolved ResponsePlan socialMove may provide the
+   * canonical fallback surface; no user semantics are re-parsed here.
    */
   fallbackFactory?: () => string | null;
 }
@@ -208,11 +209,11 @@ function runOrderedPass(
  * fallback cannot erase a response already grounded and validated by the world
  * authority. Resolved self facts/memories remain independently authoritative.
  *
- * This boundary never writes a generic social reply. A caller-supplied legacy
- * dialogue fallback can be tried only if it independently passes the exact same
- * ordered constraints. Otherwise the original candidate and its issues are kept
- * visible so a normal DialogueDecision -> ResponsePlan -> Realizer repair can
- * own recovery instead of a hidden guard author.
+ * This boundary never parses the user again or invents a second social meaning.
+ * A caller-supplied dialogue fallback is tried first. If that fallback is absent
+ * or non-conformant, the boundary may consume only the canonical ResponsePlan's
+ * already-resolved socialMove fallback. Every fallback is subjected to the same
+ * ordered constraints before it can become deliverable.
  */
 export function runKairaResponseConstraintPass(
   input: KairaResponseConstraintPassInput,
@@ -222,12 +223,17 @@ export function runKairaResponseConstraintPass(
   let fallbackUsed = false;
 
   if (first.issues.length > 0) {
-    const preferredFallback = String(input.fallbackFactory?.() ?? "").trim();
-    if (preferredFallback) {
+    const fallbackCandidates = [
+      String(input.fallbackFactory?.() ?? "").trim(),
+      String(kairaSocialMoveFallback(input.plan) ?? "").trim(),
+    ].filter((candidate, index, all) => candidate && all.indexOf(candidate) === index);
+
+    for (const preferredFallback of fallbackCandidates) {
       const candidate = runOrderedPass(preferredFallback, input);
       if (candidate.issues.length === 0) {
         final = candidate;
         fallbackUsed = true;
+        break;
       }
     }
   }
