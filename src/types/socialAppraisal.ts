@@ -6,10 +6,30 @@ import type {
   RelationshipState,
 } from "./nexus";
 
+/**
+ * Bounded, person-specific summary of canonical lived autobiography.
+ * It intentionally carries no raw facts, event text, eventType, or emotion labels,
+ * so SocialAppraisal cannot become a second semantic interpreter.
+ */
+export interface SocialAppraisalAutobiographicalContext {
+  /** Stable durable participant id for the active user, e.g. user:<owner-scope>. */
+  participantId: string;
+  /** Number of ordinary lived autobiographical episodes involving this participant. */
+  episodeCount: number;
+  /** Episodes whose canonical salience is materially high (>= 0.65). */
+  salientEpisodeCount: number;
+  /** 0..1 mean canonical episode salience. */
+  meanSalience: number;
+  /** 0..1 strongest canonical episode salience. */
+  maxSalience: number;
+  /** 0..1 mean per-episode maximum emotional intensity, labels intentionally omitted. */
+  meanEmotionalIntensity: number;
+}
+
 export interface SocialAppraisalMemoryContext {
   /** Structured summaries only. SocialAppraisal must never reparse raw history. */
   relationshipEpisodes?: readonly unknown[];
-  autobiographical?: readonly unknown[];
+  autobiographical?: Readonly<SocialAppraisalAutobiographicalContext> | null;
   world?: readonly unknown[];
 }
 

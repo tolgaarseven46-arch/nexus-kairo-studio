@@ -55,6 +55,24 @@ function relationshipBuffer(input: Readonly<SocialAppraisalInput>): number {
   return Math.max(-0.15, Math.min(0.15, (quality - 0.5) * 0.2 + toleranceContribution));
 }
 
+function autobiographicalAffectiveFactor(input: Readonly<SocialAppraisalInput>): number {
+  const memory = input.memory?.autobiographical;
+  if (!memory || memory.episodeCount <= 0) return 1;
+
+  // Shared-history depth may make an already-resolved event matter more to Kaira,
+  // but it carries no event direction and cannot create semantic meaning.
+  const episodeDepth = clamp01(memory.episodeCount / 8);
+  const salientDepth = clamp01(memory.salientEpisodeCount / 4);
+  const salience = clamp01((memory.meanSalience + memory.maxSalience) / 2);
+  const emotion = clamp01(memory.meanEmotionalIntensity);
+  const pressure =
+    episodeDepth * 0.03 +
+    salientDepth * 0.03 +
+    salience * 0.035 +
+    emotion * 0.025;
+  return clampFactor(1 + Math.min(0.12, pressure));
+}
+
 function computeContextFactors(
   input: Readonly<SocialAppraisalInput>,
   base: Readonly<SocialAppraisalResult>,
@@ -73,6 +91,7 @@ function computeContextFactors(
   const buffer = relationshipBuffer(input);
   const negativeStatePressure = ((anger + stress) / 2 - calmness * 0.35) * 0.16;
   const positiveStatePressure = (happiness - 0.5) * 0.1;
+  const autobiographicalAffective = autobiographicalAffectiveFactor(input);
 
   const relationalHarm = clampFactor(
     1 + (sensitivity - 0.5) * 0.2 - (patience - 0.5) * 0.12 - buffer,
@@ -85,13 +104,14 @@ function computeContextFactors(
   );
 
   const affectiveNegative = clampFactor(
-    1 + (sensitivity - 0.5) * 0.18 + negativeStatePressure,
+    (1 + (sensitivity - 0.5) * 0.18 + negativeStatePressure) * autobiographicalAffective,
   );
   const affectivePositive = clampFactor(
-    1 + (empathy - 0.5) * 0.08 + positiveStatePressure,
+    (1 + (empathy - 0.5) * 0.08 + positiveStatePressure) * autobiographicalAffective,
   );
   const activation = clampFactor(
-    1 + ((anger + stress) / 2 - calmness) * 0.16 + (sensitivity - 0.5) * 0.08,
+    (1 + ((anger + stress) / 2 - calmness) * 0.16 + (sensitivity - 0.5) * 0.08) *
+      autobiographicalAffective,
   );
 
   // Exact-zero / one-sided projections stay one-sided. A factor is observable but
@@ -160,10 +180,7 @@ function modulate(
     },
     noMaterialEffect:
       relationalSignificance <= 0 && affectiveSignificance <= 0,
-    reasons: [
-      ...base.reasons,
-      "g4_context_modulation:bounded",
-    ],
+    reasons: [...base.reasons, "g4_context_modulation:bounded"],
   };
 }
 
@@ -173,7 +190,9 @@ function modulate(
  * Authority rule:
  * - G3 owns resolved social meaning and projection direction.
  * - G4 may only scale existing projection magnitudes from typed personality,
- *   current state, and existing relationship context.
+ *   current state, existing relationship context, and bounded typed memory summaries.
+ * - autobiographical context may deepen an already-material affective projection,
+ *   but cannot alter relational direction/harm/repair or create effect from zero.
  * - typed relationship grounding may resolve an otherwise-unknown target, but
  *   cannot override an explicit self/third-party/event target.
  * - G4 cannot create a projection from exact zero, change target/intent/valence,

@@ -1,7 +1,7 @@
 import type { AffectiveReactionMode, DroitDynamicState, DroitPersonalityTraits, RelationshipState } from "../types/nexus";
 import type { DyadicSocialNormProfile } from "../types/dyadicSocialNorm";
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
-import type { SocialAppraisalResult } from "../types/socialAppraisal";
+import type { SocialAppraisalMemoryContext, SocialAppraisalResult } from "../types/socialAppraisal";
 import type { SemanticRelationshipScope } from "./languageUnderstandingService";
 import { resolveSocialAppraisalG4, type SocialAppraisalResolutionG4 } from "./socialAppraisalContextModulation";
 import type { RelationshipAffect, RelationshipTurnSignal } from "./relationshipReducer";
@@ -14,6 +14,8 @@ export interface RuntimeSocialAppraisalInput {
   relationship: Readonly<RelationshipState>;
   /** Prior learned context for this already owner-scoped active dyad. */
   dyadicNorm?: Readonly<DyadicSocialNormProfile>;
+  /** Bounded structured memory context prepared upstream for this active user only. */
+  memory?: Readonly<SocialAppraisalMemoryContext>;
   currentState: Readonly<DroitDynamicState>;
   personality: Readonly<DroitPersonalityTraits>;
 }
@@ -61,6 +63,7 @@ export function resolveRuntimeSocialAppraisal(
       semantic: input.semantic,
       relationship: input.relationship,
       dyadicNorm: input.dyadicNorm,
+      memory: input.memory,
       currentState: input.currentState,
       personality: input.personality,
     },
@@ -129,9 +132,6 @@ export function relationshipSignalFromRuntimeAppraisal(
 
   const relationalMaterial = dyadic && appraisal.relational.significance > 0;
   const harmMaterial = relationalMaterial && appraisal.relational.harmEvidence > 0;
-  // Repair is permitted only when the resolved relational direction is positive.
-  // A hostile continuation that also carries apology flags must not manufacture
-  // repair merely because a repair candidate exists.
   const repairMaterial =
     relationalMaterial &&
     appraisal.relational.repairEvidence > 0 &&

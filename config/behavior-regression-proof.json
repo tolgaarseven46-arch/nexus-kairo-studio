@@ -140,6 +140,20 @@
       "counterexamples": [
         "counterexample: legacy-safe user ids remain byte-compatible"
       ]
+    },
+    {
+      "id": "autobiographical-affective-depth-context",
+      "invariant": "Typed active-user autobiographical episode depth may boundedly deepen an already-material affective SocialAppraisal projection, but it must not reinterpret memory content, create effect from zero, or rewrite relational harm/repair meaning.",
+      "redSha": "7bccf84e06e050f14901f2efb337acd6ead4e2b9",
+      "testFile": "src/services/socialAppraisalAutobiographicalContextNeighborProofRegression.test.ts",
+      "reported": "reported: shared lived-episode depth strengthens an already-negative affective projection",
+      "neighbors": [
+        "neighbor-1: shared lived-episode depth strengthens an already-positive affective projection",
+        "neighbor-2: shared lived-episode depth increases activation only when an affective projection already exists"
+      ],
+      "counterexamples": [
+        "counterexample: autobiographical depth does not rewrite relational harm evidence"
+      ]
     }
   ]
 }
