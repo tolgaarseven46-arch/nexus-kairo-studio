@@ -12,18 +12,16 @@ const MATERIAL_PRIMARY_INTENTS: ReadonlySet<SemanticPrimaryIntent> = new Set([
   "apology",
 ]);
 
-const MATERIAL_SOCIAL_ACTS: ReadonlySet<SemanticSocialAct> = new Set([
+const MATERIAL_SOCIAL_ACTS: ReadonlySet<SemanticSocialAct> = new Set<SemanticSocialAct>([
   "insult",
   "mockery",
-  "boundary_violation",
+  "boundary_test",
   "coercion",
   "manipulation",
   "privacy_violation",
-  "compliment",
-  "support",
   "affection",
   "apology",
-  "repair_attempt",
+  "repair",
 ]);
 
 const maxSeverity = (semantic: Readonly<SemanticInterpretation>): number =>
@@ -34,6 +32,15 @@ const maxSeverity = (semantic: Readonly<SemanticInterpretation>): number =>
     semantic.severity.privacy,
     semantic.severity.aggression,
   );
+
+const hasMaterialCanonicalSocialScalar = (
+  semantic: Readonly<SemanticInterpretation>,
+): boolean =>
+  semantic.affection > 0 ||
+  semantic.support > 0 ||
+  semantic.compliment > 0 ||
+  semantic.apology ||
+  semantic.repairAttempt;
 
 /**
  * G1 material-evidence gate. It consumes canonical semantics only.
@@ -47,6 +54,7 @@ export function hasMaterialSocialAppraisalEvidence(
 ): boolean {
   if (MATERIAL_PRIMARY_INTENTS.has(semantic.primaryIntent)) return true;
   if (semantic.secondarySocialActs.some((act) => MATERIAL_SOCIAL_ACTS.has(act))) return true;
+  if (hasMaterialCanonicalSocialScalar(semantic)) return true;
   if (maxSeverity(semantic) > 0) return true;
   if (semantic.valence !== "neutral") return true;
 
