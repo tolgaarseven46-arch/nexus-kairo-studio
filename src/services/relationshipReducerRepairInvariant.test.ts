@@ -23,6 +23,7 @@ const neutralSignal = () => ({
   sincerityConfidence: 0.6,
   apology: false,
   repairAttempt: false,
+  repairStrength: 0,
   support: 0,
   compliment: 0,
   affection: 0,
@@ -75,7 +76,7 @@ describe("repairProgress requires real injury", () => {
 
   it("no injury + apology -> apology is NOT counted as a fresh injury and repair does not spike", () => {
     const r = reduceRelationshipTurn(
-      base({ signal: { ...neutralSignal(), valence: "positive", apology: true } }),
+      base({ signal: { ...neutralSignal(), valence: "positive", apology: true, repairStrength: 0.85 } }),
     );
     expect(r.scores.conflict).toBe(0);
     expect(r.scores.hurt).toBe(0);
@@ -90,7 +91,7 @@ describe("repairProgress requires real injury", () => {
         scores: { ...base().prev.scores, conflict: 24, hurt: 22, repairProgress: 0 },
         conversationState: "distancing",
       },
-      signal: { ...neutralSignal(), valence: "positive", apology: true, sincerityConfidence: 0.85 },
+      signal: { ...neutralSignal(), valence: "positive", apology: true, repairAttempt: true, repairStrength: 0.85, sincerityConfidence: 0.85 },
     });
     const r = reduceRelationshipTurn(injured);
     expect(r.scores.repairProgress).toBeGreaterThan(0);
