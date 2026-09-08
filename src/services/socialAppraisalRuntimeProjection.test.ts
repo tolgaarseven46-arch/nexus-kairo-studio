@@ -185,7 +185,7 @@ describe("runtime SocialAppraisal projection authority", () => {
     expect(affect).toEqual({ stress: 0, happiness: 0, calmness: 0, anger: 0 });
   });
 
-  it("uses G4 relational harm magnitude for reducer severity while preserving vector shape", () => {
+  it("uses G4 context to modulate canonical reducer severity while preserving vector shape", () => {
     const event = insult(0.3);
     const cold = resolve(
       event,
@@ -200,8 +200,8 @@ describe("runtime SocialAppraisal projection authority", () => {
     const coldSignal = relationshipSignalFromRuntimeAppraisal(event, "kaira_user", "insult", cold);
     const warmSignal = relationshipSignalFromRuntimeAppraisal(event, "kaira_user", "insult", warm);
 
-    expect(maxSignalSeverity(coldSignal)).toBeCloseTo(cold.runtimeAppraisal.relational.harmEvidence, 6);
-    expect(maxSignalSeverity(warmSignal)).toBeCloseTo(warm.runtimeAppraisal.relational.harmEvidence, 6);
+    expect(maxSignalSeverity(coldSignal)).toBeCloseTo(0.3 * cold.contextFactors.relationalHarm, 6);
+    expect(maxSignalSeverity(warmSignal)).toBeCloseTo(0.3 * warm.contextFactors.relationalHarm, 6);
     expect(maxSignalSeverity(warmSignal)).toBeLessThan(maxSignalSeverity(coldSignal));
     expect(warmSignal.severity.aggression / warmSignal.severity.disrespect).toBeCloseTo(
       coldSignal.severity.aggression / coldSignal.severity.disrespect,
