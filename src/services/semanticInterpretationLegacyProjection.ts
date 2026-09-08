@@ -16,6 +16,7 @@ import {
   type SemanticEvent,
   type SemanticIntent,
 } from "./semanticEventEngine";
+import { canonicalizeSemanticEvent } from "./semanticEventCanonicalizer";
 import { normalizeSemanticInterpretation } from "./semanticInterpretationSchema";
 import { calibrateProjectedEmotionalLoad } from "./emotionalLoadPolicy";
 import {
@@ -416,7 +417,8 @@ function buildInterpretation(event: SemanticEvent, message: string): SemanticInt
  * hard-stop severity gate; a pointed sustained insult does not.
  */
 export function interpretationFromRegexFloor(message: string): SemanticInterpretation {
-  return buildInterpretation(interpretSemanticEvent(message), message);
+  const event = canonicalizeSemanticEvent(message, interpretSemanticEvent(message));
+  return buildInterpretation(event, message);
 }
 
 /**
