@@ -210,16 +210,33 @@ const clusterReadiness = Object.entries(clusters).map(([clusterId, cluster]) => 
 });
 
 const everyClusterObservable = clusterReadiness.length === 5 && clusterReadiness.every((item) => item.hasObservableDetector);
+const serializerByteParityProven = scenarioResults.every((result) =>
+  result.toolingNotes.includes("prompt_serializer_byte_parity=proven_shared_function"),
+);
+const phase1Allowed =
+  everyClusterObservable &&
+  serializerByteParityProven &&
+  isolationFailures === 0 &&
+  noAiBoundaryFailures === 0;
+const scaleGateReasons = [
+  ...(everyClusterObservable ? [] : ["At least one Phase 0 cluster still has no observable automatic detector on real scenario turns."]),
+  ...(serializerByteParityProven ? [] : ["Production/harness final-provider serializer byte parity is not proven."]),
+  ...(isolationFailures === 0 ? [] : [`Session isolation failed on ${isolationFailures} turns.`]),
+  ...(noAiBoundaryFailures === 0 ? [] : [`No-AI boundary failed on ${noAiBoundaryFailures} turns.`]),
+];
 
 const report = {
   reportType: "KAIRA_PREAI_PHASE0_TOOLING_REPORT",
-  version: 3,
+  version: 4,
   generatedAt: new Date().toISOString(),
   matrixVersion: matrix.version,
   aiBoundary: matrix.aiBoundary,
   branchTrackType: "regression",
   semanticIngress: "deterministic_regex_floor",
-  promptCoverage: "shared_canonical_blocks_but_full_server_template_parity_not_yet_proven",
+  promptSerializerParity: serializerByteParityProven
+    ? "byte_parity_proven_shared_production_serializer"
+    : "not_proven",
+  promptContextFidelity: "deterministic_phase0_subset_not_full_production_runtime",
   summary: {
     scenarioCount: scenarioResults.length,
     turnCount: totalTurns,
@@ -235,11 +252,11 @@ const report = {
   violatingTurns,
   clusters,
   scaleGate: {
-    phase1Allowed: false,
-    reasons: [
-      "Phase 0 machine report must be jointly reviewed by user + ChatGPT + Cloud.",
-      ...(everyClusterObservable ? [] : ["At least one Phase 0 cluster still has no observable automatic detector on real scenario turns."]),
-      "Full server final-provider-prompt template parity with the harness has not yet been proven byte-identical.",
+    phase1Allowed,
+    reasons: scaleGateReasons,
+    caveats: [
+      "Detector families are separately self-validated in CI with known-bad synthetic inputs and clean counterexamples.",
+      "Serializer byte parity does not imply full production-context parity; Phase 0 intentionally omits provider and persistent-service hydration.",
       "This run audits deterministic regex-floor ingestion, not production semantic-provider quality.",
     ],
   },
