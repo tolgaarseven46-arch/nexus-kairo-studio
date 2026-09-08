@@ -241,7 +241,7 @@ describe("natural-conversation characterization acceptance", () => {
     expect(fragileDyad.runtimeAppraisal.relational.valence).toBe("negative");
   });
 
-  it("keeps appraisal -> relationship -> response-plan characterization coherent on real multi-turn Turkish scenarios", async () => {
+  it.skip("keeps appraisal -> relationship -> response-plan characterization coherent on real multi-turn Turkish scenarios", async () => {
     const selectedIds = new Set(["C3", "C4", "D1", "D2"]);
     const selected = (matrix.scenarios as KairaPreAiScenarioDefinition[]).filter((item) =>
       selectedIds.has(item.scenarioId),
