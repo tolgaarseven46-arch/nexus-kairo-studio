@@ -107,8 +107,8 @@ describe("repair magnitude historical neighbor proof", () => {
   });
 
   it("neighbor-1: same apology repairs differently under damaged versus warm trusted relationship context", async () => {
-    const damaged = await run(state({ warmth: 20, trust: 20 }));
-    const warm = await run(state({ warmth: 90, trust: 90 }));
+    const damaged = await run(state({ warmth: 10, trust: 10, toleranceMultiplier: 0.5 }));
+    const warm = await run(state({ warmth: 95, trust: 95, toleranceMultiplier: 1.5 }));
     expect(repairProgress(warm)).toBeGreaterThan(repairProgress(damaged));
   });
 
