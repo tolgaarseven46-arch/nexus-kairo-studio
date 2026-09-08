@@ -1,4 +1,5 @@
 import type { AffectiveReactionMode, DroitDynamicState, DroitPersonalityTraits, RelationshipState } from "../types/nexus";
+import type { DyadicSocialNormProfile } from "../types/dyadicSocialNorm";
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import type { SocialAppraisalResult } from "../types/socialAppraisal";
 import type { SemanticRelationshipScope } from "./languageUnderstandingService";
@@ -11,6 +12,8 @@ export interface RuntimeSocialAppraisalInput {
   semantic: SemanticInterpretation;
   relationshipScope?: SemanticRelationshipScope;
   relationship: Readonly<RelationshipState>;
+  /** Prior learned context for this already owner-scoped active dyad. */
+  dyadicNorm?: Readonly<DyadicSocialNormProfile>;
   currentState: Readonly<DroitDynamicState>;
   personality: Readonly<DroitPersonalityTraits>;
 }
@@ -57,6 +60,7 @@ export function resolveRuntimeSocialAppraisal(
     {
       semantic: input.semantic,
       relationship: input.relationship,
+      dyadicNorm: input.dyadicNorm,
       currentState: input.currentState,
       personality: input.personality,
     },
