@@ -154,7 +154,6 @@ export function relationshipSignalFromRuntimeAppraisal(
     sincerityConfidence: interp.sincerityConfidence,
     apology: repairMaterial && interp.apology,
     repairAttempt: repairMaterial && interp.repairAttempt,
-    repairStrength: repairMaterial ? clamp01(appraisal.relational.repairEvidence) : 0,
     support: affiliationMaterial ? clamp01(interp.support * affiliationFactor) : 0,
     compliment: affiliationMaterial ? clamp01(interp.compliment * affiliationFactor) : 0,
     affection: affiliationMaterial ? clamp01(interp.affection * affiliationFactor) : 0,
@@ -166,10 +165,11 @@ export function relationshipSignalFromRuntimeAppraisal(
 
 /**
  * Convert G4's independent affective projection into state-transition deltas.
- * Exact-zero stays exact-zero: legacy reducer affect is intentionally not used as
+ * Exact-zero stays exact-zero: legacy reducer affect is intentionally ignored as
  * a fallback because that would create a second affective authority.
  */
 export function affectDeltaFromRuntimeAppraisal(
+  _legacyFallback: Readonly<RelationshipAffect>,
   appraisal: Readonly<SocialAppraisalResult>,
   reactionMode: AffectiveReactionMode,
 ): RelationshipAffect {
