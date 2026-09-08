@@ -1,0 +1,99 @@
+name: one-time dyadic norm runtime wiring
+
+on:
+  push:
+    branches:
+      - fix/dyadic-norm-runtime-wiring
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Patch canonical runtime and persistence seams
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, got {count}: {old[:100]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          persistence = "src/services/kdmPersistenceService.ts"
+          replace_once(
+              persistence,
+              "import type { SemanticInterpretation } from '../types/semanticInterpretation';\n",
+              "import type { SemanticInterpretation } from '../types/semanticInterpretation';\nimport { normalizeDyadicSocialNormProfile } from './dyadicSocialNorm';\n",
+          )
+          replace_once(
+              persistence,
+              "  const relationship = rawRelationship && typeof rawRelationship === 'object' ? rawRelationship as Partial<RelationshipState> : undefined;\n",
+              "  const relationship = rawRelationship && typeof rawRelationship === 'object' ? rawRelationship as Partial<RelationshipState> : undefined;\n  const dyadicNorm = normalizeDyadicSocialNormProfile(relationship?.dyadicNorm);\n",
+          )
+          replace_once(
+              persistence,
+              "repairProgress: numberOrDefault(relationship.repairProgress, 0), repeatedNegativeCount: numberOrDefault(relationship.repeatedNegativeCount, 0),\n      ...(relationship.conversationState",
+              "repairProgress: numberOrDefault(relationship.repairProgress, 0), repeatedNegativeCount: numberOrDefault(relationship.repeatedNegativeCount, 0),\n      ...(dyadicNorm ? { dyadicNorm } : {}),\n      ...(relationship.conversationState",
+          )
+          replace_once(
+              persistence,
+              "...(previous?.lastNegativePatternAt ? { lastNegativePatternAt: previous.lastNegativePatternAt } : {}) };",
+              "...(previous?.lastNegativePatternAt ? { lastNegativePatternAt: previous.lastNegativePatternAt } : {}), ...(previous?.dyadicNorm ? { dyadicNorm: previous.dyadicNorm } : {}) };",
+          )
+
+          bridge = "src/services/kdmRelationshipReducerBridge.ts"
+          replace_once(
+              bridge,
+              "import { socialNegativePattern } from \"./socialAppraisalEngine\";\n",
+              "import { socialNegativePattern } from \"./socialAppraisalEngine\";\nimport { emptyDyadicSocialNorm } from \"./dyadicSocialNorm\";\nimport { observeCanonicalDyadicNorm } from \"./dyadicSocialNormObservation\";\n",
+          )
+          replace_once(
+              bridge,
+              "  const prevRel: RelationshipState = state.relationship ?? {};\n",
+              "  const prevRel: RelationshipState = state.relationship ?? {};\n  const priorDyadicNorm = prevRel.dyadicNorm?.subjectId === \"active-interlocutor\"\n    ? prevRel.dyadicNorm\n    : emptyDyadicSocialNorm(\"active-interlocutor\");\n",
+          )
+          replace_once(
+              bridge,
+              "    relationship: prevRel,\n    currentState: state,",
+              "    relationship: prevRel,\n    dyadicNorm: priorDyadicNorm,\n    currentState: state,",
+          )
+          replace_once(
+              bridge,
+              "  const signal = relationshipSignalFromRuntimeAppraisal(\n",
+              "  const nextDyadicNorm = observeCanonicalDyadicNorm(\n    priorDyadicNorm,\n    semanticInterpretation,\n    semanticEvent.relationshipScope,\n    nowIso,\n  );\n  const signal = relationshipSignalFromRuntimeAppraisal(\n",
+          )
+          replace_once(
+              bridge,
+              "    repairProgress: projectedResult.scores.repairProgress,\n    repeatedNegativeCount:",
+              "    repairProgress: projectedResult.scores.repairProgress,\n    dyadicNorm: nextDyadicNorm,\n    repeatedNegativeCount:",
+          )
+          PY
+      - name: Commit patched runtime and remove one-time workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-time-dyadic-norm-runtime-wiring.yml
+          git add src/services/kdmPersistenceService.ts src/services/kdmRelationshipReducerBridge.ts
+          git commit -m "feat(appraisal): wire persisted dyadic norm into KDM runtime"
+          git push origin HEAD:fix/dyadic-norm-runtime-wiring
+      - name: Focused verification
+        shell: bash
+        run: |
+          npm install --ignore-scripts
+          npx vitest run src/services/dyadicSocialNormRuntimeWiring.test.ts src/services/dyadicSocialNorm.test.ts src/services/dyadicCandidateReweight.test.ts src/services/socialAppraisalResolution.test.ts src/services/socialAppraisalContextModulation.test.ts
+          npx tsc --noEmit
