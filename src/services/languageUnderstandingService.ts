@@ -59,9 +59,18 @@ export function groundSemanticEventForAppraisal(
   let relationshipScope: SemanticRelationshipScope = "unknown";
   const explicitThirdPartyActor = actorSource === "explicit_name" && actorId !== "current_user";
   const explicitThirdPartyTarget = targetSource === "explicit_name" && targetId !== "current_user" && targetId !== "kaira";
+  const implicitActiveDyadRepair =
+    event.target === "unknown" &&
+    entityResolution.namedPeople.length === 0 &&
+    (event.apology || event.repairAttempt || event.intent === "apology" || event.intent === "repair");
   if (explicitThirdPartyActor || explicitThirdPartyTarget || event.target === "third_party") relationshipScope = "third_party";
   else if (actorId === "current_user" && targetId === "kaira") relationshipScope = "kaira_user";
   else if (event.target === "kaira" && entityResolution.namedPeople.length === 0) relationshipScope = "kaira_user";
+  // A bare typed apology/repair with no explicit third-party referent is an
+  // interlocutor-facing social act. Ground only its relationship scope here;
+  // canonical semantic target remains untouched and explicit non-dyadic targets
+  // above still win. This is grounding, not a raw-text reinterpretation.
+  else if (implicitActiveDyadRepair) relationshipScope = "kaira_user";
   else if (event.target === "event") relationshipScope = "event";
 
   let appraisalEvent: AppraisalSemanticEvent = {
