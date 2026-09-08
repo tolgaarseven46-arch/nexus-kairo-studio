@@ -59,9 +59,10 @@ function adjustmentForCandidate(
 }
 
 /**
- * Applies only established, same-subject dyadic evidence to contextual candidates.
- * It never mutates canonical semantics and never converts frequency alone into
- * permission. Harm evidence remains represented even in a permissive dyad.
+ * Applies only established, same-subject dyadic evidence to Kaira-targeted
+ * contextual candidates. It never mutates canonical semantics and never
+ * converts frequency alone into permission. Harm evidence remains represented
+ * even in a permissive dyad.
  */
 export function reweightSocialAppraisalCandidatesForDyad(
   semantic: Readonly<SemanticInterpretation>,
@@ -76,6 +77,16 @@ export function reweightSocialAppraisalCandidatesForDyad(
       normReading: null,
       candidates: candidates.map(unchangedCandidate),
       reasons: ["dyadic-subject-mismatch"],
+    };
+  }
+
+  if (semantic.target !== "kaira") {
+    return {
+      subjectMatched: true,
+      dyadicApplied: false,
+      normReading: null,
+      candidates: candidates.map(unchangedCandidate),
+      reasons: ["event-not-targeting-kaira"],
     };
   }
 
