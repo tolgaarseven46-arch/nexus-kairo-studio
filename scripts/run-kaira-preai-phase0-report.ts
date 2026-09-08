@@ -1,10 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import matrix from "../config/kairaPreAiPhase0Scenarios.json";
+import detectorExpectations from "../config/kairaPreAiPhase0DetectorExpectations.json";
 import {
   runKairaPreAiPhase0Scenario,
   type KairaPreAiScenarioDefinition,
 } from "../src/services/kairaPreAiPhase0Harness";
+import {
+  evaluateKairaPreAiScenarioReadiness,
+  type KairaPreAiDetectorExpectation,
+} from "../src/services/kairaPreAiPhase0Readiness";
 
 type ViolationDetail = {
   scenarioId: string;
@@ -71,6 +76,7 @@ for (const scenario of matrix.scenarios as KairaPreAiScenarioDefinition[]) {
 const clusters: Record<string, ClusterAggregate> = {};
 const globalViolationCounts: Record<string, number> = {};
 const globalDetectorCoverage: Record<string, DetectorCoverageAggregate> = {};
+const scenarioDetectorCoverage: Record<string, Record<string, DetectorCoverageAggregate>> = {};
 const violatingTurns: ViolationDetail[] = [];
 let totalTurns = 0;
 let isolationFailures = 0;
@@ -121,6 +127,7 @@ for (const result of scenarioResults) {
   };
   cluster.scenarioCount += 1;
   cluster.turnCount += result.turns.length;
+  const scenarioCoverage = scenarioDetectorCoverage[result.scenarioId] ??= {};
 
   for (const [code, rawCount] of Object.entries(result.failureClassCounts as Record<string, number>)) {
     const count = Number(rawCount);
@@ -156,6 +163,14 @@ for (const result of scenarioResults) {
       if (coverage.cluster === result.cluster) {
         mergeCoverage(
           cluster.detectorCoverage,
+          coverage.cluster,
+          coverage.detector,
+          coverage.active,
+          coverage.observable,
+          coverage.reason,
+        );
+        mergeCoverage(
+          scenarioCoverage,
           coverage.cluster,
           coverage.detector,
           coverage.active,
@@ -199,27 +214,43 @@ for (const result of scenarioResults) {
   }
 }
 
-const clusterReadiness = Object.entries(clusters).map(([clusterId, cluster]) => {
-  const relevant = Object.values(cluster.detectorCoverage);
-  const hasObservableDetector = relevant.some((row) => row.observableTurns > 0);
-  return {
-    cluster: clusterId,
-    hasObservableDetector,
-    detectorCoverage: relevant,
-  };
-});
-
-const everyClusterObservable = clusterReadiness.length === 5 && clusterReadiness.every((item) => item.hasObservableDetector);
+const expectationConfig = detectorExpectations as {
+  defaultExpectation: KairaPreAiDetectorExpectation;
+  scenarios: Record<string, KairaPreAiDetectorExpectation>;
+};
+const readiness = evaluateKairaPreAiScenarioReadiness(
+  scenarioResults.map((result) => ({
+    scenarioId: result.scenarioId,
+    cluster: result.cluster,
+    expectation: expectationConfig.scenarios[result.scenarioId] ?? expectationConfig.defaultExpectation,
+    detectorCoverage: Object.values(scenarioDetectorCoverage[result.scenarioId] ?? {}),
+  })),
+);
+const scenarioReadiness = readiness.scenarios;
+const clusterReadiness = readiness.clusters.map((item) => ({
+  cluster: item.cluster,
+  ready: item.ready,
+  // Compatibility field retained for old report readers; semantics are now
+  // scenario-complete rather than "one sampled turn exists in this cluster".
+  hasObservableDetector: item.ready,
+  requiredScenarioCount: item.requiredScenarioCount,
+  readyRequiredScenarioCount: item.readyRequiredScenarioCount,
+  scenarios: item.scenarios,
+}));
+const everyRequiredScenarioObservable = readiness.everyRequiredScenarioObservable;
+const everyClusterObservable = clusterReadiness.length === 5 && clusterReadiness.every((item) => item.ready);
 const serializerByteParityProven = scenarioResults.every((result) =>
   result.toolingNotes.includes("prompt_serializer_byte_parity=proven_shared_function"),
 );
 const phase1Allowed =
+  everyRequiredScenarioObservable &&
   everyClusterObservable &&
   serializerByteParityProven &&
   isolationFailures === 0 &&
   noAiBoundaryFailures === 0;
 const scaleGateReasons = [
-  ...(everyClusterObservable ? [] : ["At least one Phase 0 cluster still has no observable automatic detector on real scenario turns."]),
+  ...(everyRequiredScenarioObservable ? [] : ["At least one required Phase 0 scenario still has no observable automatic detector on real scenario turns."]),
+  ...(everyClusterObservable ? [] : ["At least one Phase 0 cluster is not scenario-complete for detector readiness."]),
   ...(serializerByteParityProven ? [] : ["Production/harness final-provider serializer byte parity is not proven."]),
   ...(isolationFailures === 0 ? [] : [`Session isolation failed on ${isolationFailures} turns.`]),
   ...(noAiBoundaryFailures === 0 ? [] : [`No-AI boundary failed on ${noAiBoundaryFailures} turns.`]),
@@ -227,9 +258,10 @@ const scaleGateReasons = [
 
 const report = {
   reportType: "KAIRA_PREAI_PHASE0_TOOLING_REPORT",
-  version: 4,
+  version: 5,
   generatedAt: new Date().toISOString(),
   matrixVersion: matrix.version,
+  detectorExpectationPolicyVersion: detectorExpectations.version,
   aiBoundary: matrix.aiBoundary,
   branchTrackType: "regression",
   semanticIngress: "deterministic_regex_floor",
@@ -245,9 +277,11 @@ const report = {
     noAiBoundaryFailures,
     violatingTurnCount: violatingTurns.length,
     auditViolationCounts: globalViolationCounts,
+    everyRequiredScenarioObservable,
     everyClusterObservable,
   },
   detectorCoverage: globalDetectorCoverage,
+  scenarioReadiness,
   clusterReadiness,
   violatingTurns,
   clusters,
@@ -256,6 +290,8 @@ const report = {
     reasons: scaleGateReasons,
     caveats: [
       "Detector families are separately self-validated in CI with known-bad synthetic inputs and clean counterexamples.",
+      "Readiness is scenario-complete: one observable neighboring turn cannot make a heterogeneous cluster ready.",
+      "Negative controls are exempt only when explicitly marked not_applicable in the detector expectation policy.",
       "Serializer byte parity does not imply full production-context parity; Phase 0 intentionally omits provider and persistent-service hydration.",
       "This run audits deterministic regex-floor ingestion, not production semantic-provider quality.",
     ],
@@ -267,6 +303,8 @@ fs.writeFileSync(outPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 console.log(JSON.stringify(report.summary, null, 2));
 console.log("Phase 0 detector coverage:");
 console.log(JSON.stringify(globalDetectorCoverage, null, 2));
+console.log("Phase 0 scenario readiness:");
+console.log(JSON.stringify(scenarioReadiness, null, 2));
 if (violatingTurns.length) {
   console.log("Phase 0 violating turns:");
   console.log(JSON.stringify(violatingTurns, null, 2));
