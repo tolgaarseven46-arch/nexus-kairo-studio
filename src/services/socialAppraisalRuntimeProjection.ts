@@ -78,6 +78,16 @@ function scaleSeverity(
   };
 }
 
+function maxSeverity(severity: RelationshipTurnSignal["severity"]): number {
+  return Math.max(
+    severity.disrespect,
+    severity.coercion,
+    severity.manipulation,
+    severity.privacy,
+    severity.aggression,
+  );
+}
+
 /**
  * Project canonical G4 relational meaning into the legacy reducer signal shape.
  * The reducer may transition relationship state, but it no longer chooses the
@@ -86,7 +96,6 @@ function scaleSeverity(
 export function relationshipSignalFromRuntimeAppraisal(
   interp: SemanticInterpretation,
   relationshipScope: SemanticRelationshipScope | undefined,
-  hardBoundary: boolean,
   negativePattern: string | null,
   resolution: Readonly<RuntimeSocialAppraisalResolution>,
 ): RelationshipTurnSignal {
@@ -109,9 +118,13 @@ export function relationshipSignalFromRuntimeAppraisal(
     !harmMaterial &&
     !repairMaterial;
 
-  // A hard boundary is a canonical policy fact, not a tolerance-sensitive injury
-  // magnitude. Ordinary relationship injury uses the bounded G4 harm factor.
-  const severityFactor = hardBoundary
+  const baseSeverity = relationshipSeverityForInterpretation(interp);
+  // Once this turn already reaches the reducer's canonical hard-boundary
+  // present-severity floor, relationship warmth/tolerance may not push it below
+  // that policy gate. G4 still modulates ordinary injury below the hard floor.
+  const hardSeverityCandidate =
+    maxSeverity(baseSeverity) >= DEFAULT_RELATIONSHIP_REDUCER_CONFIG.redline.minPresentSeverity;
+  const severityFactor = hardSeverityCandidate
     ? 1
     : harmMaterial
       ? resolution.contextFactors.relationalHarm
@@ -124,7 +137,7 @@ export function relationshipSignalFromRuntimeAppraisal(
   return {
     valence: relationalMaterial ? appraisal.relational.valence : "neutral",
     targetsKaira: dyadic,
-    severity: scaleSeverity(relationshipSeverityForInterpretation(interp), severityFactor),
+    severity: scaleSeverity(baseSeverity, severityFactor),
     jokingConfidence: interp.jokingConfidence,
     sincerityConfidence: interp.sincerityConfidence,
     apology: repairMaterial && interp.apology,
