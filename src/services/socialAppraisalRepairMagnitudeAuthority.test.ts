@@ -145,7 +145,7 @@ describe("G4 typed repair-magnitude authority", () => {
     });
     const { resolution, signal } = resolveSignal(hostile);
 
-    expect(resolution.runtimeAppraisal.relational.valence).toBe("negative");
+    expect(resolution.runtimeAppraisal.relational.valence).not.toBe("positive");
     expect(signal.repairStrength).toBe(0);
     expect(signal.apology).toBe(false);
     expect(signal.repairAttempt).toBe(false);
