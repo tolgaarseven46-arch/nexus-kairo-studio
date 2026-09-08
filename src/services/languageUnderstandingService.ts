@@ -1,9 +1,8 @@
-import { interpretSemanticEvent, type SemanticEvent } from "./semanticEventEngine";
-import { canonicalizeSemanticEvent } from "./semanticEventCanonicalizer";
+import type { SemanticEvent } from "./semanticEventEngine";
 import { resolveMessageEntities, type EntityResolutionResult } from "./entityResolutionEngine";
 import { buildCanonicalWorldEvent, type CanonicalWorldEvent } from "./worldEventEngine";
 import { isSemanticInterpretation, normalizeSemanticInterpretation } from "./semanticInterpretationSchema";
-import { interpretationFromLegacyEvent } from "./semanticInterpretationLegacyProjection";
+import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";
 import { projectSemanticEvent } from "./semanticInterpretationProjection";
 import { recognizeCanonicalDiscourseSignals } from "./semanticDiscourseFacetRecognizer";
 import type { SemanticDiscourseProjection, SemanticInterpretation } from "../types/semanticInterpretation";
@@ -67,6 +66,10 @@ export function groundSemanticEventForAppraisal(
   if (explicitThirdPartyActor || explicitThirdPartyTarget || event.target === "third_party") relationshipScope = "third_party";
   else if (actorId === "current_user" && targetId === "kaira") relationshipScope = "kaira_user";
   else if (event.target === "kaira" && entityResolution.namedPeople.length === 0) relationshipScope = "kaira_user";
+  // A bare typed apology/repair with no explicit third-party referent is an
+  // interlocutor-facing social act. Ground only its relationship scope here;
+  // canonical semantic target remains untouched and explicit non-dyadic targets
+  // above still win. This is grounding, not a raw-text reinterpretation.
   else if (implicitActiveDyadRepair) relationshipScope = "kaira_user";
   else if (event.target === "event") relationshipScope = "event";
 
@@ -110,6 +113,14 @@ function reconcileSemanticTargetWithEntityResolution(
   };
 }
 
+/**
+ * Canonical typed reconciliation for a provider over-read seen in production:
+ * a low-emotional-load third-party event is not a first-person emotional
+ * disclosure merely because the event itself receives mild negative valence.
+ * Genuine emotional openings remain protected by their higher emotional load
+ * and/or explicit emotional/relational discourse facets. This consumes only
+ * SemanticInterpretation fields; it never reparses raw text.
+ */
 function reconcileNeutralThirdPartyEventOverread(
   interpretation: SemanticInterpretation,
 ): SemanticInterpretation {
@@ -137,6 +148,16 @@ function reconcileNeutralThirdPartyEventOverread(
   };
 }
 
+/**
+ * `how_are_you` / `what_doing` are reciprocal Kaira-facing social routines.
+ * A provider can recognize the surface shape while independently resolving the
+ * utterance target to a third party (for example a question about another
+ * person's current activity). Those fields cannot both be authoritative.
+ *
+ * Reconcile the typed contradiction at the canonical LU gateway rather than
+ * teaching DialogueDecision to reinterpret the routine downstream. This uses no
+ * raw-text rule and preserves genuine Kaira-directed reciprocal routines.
+ */
 function reconcileThirdPartyReciprocalRoutineOverread(
   interpretation: SemanticInterpretation,
 ): SemanticInterpretation {
@@ -164,6 +185,16 @@ function reconcileThirdPartyReciprocalRoutineOverread(
   };
 }
 
+/**
+ * Self/autobiographical memory belongs only to Kaira. A semantic provider may
+ * emit a syntactically valid selfMemoryQuery while simultaneously resolving the
+ * message target to the current user, a third party, an event, or unknown. That
+ * is an ownership contradiction inside the canonical interpretation, not a
+ * signal for the autobiographical runtime to arbitrate later.
+ *
+ * Reconcile the typed canonical fields here, before projection. This never
+ * reparses raw text and keeps SemanticInterpretation@2 as the single authority.
+ */
 function reconcileSelfMemoryQueryOwnership(
   interpretation: SemanticInterpretation,
 ): SemanticInterpretation {
@@ -189,6 +220,10 @@ function reconcileSelfMemoryQueryOwnership(
   };
 }
 
+/**
+ * A1 authority migration: raw user text is read exactly once at ingestion for
+ * these narrow discourse cues. DiscourseState receives only the typed result.
+ */
 function attachCanonicalDiscourseSignals(
   message: string,
   interpretation: SemanticInterpretation,
@@ -287,12 +322,7 @@ export async function understandTurkishMessage(
     }
   }
 
-  // Regex fallback still enters through the same canonical event completion seam.
-  // This prevents newly added semantic facets (for example selfMemoryQuery) from
-  // being present in canonicalizeSemanticEvent contracts but silently disappearing
-  // when the language-understanding gateway falls back to the deterministic floor.
-  const fallbackEvent = canonicalizeSemanticEvent(message, interpretSemanticEvent(message));
-  const interpretation = interpretationFromLegacyEvent(fallbackEvent, message);
+  const interpretation = interpretationFromRegexFloor(message);
   return buildResult(message, interpretation, entityResolution, {
     semanticSource: "fallback_regex",
     morphology,
