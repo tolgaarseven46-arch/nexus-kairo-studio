@@ -4,7 +4,7 @@ import { loadSocialAppraisalAutobiographicalRuntime } from "./socialAppraisalAut
 
 const instance = resolveKairaInstanceContext({
   instanceId: "kaira_default",
-  instanceType: "persistent",
+  instanceType: "individual",
 });
 
 function memory(participantIds: string[], id: string) {
