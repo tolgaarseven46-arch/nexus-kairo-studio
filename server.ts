@@ -103,6 +103,7 @@ import {
 } from "./src/services/kairaInstanceContext";
 import { buildKairaRuntimeIdentityInstruction } from "./src/services/kairaRuntimeIdentity";
 import { resolveKairaAutobiographicalRecallRuntime } from "./src/services/kairaAutobiographicalRecallRuntime";
+import { loadSocialAppraisalAutobiographicalRuntime } from "./src/services/socialAppraisalAutobiographicalRuntime";
 import { enforceKairaAutobiographicalResponse } from "./src/services/kairaAutobiographicalResponseGuard";
 import { runKairaResponseConstraintPass } from "./src/services/kairaResponseConstraintPass";
 import { buildKairaFinalDeliveryRejectionError, resolveKairaFinalDelivery } from "./src/services/kairaFinalDeliveryGate";
@@ -694,6 +695,10 @@ app.post("/api/chat", async (req, res) => {
         }
       : null;
     const epistemicInstruction = buildKairaEpistemicInstruction(epistemicAccess);
+    const socialAppraisalMemoryRuntime = await loadSocialAppraisalAutobiographicalRuntime({
+      instance: kairaInstance,
+      userId: String(userId),
+    });
     const selfMemoryRuntime = await resolveKairaAutobiographicalRecallRuntime({
       instance: kairaInstance,
       query: canonicalSemantic.event.selfMemoryQuery,
@@ -706,9 +711,6 @@ app.post("/api/chat", async (req, res) => {
       userName,
       dialogueAnalysis,
     );
-    // Minimal session-scoped discourse context (routine saturation, pending
-    // question, Kaira self-repetition, previous-turn dependency). Recomputed
-    // from history each turn — no separate persistence, no decision authority.
     const discourseState = deriveDiscourseState(cleanHistory, {
       message: userMessage,
       event: languageUnderstanding.event,
@@ -754,6 +756,7 @@ app.post("/api/chat", async (req, res) => {
         canonicalSemantic.event,
         behaviorPolicy,
         affectBaseline,
+        socialAppraisalMemoryRuntime.memory,
       ),
       behaviorContract = buildBehaviorContract(kdm.nextDynamicState, kdm.trace, canonicalSemantic.event),
       behaviorProfile = kdm.behaviorProfile,
@@ -871,9 +874,6 @@ app.post("/api/chat", async (req, res) => {
               score: Math.max(0, localBaseConsistency.score - (localPlanIssues.length + localEpistemicIssues.length) * 15),
               issues: [...localBaseConsistency.issues, ...localPlanIssues, ...localEpistemicIssues],
             };
-      // The local renderer must not escape the main delivery boundary. If the
-      // rendered reply fails any plan / dialogue / grounding / rhythm check,
-      // abandon the fast path and let the full LLM pipeline produce the turn.
       const localDeliveryIssues = [
         ...localPlanIssues,
         ...localEpistemicIssues,
@@ -1081,8 +1081,6 @@ app.post("/api/chat", async (req, res) => {
     const relationshipInstruction = behaviorProfile.relationshipInstruction
       ? `İLİŞKİ DAVRANIŞI: ${behaviorProfile.relationshipInstruction}`
       : "";
-    // Flag ON: KDM scores/intent become observational-only context (no gate
-    // verbs); the single canonical behavior block is the sole decision surface.
     const canonicalObservationalContext = buildCanonicalObservationalContext({
           intent: kdm.trace.messageInterpretation.intent,
           sentiment: kdm.trace.messageInterpretation.sentiment,
@@ -1092,10 +1090,6 @@ app.post("/api/chat", async (req, res) => {
           hurt: relationship.hurtScore ?? 0,
           reactionMode: kdm.nextDynamicState.reactionMode ?? null,
         });
-    // WHAT/WHETHER authority. Flag OFF: the legacy stack is byte-identical.
-    // Flag ON: behaviorContractInstruction, the relationship directives and the
-    // "KDM ... bağlayıcıdır" line are dropped — the canonical block is the only
-    // place a social decision is stated.
     const discourseInstruction = buildDiscourseObservationalInstruction(discourseState);
     const system = buildKairaFinalProviderSystemPrompt({
     runtimeIdentityInstruction: buildKairaRuntimeIdentityInstruction(kairaInstance, kairaPolicy, character),
@@ -1207,7 +1201,6 @@ app.post("/api/chat", async (req, res) => {
           providerFailureFallbackUsed = false;
         }
       } catch {
-        // İlk geçerli yanıtı koru; onarım çağrısının geçici model hatası sohbeti düşürmesin.
       }
     }
     if (groundingIssues.length) {
