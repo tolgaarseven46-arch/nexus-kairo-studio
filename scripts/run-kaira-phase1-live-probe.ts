@@ -69,43 +69,31 @@ const probes: Probe[] = [
     id: "familiar_teasing",
     purpose: "Established relationship should soften ambiguous teasing without creating insult immunity.",
     relationship: establishedRelationship,
-    messages: [
-      "bazen çok bilmiş konuşuyon ama 😄",
-      "şaka lan",
-      "alınmadın dimi",
-    ],
+    messages: ["bazen çok bilmiş konuşuyon ama 😄", "şaka lan", "alınmadın dimi"],
   },
   {
     id: "new_teasing",
     purpose: "The same teasing in a fragile relationship should not realize identically to the established dyad.",
     relationship: fragileRelationship,
-    messages: [
-      "bazen çok bilmiş konuşuyon ama 😄",
-      "şaka lan",
-      "alınmadın dimi",
-    ],
+    messages: ["bazen çok bilmiş konuşuyon ama 😄", "şaka lan", "alınmadın dimi"],
   },
   {
     id: "hard_insult_boundary",
-    purpose: "Clear insult and stop signals must remain qualitatively different from playful teasing.",
+    purpose: "Clear insult and explicit sincerity must remain qualitatively different from playful teasing.",
     relationship: establishedRelationship,
-    messages: [
-      "aptalsın",
-      "şaka yapmıyorum",
-      "bana cevap verme",
-      "tamam konuşabilirsin",
-    ],
+    messages: ["aptalsın", "şaka yapmıyorum"],
+  },
+  {
+    id: "stop_then_resume",
+    purpose: "A hard stop signal must be respected, then explicit permission to resume must be recoverable.",
+    relationship: establishedRelationship,
+    messages: ["bana cevap verme", "tamam konuşabilirsin"],
   },
   {
     id: "playful_hurt_repair",
     purpose: "Playful surface tone may coexist with internal hurt, and repair should have explicit provenance.",
     relationship: establishedRelationship,
-    messages: [
-      "senin annen terörist mi 😄",
-      "şaka lan",
-      "alınmadın dimi",
-      "hadi barış",
-    ],
+    messages: ["senin annen terörist mi 😄", "şaka lan", "alınmadın dimi", "hadi barış"],
   },
 ];
 
@@ -113,6 +101,7 @@ function compactTurn(data: any, userMessage: string, turnNumber: number) {
   const trace = data?.kdm?.trace;
   const dynamicState = data?.kdm?.dynamicState;
   return {
+    ok: true,
     turnNumber,
     userMessage,
     reply: String(data?.reply || ""),
@@ -136,6 +125,7 @@ async function runProbe(probe: Probe) {
   const sessionId = `phase1_live_${probe.id}_${runId}`;
   const userId = `phase1_live_${probe.id}_${runId}`;
   const kairaInstanceId = `phase1_live_${probe.id}_${runId}`;
+  let aborted = false;
 
   for (let index = 0; index < probe.messages.length; index += 1) {
     const userMessage = probe.messages[index];
@@ -161,12 +151,28 @@ async function runProbe(probe: Probe) {
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(`${probe.id} turn ${index + 1} failed: HTTP ${response.status} ${String(data?.error || "unknown error")}`);
+      const failedTurn = {
+        ok: false,
+        turnNumber: index + 1,
+        userMessage,
+        status: response.status,
+        error: String(data?.error || "unknown error"),
+      };
+      turns.push(failedTurn);
+      console.log(`KAIRA_LIVE_TURN_FAIL ${probe.id}#${index + 1} user=${JSON.stringify(userMessage)} status=${response.status} error=${JSON.stringify(failedTurn.error)}`);
+      aborted = true;
+      break;
     }
 
     const turn = compactTurn(data, userMessage, index + 1);
-    if (!turn.reply.trim()) throw new Error(`${probe.id} turn ${index + 1} returned an empty reply`);
+    if (!turn.reply.trim()) {
+      turns.push({ ok: false, turnNumber: index + 1, userMessage, status: 200, error: "empty_reply" });
+      console.log(`KAIRA_LIVE_TURN_FAIL ${probe.id}#${index + 1} user=${JSON.stringify(userMessage)} status=200 error="empty_reply"`);
+      aborted = true;
+      break;
+    }
     turns.push(turn);
+    console.log(`KAIRA_LIVE_TURN_OK ${probe.id}#${index + 1} user=${JSON.stringify(userMessage)} reply=${JSON.stringify(turn.reply)} provider=${JSON.stringify(turn.providerUsed)} mood=${JSON.stringify(turn.currentMood)} relationship=${JSON.stringify(turn.relationship)}`);
 
     dynamicState = data?.kdm?.dynamicState ?? dynamicState;
     history.push({
@@ -190,6 +196,7 @@ async function runProbe(probe: Probe) {
     purpose: probe.purpose,
     initialRelationship: probe.relationship,
     finalDynamicState: dynamicState,
+    aborted,
     turns,
   };
 }
@@ -203,10 +210,31 @@ async function main() {
   }
 
   const results = [];
-  for (const probe of probes) results.push(await runProbe(probe));
+  for (const probe of probes) {
+    try {
+      results.push(await runProbe(probe));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`KAIRA_LIVE_PROBE_FAIL ${probe.id} error=${JSON.stringify(message)}`);
+      results.push({
+        id: probe.id,
+        purpose: probe.purpose,
+        initialRelationship: probe.relationship,
+        finalDynamicState: null,
+        aborted: true,
+        turns: [{ ok: false, turnNumber: 0, userMessage: "", status: 0, error: message }],
+      });
+    }
+  }
+
+  const runtimeFailures = results.flatMap((probe: any) =>
+    probe.turns
+      .filter((turn: any) => turn.ok === false)
+      .map((turn: any) => ({ probeId: probe.id, ...turn })),
+  );
 
   const report = {
-    version: 1,
+    version: 2,
     phase: "phase1_live_provider_canary",
     runId,
     generatedAt: new Date().toISOString(),
@@ -219,6 +247,8 @@ async function main() {
       persistentRelationship: false,
       persistentUserMemory: false,
     },
+    runtimeFailureCount: runtimeFailures.length,
+    runtimeFailures,
     probes: results,
   };
 
@@ -227,6 +257,8 @@ async function main() {
   console.log("===== KAIRA_PHASE1_LIVE_PROBE_BEGIN =====");
   console.log(JSON.stringify(report, null, 2));
   console.log("===== KAIRA_PHASE1_LIVE_PROBE_END =====");
+
+  if (runtimeFailures.length > 0) process.exitCode = 1;
 }
 
 main().catch((error) => {
