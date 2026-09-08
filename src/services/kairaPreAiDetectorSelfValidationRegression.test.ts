@@ -3,10 +3,10 @@ import { auditKairaFinalProviderPrompt } from "./kairaPreAiAudit";
 
 function baseInput(systemPrompt: string, allowQuestion: boolean) {
   return {
-    scenarioId: "C-selftest",
+    scenarioId: "detector-selftest",
     branchTrackType: "regression" as const,
-    userId: "preai_C-selftest_detector",
-    sessionId: "preai_session_C-selftest_detector",
+    userId: "preai_detector-selftest",
+    sessionId: "preai_session_detector-selftest",
     expectedUserIdPrefix: "preai_",
     expectedSessionIdPrefix: "preai_session_",
     systemPrompt,
@@ -24,6 +24,36 @@ function baseInput(systemPrompt: string, allowQuestion: boolean) {
 }
 
 describe("Phase 0 detector self-validation", () => {
+  it("A detector catches an ungrounded self claim with no epistemic qualification", () => {
+    const audit = auditKairaFinalProviderPrompt({
+      ...baseInput("clean", true),
+      selfEpistemic: {
+        factualSelfClaimRequired: true,
+        groundedProvenanceKey: null,
+        groundedConfidence: 0,
+        epistemicQualificationActive: false,
+        epistemicRefusalActive: false,
+      },
+    });
+    expect(audit.invariantViolations.map((item) => item.code)).toContain(
+      "self_epistemic_grounding_gap",
+    );
+  });
+
+  it("B detector catches clarification when canonical context says the cause is known", () => {
+    const audit = auditKairaFinalProviderPrompt({
+      ...baseInput("clean", true),
+      semanticCompleteness: {
+        causeKnown: true,
+        selectedMove: "clarify",
+        correctedFacts: [],
+      },
+    });
+    expect(audit.invariantViolations.map((item) => item.code)).toContain(
+      "semantic_completeness_miss",
+    );
+  });
+
   it("C detector catches a deliberately injected forbidden question instruction", () => {
     const audit = auditKairaFinalProviderPrompt(
       baseInput("REALIZER RULE: Kullanıcıya soru sor ve netleştir.", false),
