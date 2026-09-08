@@ -15,10 +15,10 @@ import {
 import { buildKairaFinalProviderSystemPrompt } from "./kairaFinalProviderPrompt";
 import { auditKairaFinalProviderPrompt, type KairaPreAiAuditSnapshot } from "./kairaPreAiAudit";
 import { resolveKairaAutobiographicalRecallRuntime } from "./kairaAutobiographicalRecallRuntime";
+import { projectPreAiSelfAuthorityObservation } from "./kairaPreAiSelfAuthorityObservability";
 import {
   projectPreAiHowStateAlignmentCheck,
   projectPreAiRepairRecoveryCheck,
-  projectPreAiSelfEpistemicCheck,
   projectPreAiSemanticCompletenessCheck,
 } from "./kairaPreAiTypedObservability";
 import type { DroitDynamicState } from "../types/nexus";
@@ -96,6 +96,21 @@ function promptFactProvenance(event: any) {
   }));
 }
 
+function buildSessionWorkingMemory(
+  history: Array<{ sender: string; text: string }>,
+) {
+  if (!history.length) {
+    return "PHASE-0 SESSION HISTORY:\nSTATUS=empty\nNo prior generated assistant turns exist; only actual user turns are authoritative.";
+  }
+  const lines = history.map((item, index) => `${index + 1}. ${item.sender}: ${item.text}`);
+  return [
+    "PHASE-0 SESSION HISTORY:",
+    "STATUS=available",
+    "RULE: Recall only facts explicitly present in these actual prior session turns; do not fill missing time/place/details.",
+    ...lines,
+  ].join("\n");
+}
+
 function buildCoreFinalProviderPrompt(input: {
   responsePlan: any;
   speech: any;
@@ -107,6 +122,7 @@ function buildCoreFinalProviderPrompt(input: {
   entityResolution: any;
   worldEvent: any;
   selfMemoryInstruction: string;
+  sessionWorkingMemory: string;
   userMessage: string;
 }) {
   const relationship = input.trace.relationship;
@@ -144,7 +160,7 @@ function buildCoreFinalProviderPrompt(input: {
     ),
     responsePlanInstruction: buildCanonicalBehaviorBlock(input.responsePlan),
     canonicalObservationalContext: observational,
-    sessionWorkingMemory: "Phase 0 user-turn-only history; generation is intentionally disabled.",
+    sessionWorkingMemory: input.sessionWorkingMemory,
     memoryContext: "Phase 0 persistent-memory hydration disabled.",
     tone: input.trace?.decision?.chosenTone || "confident",
   });
@@ -208,6 +224,11 @@ export async function runKairaPreAiPhase0Scenario(
       instance: { instanceId: "phase0_ephemeral", instanceType: "welcome" },
       query: language.interpretation.discourseFacets.selfMemoryQuery,
     });
+    const selfAuthority = projectPreAiSelfAuthorityObservation({
+      scenarioId: scenario.scenarioId,
+      autobiographicalRuntime: selfMemoryRuntime,
+      sessionHistoryTurnCount: history.length,
+    });
     const systemPrompt = buildCoreFinalProviderPrompt({
       responsePlan,
       speech,
@@ -218,7 +239,8 @@ export async function runKairaPreAiPhase0Scenario(
       interpretation: language.interpretation,
       entityResolution: language.entityResolution,
       worldEvent: language.worldEvent,
-      selfMemoryInstruction: selfMemoryRuntime.instruction,
+      selfMemoryInstruction: selfAuthority?.instruction || selfMemoryRuntime.instruction,
+      sessionWorkingMemory: buildSessionWorkingMemory(history),
       userMessage,
     });
     const audit = auditKairaFinalProviderPrompt({
@@ -247,7 +269,7 @@ export async function runKairaPreAiPhase0Scenario(
         : null,
       factProvenance: promptFactProvenance(language.event),
       consumptionTrace: coreConsumptionTrace(language.event),
-      selfEpistemic: projectPreAiSelfEpistemicCheck(language.interpretation, selfMemoryRuntime),
+      selfEpistemic: selfAuthority?.selfEpistemic ?? null,
       semanticCompleteness: projectPreAiSemanticCompletenessCheck(language.interpretation, dialogueDecision.move),
       howStateAlignment: projectPreAiHowStateAlignmentCheck(dynamicState, kdm.trace, responsePlan),
       repairRecovery: projectPreAiRepairRecoveryCheck(before, dynamicState, language.interpretation, kdm.trace),
@@ -294,6 +316,8 @@ export async function runKairaPreAiPhase0Scenario(
       "prompt_serializer_byte_parity=proven_shared_function",
       "prompt_context_fidelity=deterministic_phase0_subset_not_full_production_runtime",
       "detector_snapshots=typed_runtime_outputs_only",
+      "a_cluster_authority_facets=typed_runtime_or_explicit_unavailable",
+      "session_provenance=actual_phase0_user_turn_history",
     ],
   };
 }

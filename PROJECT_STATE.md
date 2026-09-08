@@ -140,3 +140,13 @@ Yeni patch yalnız bu characterization'da reproducible bir failure bulunursa aç
 - Stale PR #147: **CLOSED / rebuild-from-main if ever needed**
 - Open PR count at closure audit: **0**
 - Immediate next mode: **measured natural-conversation characterization on current main**
+
+## 10. Phase-0 A-cluster authority observability — ACTIVE (2026-09-08)
+- PR #173 ile Phase-0 typed detector observability tabanı main'e alındı; merge commit `06a5ebbfd9b004154191bb3d3f7f9383bbd6848b`.
+- A-cluster characterization sonucu tek bir generic `selfMemoryQuery` gate'inin A1/A2/A3/A5'i temsil etmediği doğrulandı.
+- A1/A3 current-self/world/autonomous-state sorularıdır. Phase-0 harness'ta canonical current activity/location/environment authority bağlı olmadığı için typed observation açıkça `unavailable` olmalı; boş/fabricated snapshot veya raw-text parser ile coverage üretilmez.
+- A2 autobiographical authority'dir ve `kairaAutobiographicalRecallRuntime` status/provenance'ından projekte edilir.
+- A5 session/discourse provenance'dır ve yalnız gerçek önceki Phase-0 user turns üzerinden gözlemlenir; söylenmemiş saat/yer gibi ayrıntılar authoritative fact değildir.
+- A4 grounding gerektirmeyen persona dili negatif kontrolüdür ve A authority detector için `not_applicable`/inactive kalmalıdır.
+- Aktif PR #174 bu üç typed facet'i (`current_self_world`, `autobiography`, `session_provenance`) tek observability adapter'ında toplar ve Phase-0 final prompt'taki placeholder session memory yerine gerçek önceki user-turn history'yi serialize eder.
+- Değişmez kural: bu çalışma yeni semantic classifier/regex eklemeyecek ve unavailable authority'yi varmış gibi göstermeyecek.
