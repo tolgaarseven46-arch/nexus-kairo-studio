@@ -5,6 +5,7 @@ import type {
 import { normalizeDroitPersonality } from "./droitPersonalityNormalizer";
 import {
   resolveSocialAppraisalG3,
+  type SocialAppraisalRelationshipScope,
   type SocialAppraisalResolutionG3,
 } from "./socialAppraisalResolution";
 
@@ -173,17 +174,21 @@ function modulate(
  * - G3 owns resolved social meaning and projection direction.
  * - G4 may only scale existing projection magnitudes from typed personality,
  *   current state, and existing relationship context.
+ * - typed relationship grounding may resolve an otherwise-unknown target, but
+ *   cannot override an explicit self/third-party/event target.
  * - G4 cannot create a projection from exact zero, change target/intent/valence,
  *   or reinterpret raw/canonical semantics.
  */
 export function resolveSocialAppraisalG4(
   input: Readonly<SocialAppraisalInput>,
   subjectId: string,
+  relationshipScope?: SocialAppraisalRelationshipScope,
 ): SocialAppraisalResolutionG4 {
   const g3 = resolveSocialAppraisalG3(
     input.semantic,
     subjectId,
     input.dyadicNorm,
+    relationshipScope,
   );
 
   if (g3.appraisal.noMaterialEffect) {

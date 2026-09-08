@@ -1,10 +1,15 @@
 /**
- * ADR-0006 wiring: canonical RelationshipReducer bridge.
+ * ADR-0006 + ADR-0026 wiring: canonical relationship/affect runtime bridge.
  *
- * C1b authority rule: RelationshipReducer consumes the ingestion-time
- * SemanticInterpretation@2 directly. The compatibility/appraisal event may
- * contribute deterministic entity/world grounding such as relationshipScope,
- * but nothing in this bridge reparses raw text.
+ * Authority rule:
+ * - SemanticInterpretation@2 owns per-turn semantic meaning.
+ * - G3/G4 SocialAppraisal owns relationship-facing and affect-facing projection
+ *   direction/magnitude.
+ * - RelationshipReducer transitions durable relationship state from the G4
+ *   relational projection; it must not independently reinterpret raw text.
+ * - Dynamic-state affect consumes the independent G4 affective projection.
+ * - Grounded relationshipScope may veto a dyadic projection for explicit
+ *   third-party/event scope, but it cannot manufacture relationship meaning.
  */
 import type { AffectiveReactionMode, DroitDynamicState, DroitPersonalityTraits, ReasoningTrace, RelationshipState } from "../types/nexus";
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
@@ -13,11 +18,16 @@ import type { BehaviorPolicyInput } from "./behaviorPolicyInput";
 import type { SemanticEvent } from "./semanticEventEngine";
 import type { SemanticRelationshipScope } from "./languageUnderstandingService";
 import { applyRelationshipContext } from "./relationshipBehaviorService";
-import { reduceRelationshipTurn, type RelationshipReducerResult, type RelationshipReducerPrev, type RelationshipTurnSignal } from "./relationshipReducer";
+import { reduceRelationshipTurn, type RelationshipReducerResult, type RelationshipReducerPrev } from "./relationshipReducer";
 import { DEFAULT_RELATIONSHIP_REDUCER_CONFIG } from "./relationshipReducerConfig";
-import { isRelationshipNeutralTurn, relationshipSeverityForInterpretation } from "./kairaQuestionOnlyStopRelationshipPolicy";
+import { isRelationshipNeutralTurn } from "./kairaQuestionOnlyStopRelationshipPolicy";
 import type { KairaAffectBaseline } from "./kairaAffectBaseline";
 import { socialNegativePattern } from "./socialAppraisalEngine";
+import {
+  affectDeltaFromRuntimeAppraisal,
+  relationshipSignalFromRuntimeAppraisal,
+  resolveRuntimeSocialAppraisal,
+} from "./socialAppraisalRuntimeProjection";
 
 type GroundedSemanticEvent = SemanticEvent & { relationshipScope?: SemanticRelationshipScope };
 
@@ -49,37 +59,6 @@ export function semanticNegativePattern(interp: SemanticInterpretation): string 
   return socialNegativePattern(interp);
 }
 
-function buildTurnSignal(
-  interp: SemanticInterpretation,
-  event: GroundedSemanticEvent,
-  negativePattern: string | null,
-): RelationshipTurnSignal {
-  const thirdParty = event.relationshipScope === "third_party";
-  const questionOnlyStopAddressesInterlocutor =
-    interp.discourseFacets.stopQuestions === true &&
-    interp.discourseFacets.stopTalking === false &&
-    interp.stopRequest === false;
-  const dyadic =
-    !thirdParty &&
-    event.relationshipScope !== "event" &&
-    (interp.target === "kaira" || questionOnlyStopAddressesInterlocutor);
-  return {
-    valence: thirdParty ? "neutral" : interp.valence,
-    targetsKaira: dyadic,
-    severity: relationshipSeverityForInterpretation(interp),
-    jokingConfidence: interp.jokingConfidence,
-    sincerityConfidence: interp.sincerityConfidence,
-    apology: thirdParty ? false : interp.apology,
-    repairAttempt: thirdParty ? false : interp.repairAttempt,
-    support: thirdParty ? 0 : interp.support,
-    compliment: thirdParty ? 0 : interp.compliment,
-    affection: thirdParty ? 0 : interp.affection,
-    userStop: thirdParty ? false : interp.stopRequest,
-    uncertainty: interp.uncertainty.overall,
-    negativePattern: thirdParty ? null : negativePattern,
-  };
-}
-
 function statusLabel(state: RelationshipReducerResult) {
   if (state.hard.disengage || state.conversationState === "disengaged") return "Konuşmadan çekildi";
   if (state.conversationState === "repairing") return "Mesafeli, onarımı değerlendiriyor";
@@ -107,7 +86,22 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
       ? "tekrarlanan_olumsuz_davranış"
       : input.semanticIntentToKdm(semanticEvent);
   const kdmSentiment = input.semanticSentimentToKdm(semanticEvent);
-  const signal = buildTurnSignal(semanticInterpretation, semanticEvent, negativePattern);
+
+  // G4 is resolved ONCE per turn. Both durable relationship and current affect
+  // consume projections from this same appraisal object.
+  const socialAppraisal = resolveRuntimeSocialAppraisal({
+    semantic: semanticInterpretation,
+    relationshipScope: semanticEvent.relationshipScope,
+    relationship: prevRel,
+    currentState: state,
+    personality: input.normalizedPersonality,
+  });
+  const signal = relationshipSignalFromRuntimeAppraisal(
+    semanticInterpretation,
+    semanticEvent.relationshipScope,
+    negativePattern,
+    socialAppraisal,
+  );
   const elapsedMinutesSincePrev = minutesBetween(prevRel.lastInteractionAt, nowIso);
 
   const prev: RelationshipReducerPrev = {
@@ -146,9 +140,23 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
     result.recovery.strength < 0.3
       ? prev.reactionMode
       : result.reactionMode;
-  const projectedResult: RelationshipReducerResult = projectedReactionMode === result.reactionMode
-    ? result
-    : { ...result, reactionMode: projectedReactionMode, rationale: [...result.rationale, "residual-reaction-persistence"] };
+  const canonicalAffectDelta = affectDeltaFromRuntimeAppraisal(
+    result.affectDelta,
+    socialAppraisal.runtimeAppraisal,
+    projectedReactionMode,
+  );
+  const projectedResult: RelationshipReducerResult = {
+    ...(projectedReactionMode === result.reactionMode
+      ? result
+      : { ...result, reactionMode: projectedReactionMode, rationale: [...result.rationale, "residual-reaction-persistence"] }),
+    affectDelta: canonicalAffectDelta,
+    rationale: [
+      ...(projectedReactionMode === result.reactionMode
+        ? result.rationale
+        : [...result.rationale, "residual-reaction-persistence"]),
+      `social-appraisal:g4 rel=${socialAppraisal.runtimeAppraisal.relational.valence}/${socialAppraisal.runtimeAppraisal.relational.significance.toFixed(2)} harm=${socialAppraisal.runtimeAppraisal.relational.harmEvidence.toFixed(2)} repair=${socialAppraisal.runtimeAppraisal.relational.repairEvidence.toFixed(2)} affect=${socialAppraisal.runtimeAppraisal.affective.valence}/${socialAppraisal.runtimeAppraisal.affective.significance.toFixed(2)}`,
+    ],
+  };
 
   const warmthBefore = clamp100(prev.scores.warmth ?? 50);
   const familiarityDaysLegacy = Math.max(
@@ -238,12 +246,12 @@ export function analyzeKdmInteractionCanonical(input: KdmCanonicalInput): KdmCan
       reactionMode,
       reasonText: projectedResult.hard.disengage
         ? `Birleşik sınır ihlali (${projectedResult.hard.reason}); nötr mesaj veya yakınlaşma bu durumu tek turda silemez.`
-        : `Canonical reducer: ${projectedResult.rationale.join("; ")}.`,
+        : `Canonical reducer + G4 appraisal: ${projectedResult.rationale.join("; ")}.`,
     },
     messageInterpretation: {
       intent: kdmIntent,
       sentiment: kdmSentiment,
-      explanation: `Canonical SemanticInterpretation@2: primary=${semanticInterpretation.primaryIntent}, hedef=${semanticInterpretation.target}, scope=${semanticEvent.relationshipScope ?? "unknown"}, present-severity=${presentSeverity.toFixed(2)}, joking=${signal.jokingConfidence.toFixed(2)}, uncertainty=${signal.uncertainty.toFixed(2)}.`,
+      explanation: `Canonical SemanticInterpretation@2 + G4 SocialAppraisal: primary=${semanticInterpretation.primaryIntent}, hedef=${semanticInterpretation.target}, scope=${semanticEvent.relationshipScope ?? "unknown"}, relational=${socialAppraisal.runtimeAppraisal.relational.valence}/${socialAppraisal.runtimeAppraisal.relational.significance.toFixed(2)}, affective=${socialAppraisal.runtimeAppraisal.affective.valence}/${socialAppraisal.runtimeAppraisal.affective.significance.toFixed(2)}, present-severity=${presentSeverity.toFixed(2)}, joking=${signal.jokingConfidence.toFixed(2)}, uncertainty=${signal.uncertainty.toFixed(2)}.`,
     },
     decision: {
       chosenTone: finalBehaviorProfile.tone,

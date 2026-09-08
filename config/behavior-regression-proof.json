@@ -70,6 +70,20 @@
       "counterexamples": [
         "counterexample: ordinary natural reaction with no obligation remains governed by normal question drive"
       ]
+    },
+    {
+      "id": "g4-runtime-projection-authority",
+      "invariant": "Grounded non-dyadic social events may affect Kaira's transient affect but must not hard-stop, injure, or positively mutate the Kaira-user relationship; genuine Kaira-user affiliation remains relationally positive.",
+      "redSha": "e2d699d8ac4342fb2d7bc6f5c55064b743c37a74",
+      "testFile": "src/services/socialAppraisalRuntimeProjectionNeighborProofRegression.test.ts",
+      "reported": "reported: third-party harm cannot hard-stop the Kaira-user relationship but may affect Kaira",
+      "neighbors": [
+        "neighbor-1: event-scoped harm cannot hard-stop the Kaira-user relationship",
+        "neighbor-2: event-scoped affection cannot manufacture dyadic warmth"
+      ],
+      "counterexamples": [
+        "counterexample: genuine Kaira-user affection remains a positive relationship event"
+      ]
     }
   ]
 }

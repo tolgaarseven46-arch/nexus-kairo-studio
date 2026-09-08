@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import { analyzeKdmInteractionCanonicalTurn } from "./kdmConsistencyEngine";
+import { resolveMessageEntities } from "./entityResolutionEngine";
+import { groundSemanticEventForAppraisal } from "./languageUnderstandingService";
 import { interpretSemanticEvent } from "./semanticEventEngine";
 
 function questionOnlyStopInterpretation(
@@ -54,12 +56,22 @@ function questionOnlyStopInterpretation(
 }
 
 function runCanonicalTurn(interpretation: SemanticInterpretation) {
+  const event = interpretSemanticEvent(interpretation.raw);
+  const groundedEvent = groundSemanticEventForAppraisal(
+    interpretation.raw,
+    {
+      ...event,
+      stopQuestions: interpretation.discourseFacets.stopQuestions,
+      stopTalking: interpretation.discourseFacets.stopTalking,
+    },
+    resolveMessageEntities(interpretation.raw),
+  ).event;
   return analyzeKdmInteractionCanonicalTurn(
     interpretation.raw,
     null,
     null,
     interpretation,
-    interpretSemanticEvent(interpretation.raw),
+    groundedEvent,
     null,
   );
 }

@@ -11,7 +11,7 @@ describe("KDM canonical SemanticInterpretation@2 authority", () => {
     expect(server).not.toMatch(/\banalyzeKdmInteraction\(/u);
   });
 
-  it("feeds SemanticInterpretation@2 directly into the canonical relationship bridge", () => {
+  it("feeds SemanticInterpretation@2 into the canonical G4 relationship projection seam", () => {
     const kdm = source("src/services/kdmConsistencyEngine.ts");
     const bridge = source("src/services/kdmRelationshipReducerBridge.ts");
     expect(kdm).toContain("export function analyzeKdmInteractionCanonicalTurn(");
@@ -19,25 +19,42 @@ describe("KDM canonical SemanticInterpretation@2 authority", () => {
     expect(kdm).toContain("semanticEvent,");
     expect(kdm).toContain("return analyzeKdmInteractionCanonical({");
     expect(bridge).toContain("semanticInterpretation: SemanticInterpretation");
-    expect(bridge).toContain("buildTurnSignal(semanticInterpretation, semanticEvent, negativePattern)");
+    expect(bridge).toContain("const socialAppraisal = resolveRuntimeSocialAppraisal({");
+    expect(bridge).toContain("semantic: semanticInterpretation,");
+    expect(bridge).toContain("const signal = relationshipSignalFromRuntimeAppraisal(");
+    expect(bridge).toContain("semanticInterpretation,");
+    expect(bridge).not.toContain("buildTurnSignal(");
     expect(bridge).not.toContain("interpretationFromLegacyEvent");
   });
 
   it("never reparses raw text inside the authoritative relationship bridge", () => {
     const bridge = source("src/services/kdmRelationshipReducerBridge.ts");
+    const projection = source("src/services/socialAppraisalRuntimeProjection.ts");
     expect(bridge).not.toContain("interpretSemanticEvent(");
     expect(bridge).not.toContain("interpretationFromRegexFloor");
     expect(bridge).not.toMatch(/\.test\(semantic(?:Event|Interpretation)\.raw\)/u);
-    expect(bridge).toContain('const thirdParty = event.relationshipScope === "third_party"');
-    expect(bridge).toContain("userStop: thirdParty ? false : interp.stopRequest");
     expect(bridge).toContain("semanticNegativePattern(semanticInterpretation)");
+    expect(projection).not.toContain("interpretSemanticEvent(");
+    expect(projection).not.toContain("interpretationFromRegexFloor");
+    expect(projection).not.toMatch(/\.test\(.*\.raw\)/u);
+    expect(projection).toContain("relationshipSignalFromRuntimeAppraisal(");
   });
 
-  it("uses upstream grounded relationship scope without creating a third semantic authority", () => {
+  it("uses upstream grounded relationship scope as a projection gate without creating a third semantic authority", () => {
     const bridge = source("src/services/kdmRelationshipReducerBridge.ts");
+    const projection = source("src/services/socialAppraisalRuntimeProjection.ts");
     expect(bridge).toContain("relationshipScope?: SemanticRelationshipScope");
-    expect(bridge).toContain('negativePattern: thirdParty ? null : negativePattern');
-    expect(bridge).toContain('apology: thirdParty ? false : interp.apology');
+    expect(bridge).toContain("relationshipScope: semanticEvent.relationshipScope,");
+    expect(bridge).toContain("semanticEvent.relationshipScope,");
+    expect(projection).toContain('scope !== "third_party" && scope !== "event"');
+    expect(projection).toContain('valence: "neutral" as const');
+    expect(projection).toContain("significance: 0");
+    expect(projection).toContain("harmEvidence: 0");
+    expect(projection).toContain("repairEvidence: 0");
+    expect(projection).toContain("apology: repairMaterial && interp.apology");
+    expect(projection).toContain("repairAttempt: repairMaterial && interp.repairAttempt");
+    expect(projection).not.toContain("resolveMessageEntities(");
+    expect(projection).not.toContain("buildCanonicalWorldEvent(");
     expect(bridge).not.toContain("resolveMessageEntities(");
     expect(bridge).not.toContain("buildCanonicalWorldEvent(");
   });
