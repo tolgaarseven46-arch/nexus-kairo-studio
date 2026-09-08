@@ -18,6 +18,16 @@ describe("language understanding gateway", () => {
     expect(result.event.target).toBe("kaira");
   });
 
+  it("grounds a bare typed apology to the active interlocutor without rewriting its unknown semantic target", async () => {
+    const result = await understandTurkishMessage("özür dilerim");
+
+    expect(result.interpretation.primaryIntent).toBe("apology");
+    expect(result.interpretation.target).toBe("unknown");
+    expect(result.event.target).toBe("unknown");
+    expect(result.event.relationshipScope).toBe("kaira_user");
+    expect(result.event.apology).toBe(true);
+  });
+
   it("can consume morphology before canonical v2 semantic interpretation", async () => {
     const morphologyProvider: MorphologyProvider = {
       name: "test-morphology",
