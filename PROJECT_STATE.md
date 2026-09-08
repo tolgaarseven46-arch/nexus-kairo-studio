@@ -92,26 +92,35 @@ Yeni sohbet veya yeni geliştirme turunda:
 
 Eski tamamlanmış işlere dönülmez; "daha iyi olabilir" tek başına patch sebebi değildir.
 
-## 9. Next verified development mode
-Şu anda doğrulanmış açık production regression yoktur. Bu nedenle sıradaki iş **yeni mimari katman veya speculative G4 patch'i eklemek değildir**.
+## 9. Phase-1 live provider acceptance — OPEN (2026-09-09)
+- Deterministic Phase-0 kapanışından sonra deployed `main` runtime üzerinde gerçek OpenRouter provider (`openai/gpt-5.1`) ile izole `welcome` instance canary başlatıldı.
+- Canary kalıcı identity/autobiography/world/relationship/user-memory yazmıyor; yalnız request history + dynamicState'i turdan tura taşıyor.
+- Ölçülmüş production regression #1: `aptalsın` sonrası `şaka yapmıyorum` turunda provider/repair çıktısı final ResponsePlan ile uyumsuz kaldığında API `HTTP 500 final_delivery_rejected: response_plan_humor_blocked` verdi.
+- Ölçülmüş production regression #2: playful-hurt canary'nin ilk turunda final candidate soru yasağını ihlal etti ve API `HTTP 500 final_delivery_rejected: response_plan_question_blocked` verdi.
+- Aynı canlı acceptance ayrıca established vs fragile dyad için internal state/ResponsePlan ayrışmasının güçlü olduğunu fakat bazı outward realizations'ın fazla benzer kaldığını gösterdi; bu ayrı bir quality characterization konusudur ve 500 availability regression'ıyla aynı patch'e karıştırılmayacaktır.
+- İlk kırık authority boundary final-delivery recovery seam'idir: canonical ResponsePlan zaten `socialMove` çözmüşken constraint pass yalnız caller dialogue fallback'ini deneyip plan-owned fallback'i tüketmiyordu.
+- PR #179 minimum fix: `runKairaResponseConstraintPass`, caller fallback başarısızsa yalnız `kairaSocialMoveFallback(input.plan)` ile zaten çözülmüş canonical social move'u ikinci aday olarak deneyebilir. Her aday aynı world → autobiography → epistemic → ResponsePlan → provenance/external guard zincirinden geçer.
+- Yeni semantic parser, raw-text heuristic, appraisal authority, relationship authority veya memory authority eklenmedi.
+- PR #179 merge edilmeden önce full CI + Architecture Review PASS olmalı; merge sonrası deployed runtime aynı Phase-1 live canary ile yeniden doğrulanmalıdır.
 
-Bir sonraki geliştirme yalnız şu durumda açılır:
-- gerçek kullanıcı / deterministic characterization / production evidence yeni, reproducible bir user-facing failure gösterirse;
-- failure current main üzerinde yeniden üretilebilirse;
-- ilk kırık canonical authority boundary lokalize edilebilirse.
+## 10. Next verified development mode
+Aktif doğrulanmış production regression artık vardır: **live final-delivery recovery availability**.
 
-Yeni failure gelirse önce characterization yazılır; ardından minimum architecture-correct patch uygulanır. Failure yoksa semantic/appraisal/relationship/memory/ResponsePlan zincirine yeni heuristic eklenmez.
+Sıradaki sıra sabittir:
+1. PR #179 deterministic regression + full CI/Architecture Review ile doğrulanır.
+2. Patch merge edilirse Render `main` deploy tamamlanır.
+3. Aynı Phase-1 provider canary production runtime üzerinde yeniden çalıştırılır; iki HTTP 500 tekrar etmemelidir.
+4. Availability kapanırsa established-vs-fragile outward realization farkı ayrı characterization olarak ele alınır; iç state farkı tek başına user-facing başarı sayılmaz.
+5. Yeni quality patch ancak yeniden üretilebilir outward failure ve ilk kırık canonical seam lokalize edilirse açılır.
 
-## 10. Latest checkpoint
-- Date: 2026-09-08
+## 11. Latest checkpoint
+- Date: 2026-09-09
 - G4 production wiring: **CLOSED**
 - Phase-0 A authority observability: **CLOSED**
-- Natural-conversation characterization acceptance: **CLOSED**
-- PR #176: **MERGED**
-- PR #176 final head: `e6ba9073c4cf9f5c31da82cebd22c9d3a420af76`
-- PR #176 main merge SHA: `ec7be842e433b8c84b2a47a42ed82a934847ccb9`
-- CI #2597: **PASS**
-- Architecture Review #745: **PASS**
-- Open PRs at checkpoint: **none**
-- Open issues at checkpoint: **none**
-- Immediate next mode: **no speculative patch; wait for and characterize the next measurable product regression on current main**
+- Natural-conversation deterministic characterization: **CLOSED**
+- Phase-1 live provider acceptance: **OPEN**
+- Production regression: **2 reproducible final-delivery HTTP 500 failures**
+- Live canary probe PR: **#178 OPEN (test-only)**
+- Production fix PR: **#179 OPEN**
+- PR #179 patch authority: canonical `ResponsePlan.socialMove` fallback only
+- Immediate next mode: **finish #179 CI/architecture review, merge only if green, then rerun live production canary**
