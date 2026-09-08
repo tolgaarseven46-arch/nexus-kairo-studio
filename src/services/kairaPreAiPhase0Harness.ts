@@ -14,6 +14,13 @@ import {
 } from "./kairaCanonicalPromptBuilder";
 import { buildKairaFinalProviderSystemPrompt } from "./kairaFinalProviderPrompt";
 import { auditKairaFinalProviderPrompt, type KairaPreAiAuditSnapshot } from "./kairaPreAiAudit";
+import { resolveKairaAutobiographicalRecallRuntime } from "./kairaAutobiographicalRecallRuntime";
+import {
+  projectPreAiHowStateAlignmentCheck,
+  projectPreAiRepairRecoveryCheck,
+  projectPreAiSelfEpistemicCheck,
+  projectPreAiSemanticCompletenessCheck,
+} from "./kairaPreAiTypedObservability";
 import type { DroitDynamicState } from "../types/nexus";
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
 
@@ -99,6 +106,7 @@ function buildCoreFinalProviderPrompt(input: {
   interpretation: SemanticInterpretation;
   entityResolution: any;
   worldEvent: any;
+  selfMemoryInstruction: string;
   userMessage: string;
 }) {
   const relationship = input.trace.relationship;
@@ -112,10 +120,6 @@ function buildCoreFinalProviderPrompt(input: {
     reactionMode: input.dynamicState.reactionMode ?? null,
   });
 
-  // The Phase 0 harness now uses the exact same final-provider serializer as
-  // production. It still supplies a deterministic context subset because Phase 0
-  // intentionally does not hydrate provider-dependent/persistent production
-  // services. Assembly parity and context fidelity are reported separately.
   return buildKairaFinalProviderSystemPrompt({
     runtimeIdentityInstruction: "=== PRE-AI PRODUCTION-CORE PROMPT SNAPSHOT ===\nSTOP: FINAL PROVIDER PROMPT BOUNDARY / NO MODEL CALL",
     speechIdentityInstruction: speechIdentityPrompt(input.speech),
@@ -130,7 +134,7 @@ function buildCoreFinalProviderPrompt(input: {
     worldStateAppraisalInstruction: "",
     worldReasoningPolicyInstruction: "",
     epistemicInstruction: "",
-    selfMemoryInstruction: "",
+    selfMemoryInstruction: input.selfMemoryInstruction,
     dialogueInstruction: `CURRENT USER TURN: ${input.userMessage}`,
     discourseInstruction: buildDiscourseObservationalInstruction(input.discourse),
     dialogueDecisionInstruction: buildCanonicalDialogueMoveContext(
@@ -147,14 +151,10 @@ function buildCoreFinalProviderPrompt(input: {
 }
 
 /**
- * Deterministic Phase-0 harness.
- *
- * No morphology/semantic/model provider is supplied to understandTurkishMessage,
- * so ingestion uses the repository's explicit deterministic regex-floor fallback.
- * This deliberately audits the no-AI core/composition path. It MUST NOT be used
- * as evidence about semantic-provider quality. Production and the harness share
- * the same final-provider serializer; production-context fidelity remains a
- * separate, explicit coverage dimension.
+ * Deterministic Phase-0 harness. No semantic/model provider is supplied.
+ * Persistent production stores are also not hydrated. For self-memory queries we
+ * use the real ephemeral runtime path so the prompt carries the same typed
+ * fail-closed semantics without touching storage.
  */
 export async function runKairaPreAiPhase0Scenario(
   scenario: KairaPreAiScenarioDefinition,
@@ -204,6 +204,10 @@ export async function runKairaPreAiPhase0Scenario(
     const contract = buildBehaviorContract(dynamicState, kdm.trace, language.event);
     const speech = computeKairoSpeechIdentity(personality, dynamicState, kdm.trace);
     const responsePlan = buildKairaResponsePlan(contract, dialogueDecision, speech);
+    const selfMemoryRuntime = await resolveKairaAutobiographicalRecallRuntime({
+      instance: { instanceId: "phase0_ephemeral", instanceType: "welcome" },
+      query: language.interpretation.discourseFacets.selfMemoryQuery,
+    });
     const systemPrompt = buildCoreFinalProviderPrompt({
       responsePlan,
       speech,
@@ -214,6 +218,7 @@ export async function runKairaPreAiPhase0Scenario(
       interpretation: language.interpretation,
       entityResolution: language.entityResolution,
       worldEvent: language.worldEvent,
+      selfMemoryInstruction: selfMemoryRuntime.instruction,
       userMessage,
     });
     const audit = auditKairaFinalProviderPrompt({
@@ -242,6 +247,10 @@ export async function runKairaPreAiPhase0Scenario(
         : null,
       factProvenance: promptFactProvenance(language.event),
       consumptionTrace: coreConsumptionTrace(language.event),
+      selfEpistemic: projectPreAiSelfEpistemicCheck(language.interpretation, selfMemoryRuntime),
+      semanticCompleteness: projectPreAiSemanticCompletenessCheck(language.interpretation, dialogueDecision.move),
+      howStateAlignment: projectPreAiHowStateAlignmentCheck(dynamicState, kdm.trace, responsePlan),
+      repairRecovery: projectPreAiRepairRecoveryCheck(before, dynamicState, language.interpretation, kdm.trace),
     });
 
     for (const violation of audit.invariantViolations) {
@@ -265,9 +274,6 @@ export async function runKairaPreAiPhase0Scenario(
       audit,
     });
 
-    // Phase 0 stops before provider generation, so no assistant text is invented.
-    // Persist the canonical user turn only; exact reply-dependent discourse belongs
-    // to the later generation phase / captured replay tracks.
     history.push({ sender: "user", text: userMessage, semanticInterpretation: language.interpretation });
   }
 
@@ -285,7 +291,9 @@ export async function runKairaPreAiPhase0Scenario(
       "semantic_ingestion=deterministic_regex_floor",
       "history_fidelity=user_turns_only_until_generation_phase",
       "prompt_assembly=shared_production_final_provider_serializer",
+      "prompt_serializer_byte_parity=proven_shared_function",
       "prompt_context_fidelity=deterministic_phase0_subset_not_full_production_runtime",
+      "detector_snapshots=typed_runtime_outputs_only",
     ],
   };
 }
