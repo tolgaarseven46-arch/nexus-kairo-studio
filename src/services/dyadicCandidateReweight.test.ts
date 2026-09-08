@@ -112,6 +112,24 @@ describe("dyadic candidate reweight G2", () => {
     }
   });
 
+  it("never applies the Kaira-user dyadic norm to a third-party target", () => {
+    const semantic = normalizeSemanticInterpretation({
+      ...ambiguousInsult(),
+      target: "third_party",
+    });
+    const candidates = generateSocialAppraisalCandidateReadings(semantic);
+    const alice = profile("alice", ["benign", "benign", "benign", "benign"]);
+
+    const result = reweightSocialAppraisalCandidatesForDyad(semantic, candidates, "alice", alice);
+
+    expect(result.subjectMatched).toBe(true);
+    expect(result.dyadicApplied).toBe(false);
+    expect(result.reasons).toContain("event-not-targeting-kaira");
+    for (const candidate of result.candidates) {
+      expect(candidate.plausibility).toBe(candidate.basePlausibility);
+    }
+  });
+
   it("does not learn a norm from one benign observation", () => {
     const semantic = ambiguousInsult();
     const candidates = generateSocialAppraisalCandidateReadings(semantic);
