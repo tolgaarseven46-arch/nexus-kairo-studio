@@ -262,7 +262,7 @@ export function auditKairaFinalProviderPrompt(input: KairaPreAiAuditInput): Kair
   // checked against the effective hard permission. DEBUG_ONLY metadata is kept
   // for diagnostics but deliberately excluded from the instruction surface.
   const realizerSurface = realizerInstructionSurface(input.systemPrompt);
-  if (!input.responsePlan.allowQuestion && /(?:soru sor|sorabilirsin|clarify|netleştir)/iu.test(realizerSurface)) {
+  if (!input.responsePlan.allowQuestion && /(?:soru sor\b|sorabilirsin|clarify|netleştir)/iu.test(realizerSurface)) {
     const explicitOverride = /clarification-question-authorized-by-obligation|obligation-owned clarification/iu.test(realizerSurface);
     if (!explicitOverride) {
       violations.push({
