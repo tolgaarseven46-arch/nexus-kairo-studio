@@ -18,8 +18,9 @@ export interface RuntimeSocialAppraisalInput {
 export interface RuntimeSocialAppraisalResolution extends SocialAppraisalResolutionG4 {
   /**
    * Runtime projection after deterministic entity/world grounding. G4 remains the
-   * magnitude authority; grounding may only veto a dyadic relationship projection
-   * when the canonical grounded scope is explicitly third-party/event-facing.
+   * magnitude authority; grounding may resolve an unknown target to the active
+   * dyad or veto a projection for explicit third-party/event scope, but it cannot
+   * override an explicit semantic self/third-party/event target.
    */
   runtimeAppraisal: SocialAppraisalResult;
 }
@@ -58,6 +59,7 @@ export function resolveRuntimeSocialAppraisal(
       personality: input.personality,
     },
     "active-interlocutor",
+    input.relationshipScope,
   );
   return {
     ...resolved,
@@ -105,9 +107,13 @@ export function relationshipSignalFromRuntimeAppraisal(
     interp.discourseFacets.stopQuestions === true &&
     interp.discourseFacets.stopTalking === false &&
     interp.stopRequest === false;
+  const groundedUnknownTargetAddressesInterlocutor =
+    interp.target === "unknown" && relationshipScope === "kaira_user";
   const dyadic =
     !thirdParty &&
-    (interp.target === "kaira" || questionOnlyStopAddressesInterlocutor);
+    (interp.target === "kaira" ||
+      groundedUnknownTargetAddressesInterlocutor ||
+      questionOnlyStopAddressesInterlocutor);
 
   const relationalMaterial = dyadic && appraisal.relational.significance > 0;
   const harmMaterial = relationalMaterial && appraisal.relational.harmEvidence > 0;
