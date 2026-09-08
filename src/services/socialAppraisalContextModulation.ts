@@ -16,8 +16,6 @@ export interface SocialAppraisalContextFactors {
   affectiveNegative: number;
   affectivePositive: number;
   activation: number;
-  /** Shared lived-episode depth; affects only already-material affective projections. */
-  autobiographicalAffective: number;
 }
 
 export interface SocialAppraisalResolutionG4 extends SocialAppraisalResolutionG3 {
@@ -136,8 +134,6 @@ function computeContextFactors(
         ? affectivePositive
         : 1,
     activation: base.affective.activation > 0 ? activation : 1,
-    autobiographicalAffective:
-      base.affective.significance > 0 ? autobiographicalAffective : 1,
   };
 }
 
@@ -184,13 +180,7 @@ function modulate(
     },
     noMaterialEffect:
       relationalSignificance <= 0 && affectiveSignificance <= 0,
-    reasons: [
-      ...base.reasons,
-      "g4_context_modulation:bounded",
-      ...(factors.autobiographicalAffective > 1
-        ? ["g4_autobiographical_context:affective-depth"]
-        : []),
-    ],
+    reasons: [...base.reasons, "g4_context_modulation:bounded"],
   };
 }
 
@@ -230,7 +220,6 @@ export function resolveSocialAppraisalG4(
         affectiveNegative: 1,
         affectivePositive: 1,
         activation: 1,
-        autobiographicalAffective: 1,
       },
     };
   }
