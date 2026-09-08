@@ -23,9 +23,11 @@ Inputs are:
 
 Outputs retain each candidate's base plausibility and expose contextual plausibility plus the signed dyadic adjustment.
 
-## Subject isolation
+## Subject and target isolation
 
 A norm profile whose `subjectId` differs from the active subject is never applied. The result is explicitly marked `subjectMatched=false`, all candidate weights remain unchanged, and the reason is auditable.
+
+The Kaira↔person dyadic norm is also applied only when canonical `semantic.target === "kaira"`. A third-party, self, event, or unresolved target cannot borrow the user's relationship norm with Kaira. This prevents statements such as an insult directed at Mert from being reinterpreted through the user's Kaira-specific banter history.
 
 ## Evidence threshold
 
@@ -58,7 +60,8 @@ Those remain downstream responsibilities.
 2. Benign history cannot erase the literal-harm candidate.
 3. Repeated harmful familiarity cannot become playful permission.
 4. Alice's profile cannot affect Bob.
-5. One benign observation cannot reweight appraisal.
+5. A third-party target cannot consume the Kaira-user dyadic norm.
+6. One benign observation cannot reweight appraisal.
 
 ## Consequence
 
