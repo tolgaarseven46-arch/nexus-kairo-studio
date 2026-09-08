@@ -84,6 +84,20 @@
       "counterexamples": [
         "counterexample: genuine Kaira-user affection remains a positive relationship event"
       ]
+    },
+    {
+      "id": "g4-repair-magnitude-authority",
+      "invariant": "Canonical repair evidence is converted once into a typed repair magnitude and G4 may boundedly modulate that magnitude from dyadic/personality context; downstream reducer logic must not erase those contextual differences.",
+      "redSha": "65500f327b2d685dbdd5aeeb88a31cd682dc63d6",
+      "testFile": "src/services/socialAppraisalRepairMagnitudeNeighborProofRegression.test.ts",
+      "reported": "reported: same apology repairs differently under low versus high dyadic tolerance",
+      "neighbors": [
+        "neighbor-1: same apology repairs differently under damaged versus warm trusted relationship context",
+        "neighbor-2: same apology repairs differently under low versus high empathy and loyalty"
+      ],
+      "counterexamples": [
+        "counterexample: identical repair context remains deterministic"
+      ]
     }
   ]
 }
