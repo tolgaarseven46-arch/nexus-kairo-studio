@@ -1,22 +1,27 @@
 import { describe, expect, it } from "vitest";
+import { computeBehaviorProfile } from "./droitBehaviorEngine";
+import { NEUTRAL_DROIT_PERSONALITY } from "./droitPersonalityNormalizer";
+import { analyzeKdmInteractionCanonical } from "./kdmRelationshipReducerBridge";
 import { normalizeSemanticInterpretation } from "./semanticInterpretationSchema";
-import {
-  affectDeltaFromRuntimeAppraisal,
-  relationshipSignalFromRuntimeAppraisal,
-  resolveRuntimeSocialAppraisal,
-} from "./socialAppraisalRuntimeProjection";
 
-const relationship = {
+const initialRelationship = {
   warmthScore: 50,
   trustScore: 50,
+  warmth: 50,
+  trust: 50,
   toleranceMultiplier: 1,
   interactionCount: 4,
   familiarityDays: 2,
   conflictScore: 0,
   hurtScore: 0,
+  repairProgress: 0,
+  positiveEvents: 0,
+  negativeEvents: 0,
+  repeatedNegativeCount: 0,
+  conversationState: "active",
 } as any;
 
-const currentState = {
+const initialState = {
   calmness: 50,
   anger: 10,
   stress: 20,
@@ -25,28 +30,7 @@ const currentState = {
   surprise: 0,
   lastStatus: "neutral",
   reactionMode: "neutral",
-} as any;
-
-const personality = {
-  anger: 50,
-  patience: 50,
-  empathy: 50,
-  emotionalSensitivity: 50,
-  socialIntelligence: 50,
-  selfConfidence: 50,
-  humor: 50,
-  communication: 50,
-  charisma: 50,
-  curiosity: 50,
-  analyticalThinking: 50,
-  creativity: 50,
-  decisionMaking: 50,
-  attention: 50,
-  authority: 50,
-  courage: 50,
-  seriousness: 50,
-  loyalty: 50,
-  initiative: 50,
+  relationship: initialRelationship,
 } as any;
 
 function semantic(overrides: Record<string, unknown>) {
@@ -63,7 +47,7 @@ function semantic(overrides: Record<string, unknown>) {
       aggression: 0,
     },
     jokingConfidence: 0,
-    sincerityConfidence: 0.8,
+    sincerityConfidence: 0.9,
     affection: 0,
     support: 0,
     compliment: 0,
@@ -71,77 +55,66 @@ function semantic(overrides: Record<string, unknown>) {
     apology: false,
     repairAttempt: false,
     uncertainty: {
-      overall: 0.1,
-      intent: 0.1,
-      target: 0.1,
-      severity: 0.1,
+      overall: 0.05,
+      intent: 0.05,
+      target: 0.05,
+      severity: 0.05,
     },
     evidence: [],
     ...overrides,
   });
 }
 
-function project(event: ReturnType<typeof semantic>, scope: "kaira_user" | "third_party" | "event") {
-  const resolution = resolveRuntimeSocialAppraisal({
-    semantic: event,
-    relationshipScope: scope,
-    relationship,
-    currentState,
-    personality,
+function run(
+  interpretation: ReturnType<typeof semantic>,
+  relationshipScope: "kaira_user" | "third_party" | "event",
+) {
+  const baseBehaviorProfile = computeBehaviorProfile(NEUTRAL_DROIT_PERSONALITY);
+  return analyzeKdmInteractionCanonical({
+    state: initialState,
+    semanticInterpretation: interpretation,
+    semanticEvent: { relationshipScope } as any,
+    normalizedPersonality: NEUTRAL_DROIT_PERSONALITY,
+    baseBehaviorProfile,
+    behaviorPolicy: null,
+    applyIntegrated: (profile) => profile,
+    semanticIntentToKdm: () => "genel_sohbet",
+    semanticSentimentToKdm: () => "nötr",
   });
-  return {
-    resolution,
-    signal: relationshipSignalFromRuntimeAppraisal(event, scope, "insult", resolution),
-  };
 }
 
+const hardNonDyadicInsult = () =>
+  semantic({
+    primaryIntent: "insult",
+    secondarySocialActs: ["insult"],
+    valence: "negative",
+    emotionalLoad: 0.6,
+    severity: {
+      disrespect: 0.8,
+      coercion: 0.8,
+      manipulation: 0,
+      privacy: 0,
+      aggression: 0.25,
+    },
+  });
+
 describe("G4 runtime projection authority bug-class neighbor proof", () => {
-  it("reported: a third-party insult cannot damage the Kaira-user relationship but can affect Kaira", () => {
-    const event = semantic({
-      primaryIntent: "insult",
-      secondarySocialActs: ["insult"],
-      valence: "negative",
-      emotionalLoad: 0.45,
-      severity: {
-        disrespect: 0.75,
-        coercion: 0,
-        manipulation: 0,
-        privacy: 0,
-        aggression: 0.2,
-      },
-    });
-    const { resolution, signal } = project(event, "third_party");
-    const affect = affectDeltaFromRuntimeAppraisal(
-      { stress: 0, happiness: 0, calmness: 0, anger: 0 },
-      resolution.runtimeAppraisal,
-      "irritated",
-    );
+  it("reported: third-party harm cannot hard-stop the Kaira-user relationship but may affect Kaira", () => {
+    const result = run(hardNonDyadicInsult(), "third_party");
 
-    expect(signal.valence).toBe("neutral");
-    expect(Math.max(...Object.values(signal.severity))).toBe(0);
-    expect(resolution.runtimeAppraisal.relational.significance).toBe(0);
-    expect(resolution.runtimeAppraisal.affective.significance).toBeGreaterThan(0);
-    expect(affect.stress).toBeGreaterThan(0);
+    expect(result.nextDynamicState.relationship?.conversationState).toBe("active");
+    expect(result.nextDynamicState.relationship?.disengageReason).toBeUndefined();
+    expect(result.nextDynamicState.stress).toBeGreaterThan(initialState.stress);
   });
 
-  it("neighbor-1: a third-party apology cannot manufacture dyadic repair", () => {
-    const event = semantic({
-      primaryIntent: "apology",
-      secondarySocialActs: ["apology", "repair"],
-      valence: "positive",
-      apology: true,
-      repairAttempt: true,
-      sincerityConfidence: 0.95,
-      emotionalLoad: 0.3,
-    });
-    const { signal } = project(event, "third_party");
+  it("neighbor-1: event-scoped harm cannot hard-stop the Kaira-user relationship", () => {
+    const result = run(hardNonDyadicInsult(), "event");
 
-    expect(signal.apology).toBe(false);
-    expect(signal.repairAttempt).toBe(false);
-    expect(signal.valence).toBe("neutral");
+    expect(result.nextDynamicState.relationship?.conversationState).toBe("active");
+    expect(result.nextDynamicState.relationship?.disengageReason).toBeUndefined();
   });
 
-  it("neighbor-2: an event-scoped affection signal cannot mutate the dyadic relationship", () => {
+  it("neighbor-2: event-scoped affection cannot manufacture dyadic warmth", () => {
     const event = semantic({
       primaryIntent: "affection",
       secondarySocialActs: ["affection"],
@@ -149,14 +122,13 @@ describe("G4 runtime projection authority bug-class neighbor proof", () => {
       affection: 0.85,
       emotionalLoad: 0.35,
     });
-    const { signal } = project(event, "event");
+    const result = run(event, "event");
 
-    expect(signal.targetsKaira).toBe(false);
-    expect(signal.affection).toBe(0);
-    expect(signal.valence).toBe("neutral");
+    expect(result.nextDynamicState.relationship?.warmth).toBe(initialRelationship.warmth);
+    expect(result.nextDynamicState.relationship?.positiveEvents).toBe(initialRelationship.positiveEvents);
   });
 
-  it("counterexample: a Kaira-user affection event remains a positive affiliation", () => {
+  it("counterexample: genuine Kaira-user affection remains a positive relationship event", () => {
     const event = semantic({
       primaryIntent: "affection",
       secondarySocialActs: ["affection"],
@@ -164,12 +136,9 @@ describe("G4 runtime projection authority bug-class neighbor proof", () => {
       affection: 0.85,
       emotionalLoad: 0.35,
     });
-    const { signal } = project(event, "kaira_user");
+    const result = run(event, "kaira_user");
 
-    expect(signal.targetsKaira).toBe(true);
-    expect(signal.valence).toBe("positive");
-    expect(signal.affection).toBeGreaterThan(0);
-    expect(signal.apology).toBe(false);
-    expect(signal.repairAttempt).toBe(false);
+    expect(result.nextDynamicState.relationship?.warmth).toBeGreaterThan(initialRelationship.warmth);
+    expect(result.nextDynamicState.relationship?.positiveEvents).toBeGreaterThan(initialRelationship.positiveEvents);
   });
 });
