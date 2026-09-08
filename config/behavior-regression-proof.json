@@ -154,6 +154,20 @@
       "counterexamples": [
         "counterexample: autobiographical depth does not rewrite relational harm evidence"
       ]
+    },
+    {
+      "id": "fallback-self-memory-ingress-completion",
+      "invariant": "Deterministic regex-floor ingress must preserve canonical self-memory completion before emitting SemanticInterpretation@2, while third-party recall must not be converted into Kaira self-memory.",
+      "redSha": "e8c81b915111200590660cc9d017dbcd860366bd",
+      "testFile": "src/services/kairaFallbackSelfMemoryIngressNeighborProofRegression.test.ts",
+      "reported": "reported: preserves a direct Kaira favorite self-fact query at regex-floor ingress",
+      "neighbors": [
+        "neighbor-1: preserves a direct Kaira preference self-fact query at regex-floor ingress",
+        "neighbor-2: preserves targeted autobiographical recall at regex-floor ingress"
+      ],
+      "counterexamples": [
+        "counterexample: does not manufacture Kaira self-memory for a third-party recall question"
+      ]
     }
   ]
 }

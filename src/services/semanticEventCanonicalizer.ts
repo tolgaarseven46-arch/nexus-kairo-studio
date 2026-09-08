@@ -41,11 +41,17 @@ export function canonicalizeSemanticEvent(
       discourseAct: event.discourseAct ?? fallback.discourseAct,
       intent: event.intent,
     });
+  // A canonical self-memory query is owned by Kaira. When the legacy/fallback
+  // producer left target unresolved, complete that ownership here alongside the
+  // facet itself. Explicit non-Kaira targets remain authoritative and are never
+  // overwritten by completion.
+  const target = selfMemoryQuery && event.target === "unknown" ? "kaira" : event.target;
 
   return {
     ...event,
     raw: event.raw || message,
     normalized: event.normalized || fallback.normalized,
+    target,
     socialRoutine,
     discourseAct: event.discourseAct ?? fallback.discourseAct ?? "none",
     repairSignal: event.repairSignal ?? fallback.repairSignal ?? "none",

@@ -18,6 +18,20 @@ describe("language understanding gateway", () => {
     expect(result.event.target).toBe("kaira");
   });
 
+  it("preserves canonical self-memory fallback completion at regex ingress", async () => {
+    const result = await understandTurkishMessage("senin en sevdiğin çiçek ne?");
+
+    expect(result.semanticSource).toBe("fallback_regex");
+    expect(result.interpretation.target).toBe("kaira");
+    expect(result.interpretation.discourseFacets.selfMemoryQuery).toMatchObject({
+      scope: "self_fact",
+      retrievalMode: "targeted",
+    });
+    expect(result.event.selfMemoryQuery).toEqual(
+      result.interpretation.discourseFacets.selfMemoryQuery,
+    );
+  });
+
   it("grounds a bare typed apology to the active interlocutor without rewriting its unknown semantic target", async () => {
     const result = await understandTurkishMessage("özür dilerim");
 
