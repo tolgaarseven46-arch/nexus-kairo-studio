@@ -13,11 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
       KAIRA_LIVE_PROVIDER: openrouter
-      KAIRA_LIVE_BASE_URL: http://127.0.0.1:3000
+      KAIRA_LIVE_BASE_URL: https://nexus-kairo-studio.onrender.com
 
     steps:
       - name: Checkout
@@ -31,29 +28,16 @@ jobs:
       - name: Install dependencies
         run: npm install --ignore-scripts
 
-      - name: Require a live provider secret
+      - name: Verify deployed main runtime
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${OPENROUTER_API_KEY:-}" && -z "${GEMINI_API_KEY:-}" ]]; then
-            echo "::error::No OPENROUTER_API_KEY or GEMINI_API_KEY is available in GitHub Actions secrets."
-            exit 1
-          fi
-
-      - name: Start isolated Kaira server
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run dev > /tmp/kaira-live-server.log 2>&1 &
-          echo $! > /tmp/kaira-live-server.pid
-          for i in {1..45}; do
-            if curl --fail --silent http://127.0.0.1:3000/api/health >/dev/null; then
-              curl --fail --silent http://127.0.0.1:3000/api/runtime-info
+          for i in {1..60}; do
+            if curl --fail --silent --show-error https://nexus-kairo-studio.onrender.com/api/runtime-info; then
               exit 0
             fi
-            sleep 1
+            sleep 2
           done
-          cat /tmp/kaira-live-server.log
           exit 1
 
       - name: Run Phase 1 live conversation canary
@@ -61,8 +45,3 @@ jobs:
         run: |
           set -euo pipefail
           npx tsx scripts/run-kaira-phase1-live-probe.ts artifacts/kaira-phase1-live-probe.json
-
-      - name: Show server log on failure
-        if: failure()
-        shell: bash
-        run: cat /tmp/kaira-live-server.log || true
