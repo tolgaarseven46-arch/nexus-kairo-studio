@@ -126,6 +126,11 @@ const EMOTIONAL_SHARE_RE = /(moralim.{0,30}bozuk|moral yok|üzgünüm|çok mutlu
 const LOW_MOOD_RE = /(moralim.{0,30}bozuk|moral yok|üzgün|kötü hissed|bunaldım|canım (?:çok )?sıkkın|kaygı|endişe|stres|yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|mod düşük|moodum düşük|enerjim yok|keyfim yerinde değil|içim sıkılıyor|içim daraldı)/u;
 const INFORMATION_REQUEST_RE = /(?:^|\s)(neden|niye|nasıl|nedir|ne demek|kim|kime|kimi|hangi|hangisi|nerede|neresi)(?:\s|$|[?.!,])/u;
 const QUESTION_PARTICLE_RE = word("mi|mı|mu|mü|miyim|mıyım|muyum|müyüm|misin|mısın|musun|müsün|miyiz|mıyız|muyuz|müyüz|misiniz|mısınız|musunuz|müsünüz");
+const SECOND_PERSON_FINITE_ENDING = "(?:dın|din|dun|dün|tın|tin|tun|tün|dınız|diniz|dunuz|dünüz|tınız|tiniz|tunuz|tünüz|yorsun|yorsunuz|acaksın|eceksin|acaksınız|eceksiniz|arsın|ersin|arsınız|ersiniz)";
+const INFLECTED_INTERROGATIVE_RE = new RegExp(
+  `(?:^|\\s)(?:nerede(?:sin|siniz|ydin|ydiniz)|(?:ne|kim(?:le|lerle))\\s+[\\p{L}]+${SECOND_PERSON_FINITE_ENDING})(?:\\s|$|[?.!,])`,
+  "u",
+);
 const RECALL_QUESTION_RE = /(?:^|\s)(?:neydi|ne yapacaktı)(?:\s|$|[?.!,])|ne\s+yapmayı\s+düşünüyordu|hatırlıyor\s+musun|hatırladın\s+mı|az önce ne dedi|ne demişti|ne söylemişti|kim söylemişti/u;
 const CORRECTION_RE = /(?:^|\s)(?:yok|hayır|yanlış|değil|değildi|ben değildim|o ben değildim|onu demedim|öyle demedim|demek istemedim|düzelteyim|düzeltiyorum)(?:\s|$|[?.!,])/u;
 const TOPIC_SHIFT_RE = /(?:^|\s)(?:bu arada|neyse|konu dışı|şey diyeceğim|şey dicem|onu boşver|geç onu)(?:\s|$|[?.!,])/u;
@@ -219,7 +224,7 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   else if (affection > 0 && !reassuranceSeek && !repairProbe) intent = "affection";
   else if (reassuranceSeek || repairProbe) intent = "question";
   else if (RECALL_QUESTION_RE.test(text)) intent = "question";
-  else if (/[?]/u.test(message) || QUESTION_PARTICLE_RE.test(text) || INFORMATION_REQUEST_RE.test(text)) intent = "information_request";
+  else if (/[?]/u.test(message) || QUESTION_PARTICLE_RE.test(text) || INFORMATION_REQUEST_RE.test(text) || INFLECTED_INTERROGATIVE_RE.test(text)) intent = "information_request";
   else if (/^(selam|merhaba|hey|naber|nabr|nasılsın)(?:\s|$)/u.test(text)) intent = "greeting";
   else if (/(😂|🤣|😄|😅|:d|haha|hahah|taşak)/iu.test(text)) intent = "banter";
   else if (stopQuestions || stopTalking) intent = "complaint";
