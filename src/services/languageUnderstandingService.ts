@@ -13,6 +13,7 @@ import {
 import type { SemanticDiscourseProjection, SemanticGroundingField, SemanticInterpretation } from "../types/semanticInterpretation";
 import {
   appendSemanticFieldEvidence,
+  type SemanticEvidenceKind,
   type SemanticFieldProvenance,
 } from "../types/semanticFieldProvenance";
 import type { TurkishMorphologyEvidence } from "../types/turkishLinguisticEvidence";
@@ -265,13 +266,28 @@ function attachCanonicalDiscourseSignals(
   };
 }
 
-const typedEvidenceFieldsForCue = (cue: string): SemanticGroundingField[] => {
-  if (cue.startsWith("typed_social_routine:")) return ["primaryIntent", "socialRoutine"];
-  if (cue === "morphology_unanimous_NEG_blocks_apology") return ["primaryIntent", "secondarySocialActs", "apology"];
-  if (cue === "morphology_unanimous_NEG_blocks_advice_request") return ["adviceRequested"];
-  if (cue === "morphology_QUES_with_typed_polar_clause") return ["primaryIntent"];
-  if (cue === "ambiguous_morphology_QUES_not_promoted") return ["primaryIntent"];
-  return [];
+type TypedEvidenceProvenanceSpec = {
+  fields: SemanticGroundingField[];
+  kinds: SemanticEvidenceKind[];
+};
+
+const typedEvidenceProvenanceForCue = (cue: string): TypedEvidenceProvenanceSpec | undefined => {
+  if (cue.startsWith("typed_social_routine:")) {
+    return { fields: ["primaryIntent", "socialRoutine"], kinds: ["discourse"] };
+  }
+  if (cue === "morphology_unanimous_NEG_blocks_apology") {
+    return { fields: ["primaryIntent", "secondarySocialActs", "apology"], kinds: ["morphology"] };
+  }
+  if (cue === "morphology_unanimous_NEG_blocks_advice_request") {
+    return { fields: ["adviceRequested"], kinds: ["morphology"] };
+  }
+  if (cue === "morphology_QUES_with_typed_polar_clause") {
+    return { fields: ["primaryIntent"], kinds: ["morphology", "syntax"] };
+  }
+  if (cue === "ambiguous_morphology_QUES_not_promoted") {
+    return { fields: ["primaryIntent"], kinds: ["morphology"] };
+  }
+  return undefined;
 };
 
 function buildTypedEvidenceProvenance(interpretation: SemanticInterpretation): SemanticFieldProvenance | undefined {
@@ -280,14 +296,18 @@ function buildTypedEvidenceProvenance(interpretation: SemanticInterpretation): S
   for (const evidence of interpretation.evidence) {
     if (evidence.provider !== "typed_turkish_linguistic_evidence") continue;
     for (const cue of evidence.cues) {
-      for (const field of typedEvidenceFieldsForCue(cue)) {
-        provenance = appendSemanticFieldEvidence(provenance, field, {
-          kind: "morphology",
-          provider: evidence.provider,
-          cues: [cue],
-          confidence: evidence.confidence,
-        });
-        populated = true;
+      const spec = typedEvidenceProvenanceForCue(cue);
+      if (!spec) continue;
+      for (const field of spec.fields) {
+        for (const kind of spec.kinds) {
+          provenance = appendSemanticFieldEvidence(provenance, field, {
+            kind,
+            provider: evidence.provider,
+            cues: [cue],
+            confidence: evidence.confidence,
+          });
+          populated = true;
+        }
       }
     }
   }
