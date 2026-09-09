@@ -1,4 +1,4 @@
-# Pre-Gemini Language Foundation — Phase 0–4 Audit
+# Pre-Gemini Language Foundation — Phase 0–5 Audit
 
 Date: 2026-09-09
 Status: bounded audit / no runtime behavior change
@@ -151,25 +151,50 @@ The isolated `nlptoolkit-morphologicalanalysis@1.0.20` proof produced:
 5. The proof does **not** justify removing the semantic provider.
 6. The existing `TurkishMorphologyResult` seam is directionally sufficient to carry richer evidence; there is still no evidence requiring `SemanticInterpretation@3` at this stage.
 
-## Phase-5 contract-audit boundary
+## Phase-5 contract audit
 
-Next question:
+Question:
 
 > How should rich morphology evidence be represented and consumed without creating a second semantic authority?
 
-Constraints:
-- morphology remains evidence, not semantic truth
-- only L6 may adjudicate evidence into `SemanticInterpretation@2`
-- ambiguous parses must remain explicit until adjudication
-- analyzer failure/zero-parse must propagate as uncertainty/evidence absence, never as forced semantic certainty
-- field-level confidence/provenance remains the primary L7 gap to audit
+Result: **keep morphology as a typed sidecar; keep `SemanticInterpretation@2` as the only semantic truth.**
 
-## First local-semantic prototype families (later phase)
+### Contract decision
 
-Only these three families are admitted initially:
+- `LanguageUnderstandingResult.morphology` is the correct place for raw/analyzer morphology evidence.
+- `SemanticInterpretation@2` should **not** embed raw analyzer parses or morphology-provider-specific tags.
+- L6 alone may consume morphology + lexical + entity + discourse/context evidence and adjudicate canonical semantic fields.
+- Ambiguous morphology (`sende`, `mi`, `arkadaşına`) must remain ambiguous evidence until L6 resolves it with context.
+- Zero-parse (`kimlerle`) must remain explicit evidence absence / uncertainty; it must never force a fallback semantic conclusion.
+- The existing `SemanticInterpretation@2` meaning schema is sufficient for the current proof families. No `@3` migration is justified yet.
+
+### L7 gap
+
+Current uncertainty is coarse-grained (`overall`, `intent`, `target`, `severity`) and `evidence[]` is global. The remaining contract weakness is **field-level confidence/provenance**, e.g. which evidence actually supported `target`, `primaryIntent`, `socialRoutine`, or `severity`.
+
+This does not yet require a schema-version break. The next prototype should prove the minimum provenance shape before any contract extension is committed.
+
+## Phase-6 local semantic shadow prototype boundary
+
+The next bounded proof is not a product behavior switch. It must run in shadow/test mode only.
+
+Admitted families:
 1. greeting / how_are_you / what_doing
 2. simple negation
 3. simple `mi/mı/mu/mü` polar questions
+
+Goal:
+
+> Can local typed linguistic evidence produce the same canonical `SemanticInterpretation@2` decisions for these narrow families without becoming a parallel semantic authority in production?
+
+Guards:
+- no provider removal
+- no YDK routing change
+- no ResponsePlan change
+- no relationship/G4/memory change
+- no new downstream raw-text parser
+- no learning/community language work
+- local result is characterization/shadow evidence until acceptance criteria are met
 
 ## Guards
 
