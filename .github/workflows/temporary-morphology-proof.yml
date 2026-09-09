@@ -24,7 +24,11 @@ jobs:
         run: npm install --no-save --package-lock=false --ignore-scripts nlptoolkit-morphologicalanalysis@1.0.20
       - name: Fetch analyzer data files for isolated proof
         run: |
-          curl -fsSL https://raw.githubusercontent.com/StarlangSoftware/TurkishMorphologicalAnalysis-Php/main/turkish_dictionary.txt -o turkish_dictionary.txt
-          curl -fsSL https://raw.githubusercontent.com/StarlangSoftware/TurkishMorphologicalAnalysis-Php/main/turkish_finite_state_machine.xml -o turkish_finite_state_machine.xml
+          BASE=https://raw.githubusercontent.com/StarlangSoftware/TurkishMorphologicalAnalysis-Js/master
+          curl -fsSL $BASE/turkish_dictionary.txt -o turkish_dictionary.txt
+          curl -fsSL $BASE/turkish_finite_state_machine.xml -o turkish_finite_state_machine.xml
+          curl -fsSL $BASE/turkish_misspellings.txt -o turkish_misspellings.txt
+          curl -fsSL $BASE/suffixes.txt -o suffixes.txt
+          curl -fsSL $BASE/pronunciations.txt -o pronunciations.txt
       - name: Run frozen morphology proof
         run: node scripts/probe-turkish-morphology.mjs
