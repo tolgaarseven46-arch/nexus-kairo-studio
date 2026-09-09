@@ -1,8 +1,6 @@
 # KAIRO PROJECT STATE
 
 > Bu dosya projenin **tek kaynaklı aktif çalışma checkpoint'idir**. Yeni sohbet başladığında önce GitHub'daki gerçek `main`, açık PR/issue/CI durumu ve bu dosya doğrulanır; eski sohbetten varsayım yapılmaz.
->
-> Ayrıntılı geçmiş Git history, `AI_CHANGELOG.md`, `docs/adr/` ve `docs/audits/` altında korunur. Bu dosya yalnız aktif mimari gerçek + kapanmış fazlar + sıradaki ölçülebilir işi tutar.
 
 ## 1. Değişmez mimari kurallar
 - `SemanticInterpretation@2` current-turn sınıflandırmasının tek canonical semantik otoritesidir.
@@ -12,64 +10,53 @@
 - Provider/API deterministic architecture proof yerine kullanılmaz.
 - Yeni regex/classifier/phrase patch ancak canonical boundary'deki ölçülmüş failure ile gerekçelendirilir.
 
-## 2. Kapanmış temel fazlar
-- Single semantic authority / canonical-only rollout.
-- World-memory / self / autobiography ownership sınırları.
-- Dialogue obligations ve final-delivery fail-closed zinciri.
-- Autonomous Life production recovery.
-- Social Appraisal G1→G4 production wiring.
-- Natural Characterization v2 deterministic product-failure pass.
+## 2. Pre-Gemini language foundation — MERGED
+- PR #192 merge: `1605e239355b485164b72f3b70f9c8c8a2f42344`.
+- Rich provider-neutral `TurkishMorphologyEvidence` contract, ambiguity/zero-parse preservation, typed L6 adjudicator ve L7 provenance sidecar contract mevcut.
 
-## 3. Pre-Gemini Turkish language foundation — MERGED
-- PR #192 merge SHA: `1605e239355b485164b72f3b70f9c8c8a2f42344`.
-- Rich provider-neutral `TurkishMorphologyEvidence` L2 contract mevcut.
-- Ambiguity + explicit zero-parse korunur.
-- Typed L6 adjudicator raw text okumadan typed evidence tüketir.
-- Field-level semantic provenance sidecar contract mevcut.
-- Production analyzer seçilmedi; semantic LLM kaldırılmadı.
+## 3. Local language runtime integration — MERGED
+- PR #193 merge: `cb5a1207d8bfba80865fae2bfeb6ae31675912ff`.
+- Rich morphology evidence production language-understanding gateway'e bağlandı.
+- Legacy morphology aynı rich contract'a adapte edilir.
+- Incoming/shared ve semantic-provider interpretation aynı canonical L6 evidence gate'inden geçer.
+- Post-merge FULL CI #2638 PASS.
 
-## 4. Local language runtime integration — MERGED
-- PR #193 merge SHA: `cb5a1207d8bfba80865fae2bfeb6ae31675912ff`.
-- Rich `MorphologyEvidenceProvider` production language-understanding gateway'e bağlandı.
-- Legacy morphology aynı rich evidence contract'a adapte edilerek L6'ya girer.
-- Incoming/client-shared ve semantic-provider interpretation aynı canonical L6 evidence gate'inden geçer.
-- Runtime `semanticFieldProvenance` yalnız morphology ile adjudicate edilen alanları sidecar olarak kaydeder.
-- Zero-parse ve ambiguity abstention runtime'da korunur.
-- Post-merge main FULL CI #2638: PASS (architecture/autonomous/beta/Phase-0/historical/full tests/TypeScript/build).
+## 4. Morphology analyzer shadow benchmark — MERGED
+- PR #194 merge: `ac9bfa9cc3998167f67bc5ecc17e3b122d6254bb`.
+- Provider-neutral deterministic benchmark parse rate / zero-parse / ambiguity / expected-feature recall ölçer.
+- JS-native frozen proof: yararlı morphology + `kimlerle` zero-parse; production dependency seçilmedi.
+- Legacy Zemberek `/lemmas`: `compatibility_only`.
+- Rich Zemberek sentence analysis: ölçülmemiş `reference_candidate`.
+- Analyzer winner: intentionally NOT SELECTED.
+- Post-merge main FULL CI #2640 PASS.
 
-## 5. Morphology analyzer shadow benchmark — ACTIVE
-Branch: `codex/morphology-shadow-benchmark`.
+## 5. Bounded local semantic runtime acceptance — ACTIVE
+Branch: `codex/local-semantic-bounded-acceptance`.
 
-Eklenen provider-neutral benchmark:
-- parse rate;
-- zero-parse rate;
-- ambiguity rate;
-- frozen expected-feature recall;
-- operational profile: process boundary, token-vs-sentence granularity, competing analyses, sentence disambiguation, production dependency acceptance.
+Deterministic runtime acceptance artık şu üç bounded aileyi canonical L6 üzerinde doğruluyor:
+- typed greeting / how_are_you / what_doing routine evidence;
+- simple unanimous NEG evidence yalnız aday positive semantic'i block eder, kendi başına yeni semantic invention yapmaz;
+- QUES morphology yalnız typed `polarQuestionClause` scope ile information request'e promote edilir.
 
-Frozen deterministic evidence:
-- JS-native `nlptoolkit-morphologicalanalysis@1.0.20` proof: NEG/DAT/INS/LOC/QUES/PAST/FUT/A2SG gibi yararlı typed evidence üretmişti; `kimlerle` explicit zero-parse kaldı.
-- Bu sonuç package'ı production dependency yapmak için yeterli kabul edilmedi; candidate `shadow_candidate` olarak kalır.
-- Mevcut legacy Zemberek `/lemmas` wrapper per-token service boundary + lemma-only olduğu için `compatibility_only` sınıfındadır.
-- Zemberek rich sentence analysis competing analyses + sentence disambiguation sunabildiği için ölçülmemiş `reference_candidate` olarak kalır; live benchmark sonucu yokmuş gibi davranılmaz.
-- Benchmark semantic authority vermez; yalnız provider seçimi için evidence üretir.
+Counterexamples:
+- ambiguous QUES + clause scope yok → promote edilmez, uncertainty artar;
+- zero-parse → tamamen abstain eder.
+
+Bu acceptance testleri raw Turkish text parser yazmaz; test mesajı deliberately opaque tutulur ve karar yalnız typed evidence ile kanıtlanır.
 
 ## 6. Sıradaki doğrulanmış iş
-1. Shadow benchmark branch FAST CI'ı doğrula ve hataları düzelt.
-2. PR gate aç; FULL CI + Architecture Review yeşilse merge et.
-3. Post-merge main FULL CI doğrula.
-4. Ardından bounded local semantic coverage'ı deterministic characterization ile ölç: greeting/how_are_you/what_doing, simple negation, polar question.
-5. Eksik L7 field provenance coverage'ı ölç ve yalnız gerçekten adjudicate edilen semantic alanlarda genişlet.
-6. L3/L4 observation aileleri (`yeter`, preference-vs-compliment, inflected interrogatives, target grounding) yalnız reproducible failure çıkarsa typed evidence seam'inde ele alınır.
-7. Local coverage acceptance eşiği kanıtlanmadan semantic LLM rolü azaltılmaz.
+1. Bounded acceptance FAST/FULL CI ve Architecture Review'u yeşile getirip merge et.
+2. L7 provenance audit: typed social routine'ın `lexical/discourse`, NEG'in `morphology`, polar QUES'in `morphology + syntax` kaynağını field-level doğru ayır; yalnız adjudicate edilen field'lara provenance yaz.
+3. Sonra L3/L4 observation ailelerini deterministic characterization ile ölç: contextual `yeter`, preference-vs-compliment, inflected interrogatives, target grounding.
+4. Yalnız reproducible failure çıkan ailede canonical typed evidence seam aç; phrase-patch/raw parser ekleme.
+5. Local coverage acceptance eşiği kanıtlanmadan semantic LLM rolünü azaltma.
 
 ## 7. Latest checkpoint
 - Date: 2026-09-09
-- Current main: `cb5a1207d8bfba80865fae2bfeb6ae31675912ff`
-- Main FULL CI #2638: PASS
-- Active branch: `codex/morphology-shadow-benchmark`
-- Analyzer winner: NOT SELECTED
+- Current main: `ac9bfa9cc3998167f67bc5ecc17e3b122d6254bb`
+- Main FULL CI #2640: PASS
+- Active branch: `codex/local-semantic-bounded-acceptance`
 - External AI API in deterministic tests: NO
 - New regex semantic parser: NO
 - Semantic LLM removal: NO
-- Active work: benchmark CI → PR → merge → bounded local semantic characterization
+- Active work: bounded acceptance CI → merge → L7 provenance audit
