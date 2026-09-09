@@ -31,7 +31,6 @@ console.log(
   })}`,
 );
 
-const blocking =
-  report.classCounts.FAIL_PRODUCT > 0 ||
-  report.classCounts.FAIL_TEST_OR_DETECTOR > 0;
-process.exit(blocking ? 1 : 0);
+// Characterization is allowed to DISCOVER FAIL_PRODUCT; that is its purpose.
+// Only a broken test/detector contract blocks the characterization tooling lane.
+process.exit(report.classCounts.FAIL_TEST_OR_DETECTOR > 0 ? 1 : 0);
