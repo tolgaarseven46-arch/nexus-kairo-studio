@@ -30,33 +30,56 @@
 - Analyzer winner: intentionally NOT SELECTED.
 - Post-merge main FULL CI #2640 PASS.
 
-## 5. Bounded local semantic runtime acceptance — ACTIVE
-Branch: `codex/local-semantic-bounded-acceptance`.
-
-Deterministic runtime acceptance artık şu üç bounded aileyi canonical L6 üzerinde doğruluyor:
-- typed greeting / how_are_you / what_doing routine evidence;
-- simple unanimous NEG evidence yalnız aday positive semantic'i block eder, kendi başına yeni semantic invention yapmaz;
+## 5. Bounded local semantic runtime acceptance — MERGED
+- PR #195 merge: `4af0b4841db70c7595c816d157ba7fb7235d9e4b`.
+- Typed greeting / how_are_you / what_doing routine evidence canonical L6'da kabul edilir.
+- Unanimous NEG yalnız existing positive semantic candidate'i block eder; semantic invention yapmaz.
 - QUES morphology yalnız typed `polarQuestionClause` scope ile information request'e promote edilir.
+- Ambiguous QUES promotion yapılmaz; uncertainty yükselir.
+- Zero-parse tamamen abstain eder.
+- Post-merge main FULL CI #2642 PASS.
 
-Counterexamples:
-- ambiguous QUES + clause scope yok → promote edilmez, uncertainty artar;
-- zero-parse → tamamen abstain eder.
+## 6. L7 provenance source-kind audit — ACTIVE
+Branch: `codex/l7-provenance-and-language-characterization`.
 
-Bu acceptance testleri raw Turkish text parser yazmaz; test mesajı deliberately opaque tutulur ve karar yalnız typed evidence ile kanıtlanır.
+Implemented:
+- typed social-routine provenance artık `discourse` olarak kaydedilir; morphology diye yanlış etiketlenmez;
+- unanimous NEG provenance `morphology` olarak kalır;
+- typed polar-question promotion field provenance'da ortak `morphology + syntax` evidence olarak kaydedilir;
+- yalnız gerçekten adjudicate edilen canonical semantic field'lara sidecar provenance yazılır;
+- focused provenance-kind regressions eklendi.
 
-## 6. Sıradaki doğrulanmış iş
-1. Bounded acceptance FAST/FULL CI ve Architecture Review'u yeşile getirip merge et.
-2. L7 provenance audit: typed social routine'ın `lexical/discourse`, NEG'in `morphology`, polar QUES'in `morphology + syntax` kaynağını field-level doğru ayır; yalnız adjudicate edilen field'lara provenance yaz.
-3. Sonra L3/L4 observation ailelerini deterministic characterization ile ölç: contextual `yeter`, preference-vs-compliment, inflected interrogatives, target grounding.
-4. Yalnız reproducible failure çıkan ailede canonical typed evidence seam aç; phrase-patch/raw parser ekleme.
-5. Local coverage acceptance eşiği kanıtlanmadan semantic LLM rolünü azaltma.
+## 7. Remaining deterministic language families — CHARACTERIZED
+Current canonical runtime üzerinde yeniden doğrulanan aileler:
+- contextual `yeter`: sufficiency/predicate kullanım stop değildir; standalone `yeter` stop request'tir;
+- preference-vs-directed `seviyorum`: `kahveyi seviyorum` neutral preference, `seni seviyorum` Kaira-directed positive social act olarak ayrılır;
+- inflected interrogatives: `ne yaptın`, `neredeydin`, `kimlerle konuştun`, `neredesin`, `ne yapacaksın` information_request olarak kalır;
+- target grounding: narrated dative third-party harm active Kaira-user dyadına sızmaz; explicit second-person harm Kaira target olarak kalır;
+- nearby non-question counterexamples korunur.
 
-## 7. Latest checkpoint
+Bu characterization yeni parser/phrase patch eklemedi; mevcut canonical behavior üzerinde regression proof'tur.
+
+## 8. Validation
+- PR #195 Architecture Review: PASS.
+- PR #195 FULL CI #2641: PASS.
+- PR #195 post-merge main FULL CI #2642: PASS.
+- `codex/l7-provenance-and-language-characterization` FAST CI #129: PASS.
+- External AI/API deterministic proof içinde kullanılmadı.
+
+## 9. Sıradaki doğrulanmış iş
+1. L7 provenance + remaining-family characterization branch için PR aç.
+2. FULL CI + Architecture Review green ise merge et.
+3. Post-merge main FULL CI doğrula.
+4. Yeni reproducible semantic failure yoksa bu pre-Gemini bounded language foundation fazını kapat; analyzer winner seçmeden ve semantic LLM rolünü azaltmadan sonraki ürün hedefine geç.
+
+## 10. Latest checkpoint
 - Date: 2026-09-09
-- Current main: `ac9bfa9cc3998167f67bc5ecc17e3b122d6254bb`
-- Main FULL CI #2640: PASS
-- Active branch: `codex/local-semantic-bounded-acceptance`
+- Current main: `4af0b4841db70c7595c816d157ba7fb7235d9e4b`
+- Main FULL CI #2642: PASS
+- Active branch: `codex/l7-provenance-and-language-characterization`
+- Branch FAST CI #129: PASS
+- Analyzer winner: NOT SELECTED
 - External AI API in deterministic tests: NO
 - New regex semantic parser: NO
 - Semantic LLM removal: NO
-- Active work: bounded acceptance CI → merge → L7 provenance audit
+- Active work: PR → FULL/Architecture Review → merge → post-merge main CI
