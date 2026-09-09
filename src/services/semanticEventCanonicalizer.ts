@@ -17,7 +17,7 @@ const normalizeSpeechSurface = (message: string) =>
 const APOLOGY_CUE_RE = /(?<![\p{L}])(özür|pardon|af|pişman|üzgün)(?![\p{L}])/iu;
 const ADVICE_CUE_RE = /(?<![\p{L}])(tavsiye|öneri|öner|akıl)(?![\p{L}])/iu;
 const NEGATION_PARTICLE_RE = /(?<![\p{L}])(?:değil(?:im|sin|iz|siniz)?|yok)(?![\p{L}])/iu;
-const NEGATED_PREDICATE_RE = /(?<![\p{L}])[\p{L}]{2,}(?:ma|me)(?:d[ıiuü](?:m|n|k|nız|niz|lar|ler)?|mış|miş|muş|müş|yor(?:um|sun|uz|sunuz|lar)?|yacak|yecek|yacağım|yeceğim|malı|meli|sın|sin)?(?![\p{L}])/iu;
+const NEGATED_PREDICATE_RE = /(?<![\p{L}])(?:[\p{L}]{2,}(?:ma|me)(?:d[ıiuü](?:m|n|k|nız|niz|lar|ler)?|mış|miş|muş|müş|yacak|yecek|yacağım|yeceğim|malı|meli|sın|sin)?|[\p{L}]{2,}m[ıiuü]yor(?:um|sun|uz|sunuz|lar)?)(?![\p{L}])/iu;
 
 const STOP_TALKING_PARAPHRASE_RE = /(?:^|[\s,;:.!?])(?:konuşmayı\s+bırak(?![\p{L}])|yeter\s+artık\s+cevap\s+verme(?![\p{L}])|bana\s+(?:bir\s+şey|bi\s+şey|birşey)\s+yazma(?![\p{L}])|çekil\s+git(?![\p{L}])|artık\s+konuşmayalım(?![\p{L}])|bitir\s+bunu(?![\p{L}])|bırak\s+beni(?![\p{L}])|seninle\s+konuşmak\s+istemiyorum\s+artık(?![\p{L}])|yeter(?:\s+artık)?)(?:$|[\s,;:.!?])/iu;
 
