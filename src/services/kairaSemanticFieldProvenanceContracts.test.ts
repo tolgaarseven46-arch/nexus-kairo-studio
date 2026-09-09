@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { appendSemanticFieldEvidence } from "../types/semanticFieldProvenance";
+import {
+  appendSemanticFieldEvidence,
+  type SemanticFieldProvenance,
+} from "../types/semanticFieldProvenance";
 
 describe("semantic field provenance sidecar", () => {
   it("tracks target and intent evidence independently", () => {
-    let provenance = {};
+    let provenance: SemanticFieldProvenance = {};
     provenance = appendSemanticFieldEvidence(provenance, "target", {
       kind: "entity",
       provider: "entity_resolution",
@@ -22,7 +25,7 @@ describe("semantic field provenance sidecar", () => {
   });
 
   it("clamps confidence and keeps the bounded latest evidence", () => {
-    let provenance = {};
+    let provenance: SemanticFieldProvenance = {};
     for (let i = 0; i < 8; i += 1) {
       provenance = appendSemanticFieldEvidence(provenance, "primaryIntent", {
         kind: "reconciliation",
