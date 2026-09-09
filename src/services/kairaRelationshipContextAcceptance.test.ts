@@ -10,7 +10,13 @@ const scenario: KairaPreAiScenarioDefinition = {
   cluster: "C",
   branchTrackType: "exploration",
   title: "Same teasing stimulus under new vs familiar relationship state",
-  messages: ["sen bu işlerden harbi ne anlarsın"],
+  // The prior fixture ("sen bu işlerden harbi ne anlarsın") is intentionally
+  // harmless in the deterministic semantic floor: it carries no canonical
+  // severity, so an injury-damping A/B test cannot observe relationship context.
+  // Keep the joking frame, but use an explicit typed harm cue so both arms receive
+  // the exact same non-zero canonical relational signal. The thing under test is
+  // relationship-context modulation downstream, not phrase classification.
+  messages: ["sen aptalsın 😄 şaka yapıyorum"],
   invariants: [
     "The same canonical turn must be allowed to produce relationship-sensitive injury magnitude.",
     "Familiarity may dampen harm but must never create insult immunity.",
