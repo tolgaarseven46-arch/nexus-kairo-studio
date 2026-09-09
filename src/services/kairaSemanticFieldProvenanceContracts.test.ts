@@ -37,4 +37,49 @@ describe("semantic field provenance sidecar", () => {
     expect(provenance.primaryIntent?.at(-1)?.confidence).toBe(1);
     expect(provenance.primaryIntent?.[0]?.cues).toContain("cue-2");
   });
+
+  it("is immutable and cannot overwrite evidence for another semantic field", () => {
+    const original: SemanticFieldProvenance = {
+      target: [{
+        kind: "entity",
+        provider: "entity_resolution",
+        cues: ["third_party_grounded"],
+        confidence: 0.91,
+      }],
+    };
+
+    const next = appendSemanticFieldEvidence(original, "primaryIntent", {
+      kind: "morphology",
+      provider: "fixture",
+      cues: ["QUES"],
+      confidence: 0.87,
+    });
+
+    expect(next).not.toBe(original);
+    expect(next.target).toEqual(original.target);
+    expect(original.primaryIntent).toBeUndefined();
+    expect(next.primaryIntent?.[0]?.cues).toEqual(["QUES"]);
+  });
+
+  it("keeps conflicting evidence as provenance instead of resolving semantic truth", () => {
+    let provenance: SemanticFieldProvenance = {};
+    provenance = appendSemanticFieldEvidence(provenance, "primaryIntent", {
+      kind: "morphology",
+      provider: "analyzer_a",
+      cues: ["QUES"],
+      confidence: 0.7,
+    });
+    provenance = appendSemanticFieldEvidence(provenance, "primaryIntent", {
+      kind: "semantic_provider",
+      provider: "semantic_shadow",
+      cues: ["smalltalk"],
+      confidence: 0.72,
+    });
+
+    expect(provenance.primaryIntent).toHaveLength(2);
+    expect(provenance.primaryIntent?.map((item) => item.kind)).toEqual([
+      "morphology",
+      "semantic_provider",
+    ]);
+  });
 });
