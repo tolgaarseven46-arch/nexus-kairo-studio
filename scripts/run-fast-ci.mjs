@@ -4,6 +4,16 @@ import { spawnSync } from 'node:child_process';
 const artifactDir = 'artifacts/fast-ci';
 mkdirSync(artifactDir, { recursive: true });
 
+function capture(command, args) {
+  const result = spawnSync(command, args, { encoding: 'utf8', env: process.env });
+  return result.status === 0 ? String(result.stdout ?? '') : '';
+}
+
+const changedPaths = capture('git', ['diff', '--name-only', 'origin/main...HEAD'])
+  .split(/\r?\n/u)
+  .map((item) => item.trim())
+  .filter(Boolean);
+
 const tests = [
   'src/services/kairaArchitectureContracts.test.ts',
   'src/services/kairaSemanticConsumerAuthorityContracts.test.ts',
@@ -15,6 +25,17 @@ const tests = [
   'src/services/kairaBehaviorPolicyBoundaryContracts.test.ts',
   'src/services/kairaResponsePlanFinalAuthorityContracts.test.ts',
 ];
+
+const naturalV2Touched = changedPaths.some((path) =>
+  path === 'config/kairaNaturalCharacterizationV2Scenarios.json' ||
+  path === 'src/services/kairaNaturalCharacterizationV2.ts' ||
+  path === 'src/services/kairaNaturalCharacterizationV2.characterization.test.ts' ||
+  path === 'src/services/kairaPreAiPhase0Harness.ts'
+);
+
+if (naturalV2Touched) {
+  tests.push('src/services/kairaNaturalCharacterizationV2.characterization.test.ts');
+}
 
 function run(label, command, args, options = {}) {
   const startedAt = Date.now();
@@ -62,15 +83,16 @@ if (vitest.exitCode === 0) {
 }
 
 const summary = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   lane: 'fast',
   providerCalls: false,
   generatedAt: new Date().toISOString(),
+  changedPaths,
   tests,
   phases: [vitest, typescript],
   passed: vitest.exitCode === 0 && typescript.exitCode === 0,
 };
 
 writeFileSync(`${artifactDir}/summary.json`, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
-console.log(`\nFAST_CI_SUMMARY ${JSON.stringify({ passed: summary.passed, artifactDir })}`);
+console.log(`\nFAST_CI_SUMMARY ${JSON.stringify({ passed: summary.passed, artifactDir, tests: tests.length })}`);
 process.exit(summary.passed ? 0 : 1);
