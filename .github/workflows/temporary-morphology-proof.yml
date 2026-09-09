@@ -1,0 +1,26 @@
+name: Temporary Morphology Proof
+
+on:
+  push:
+    branches:
+      - codex/pre-gemini-language-foundation
+    paths:
+      - scripts/probe-turkish-morphology.mjs
+      - .github/workflows/temporary-morphology-proof.yml
+
+jobs:
+  morphology-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install project dependencies
+        run: npm ci
+      - name: Install isolated morphology candidate
+        run: npm install --no-save --package-lock=false --ignore-scripts nlptoolkit-morphologicalanalysis@1.0.20
+      - name: Run frozen morphology proof
+        run: node scripts/probe-turkish-morphology.mjs
