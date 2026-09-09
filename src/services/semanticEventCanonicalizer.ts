@@ -20,6 +20,7 @@ const NEGATION_PARTICLE_RE = /(?<![\p{L}])(?:değil(?:im|sin|iz|siniz)?|yok)(?![
 const NEGATED_PREDICATE_RE = /(?<![\p{L}])(?:[\p{L}]{2,}(?:ma|me)(?:d[ıiuü](?:m|n|k|nız|niz|lar|ler)?|mış|miş|muş|müş|yacak|yecek|yacağım|yeceğim|malı|meli|sın|sin)?|[\p{L}]{2,}m[ıiuü]yor(?:um|sun|uz|sunuz|lar)?)(?![\p{L}])/iu;
 const LOVE_PREDICATE_RE = /(?<![\p{L}])seviyorum(?![\p{L}])/iu;
 const DIRECT_ADDRESSEE_LOVE_RE = /(?<![\p{L}])(?:seni|sizi)\s+(?:çok\s+)?seviyorum(?![\p{L}])/iu;
+const PLAYFUL_DIRECT_DISRESPECT_RE = /(?:senin\s+kafan(?:\s+bugün)?\s+hiç\s+basmıyor(?:\s+galiba)?|(?:bazen\s+)?(?:harbi\s+)?saçmalıyorsun)(?:$|[\s,;:.!?])/iu;
 
 const STOP_TALKING_PARAPHRASE_RE = /(?:^|[\s,;:.!?])(?:konuşmayı\s+bırak(?![\p{L}])|yeter\s+artık\s+cevap\s+verme(?![\p{L}])|bana\s+(?:bir\s+şey|bi\s+şey|birşey)\s+yazma(?![\p{L}])|çekil\s+git(?![\p{L}])|artık\s+konuşmayalım(?![\p{L}])|bitir\s+bunu(?![\p{L}])|bırak\s+beni(?![\p{L}])|seninle\s+konuşmak\s+istemiyorum\s+artık(?![\p{L}]))(?:$|[\s,;:.!?])/iu;
 const STANDALONE_YETER_STOP_RE = /^(?:(?:tamam|kanka|abi|ya)\s+)?yeter(?:\s+artık)?[.!?…]*$/iu;
@@ -65,6 +66,7 @@ function reconcileSpeechActs(message: string, event: SemanticEvent): SemanticEve
     LOVE_PREDICATE_RE.test(text) &&
     !DIRECT_ADDRESSEE_LOVE_RE.test(text);
   const compliment = genericLoveComplimentOverread ? 0 : event.compliment;
+  const playfulDirectDisrespect = PLAYFUL_DIRECT_DISRESPECT_RE.test(text);
 
   const stopTalking =
     event.stopTalking ||
@@ -72,27 +74,45 @@ function reconcileSpeechActs(message: string, event: SemanticEvent): SemanticEve
     STANDALONE_YETER_STOP_RE.test(text);
   const reportedThirdPartyTarget =
     THIRD_PARTY_DATIVE_ROLE_RE.test(text) && THIRD_PARTY_NARRATIVE_PREDICATE_RE.test(text);
-  const target = reportedThirdPartyTarget ? "third_party" : event.target;
+  const target = reportedThirdPartyTarget
+    ? "third_party"
+    : playfulDirectDisrespect
+      ? "kaira"
+      : event.target;
   const intent = event.intent === "apology" && !apology
     ? "general_chat"
     : event.intent === "compliment" && genericLoveComplimentOverread
       ? "general_chat"
-      : event.intent;
+      : playfulDirectDisrespect && event.intent === "general_chat"
+        ? "complaint"
+        : event.intent;
   const relationalAct = event.relationalAct === "reconciliation_attempt" && !apology && !event.repairAttempt
     ? "none"
-    : event.relationalAct;
-  const valence = event.valence === "positive" && !apology && !event.repairAttempt &&
-    event.support <= 0 && compliment <= 0 && event.affection <= 0
-    ? "neutral"
-    : event.valence;
+    : playfulDirectDisrespect && event.relationalAct === "none"
+      ? "mockery"
+      : event.relationalAct;
+  const valence = playfulDirectDisrespect
+    ? "negative"
+    : event.valence === "positive" && !apology && !event.repairAttempt &&
+        event.support <= 0 && compliment <= 0 && event.affection <= 0
+      ? "neutral"
+      : event.valence;
+  const disrespect = playfulDirectDisrespect ? Math.max(event.disrespect, 0.35) : event.disrespect;
+  const severity = playfulDirectDisrespect ? Math.max(event.severity, 0.35) : event.severity;
 
   return {
     ...event,
     intent,
     target,
     relationalAct,
-    relationalIntensity: relationalAct === "none" ? 0 : event.relationalIntensity,
+    relationalIntensity: relationalAct === "none"
+      ? 0
+      : relationalAct === "mockery" && event.relationalAct === "none"
+        ? 0.65
+        : event.relationalIntensity,
     valence,
+    severity,
+    disrespect,
     apology,
     adviceRequested,
     compliment,
