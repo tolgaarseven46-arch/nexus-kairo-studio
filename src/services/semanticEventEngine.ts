@@ -125,6 +125,7 @@ const VENTING_PROFANITY_RE = word("amk|aq|mk");
 const EMOTIONAL_SHARE_RE = /(moralim.{0,30}bozuk|moral yok|üzgünüm|çok mutluyum|mutluyum|bunaldım|çok bunaldım|canım (?:çok )?sıkkın|kendimi (?:çok )?kötü hissediyorum|kendimi (?:çok )?iyi hissediyorum|kaygılıyım|endişeliyim|yoruldum|çok yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|mod düşük|moodum düşük|enerjim yok|keyfim yerinde değil|içim sıkılıyor|içim daraldı)/u;
 const LOW_MOOD_RE = /(moralim.{0,30}bozuk|moral yok|üzgün|kötü hissed|bunaldım|canım (?:çok )?sıkkın|kaygı|endişe|stres|yoruldum|tükendim|hiç havamda değilim|kafam bozuk|modum yo(?:k)?|mod düşük|moodum düşük|enerjim yok|keyfim yerinde değil|içim sıkılıyor|içim daraldı)/u;
 const INFORMATION_REQUEST_RE = /(?:^|\s)(neden|niye|nasıl|nedir|ne demek|kim|kime|kimi|hangi|hangisi|nerede|neresi)(?:\s|$|[?.!,])/u;
+const QUESTION_PARTICLE_RE = word("mi|mı|mu|mü|miyim|mıyım|muyum|müyüm|misin|mısın|musun|müsün|miyiz|mıyız|muyuz|müyüz|misiniz|mısınız|musunuz|müsünüz");
 const RECALL_QUESTION_RE = /(?:^|\s)(?:neydi|ne yapacaktı)(?:\s|$|[?.!,])|ne\s+yapmayı\s+düşünüyordu|hatırlıyor\s+musun|hatırladın\s+mı|az önce ne dedi|ne demişti|ne söylemişti|kim söylemişti/u;
 const CORRECTION_RE = /(?:^|\s)(?:yok|hayır|yanlış|değil|değildi|ben değildim|o ben değildim|onu demedim|öyle demedim|demek istemedim|düzelteyim|düzeltiyorum)(?:\s|$|[?.!,])/u;
 const TOPIC_SHIFT_RE = /(?:^|\s)(?:bu arada|neyse|konu dışı|şey diyeceğim|şey dicem|onu boşver|geç onu)(?:\s|$|[?.!,])/u;
@@ -218,7 +219,7 @@ export function interpretSemanticEvent(message: string): SemanticEvent {
   else if (affection > 0 && !reassuranceSeek && !repairProbe) intent = "affection";
   else if (reassuranceSeek || repairProbe) intent = "question";
   else if (RECALL_QUESTION_RE.test(text)) intent = "question";
-  else if (/[?]/u.test(message) || INFORMATION_REQUEST_RE.test(text)) intent = "information_request";
+  else if (/[?]/u.test(message) || QUESTION_PARTICLE_RE.test(text) || INFORMATION_REQUEST_RE.test(text)) intent = "information_request";
   else if (/^(selam|merhaba|hey|naber|nabr|nasılsın)(?:\s|$)/u.test(text)) intent = "greeting";
   else if (/(😂|🤣|😄|😅|:d|haha|hahah|taşak)/iu.test(text)) intent = "banter";
   else if (stopQuestions || stopTalking) intent = "complaint";
