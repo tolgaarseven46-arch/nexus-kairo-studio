@@ -76,21 +76,22 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 - Yeni downstream semantic authority: **NO**.
 - Yeni raw-text semantic parser: **NO**.
 
-## 9. Sıradaki doğrulanmış iş
-- Bu language foundation fazını yeniden açma; yalnız yeni reproducible failure, invariant break veya gerçek production evidence çıkarsa dön.
-- Sonraki geliştirme yeni bir ölçülmüş product/runtime hedefinden başlamalı.
-- Analyzer/provider seçimi ancak gerçek, karşılaştırılabilir accuracy/coverage/latency/resource/deployment ölçümü elde edildiğinde yapılmalı; kanıtsız winner seçilmemeli.
-- Local coverage acceptance kanıtı olmadan semantic LLM rolü azaltılmamalı.
+## 9. Provider-free runtime acceptance — ACTIVE
+- Yeni ölçülmüş hedef: frozen Phase-0 C3 invariant'ını gerçek same-stimulus A/B relationship state karşılaştırmasıyla kanıtlamak.
+- 21/423 Phase-0 corpus korunur; baseline yeniden tanımlanmaz.
+- Yeni ilişki ve established/high-quality ilişki yalnız typed `DroitDynamicState.relationship` seed'iyle ayrılır.
+- Aynı user turn için canonical `SemanticInterpretation@2` ve `SemanticEvent` eşit kalmalıdır.
+- Established/familiar context harm etkisini azaltabilir fakat sıfırlayamaz; insult immunity yasaktır.
+- Bu acceptance provider/API çağırmaz ve runtime semantic parser/regex/phrase patch eklemez.
+- Bu hedef geçince sıradaki provider-free hedef: uzun-horizon relationship progression/persistence; ardından memory + relationship combined behavior.
 
 ## 10. Latest checkpoint
 - Date: 2026-09-09
-- Language closeout PR #197 merged as `224c62d62319be8434ab5ab4c0233128c7e8525a`.
-- Verified post-closeout main CI #2646: PASS.
-- Open PRs at checkpoint verification: NONE.
-- Pre-Gemini bounded language phase: CLOSED.
-- Analyzer winner: NOT SELECTED.
+- Base main before provider-free acceptance: `b46dde37933e6c53cc8d2c175d7c404386e0d248`.
+- Relationship-aware acceptance branch: `codex/relationship-context-acceptance`.
+- PR #199: OPEN / CI verification in progress.
+- Pre-Gemini bounded language phase: CLOSED; yeniden açılmayacak.
 - External AI API in deterministic tests: NO.
 - New regex semantic parser: NO.
 - Semantic LLM removal: NO.
-- Active language cleanup work: NONE.
-- Next work must start from a newly measured product/runtime target; do not reopen this phase without new evidence.
+- Active target: explicit C3 new-vs-familiar runtime A/B proof.
