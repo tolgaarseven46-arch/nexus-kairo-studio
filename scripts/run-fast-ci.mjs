@@ -37,6 +37,9 @@ const naturalV2Touched = changedPaths.some((path) =>
   path === 'src/services/kairaNaturalCharacterizationV2.ts' ||
   path === 'src/services/kairaNaturalCharacterizationV2.characterization.test.ts' ||
   path === 'src/services/kairaPreAiPhase0Harness.ts' ||
+  path === 'src/services/semanticEventEngine.ts' ||
+  path === 'src/services/semanticEventCanonicalizer.ts' ||
+  path === 'src/services/languageUnderstandingService.ts' ||
   path === 'scripts/run-natural-characterization-v2.ts'
 );
 
@@ -115,7 +118,7 @@ if (vitest.exitCode === 0 && characterization.exitCode === 0) {
 
 const phases = [vitest, characterization, typescript];
 const summary = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   lane: 'fast',
   providerCalls: false,
   generatedAt: new Date().toISOString(),
