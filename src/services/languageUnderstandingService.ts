@@ -5,7 +5,17 @@ import { isSemanticInterpretation, normalizeSemanticInterpretation } from "./sem
 import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";
 import { projectSemanticEvent } from "./semanticInterpretationProjection";
 import { recognizeCanonicalDiscourseSignals } from "./semanticDiscourseFacetRecognizer";
-import type { SemanticDiscourseProjection, SemanticInterpretation } from "../types/semanticInterpretation";
+import { adaptLegacyMorphologyEvidence } from "./turkishMorphologyEvidenceAdapter";
+import {
+  reconcileSemanticInterpretationWithLinguisticEvidence,
+  type CanonicalLinguisticEvidenceInput,
+} from "./turkishLinguisticEvidenceAdjudicator";
+import type { SemanticDiscourseProjection, SemanticGroundingField, SemanticInterpretation } from "../types/semanticInterpretation";
+import {
+  appendSemanticFieldEvidence,
+  type SemanticFieldProvenance,
+} from "../types/semanticFieldProvenance";
+import type { TurkishMorphologyEvidence } from "../types/turkishLinguisticEvidence";
 
 export type SemanticRelationshipScope = "kaira_user" | "third_party" | "event" | "unknown";
 export type AppraisalSemanticEvent = SemanticEvent & SemanticDiscourseProjection & {
@@ -22,9 +32,18 @@ export interface LanguageUnderstandingContext {
   userName?: string; characterName?: string;
 }
 export interface MorphologyProvider { name: string; analyze(message: string): Promise<TurkishMorphologyResult>; }
+export interface MorphologyEvidenceProvider {
+  name: string;
+  analyzeEvidence(message: string): Promise<TurkishMorphologyEvidence>;
+}
 export interface SemanticUnderstandingProvider {
   name: string;
-  interpret(input: { message: string; morphology?: TurkishMorphologyResult; context?: LanguageUnderstandingContext }): Promise<SemanticInterpretation>;
+  interpret(input: {
+    message: string;
+    morphology?: TurkishMorphologyResult;
+    morphologyEvidence?: TurkishMorphologyEvidence;
+    context?: LanguageUnderstandingContext;
+  }): Promise<SemanticInterpretation>;
 }
 
 export type LanguageUnderstandingSource = "client_shared" | "semantic_provider" | "fallback_regex";
@@ -36,13 +55,18 @@ export interface LanguageUnderstandingResult {
   semanticSource: LanguageUnderstandingSource;
   semanticProvider?: string;
   morphology?: TurkishMorphologyResult;
+  morphologyEvidence?: TurkishMorphologyEvidence;
   morphologyProvider?: string;
+  semanticFieldProvenance?: SemanticFieldProvenance;
   warnings: string[];
 }
 export interface LanguageUnderstandingOptions {
   incomingSemanticInterpretation?: unknown;
   morphologyProvider?: MorphologyProvider;
+  morphologyEvidenceProvider?: MorphologyEvidenceProvider;
   semanticProvider?: SemanticUnderstandingProvider;
+  /** Typed L3/L5 evidence only. Raw-text parsing is not allowed here. */
+  linguisticEvidence?: Omit<CanonicalLinguisticEvidenceInput, "morphology">;
   context?: LanguageUnderstandingContext;
 }
 
@@ -66,10 +90,6 @@ export function groundSemanticEventForAppraisal(
   if (explicitThirdPartyActor || explicitThirdPartyTarget || event.target === "third_party") relationshipScope = "third_party";
   else if (actorId === "current_user" && targetId === "kaira") relationshipScope = "kaira_user";
   else if (event.target === "kaira" && entityResolution.namedPeople.length === 0) relationshipScope = "kaira_user";
-  // A bare typed apology/repair with no explicit third-party referent is an
-  // interlocutor-facing social act. Ground only its relationship scope here;
-  // canonical semantic target remains untouched and explicit non-dyadic targets
-  // above still win. This is grounding, not a raw-text reinterpretation.
   else if (implicitActiveDyadRepair) relationshipScope = "kaira_user";
   else if (event.target === "event") relationshipScope = "event";
 
@@ -97,11 +117,6 @@ function reconcileSemanticTargetWithEntityResolution(
     ref.role === "named_person" && ref.resolvedId !== "current_user" && ref.resolvedId !== "kaira"
   ) || entityResolution.namedPeople.length > 0;
 
-  // Entity resolution already owns participant/reference grounding. If the
-  // semantic provider/fallback left target unresolved despite an explicit,
-  // high-confidence Kaira reference and there is no competing named third party,
-  // complete that typed contradiction here rather than teaching downstream
-  // appraisal/relationship consumers to reparse second-person morphology.
   if (
     interpretation.target === "unknown" &&
     explicitKairaReference &&
@@ -143,14 +158,6 @@ function reconcileSemanticTargetWithEntityResolution(
   };
 }
 
-/**
- * Canonical typed reconciliation for a provider over-read seen in production:
- * a low-emotional-load third-party event is not a first-person emotional
- * disclosure merely because the event itself receives mild negative valence.
- * Genuine emotional openings remain protected by their higher emotional load
- * and/or explicit emotional/relational discourse facets. This consumes only
- * SemanticInterpretation fields; it never reparses raw text.
- */
 function reconcileNeutralThirdPartyEventOverread(
   interpretation: SemanticInterpretation,
 ): SemanticInterpretation {
@@ -178,16 +185,6 @@ function reconcileNeutralThirdPartyEventOverread(
   };
 }
 
-/**
- * `how_are_you` / `what_doing` are reciprocal Kaira-facing social routines.
- * A provider can recognize the surface shape while independently resolving the
- * utterance target to a third party (for example a question about another
- * person's current activity). Those fields cannot both be authoritative.
- *
- * Reconcile the typed contradiction at the canonical LU gateway rather than
- * teaching DialogueDecision to reinterpret the routine downstream. This uses no
- * raw-text rule and preserves genuine Kaira-directed reciprocal routines.
- */
 function reconcileThirdPartyReciprocalRoutineOverread(
   interpretation: SemanticInterpretation,
 ): SemanticInterpretation {
@@ -215,16 +212,6 @@ function reconcileThirdPartyReciprocalRoutineOverread(
   };
 }
 
-/**
- * Self/autobiographical memory belongs only to Kaira. A semantic provider may
- * emit a syntactically valid selfMemoryQuery while simultaneously resolving the
- * message target to the current user, a third party, an event, or unknown. That
- * is an ownership contradiction inside the canonical interpretation, not a
- * signal for the autobiographical runtime to arbitrate later.
- *
- * Reconcile the typed canonical fields here, before projection. This never
- * reparses raw text and keeps SemanticInterpretation@2 as the single authority.
- */
 function reconcileSelfMemoryQueryOwnership(
   interpretation: SemanticInterpretation,
 ): SemanticInterpretation {
@@ -250,10 +237,6 @@ function reconcileSelfMemoryQueryOwnership(
   };
 }
 
-/**
- * A1 authority migration: raw user text is read exactly once at ingestion for
- * these narrow discourse cues. DiscourseState receives only the typed result.
- */
 function attachCanonicalDiscourseSignals(
   message: string,
   interpretation: SemanticInterpretation,
@@ -282,12 +265,43 @@ function attachCanonicalDiscourseSignals(
   };
 }
 
+const typedEvidenceFieldsForCue = (cue: string): SemanticGroundingField[] => {
+  if (cue.startsWith("typed_social_routine:")) return ["primaryIntent", "socialRoutine"];
+  if (cue === "morphology_unanimous_NEG_blocks_apology") return ["primaryIntent", "secondarySocialActs", "apology"];
+  if (cue === "morphology_unanimous_NEG_blocks_advice_request") return ["adviceRequested"];
+  if (cue === "morphology_QUES_with_typed_polar_clause") return ["primaryIntent"];
+  if (cue === "ambiguous_morphology_QUES_not_promoted") return ["primaryIntent"];
+  return [];
+};
+
+function buildTypedEvidenceProvenance(interpretation: SemanticInterpretation): SemanticFieldProvenance | undefined {
+  let provenance: SemanticFieldProvenance = {};
+  let populated = false;
+  for (const evidence of interpretation.evidence) {
+    if (evidence.provider !== "typed_turkish_linguistic_evidence") continue;
+    for (const cue of evidence.cues) {
+      for (const field of typedEvidenceFieldsForCue(cue)) {
+        provenance = appendSemanticFieldEvidence(provenance, field, {
+          kind: "morphology",
+          provider: evidence.provider,
+          cues: [cue],
+          confidence: evidence.confidence,
+        });
+        populated = true;
+      }
+    }
+  }
+  return populated ? provenance : undefined;
+}
+
 function buildResult(
   message: string,
   interpretation: SemanticInterpretation,
   entityResolution: EntityResolutionResult,
-  rest: Omit<LanguageUnderstandingResult, "interpretation" | "event" | "entityResolution" | "worldEvent">,
+  rest: Omit<LanguageUnderstandingResult, "interpretation" | "event" | "entityResolution" | "worldEvent" | "semanticFieldProvenance">,
+  linguisticEvidence: CanonicalLinguisticEvidenceInput = {},
 ): LanguageUnderstandingResult {
+  interpretation = reconcileSemanticInterpretationWithLinguisticEvidence(interpretation, linguisticEvidence);
   interpretation = attachCanonicalDiscourseSignals(message, interpretation);
   interpretation = reconcileSemanticTargetWithEntityResolution(interpretation, entityResolution);
   interpretation = reconcileNeutralThirdPartyEventOverread(interpretation);
@@ -303,48 +317,81 @@ function buildResult(
     },
     entityResolution,
     worldEvent: grounded.worldEvent,
+    semanticFieldProvenance: buildTypedEvidenceProvenance(interpretation),
     ...rest,
   };
 }
 
 /**
  * Single language-understanding gateway.
- * Normal path: LLM provider -> SemanticInterpretation@2.
- * Regex is legal only as an explicit provider-failure fallback, and it must emit
- * the same canonical schema. No downstream raw-text reparse is allowed.
+ * SemanticInterpretation@2 remains the single canonical semantic authority.
+ * L2/L3/L5 evidence can only reconcile that object here at L6; no downstream
+ * consumer receives permission to reparse raw text.
  */
 export async function understandTurkishMessage(
   message: string,
   options: LanguageUnderstandingOptions = {},
 ): Promise<LanguageUnderstandingResult> {
   const entityResolution = resolveMessageEntities(message, options.context);
+  const warnings: string[] = [];
 
-  if (isSemanticInterpretation(options.incomingSemanticInterpretation)) {
-    const interpretation = normalizeSemanticInterpretation(options.incomingSemanticInterpretation, message);
-    return buildResult(message, interpretation, entityResolution, { semanticSource: "client_shared", warnings: [] });
+  let morphology: TurkishMorphologyResult | undefined;
+  let morphologyEvidence: TurkishMorphologyEvidence | undefined;
+  let morphologyProviderName: string | undefined;
+
+  if (options.morphologyEvidenceProvider) {
+    try {
+      morphologyEvidence = await options.morphologyEvidenceProvider.analyzeEvidence(message);
+      morphologyProviderName = options.morphologyEvidenceProvider.name;
+    } catch (error) {
+      warnings.push(`Morphology evidence provider ${options.morphologyEvidenceProvider.name} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
-  const warnings: string[] = [];
-  let morphology: TurkishMorphologyResult | undefined;
-  if (options.morphologyProvider) {
-    try { morphology = await options.morphologyProvider.analyze(message); }
-    catch (error) {
+  if (!morphologyEvidence && options.morphologyProvider) {
+    try {
+      morphology = await options.morphologyProvider.analyze(message);
+      morphologyEvidence = adaptLegacyMorphologyEvidence(morphology);
+      morphologyProviderName = options.morphologyProvider.name;
+    } catch (error) {
       warnings.push(`Morphology provider ${options.morphologyProvider.name} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
+  const linguisticEvidence: CanonicalLinguisticEvidenceInput = {
+    ...(options.linguisticEvidence ?? {}),
+    ...(morphologyEvidence ? { morphology: morphologyEvidence } : {}),
+  };
+
+  if (isSemanticInterpretation(options.incomingSemanticInterpretation)) {
+    const interpretation = normalizeSemanticInterpretation(options.incomingSemanticInterpretation, message);
+    return buildResult(message, interpretation, entityResolution, {
+      semanticSource: "client_shared",
+      morphology,
+      morphologyEvidence,
+      morphologyProvider: morphologyProviderName,
+      warnings,
+    }, linguisticEvidence);
+  }
+
   if (options.semanticProvider) {
     try {
-      const provided = await options.semanticProvider.interpret({ message, morphology, context: options.context });
+      const provided = await options.semanticProvider.interpret({
+        message,
+        morphology,
+        morphologyEvidence,
+        context: options.context,
+      });
       if (isSemanticInterpretation(provided)) {
         const interpretation = normalizeSemanticInterpretation(provided, message);
         return buildResult(message, interpretation, entityResolution, {
           semanticSource: "semantic_provider",
           semanticProvider: options.semanticProvider.name,
           morphology,
-          morphologyProvider: options.morphologyProvider?.name,
+          morphologyEvidence,
+          morphologyProvider: morphologyProviderName,
           warnings,
-        });
+        }, linguisticEvidence);
       }
       warnings.push(`Semantic provider ${options.semanticProvider.name} returned an invalid SemanticInterpretation@2.`);
     } catch (error) {
@@ -356,7 +403,8 @@ export async function understandTurkishMessage(
   return buildResult(message, interpretation, entityResolution, {
     semanticSource: "fallback_regex",
     morphology,
-    morphologyProvider: options.morphologyProvider?.name,
+    morphologyEvidence,
+    morphologyProvider: morphologyProviderName,
     warnings,
-  });
+  }, linguisticEvidence);
 }
