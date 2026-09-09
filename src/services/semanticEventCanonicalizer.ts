@@ -18,6 +18,8 @@ const APOLOGY_CUE_RE = /(?<![\p{L}])(özür|pardon|af|pişman|üzgün)(?![\p{L}]
 const ADVICE_CUE_RE = /(?<![\p{L}])(tavsiye|öneri|öner|akıl)(?![\p{L}])/iu;
 const NEGATION_PARTICLE_RE = /(?<![\p{L}])(?:değil(?:im|sin|iz|siniz)?|yok)(?![\p{L}])/iu;
 const NEGATED_PREDICATE_RE = /(?<![\p{L}])(?:[\p{L}]{2,}(?:ma|me)(?:d[ıiuü](?:m|n|k|nız|niz|lar|ler)?|mış|miş|muş|müş|yacak|yecek|yacağım|yeceğim|malı|meli|sın|sin)?|[\p{L}]{2,}m[ıiuü]yor(?:um|sun|uz|sunuz|lar)?)(?![\p{L}])/iu;
+const LOVE_PREDICATE_RE = /(?<![\p{L}])seviyorum(?![\p{L}])/iu;
+const DIRECT_ADDRESSEE_LOVE_RE = /(?<![\p{L}])(?:seni|sizi)\s+(?:çok\s+)?seviyorum(?![\p{L}])/iu;
 
 const STOP_TALKING_PARAPHRASE_RE = /(?:^|[\s,;:.!?])(?:konuşmayı\s+bırak(?![\p{L}])|yeter\s+artık\s+cevap\s+verme(?![\p{L}])|bana\s+(?:bir\s+şey|bi\s+şey|birşey)\s+yazma(?![\p{L}])|çekil\s+git(?![\p{L}])|artık\s+konuşmayalım(?![\p{L}])|bitir\s+bunu(?![\p{L}])|bırak\s+beni(?![\p{L}])|seninle\s+konuşmak\s+istemiyorum\s+artık(?![\p{L}]))(?:$|[\s,;:.!?])/iu;
 const STANDALONE_YETER_STOP_RE = /^(?:(?:tamam|kanka|abi|ya)\s+)?yeter(?:\s+artık)?[.!?…]*$/iu;
@@ -54,6 +56,16 @@ function reconcileSpeechActs(message: string, event: SemanticEvent): SemanticEve
   const adviceRequested = Boolean(event.adviceRequested) &&
     (!adviceMentioned || hasAffirmativeCue(text, ADVICE_CUE_RE));
 
+  // The legacy semantic floor historically treated every bounded "seviyorum"
+  // token as a compliment. That leaks ordinary preference/self-description into
+  // Kaira's positive social trajectory. Preserve the existing direct-addressee
+  // reading, but neutralize the over-read before SemanticInterpretation@2 is built.
+  const genericLoveComplimentOverread =
+    event.compliment > 0 &&
+    LOVE_PREDICATE_RE.test(text) &&
+    !DIRECT_ADDRESSEE_LOVE_RE.test(text);
+  const compliment = genericLoveComplimentOverread ? 0 : event.compliment;
+
   const stopTalking =
     event.stopTalking ||
     STOP_TALKING_PARAPHRASE_RE.test(text) ||
@@ -61,12 +73,16 @@ function reconcileSpeechActs(message: string, event: SemanticEvent): SemanticEve
   const reportedThirdPartyTarget =
     THIRD_PARTY_DATIVE_ROLE_RE.test(text) && THIRD_PARTY_NARRATIVE_PREDICATE_RE.test(text);
   const target = reportedThirdPartyTarget ? "third_party" : event.target;
-  const intent = event.intent === "apology" && !apology ? "general_chat" : event.intent;
+  const intent = event.intent === "apology" && !apology
+    ? "general_chat"
+    : event.intent === "compliment" && genericLoveComplimentOverread
+      ? "general_chat"
+      : event.intent;
   const relationalAct = event.relationalAct === "reconciliation_attempt" && !apology && !event.repairAttempt
     ? "none"
     : event.relationalAct;
   const valence = event.valence === "positive" && !apology && !event.repairAttempt &&
-    event.support <= 0 && event.compliment <= 0 && event.affection <= 0
+    event.support <= 0 && compliment <= 0 && event.affection <= 0
     ? "neutral"
     : event.valence;
 
@@ -79,6 +95,7 @@ function reconcileSpeechActs(message: string, event: SemanticEvent): SemanticEve
     valence,
     apology,
     adviceRequested,
+    compliment,
     stopTalking,
   };
 }
