@@ -38,6 +38,10 @@ const fixture = (overrides: Record<string, unknown> = {}) => normalizeSemanticIn
   ...overrides,
 });
 
+type UnderstandingResult = Awaited<ReturnType<typeof understandTurkishMessage>>;
+const evidenceCues = (result: UnderstandingResult) =>
+  result.interpretation.evidence.flatMap((item) => item.cues);
+
 describe("bounded local semantic runtime acceptance", () => {
   it.each([
     ["greeting", "greeting", "greeting"],
@@ -51,7 +55,7 @@ describe("bounded local semantic runtime acceptance", () => {
 
     expect(result.interpretation.primaryIntent).toBe(intent);
     expect(result.interpretation.discourseFacets.socialRoutine).toBe(expectedRoutine);
-    expect(result.interpretation.evidence.at(-1)?.cues).toContain(`typed_social_routine:${routine}`);
+    expect(evidenceCues(result)).toContain(`typed_social_routine:${routine}`);
     expect(result.interpretation.uncertainty.intent).toBeLessThanOrEqual(0.2);
   });
 
@@ -105,9 +109,7 @@ describe("bounded local semantic runtime acceptance", () => {
     });
 
     expect(result.interpretation.primaryIntent).toBe("information_request");
-    expect(result.interpretation.evidence.at(-1)?.cues).toContain(
-      "morphology_QUES_with_typed_polar_clause",
-    );
+    expect(evidenceCues(result)).toContain("morphology_QUES_with_typed_polar_clause");
   });
 
   it("rejects ambiguous QUES promotion without typed clause scope", async () => {
