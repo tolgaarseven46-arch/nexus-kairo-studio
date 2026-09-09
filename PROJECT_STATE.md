@@ -60,90 +60,58 @@ Kapanmış seam yeni reproducible failure, invariant failure, authority contradi
 Semantic interpretation, appraisal resolution, relationship transition ve final behavior permission ayrı fakat tekil authority'lerdir.
 
 ## 6. FAST/FULL operating model — ACTIVE
-- PR #180 merge edildi.
 - `codex/**` branch push'larında FAST lane compact canonical tests + changed tests + gerektiğinde Natural Characterization v2 + TypeScript çalıştırır ve artifact üretir.
 - PR/main gate'de FULL CI: architecture contracts + autonomous + beta + Phase-0 + historical proof + full Vitest + TypeScript + production build.
 - Behavior-critical fix PR'ları reported + neighbor + counterexample regression evidence taşır.
 
-## 7. Natural Characterization v2 — CLOSED AS PRODUCT-FAILURE PASS (2026-09-09)
-- Tooling/corpus PR #181 merge edildi.
-- Ayrı v2 corpus: 10 senaryo, 11 execution, 220 user turn.
-- Frozen 21 senaryo / 423 tur regression baseline'a dokunulmadı.
-- Per-turn artifact semantic/state/relationship/dialogue/ResponsePlan/invariant snapshot üretir.
-- Provider/API proof için kullanılmadı.
+## 7. Natural Characterization v2 — CLOSED AS PRODUCT-FAILURE PASS
+- Frozen regression baseline korunur.
+- Deterministic product-failure sonucu: `FAIL_PRODUCT=0`, `FAIL_TEST_OR_DETECTOR=0`.
+- Provider/API deterministic proof için kullanılmaz.
 
-### Final deterministic result
-- `PASS=5`
-- `FAIL_PRODUCT=0`
-- `FAIL_TEST_OR_DETECTOR=0`
-- `OBSERVATION=6`
-- `CAPABILITY_GAP=0`
+## 8. Pre-Gemini Turkish language foundation — FOUNDATION MERGED
+- PR #192 merge edildi.
+- Merge SHA: `1605e239355b485164b72f3b70f9c8c8a2f42344`.
+- Post-merge FULL CI PASS.
+- Provider-neutral rich `TurkishMorphologyEvidence` L2 contract mevcut.
+- Legacy morphology adapter mevcut; ambiguity ve explicit zero-parse korunur.
+- Typed L6 adjudicator raw text okumadan morphology + typed L3/L5 evidence tüketir.
+- `SemanticInterpretation@2` tek canonical semantic authority olarak kalır.
+- Field-level semantic provenance sidecar contract mevcut.
+- Provider winner bilinçli olarak seçilmedi; semantic LLM kaldırılmadı.
 
-### Kapanan S5 — stop + generic negation
-- PR #182 merge edildi.
-- Merge SHA: `4870d5a2398082eefdc31a04c0078b9b91875b4f`.
-- Canonical ingestion explicit Turkish stop paraphrase'lerini tanıyor.
-- `özür dilemedim / dilemiyorum` apology değildir.
-- `tavsiye/öneri istemiyorum` positive advice request değildir.
-- Progressive Turkish negation `-mıyor/-miyor/-muyor/-müyor` scope'u kapsanır.
-- Explicit resume, Kaira'nın bağımsız genuine `disengaged` relationship sınırını zorla kaldıramaz.
-- G1→G4 / RelationshipReducer / ResponsePlan değiştirilmedi.
+## 9. Local language runtime integration — ACTIVE
+Branch: `codex/local-language-runtime-integration`.
 
-### Kapanan S8 — reported third-party target bleed
-- PR #183 merge edildi.
-- Main merge SHA: `86a8cbd4664d5d52ecad5a268d83138117410caf`.
-- Narrated dative social-role recipientleri (`iş arkadaşına`, `arkadaşıma`, `kardeşime`, `patronuna`, `eşine`) canonical target resolution'da third-party olarak korunur.
-- Explicit Kaira-directed counterexample (`sana ... dedim`) Kaira target olarak kalır.
-- Third-party narrative dyadic warmth/trust/conflict/hurt'a sızmaz.
-- FULL CI #2613 PASS; Architecture Review #755 PASS.
+Bu branch'te:
+- `languageUnderstandingService` rich `MorphologyEvidenceProvider` seam'ini doğrudan kabul ediyor.
+- Legacy `MorphologyProvider` sonucu provider-neutral rich evidence'a adapte edilerek aynı L6 hattına giriyor.
+- Semantic provider input'u optional provider-neutral `morphologyEvidence` alabiliyor; provider-specific API L6 authority'ye taşınmıyor.
+- Typed L2/L3/L5 evidence canonical `SemanticInterpretation@2` üzerinde yalnız L6 reconciliation yapıyor.
+- Incoming client-shared semantic interpretation da aynı canonical L6 evidence gate'inden geçiyor; downstream raw-text parser eklenmedi.
+- Zero-parse ve ambiguity abstention davranışı runtime gateway'de korunuyor.
+- L7 `semanticFieldProvenance` runtime result sidecar olarak yalnız gerçekten morphology ile adjudicate edilen alanları kaydediyor.
+- Yeni regression testi rich morphology → canonical L6 → provenance hattını, zero-parse abstention'ı ve semantic provider'a provider-neutral evidence taşınmasını doğruluyor.
+- Production analyzer dependency henüz eklenmedi; bu commit integration seam'i kapatır, provider seçmez.
 
-## 8. Shadow-authority kısa kontrolü — CLOSED
-- `discourseSocialAct.ts` user classification shared canonical event'ten gelir.
-- `droitBehaviorEngine.computeBehaviorProfile` legacy raw-text distress fallback kodda kalsa da canonical production path structured appraisal kullanır.
-- `relationshipBehaviorService.applyRelationshipContext` caller bulunmayan cleanup candidate olarak evidence-before-deletion değerlendirilmelidir.
+## 10. Sıradaki doğrulanmış iş
+1. Branch FAST CI sonucunu doğrula; type/test failure varsa branch üzerinde düzelt.
+2. FULL PR gate aç ve Architecture Review + CI sonucunu doğrula.
+3. Green ise runtime integration PR'ını `main`e merge et.
+4. Post-merge main FULL CI doğrula.
+5. Ardından analyzer seçimini behavior authority'den bağımsız shadow benchmark işi olarak ele al: JS-native vs Zemberek sentence analysis; accuracy/coverage/latency/resource/deployment ölç.
+6. Analyzer winner ancak ölçüm kanıtıyla seçilir; semantic LLM kaldırılmaz.
+7. L3/L4 observation aileleri yalnız deterministic reproducible failure çıkarsa canonical typed evidence seam'lerinde açılır; phrase-patch yapılmaz.
 
-## 9. Repo cleanup — DEFERRED / EVIDENCE-FIRST
-- Cleanup manifest: `docs/audits/2026-09-09-repo-cleanup-manifest.md`.
-- Büyük branch/script temizliği product-language foundation işinden ayrıdır; ancestry/reference kanıtı olmadan silme yapılmaz.
-- Workflow'lar ve aktif test/proof runner'ları yalnız isimlerine bakılarak kaldırılmaz.
-
-## 10. Pre-Gemini Turkish language foundation — ACTIVE / PR #192
-- Current main bu çalışma başlamadan önce audit implementasyonunu geri alan `c30c81e94a9d549896e40580d9c76047a9a9b99f` commit'indedir; production main davranışı korunmuştur.
-- PR #192 branch: `codex/pre-gemini-language-foundation`.
-- L2 provider-neutral `TurkishMorphologyEvidence` kontratı eklendi.
-- Provider-specific morphology çıktısı L2 evidence adapter üzerinden normalize edilir; L6 provider API'sini bilmez.
-- L6 typed-evidence adjudicator yalnız typed morphology evidence tüketir; raw text'i yeniden parse ederek ikinci semantic authority oluşturmaz.
-- Ambiguous analysis ve zero-parse durumlarında semantic invention yapılmaz; adjudicator abstain eder.
-- Field-level semantic provenance sidecar kontratı eklendi; `SemanticInterpretation@2` canonical authority olarak kalır.
-- Morfoloji provider kararı bilinçli olarak ertelendi: mevcut Zemberek `/lemmas` compatibility path kalabilir; JS-native analyzer yalnız bounded shadow/characterization adayıdır; Zemberek sentence analysis daha güçlü reference adayıdır.
-- Semantic LLM kaldırılmadı; local path acceptance kanıtı olmadan provider routing değişmez.
-- Production ResponsePlan, G4, relationship, memory, YDK ve final-delivery authority değiştirilmedi.
-- FULL validate job: PASS (architecture contracts, autonomous, beta, Phase-0, historical proof, full tests, TypeScript, production build).
-- Behavior guard: PASS.
-- Architecture Review: PASS.
-- İlk PR CI başarısızlığının tek nedeni docs-guard idi; bu `PROJECT_STATE.md` checkpoint güncellemesi onu kapatmak içindir.
-
-## 11. Sıradaki doğrulanmış iş
-1. PR #192 yeni head üzerinde FULL CI + Architecture Review sonucunu doğrula.
-2. Tüm required gates yeşilse PR #192'yi `main`e merge et.
-3. Merge sonrası gerçek `main` SHA ve main CI sonucunu doğrula.
-4. Frozen 21/423 deterministic baseline'ın unchanged/pass durumunu CI evidence üzerinden tekrar doğrula.
-5. Yeni reproducible product failure yoksa G1→G4, RelationshipReducer veya ResponsePlan seam'lerini yeniden açma.
-6. Ardından yalnız ölçülmüş OBSERVATION/capability gap'leri canonical L2/L3/L4/L6 seam'lerine sınıflandır; phrase-patch açma.
-7. Repo cleanup'ı product behavior'dan ayrı evidence-first iş olarak sürdür.
-
-## 12. Latest checkpoint
+## 11. Latest checkpoint
 - Date: 2026-09-09
-- Current main: `c30c81e94a9d549896e40580d9c76047a9a9b99f`
-- Open PR: `#192 feat(language): pre-Gemini Turkish language foundation`
-- PR #192 pre-checkpoint head: `871db32021fa7b5353fcd368a65341d0533fb589`
-- FULL validate on that head: PASS
-- Behavior guard: PASS
-- Architecture Review: PASS
-- Docs guard: FAILED only because checkpoint file had not yet changed; now addressed by this commit
-- `SemanticInterpretation@2`: SINGLE CANONICAL SEMANTIC AUTHORITY
-- L6 typed-evidence adjudicator: ACTIVE IN PR, ambiguity/zero-parse abstention preserved
-- Frozen 21/423 baseline: UNCHANGED / validated in FULL lane
-- Provider winner: DEFERRED
+- Main before this branch: `1605e239355b485164b72f3b70f9c8c8a2f42344`
+- Active branch: `codex/local-language-runtime-integration`
+- Runtime typed morphology integration: IMPLEMENTED ON BRANCH
+- L7 field provenance runtime sidecar: IMPLEMENTED ON BRANCH
+- Zero-parse abstention: PRESERVED
+- Ambiguity authority rule: PRESERVED
+- New regex semantic parser: NO
+- Provider dependency added: NO
 - Semantic LLM removal: NO
-- Active work: GREEN PR #192 → MERGE → POST-MERGE MAIN CI VERIFY
+- Active work: CI → PR → MERGE → analyzer shadow benchmark
