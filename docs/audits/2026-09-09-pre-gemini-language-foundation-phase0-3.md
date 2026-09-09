@@ -1,4 +1,4 @@
-# Pre-Gemini Language Foundation — Phase 0–3 Audit
+# Pre-Gemini Language Foundation — Phase 0–4 Audit
 
 Date: 2026-09-09
 Status: bounded audit / no runtime behavior change
@@ -116,20 +116,53 @@ Use in this project:
 
 BOUN/Kenet treebanks provide manually annotated lemmas, POS, morphology and dependency relations. They are test/reference corpora, not the runtime semantic authority.
 
-## Phase-4 proof boundary
+## Phase-4 isolated morphology proof
 
-The first morphology prototype must be isolated and behavior-neutral. It will answer only:
+Question:
 
-> Can a real Turkish morphological analyzer produce useful typed evidence for our known failure families without adding new regex semantic authority?
+> Can a real Turkish morphological analyzer produce useful typed evidence for our frozen failure families without adding new regex semantic authority?
 
-Initial proof surfaces are limited to known examples around:
-- negation
-- dative/possessive forms
-- second-person forms
-- polar question morphology
-- inflected interrogatives
+Result: **GO, with bounded limitations.**
 
-No ResponsePlan, relationship, G4, memory, YDK behavior, provider routing, or learning behavior may change in the prototype.
+The isolated `nlptoolkit-morphologicalanalysis@1.0.20` proof produced:
+
+| Surface | Relevant evidence observed |
+| --- | --- |
+| `dilemiyorum` | `NEG + PROG1 + A1SG` (plus an alternate parse) |
+| `arkadaşına` | `NOUN + P2SG/P3SG + DAT` |
+| `senle` | `PRON + PERS + A2SG + INS` |
+| `seninle` | `PRON + PERS + A2SG + INS` |
+| `sende` | `PRON + PERS + A2SG + LOC`, plus an adverb ambiguity |
+| `mi` | `QUES + PRES + A3SG`, plus a noun ambiguity |
+| `mı` | `QUES + PRES + A3SG` |
+| `mu` | `QUES + PRES + A3SG` |
+| `mü` | `QUES + PRES + A3SG` |
+| `neredeydin` | interrogative pronoun + `LOC + PAST + A2SG` |
+| `kimlerle` | **no parse returned** |
+| `yaptın` | `VERB + POS + PAST + A2SG` |
+| `yapacaksın` | `VERB + POS + FUT + A2SG` |
+
+### Interpretation of Phase-4 result
+
+1. A real morphology layer can replace several hand-written surface assumptions with typed linguistic evidence.
+2. Morphology alone is **not** a complete Turkish-understanding solution. `kimlerle` failed outright, and several other surfaces returned multiple analyses.
+3. Therefore disambiguation, lexical/MWE evidence, context, syntax and canonical adjudication remain separate responsibilities.
+4. The proof does **not** justify selecting this package as the production dependency yet.
+5. The proof does **not** justify removing the semantic provider.
+6. The existing `TurkishMorphologyResult` seam is directionally sufficient to carry richer evidence; there is still no evidence requiring `SemanticInterpretation@3` at this stage.
+
+## Phase-5 contract-audit boundary
+
+Next question:
+
+> How should rich morphology evidence be represented and consumed without creating a second semantic authority?
+
+Constraints:
+- morphology remains evidence, not semantic truth
+- only L6 may adjudicate evidence into `SemanticInterpretation@2`
+- ambiguous parses must remain explicit until adjudication
+- analyzer failure/zero-parse must propagate as uncertainty/evidence absence, never as forced semantic certainty
+- field-level confidence/provenance remains the primary L7 gap to audit
 
 ## First local-semantic prototype families (later phase)
 
