@@ -21,6 +21,13 @@ const NEGATED_PREDICATE_RE = /(?<![\p{L}])(?:[\p{L}]{2,}(?:ma|me)(?:d[ıiuü](?:
 
 const STOP_TALKING_PARAPHRASE_RE = /(?:^|[\s,;:.!?])(?:konuşmayı\s+bırak(?![\p{L}])|yeter\s+artık\s+cevap\s+verme(?![\p{L}])|bana\s+(?:bir\s+şey|bi\s+şey|birşey)\s+yazma(?![\p{L}])|çekil\s+git(?![\p{L}])|artık\s+konuşmayalım(?![\p{L}])|bitir\s+bunu(?![\p{L}])|bırak\s+beni(?![\p{L}])|seninle\s+konuşmak\s+istemiyorum\s+artık(?![\p{L}])|yeter(?:\s+artık)?)(?:$|[\s,;:.!?])/iu;
 
+// Narrative-role grounding at the single semantic-ingestion boundary. These
+// forms identify an explicit third-party recipient of the narrated act. The
+// predicate requirement prevents a bare comparison such as "arkadaşına göre sen
+// salaksın" from stealing the current Kaira-directed target.
+const THIRD_PARTY_DATIVE_ROLE_RE = /(?<![\p{L}])(?:(?:iş\s+)?arkadaş|kardeş|patron|eş)(?:ım|im|um|üm|ın|in|un|ün|ı|i|u|ü|ımız|imiz|umuz|ümüz|ınız|iniz|unuz|ünüz|ları|leri)?(?:a|e|na|ne)(?![\p{L}])/iu;
+const THIRD_PARTY_NARRATIVE_PREDICATE_RE = /(?<![\p{L}])(?:dedi|demiş|bağırdı|bağırmış|hakaret\s+etti|hakaret\s+etmiş|küfür\s+etti|küfür\s+etmiş|tehdit\s+etti|tehdit\s+etmiş|kötü\s+davrandı|kötü\s+davranıyordu)(?![\p{L}])/iu;
+
 function hasAffirmativeCue(text: string, cue: RegExp): boolean {
   const flags = cue.flags.includes("g") ? cue.flags : `${cue.flags}g`;
   const matcher = new RegExp(cue.source, flags);
@@ -47,6 +54,9 @@ function reconcileSpeechActs(message: string, event: SemanticEvent): SemanticEve
     (!adviceMentioned || hasAffirmativeCue(text, ADVICE_CUE_RE));
 
   const stopTalking = event.stopTalking || STOP_TALKING_PARAPHRASE_RE.test(text);
+  const reportedThirdPartyTarget =
+    THIRD_PARTY_DATIVE_ROLE_RE.test(text) && THIRD_PARTY_NARRATIVE_PREDICATE_RE.test(text);
+  const target = reportedThirdPartyTarget ? "third_party" : event.target;
   const intent = event.intent === "apology" && !apology ? "general_chat" : event.intent;
   const relationalAct = event.relationalAct === "reconciliation_attempt" && !apology && !event.repairAttempt
     ? "none"
@@ -59,6 +69,7 @@ function reconcileSpeechActs(message: string, event: SemanticEvent): SemanticEve
   return {
     ...event,
     intent,
+    target,
     relationalAct,
     relationalIntensity: relationalAct === "none" ? 0 : event.relationalIntensity,
     valence,
