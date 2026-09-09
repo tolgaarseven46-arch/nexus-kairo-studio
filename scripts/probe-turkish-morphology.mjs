@@ -23,7 +23,7 @@ function analysesFor(surface) {
   const analyses = [];
   for (let i = 0; i < parses.size(); i += 1) {
     const parse = parses.getFsmParse(i);
-    analyses.push(parse.getTransitionList());
+    analyses.push(String(parse));
   }
   return analyses;
 }
