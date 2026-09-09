@@ -28,6 +28,22 @@ describe("semantic negation + stop neighbor proof regression", () => {
     expect(result.event.stopTalking).toBe(true);
   });
 
+  it("reported stop-scope: predicative yeter does not end the conversation", async () => {
+    const result = await semantic("bilmiyorsan bilmiyorum de yeter");
+    expect(result.interpretation.stopRequest).toBe(false);
+    expect(result.event.stopTalking).toBe(false);
+  });
+
+  it("stop-scope neighbor-1: sufficiency statement is not a stop request", async () => {
+    const result = await semantic("bu bilgi yeter");
+    expect(result.interpretation.stopRequest).toBe(false);
+  });
+
+  it("stop-scope neighbor-2: this-much-is-enough wording is not a stop request", async () => {
+    const result = await semantic("şimdilik bu kadarı yeter");
+    expect(result.interpretation.stopRequest).toBe(false);
+  });
+
   it("counterexample: affirmative apology remains affirmative", async () => {
     const result = await semantic("özür dilerim");
     expect(result.interpretation.apology).toBe(true);
@@ -36,5 +52,17 @@ describe("semantic negation + stop neighbor proof regression", () => {
   it("counterexample: negated stop wording does not manufacture stop", async () => {
     const result = await semantic("susma");
     expect(result.interpretation.stopRequest).toBe(false);
+  });
+
+  it("stop-scope counterexample-1: standalone yeter remains a stop request", async () => {
+    const result = await semantic("yeter");
+    expect(result.interpretation.stopRequest).toBe(true);
+    expect(result.event.stopTalking).toBe(true);
+  });
+
+  it("stop-scope counterexample-2: explicit yeter artık remains a stop request", async () => {
+    const result = await semantic("tamam yeter artık");
+    expect(result.interpretation.stopRequest).toBe(true);
+    expect(result.event.stopTalking).toBe(true);
   });
 });
