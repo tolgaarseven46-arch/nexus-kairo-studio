@@ -28,6 +28,7 @@ jobs:
           curl -fsSL $BASE/turkish_dictionary.txt -o turkish_dictionary.txt
           curl -fsSL $BASE/turkish_finite_state_machine.xml -o turkish_finite_state_machine.xml
           curl -fsSL $BASE/turkish_misspellings.txt -o turkish_misspellings.txt
+          curl -fsSL $BASE/turkish_morphological_lexicon.txt -o turkish_morphological_lexicon.txt
           curl -fsSL $BASE/suffixes.txt -o suffixes.txt
           curl -fsSL $BASE/pronunciations.txt -o pronunciations.txt
       - name: Run frozen morphology proof
