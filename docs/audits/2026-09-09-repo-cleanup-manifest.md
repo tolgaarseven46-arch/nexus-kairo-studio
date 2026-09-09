@@ -2,113 +2,85 @@
 
 ## Purpose
 
-This manifest records repository cleanup candidates **without deleting by appearance or age alone**. Cleanup must preserve canonical architecture, regression evidence, active CI, and historical ADR/audit records.
+Repository hygiene without deleting evidence by filename/age alone. Git history remains the archive; active runtime, CI, regression and architecture evidence stays in the current tree.
 
-Classification:
+## Verified state before this cleanup PR
 
-- `KEEP` — active runtime/CI/architecture evidence.
-- `DELETE_BRANCH` — branch is proven merged and has no open PR/work remaining.
-- `REVIEW_BRANCH` — branch exists but must receive merge/ancestry evidence before deletion.
-- `REVIEW_SCRIPT` — helper looks one-shot/legacy but must receive reference/history evidence before deletion.
-- `ARCHIVE` — historical evidence that should remain in git/docs even if no longer active.
+- Canonical main after PR #190: `5a00364af59f1968d1432ac0524dd7c02800e148`.
+- Natural Characterization v2: 10 scenarios / 11 executions / 220 turns, API-free.
+- Known reproducible product failures discovered in this characterization cycle were closed through PRs #182, #183, #185, #186, #187, #188, #189 and #190.
+- S6 playful/hurt is additionally protected by a hard trajectory regression after PR #190.
 
-## Current verified repository state
+## Workflow inventory — KEEP
 
-- Canonical main after PR #183: `86a8cbd4664d5d52ecad5a268d83138117410caf`.
-- Open PRs at inventory time: `0`.
-- `codex/*` branches discovered: `72`.
-- Natural Characterization v2 latest deterministic result before PR #183 merge: 10 scenarios / 11 executions / 220 turns, `FAIL_PRODUCT=0`, `FAIL_TEST_OR_DETECTOR=0`.
-- Provider/API was not used as proof for the S5/S8 fixes.
+All four workflows remain active and are not cleanup candidates:
 
-## Workflow inventory
+- `.github/workflows/ci.yml` — FULL merge gate.
+- `.github/workflows/architecture-review.yml` — architecture boundary review.
+- `.github/workflows/fast-ci.yml` — branch FAST lane + evidence artifact.
+- `.github/workflows/kaira-autonomous-life.yml` — autonomous-life runtime workflow.
 
-| Path | Class | Evidence / reason |
-| --- | --- | --- |
-| `.github/workflows/ci.yml` | KEEP | FULL merge gate: architecture contracts, autonomous contracts, beta, Phase-0, historical proof, full Vitest, TypeScript, production build. |
-| `.github/workflows/architecture-review.yml` | KEEP | Active architecture review gate; PR #183 Architecture Review #755 passed. |
-| `.github/workflows/fast-ci.yml` | KEEP | Active `codex/**` FAST operating model; reruns touched tests and Natural Characterization v2 on semantic-ingestion changes. |
-| `.github/workflows/kaira-autonomous-life.yml` | KEEP | Production autonomous-life scheduler/runtime workflow. |
+## Active script/tooling policy — KEEP
 
-No workflow is a deletion candidate in this pass.
+Keep scripts that are referenced by package/workflow/current testing, including:
 
-## Immediately proven merged branch candidates
+- `scripts/run-behavior-red-green-proof.mjs`
+- FAST CI runner
+- Natural Characterization v2 report runner
+- Phase-0 / beta acceptance runners used by FULL CI
 
-These branch heads were used by merged PRs and there are no open PRs now.
+## One-shot source-rewrite/debug scripts — REMOVED FROM CURRENT TREE
 
-| Branch | Class | Merge evidence |
-| --- | --- | --- |
-| `codex/natural-characterization-v2` | DELETE_BRANCH | PR #181 merged; Natural Characterization v2 tooling is on main. |
-| `codex/semantic-negation-stop-paraphrase` | DELETE_BRANCH | PR #182 merged; merge SHA `4870d5a2398082eefdc31a04c0078b9b91875b4f`. |
-| `codex/third-party-reported-target-resolution` | DELETE_BRANCH | PR #183 merged; merge SHA `86a8cbd4664d5d52ecad5a268d83138117410caf`. |
+The following files were verified as unreferenced by `package.json`, workflows, source imports and current repo code search. Representative inspection also confirmed that they mutate source files as historical migration/debug helpers rather than serving runtime/test execution.
 
-Branch deletion is repository hygiene only; it must not remove git history or merged commits.
+Removed in `codex/repo-cleanup-one-shot-scripts`:
 
-## Remaining branch inventory
+1. `scripts/addSemanticTestsToLiveDebug.mjs`
+2. `scripts/removeSemanticTestsFromLiveDebug.mjs`
+3. `scripts/makeSemanticQuickTestsVisible.mjs`
+4. `scripts/fixTestLabCanonicalState.mjs`
+5. `scripts/applyEntityGroundingToResponse.mjs`
+6. `scripts/applyEntityResolutionPersistence.mjs`
+7. `scripts/applyLanguageUnderstandingIntegration.mjs`
+8. `scripts/applyWorldEventIntegration.mjs`
+9. `scripts/applyWorldEventRetrieval.mjs`
+10. `scripts/applyWorldEventRetrievalAudit.mjs`
+11. `scripts/applyWorldModelEventStore.mjs`
 
-The repository still contains 69 additional `codex/*` branches after excluding the three directly proven candidates above. They are `REVIEW_BRANCH` until GitHub merge/ancestry evidence is checked. No branch may be deleted merely because its name looks old.
+These are **not destroyed historical evidence**: their contents and commits remain recoverable through git history.
 
-Notable families observed:
+## Branch hygiene
 
-- Phase-0 authority/harness/report/red-team branches.
-- Social Appraisal G1/G2/G3/G4 and dyadic-norm branches.
-- Autonomous-life scheduler/finalize/diagnostics branches.
-- Conversation/final-delivery/question/memory bug-fix branches.
-- World-model/event/retrieval branches.
-- FAST CI / beta acceptance / characterization branches.
+The earlier inventory found 72 `codex/*` branches. Several heads are proven merged and are safe deletion candidates, including the heads used by PRs #181–#190.
 
-Cleanup rule: a branch becomes `DELETE_BRANCH` only if all branch-only commits are already represented on main (directly or through a merged PR) and there is no open PR or active checkpoint depending on it.
+However, the currently available GitHub connector exposes branch create/update but **no delete-ref action**. Therefore branch refs are not claimed as deleted in this cleanup. The safe-delete classification remains recorded; physical branch deletion is a repository-hygiene follow-up when an authorized delete-ref path is available.
 
-## Script inventory — active vs review
+Important: some older branches diverge from main and cannot be deleted merely because their names look historical. Git history/merged-PR evidence is required.
 
-### KEEP — explicitly wired to package/CI or current operating model
+## Docs policy
 
-- `scripts/run-behavior-red-green-proof.mjs` — called by FULL CI historical RED→GREEN gate.
-- FAST CI runner and Natural Characterization v2 report runner — active branch validation/characterization evidence.
-- Phase-0/beta acceptance report runners referenced by `.github/workflows/ci.yml` — active CI evidence.
+KEEP:
+- `PROJECT_STATE.md`
+- `AI_CONTEXT.md`
+- `AI_CHANGELOG.md`
+- `AGENTS.md`
+- `CLAUDE.md`
+- `docs/adr/**`
 
-### REVIEW_SCRIPT — likely one-shot migration/debug helpers; no deletion in this manifest
+ARCHIVE/KEEP as historical evidence:
+- `docs/audits/**`
 
-The `scripts/` directory still contains helpers with migration/debug naming such as:
+Root historical audit documents should migrate under `docs/audits/` or `docs/archive/` in a future docs-only cleanup if needed; this is not allowed to block product work.
 
-- `addSemanticTestsToLiveDebug.mjs`
-- `removeSemanticTestsFromLiveDebug.mjs`
-- `makeSemanticQuickTestsVisible.mjs`
-- `fixTestLabCanonicalState.mjs`
-- `applyEntityGroundingToResponse.mjs`
-- `applyEntityResolutionPersistence.mjs`
-- `applyLanguageUnderstandingIntegration.mjs`
-- `applyWorldEventIntegration.mjs`
-- `applyWorldEventRetrieval.mjs`
-- `applyWorldEventRetrievalAudit.mjs`
-- `applyWorldModelEventStore.mjs`
+## Cleanup result
 
-`package.json` does not expose these helpers as npm scripts. That is **not sufficient evidence for deletion**. Before deleting each file, require:
+- 11 obsolete one-shot scripts removed from the live tree.
+- Active CI/runtime/test tooling preserved.
+- No product runtime behavior changed by this cleanup PR.
+- No regression baseline removed.
+- No provider/API evidence used.
+- Branch refs remain only because delete-ref capability is unavailable; no false claim of deletion is made.
 
-1. no reference from package scripts, workflows, source imports, docs instructions, or current tooling;
-2. its intended transformation is already represented in main;
-3. no regression/restore procedure depends on it;
-4. deletion passes FAST and FULL gates when behavior-critical paths are involved.
+## Closure rule
 
-## Docs / audit policy
-
-- `PROJECT_STATE.md`: KEEP, but update to the post-PR-183 checkpoint.
-- `AI_CONTEXT.md`, `AI_CHANGELOG.md`, `docs/adr/**`: KEEP; they hold architecture/contracts/history.
-- `docs/audits/**`: ARCHIVE by default. Audit files are evidence, not runtime clutter; delete only duplicate/generated artifacts that are reproducible and carry no unique decision record.
-
-## Cleanup execution order
-
-1. Update `PROJECT_STATE.md` to mark Natural Characterization v2 tooling + S5 + S8 closed and main at `86a8cbd4…`.
-2. Remove only the three directly proven merged branch refs above when branch-ref deletion capability is available.
-3. Batch-audit the remaining 69 branches against main/merged PR history; promote only proven ones to `DELETE_BRANCH`.
-4. Audit `REVIEW_SCRIPT` helpers for references and historical necessity.
-5. Delete script files only in a dedicated cleanup PR with no product behavior change, and run the normal gates.
-6. Recount branch/script inventory after merge and record the reduced state.
-
-## Explicit non-goals
-
-- No architecture redesign.
-- No new semantic classifier or regex patch.
-- No G1→G4, RelationshipReducer, memory, ResponsePlan, or speech-identity change.
-- No regression baseline removal.
-- No provider/API evidence.
-- No deletion based only on filename, age, or branch naming.
+This cleanup phase is complete when this PR passes normal gates and merges. Further branch/doc hygiene is backlog and must not block the next product capability unless a concrete repository-operability problem is demonstrated.
