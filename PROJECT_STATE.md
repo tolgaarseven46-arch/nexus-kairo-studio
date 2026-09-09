@@ -84,11 +84,13 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 
 ## 10. Latest checkpoint
 - Date: 2026-09-09
-- Current main: `cbd4c8bf93c87c97deb30c378631b5f24a3fa732`
-- Main FULL CI #2644: PASS
-- Pre-Gemini bounded language phase: CLOSED
-- Analyzer winner: NOT SELECTED
-- External AI API in deterministic tests: NO
-- New regex semantic parser: NO
-- Semantic LLM removal: NO
-- Active language cleanup work: NONE
+- Language closeout PR #197 merged as `224c62d62319be8434ab5ab4c0233128c7e8525a`.
+- Verified post-closeout main CI #2646: PASS.
+- Open PRs at checkpoint verification: NONE.
+- Pre-Gemini bounded language phase: CLOSED.
+- Analyzer winner: NOT SELECTED.
+- External AI API in deterministic tests: NO.
+- New regex semantic parser: NO.
+- Semantic LLM removal: NO.
+- Active language cleanup work: NONE.
+- Next work must start from a newly measured product/runtime target; do not reopen this phase without new evidence.
