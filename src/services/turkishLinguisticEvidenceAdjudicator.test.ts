@@ -80,8 +80,24 @@ describe("canonical Turkish linguistic-evidence adjudicator", () => {
         }],
       },
     });
-    expect(result.apology).toBe(true);
-    expect(result.primaryIntent).toBe("apology");
+    expect(result).toEqual(input);
+  });
+
+  it("abstains completely when morphology has a zero-parse token", () => {
+    const input = base({ primaryIntent: "apology", secondarySocialActs: ["apology"], apology: true });
+    const result = reconcileSemanticInterpretationWithLinguisticEvidence(input, {
+      apologyCandidate: true,
+      adviceCandidate: true,
+      polarQuestionClause: true,
+      morphology: {
+        provider: "fixture",
+        normalizedText: "kimlerle",
+        tokens: [{ surface: "kimlerle", analyses: [] }],
+      },
+    });
+
+    expect(result).toEqual(input);
+    expect(result.evidence).toHaveLength(0);
   });
 
   it("promotes QUES only when clause scope is typed", () => {
@@ -114,6 +130,28 @@ describe("canonical Turkish linguistic-evidence adjudicator", () => {
     expect(result.primaryIntent).toBe("smalltalk");
     expect(result.uncertainty.intent).toBeGreaterThanOrEqual(0.65);
     expect(result.uncertainty.ambiguousReadings).toContain("question_particle_vs_non_question_homograph");
+    expect(result.evidence.at(-1)?.cues).toContain("ambiguous_morphology_QUES_not_promoted");
+  });
+
+  it("does not use ambiguous QUES as standalone semantic authority", () => {
+    const input = base();
+    const result = reconcileSemanticInterpretationWithLinguisticEvidence(input, {
+      morphology: {
+        provider: "fixture",
+        normalizedText: "mi",
+        tokens: [{
+          surface: "mi",
+          analyses: [
+            { lemma: "mi", pos: "NOUN", morphemes: ["A3SG", "PNON", "NOM"] },
+            { lemma: "mi", pos: "QUES", morphemes: ["QUES", "PRES", "A3SG"] },
+          ],
+        }],
+      },
+    });
+
+    expect(result.primaryIntent).toBe(input.primaryIntent);
+    expect(result.evidence.at(-1)?.provider).toBe("typed_turkish_linguistic_evidence");
+    expect(result.evidence.at(-1)?.cues).toEqual(["ambiguous_morphology_QUES_not_promoted"]);
   });
 
   it("does nothing for lemma-only legacy evidence", () => {
