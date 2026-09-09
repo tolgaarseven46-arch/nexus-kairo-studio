@@ -214,18 +214,31 @@ function evaluateSingleExecution(
 
   if (oracle.type === "stop_resume") {
     const failures: string[] = [];
+    const observations: string[] = [];
     for (const turnNumber of oracle.stopTurns) {
       const turn = execution.turns[turnNumber - 1];
       if (!turn || turn.responsePlan.continueConversation) failures.push(`turn=${turnNumber} expected current-turn stop to set continueConversation=false`);
     }
     const resume = execution.turns[oracle.resumeTurn - 1];
-    if (!resume || !resume.responsePlan.continueConversation) failures.push(`turn=${oracle.resumeTurn} expected explicit resume turn to allow conversation`);
+    if (!resume) {
+      failures.push(`turn=${oracle.resumeTurn} resume turn missing`);
+    } else {
+      const relationshipStateBefore = String(resume.relationship.before?.conversationState ?? "active");
+      if (relationshipStateBefore === "active" && !resume.responsePlan.continueConversation) {
+        failures.push(`turn=${oracle.resumeTurn} active relationship remained closed after explicit resume`);
+      } else if (relationshipStateBefore !== "active" && !resume.responsePlan.continueConversation) {
+        observations.push(`turn=${oracle.resumeTurn} explicit resume did not override independent relationship state=${relationshipStateBefore}`);
+      }
+    }
     for (const turnNumber of oracle.nonApologyTurns ?? []) {
       const turn = execution.turns[turnNumber - 1];
       if (!turn || turn.semantic.apology || turn.semantic.repairAttempt) failures.push(`turn=${turnNumber} negated apology must not become apology/repair`);
     }
     execution.classification = failures.length ? "FAIL_PRODUCT" : "PASS";
-    execution.evidence.push(...(failures.length ? failures : ["current-turn stop paraphrases, resume and negated-apology semantics respected"]));
+    execution.evidence.push(
+      ...(failures.length ? failures : ["current-turn stop paraphrases and negated-apology semantics respected without overriding independent Kaira disengage"]),
+      ...observations,
+    );
     return execution;
   }
 
