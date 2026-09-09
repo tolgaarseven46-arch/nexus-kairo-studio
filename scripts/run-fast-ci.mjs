@@ -26,6 +26,12 @@ const tests = [
   'src/services/kairaResponsePlanFinalAuthorityContracts.test.ts',
 ];
 
+for (const path of changedPaths) {
+  if (/\.test\.(?:ts|tsx|js|jsx)$/u.test(path) && !tests.includes(path)) {
+    tests.push(path);
+  }
+}
+
 const naturalV2Touched = changedPaths.some((path) =>
   path === 'config/kairaNaturalCharacterizationV2Scenarios.json' ||
   path === 'src/services/kairaNaturalCharacterizationV2.ts' ||
@@ -34,7 +40,7 @@ const naturalV2Touched = changedPaths.some((path) =>
   path === 'scripts/run-natural-characterization-v2.ts'
 );
 
-if (naturalV2Touched) {
+if (naturalV2Touched && !tests.includes('src/services/kairaNaturalCharacterizationV2.characterization.test.ts')) {
   tests.push('src/services/kairaNaturalCharacterizationV2.characterization.test.ts');
 }
 
@@ -109,7 +115,7 @@ if (vitest.exitCode === 0 && characterization.exitCode === 0) {
 
 const phases = [vitest, characterization, typescript];
 const summary = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   lane: 'fast',
   providerCalls: false,
   generatedAt: new Date().toISOString(),
