@@ -19,7 +19,8 @@ const ADVICE_CUE_RE = /(?<![\p{L}])(tavsiye|öneri|öner|akıl)(?![\p{L}])/iu;
 const NEGATION_PARTICLE_RE = /(?<![\p{L}])(?:değil(?:im|sin|iz|siniz)?|yok)(?![\p{L}])/iu;
 const NEGATED_PREDICATE_RE = /(?<![\p{L}])(?:[\p{L}]{2,}(?:ma|me)(?:d[ıiuü](?:m|n|k|nız|niz|lar|ler)?|mış|miş|muş|müş|yacak|yecek|yacağım|yeceğim|malı|meli|sın|sin)?|[\p{L}]{2,}m[ıiuü]yor(?:um|sun|uz|sunuz|lar)?)(?![\p{L}])/iu;
 
-const STOP_TALKING_PARAPHRASE_RE = /(?:^|[\s,;:.!?])(?:konuşmayı\s+bırak(?![\p{L}])|yeter\s+artık\s+cevap\s+verme(?![\p{L}])|bana\s+(?:bir\s+şey|bi\s+şey|birşey)\s+yazma(?![\p{L}])|çekil\s+git(?![\p{L}])|artık\s+konuşmayalım(?![\p{L}])|bitir\s+bunu(?![\p{L}])|bırak\s+beni(?![\p{L}])|seninle\s+konuşmak\s+istemiyorum\s+artık(?![\p{L}])|yeter(?:\s+artık)?)(?:$|[\s,;:.!?])/iu;
+const STOP_TALKING_PARAPHRASE_RE = /(?:^|[\s,;:.!?])(?:konuşmayı\s+bırak(?![\p{L}])|yeter\s+artık\s+cevap\s+verme(?![\p{L}])|bana\s+(?:bir\s+şey|bi\s+şey|birşey)\s+yazma(?![\p{L}])|çekil\s+git(?![\p{L}])|artık\s+konuşmayalım(?![\p{L}])|bitir\s+bunu(?![\p{L}])|bırak\s+beni(?![\p{L}])|seninle\s+konuşmak\s+istemiyorum\s+artık(?![\p{L}]))(?:$|[\s,;:.!?])/iu;
+const STANDALONE_YETER_STOP_RE = /^(?:(?:tamam|kanka|abi|ya)\s+)?yeter(?:\s+artık)?[.!?…]*$/iu;
 
 // Narrative-role grounding at the single semantic-ingestion boundary. These
 // forms identify an explicit third-party recipient of the narrated act. The
@@ -53,7 +54,10 @@ function reconcileSpeechActs(message: string, event: SemanticEvent): SemanticEve
   const adviceRequested = Boolean(event.adviceRequested) &&
     (!adviceMentioned || hasAffirmativeCue(text, ADVICE_CUE_RE));
 
-  const stopTalking = event.stopTalking || STOP_TALKING_PARAPHRASE_RE.test(text);
+  const stopTalking =
+    event.stopTalking ||
+    STOP_TALKING_PARAPHRASE_RE.test(text) ||
+    STANDALONE_YETER_STOP_RE.test(text);
   const reportedThirdPartyTarget =
     THIRD_PARTY_DATIVE_ROLE_RE.test(text) && THIRD_PARTY_NARRATIVE_PREDICATE_RE.test(text);
   const target = reportedThirdPartyTarget ? "third_party" : event.target;
