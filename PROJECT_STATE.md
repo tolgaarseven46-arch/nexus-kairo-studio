@@ -102,36 +102,48 @@ Semantic interpretation, appraisal resolution, relationship transition ve final 
 - `droitBehaviorEngine.computeBehaviorProfile` legacy raw-text distress fallback kodda kalsa da canonical production path structured appraisal kullanır.
 - `relationshipBehaviorService.applyRelationshipContext` caller bulunmayan cleanup candidate olarak evidence-before-deletion değerlendirilmelidir.
 
-## 9. Repo cleanup — ACTIVE, EVIDENCE-FIRST
+## 9. Repo cleanup — DEFERRED / EVIDENCE-FIRST
 - Cleanup manifest: `docs/audits/2026-09-09-repo-cleanup-manifest.md`.
-- Inventory anında açık PR: `0`.
-- Tespit edilen `codex/*` branch sayısı: `72`.
-- Dört workflow da aktif ve KEEP: `ci.yml`, `architecture-review.yml`, `fast-ci.yml`, `kaira-autonomous-life.yml`.
-- Doğrudan merge-proof branch delete candidates:
-  - `codex/natural-characterization-v2` — PR #181 merged;
-  - `codex/semantic-negation-stop-paraphrase` — PR #182 merged;
-  - `codex/third-party-reported-target-resolution` — PR #183 merged.
-- Diğer 69 branch ancestry/merged-PR kanıtı olmadan silinmez.
-- Eski `apply*/fix*/debug*` scriptleri yalnız isimlerine bakılarak silinmez; reference/history evidence gerekir.
-- `run-behavior-red-green-proof.mjs`, Phase-0/beta runners, FAST/Natural-v2 runners aktif CI/tooling kanıtıdır ve KEEP'tir.
+- Büyük branch/script temizliği product-language foundation işinden ayrıdır; ancestry/reference kanıtı olmadan silme yapılmaz.
+- Workflow'lar ve aktif test/proof runner'ları yalnız isimlerine bakılarak kaldırılmaz.
 
-## 10. Sıradaki doğrulanmış iş
-1. Cleanup manifest PR'ını merge gate'den geçir.
-2. Remaining 69 `codex/*` branch'i batch merge/ancestry evidence ile sınıflandır.
-3. Merge-proof branch ref'lerini repository hygiene olarak kaldır.
-4. `REVIEW_SCRIPT` listesindeki one-shot yardımcıları repo reference/history evidence ile ayır.
-5. Yalnız kanıtlı dead script/doc kalıntılarını ayrı cleanup PR'da kaldır; product behavior değiştirme.
-6. Cleanup sonrası branch/script sayısını yeniden kaydet.
-7. Sonra Natural Characterization v2 OBSERVATION senaryolarını **bug varsaymadan** sırayla analiz et; yalnız yeni `FAIL_PRODUCT` kanıtı çıkan yerde product patch aç.
+## 10. Pre-Gemini Turkish language foundation — ACTIVE / PR #192
+- Current main bu çalışma başlamadan önce audit implementasyonunu geri alan `c30c81e94a9d549896e40580d9c76047a9a9b99f` commit'indedir; production main davranışı korunmuştur.
+- PR #192 branch: `codex/pre-gemini-language-foundation`.
+- L2 provider-neutral `TurkishMorphologyEvidence` kontratı eklendi.
+- Provider-specific morphology çıktısı L2 evidence adapter üzerinden normalize edilir; L6 provider API'sini bilmez.
+- L6 typed-evidence adjudicator yalnız typed morphology evidence tüketir; raw text'i yeniden parse ederek ikinci semantic authority oluşturmaz.
+- Ambiguous analysis ve zero-parse durumlarında semantic invention yapılmaz; adjudicator abstain eder.
+- Field-level semantic provenance sidecar kontratı eklendi; `SemanticInterpretation@2` canonical authority olarak kalır.
+- Morfoloji provider kararı bilinçli olarak ertelendi: mevcut Zemberek `/lemmas` compatibility path kalabilir; JS-native analyzer yalnız bounded shadow/characterization adayıdır; Zemberek sentence analysis daha güçlü reference adayıdır.
+- Semantic LLM kaldırılmadı; local path acceptance kanıtı olmadan provider routing değişmez.
+- Production ResponsePlan, G4, relationship, memory, YDK ve final-delivery authority değiştirilmedi.
+- FULL validate job: PASS (architecture contracts, autonomous, beta, Phase-0, historical proof, full tests, TypeScript, production build).
+- Behavior guard: PASS.
+- Architecture Review: PASS.
+- İlk PR CI başarısızlığının tek nedeni docs-guard idi; bu `PROJECT_STATE.md` checkpoint güncellemesi onu kapatmak içindir.
 
-## 11. Latest checkpoint
+## 11. Sıradaki doğrulanmış iş
+1. PR #192 yeni head üzerinde FULL CI + Architecture Review sonucunu doğrula.
+2. Tüm required gates yeşilse PR #192'yi `main`e merge et.
+3. Merge sonrası gerçek `main` SHA ve main CI sonucunu doğrula.
+4. Frozen 21/423 deterministic baseline'ın unchanged/pass durumunu CI evidence üzerinden tekrar doğrula.
+5. Yeni reproducible product failure yoksa G1→G4, RelationshipReducer veya ResponsePlan seam'lerini yeniden açma.
+6. Ardından yalnız ölçülmüş OBSERVATION/capability gap'leri canonical L2/L3/L4/L6 seam'lerine sınıflandır; phrase-patch açma.
+7. Repo cleanup'ı product behavior'dan ayrı evidence-first iş olarak sürdür.
+
+## 12. Latest checkpoint
 - Date: 2026-09-09
-- Current main: `86a8cbd4664d5d52ecad5a268d83138117410caf`
-- Open PRs before cleanup-manifest PR: `0`
-- FAST/FULL model: ACTIVE
-- Natural Characterization v2: `FAIL_PRODUCT=0`, `FAIL_TEST_OR_DETECTOR=0`
-- S5: CLOSED / MERGED
-- S8: CLOSED / MERGED
-- Frozen 21/423 baseline: UNCHANGED
-- Provider/API used in current proof: NO
-- Active work: EVIDENCE-FIRST REPO CLEANUP MANIFEST + CLASSIFICATION
+- Current main: `c30c81e94a9d549896e40580d9c76047a9a9b99f`
+- Open PR: `#192 feat(language): pre-Gemini Turkish language foundation`
+- PR #192 pre-checkpoint head: `871db32021fa7b5353fcd368a65341d0533fb589`
+- FULL validate on that head: PASS
+- Behavior guard: PASS
+- Architecture Review: PASS
+- Docs guard: FAILED only because checkpoint file had not yet changed; now addressed by this commit
+- `SemanticInterpretation@2`: SINGLE CANONICAL SEMANTIC AUTHORITY
+- L6 typed-evidence adjudicator: ACTIVE IN PR, ambiguity/zero-parse abstention preserved
+- Frozen 21/423 baseline: UNCHANGED / validated in FULL lane
+- Provider winner: DEFERRED
+- Semantic LLM removal: NO
+- Active work: GREEN PR #192 → MERGE → POST-MERGE MAIN CI VERIFY
