@@ -117,7 +117,7 @@ function reconcileSemanticTargetWithEntityResolution(
       evidence: [
         ...interpretation.evidence,
         {
-          source: "reconciled",
+          source: "reconciled" as const,
           provider: "canonical_language_gateway",
           cues: ["explicit_kaira_reference_completes_unknown_target"],
           confidence: 0.95,
