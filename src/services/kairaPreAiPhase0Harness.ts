@@ -63,6 +63,11 @@ export interface KairaPreAiScenarioResult {
   toolingNotes: string[];
 }
 
+export interface KairaPreAiScenarioRunOptions {
+  /** Test-only deterministic seed. Omitted for the frozen 21/423 Phase-0 baseline. */
+  initialDynamicState?: Partial<DroitDynamicState>;
+}
+
 const DEFAULT_STATE: DroitDynamicState = {
   calmness: 70,
   anger: 10,
@@ -72,6 +77,18 @@ const DEFAULT_STATE: DroitDynamicState = {
   surprise: 10,
   lastStatus: "Sakin ve kontrollü",
 };
+
+function initialDynamicStateFrom(
+  seed?: Partial<DroitDynamicState>,
+): DroitDynamicState {
+  return {
+    ...DEFAULT_STATE,
+    ...seed,
+    ...(seed?.relationship
+      ? { relationship: { ...seed.relationship } }
+      : {}),
+  };
+}
 
 function coreConsumptionTrace(event: any) {
   return [
@@ -175,11 +192,12 @@ function buildCoreFinalProviderPrompt(input: {
 export async function runKairaPreAiPhase0Scenario(
   scenario: KairaPreAiScenarioDefinition,
   runId = "run001",
+  options: KairaPreAiScenarioRunOptions = {},
 ): Promise<KairaPreAiScenarioResult> {
   const userId = `preai_${scenario.scenarioId}_${runId}`;
   const sessionId = `preai_session_${scenario.scenarioId}_${runId}`;
   const personality = normalizeDroitPersonality(null);
-  let dynamicState: DroitDynamicState = { ...DEFAULT_STATE };
+  let dynamicState: DroitDynamicState = initialDynamicStateFrom(options.initialDynamicState);
   const history: Array<{ sender: string; text: string; semanticInterpretation?: SemanticInterpretation }> = [];
   const turns: KairaPreAiScenarioTurnResult[] = [];
   const failureClassCounts: Record<string, number> = {};
