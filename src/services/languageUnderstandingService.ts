@@ -88,7 +88,6 @@ function reconcileSemanticTargetWithEntityResolution(
   interpretation: SemanticInterpretation,
   entityResolution: EntityResolutionResult,
 ): SemanticInterpretation {
-  if (interpretation.target !== "third_party") return interpretation;
   const explicitKairaReference = entityResolution.references.some((ref) =>
     (ref.role === "second_person" || ref.role === "character") &&
     ref.resolvedId === "kaira" &&
@@ -97,6 +96,37 @@ function reconcileSemanticTargetWithEntityResolution(
   const explicitThirdPartyReference = entityResolution.references.some((ref) =>
     ref.role === "named_person" && ref.resolvedId !== "current_user" && ref.resolvedId !== "kaira"
   ) || entityResolution.namedPeople.length > 0;
+
+  // Entity resolution already owns participant/reference grounding. If the
+  // semantic provider/fallback left target unresolved despite an explicit,
+  // high-confidence Kaira reference and there is no competing named third party,
+  // complete that typed contradiction here rather than teaching downstream
+  // appraisal/relationship consumers to reparse second-person morphology.
+  if (
+    interpretation.target === "unknown" &&
+    explicitKairaReference &&
+    !explicitThirdPartyReference
+  ) {
+    return {
+      ...interpretation,
+      target: "kaira",
+      uncertainty: {
+        ...interpretation.uncertainty,
+        target: Math.min(interpretation.uncertainty.target, 0.2),
+      },
+      evidence: [
+        ...interpretation.evidence,
+        {
+          source: "reconciled",
+          provider: "canonical_language_gateway",
+          cues: ["explicit_kaira_reference_completes_unknown_target"],
+          confidence: 0.95,
+        },
+      ].slice(-8),
+    };
+  }
+
+  if (interpretation.target !== "third_party") return interpretation;
   const relationalAct = interpretation.discourseFacets.relationalAct;
   const dyadicSemantic = relationalAct !== "none" ||
     interpretation.primaryIntent === "affection" ||
