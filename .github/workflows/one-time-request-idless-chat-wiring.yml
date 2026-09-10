@@ -1,0 +1,57 @@
+name: One-time requestId-less chat wiring
+
+on:
+  push:
+    branches:
+      - codex/request-idless-chat-serialization
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/request-idless-chat-serialization
+          fetch-depth: 0
+      - name: Wire internal coordination identity into chat route
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('server.ts')
+          s = p.read_text()
+
+          old = 'import express from "express";\n'
+          new = 'import express from "express";\nimport { randomUUID } from "node:crypto";\n'
+          assert old in s and 'node:crypto' not in s
+          s = s.replace(old, new, 1)
+
+          old = 'import { claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";\n'
+          new = old + 'import { resolveKairaChatRequestCoordinationIdentity } from "./src/services/kairaChatRequestCoordinationIdentity";\n'
+          assert old in s and 'resolveKairaChatRequestCoordinationIdentity' not in s
+          s = s.replace(old, new, 1)
+
+          assert 'let idempotencyKey = "";' in s
+          assert 'let ownsIdempotencyClaim = false;' in s
+          s = s.replace('let idempotencyKey = "";', 'let coordinationKey = "";')
+          s = s.replace('let ownsIdempotencyClaim = false;', 'let ownsCoordinationClaim = false;')
+          s = s.replace('idempotencyKey', 'coordinationKey')
+          s = s.replace('ownsIdempotencyClaim', 'ownsCoordinationClaim')
+
+          old = '''    const requestId = typeof incomingRequestId === "string" ? incomingRequestId.trim().slice(0, 160) : "";\n    coordinationKey = requestId ? `${stateUserId}::${kairaInstance.instanceId}::${requestId}` : "";\n'''
+          new = '''    const requestIdentity = resolveKairaChatRequestCoordinationIdentity(\n      incomingRequestId,\n      randomUUID,\n    );\n    const requestId = requestIdentity.requestId;\n    coordinationKey = `${stateUserId}::${kairaInstance.instanceId}::${requestIdentity.coordinationRequestId}`;\n'''
+          assert old in s
+          s = s.replace(old, new, 1)
+
+          p.write_text(s)
+          PY
+
+          rm .github/workflows/one-time-request-idless-chat-wiring.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts .github/workflows/one-time-request-idless-chat-wiring.yml
+          git commit -m "fix(persistence): serialize requestId-less chat turns"
+          git push origin HEAD:codex/request-idless-chat-serialization
