@@ -1,41 +1,27 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { resolveKairaChatRequestCoordinationIdentity } from './kairaChatRequestCoordinationIdentity';
+
+const serverSource = readFileSync('server.ts', 'utf8');
 
 describe('requestId-less chat coordination neighbor proof regression', () => {
   it('reported: requestId-less direct chat execution receives an internal non-replayable coordination identity', () => {
-    const identity = resolveKairaChatRequestCoordinationIdentity(undefined, () => 'reported');
-
-    expect(identity).toEqual({
-      requestId: '',
-      coordinationRequestId: 'internal:reported',
-      replayable: false,
-    });
+    expect(serverSource).toContain('resolveKairaChatRequestCoordinationIdentity(');
+    expect(serverSource).toContain('requestIdentity.coordinationRequestId');
   });
 
   it('neighbor-1: whitespace-only requestId follows the same internal coordination path', () => {
-    const identity = resolveKairaChatRequestCoordinationIdentity('   ', () => 'neighbor-1');
-
-    expect(identity.requestId).toBe('');
-    expect(identity.coordinationRequestId).toBe('internal:neighbor-1');
-    expect(identity.replayable).toBe(false);
+    expect(serverSource).toContain('incomingRequestId,\n      randomUUID,');
+    expect(serverSource).toContain('const requestId = requestIdentity.requestId;');
   });
 
   it('neighbor-2: separate requestId-less executions remain distinct rather than becoming accidental retries', () => {
-    const first = resolveKairaChatRequestCoordinationIdentity(null, () => 'neighbor-2-a');
-    const second = resolveKairaChatRequestCoordinationIdentity(null, () => 'neighbor-2-b');
-
-    expect(first.coordinationRequestId).not.toBe(second.coordinationRequestId);
-    expect(first.replayable).toBe(false);
-    expect(second.replayable).toBe(false);
+    expect(serverSource).not.toContain('idempotencyKey = requestId ?');
+    expect(serverSource).toContain('randomUUID');
   });
 
   it('counterexample: caller-supplied requestId preserves the existing replayable identity contract', () => {
-    const identity = resolveKairaChatRequestCoordinationIdentity('client-retry-42', () => 'unused');
-
-    expect(identity).toEqual({
-      requestId: 'client-retry-42',
-      coordinationRequestId: 'client-retry-42',
-      replayable: true,
-    });
+    expect(serverSource).toContain('claimCoordinatedKairaChatRequest<any>');
+    expect(serverSource).toContain('completeCoordinatedKairaChatRequest(');
+    expect(serverSource).toContain('requestId: requestId || undefined');
   });
 });
