@@ -82,26 +82,35 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 - Yeni semantic authority veya provider/API dependency eklenmedi.
 - Frozen 21/423 Phase-0 baseline ve PR #199 relationship A/B acceptance korundu.
 
-## 10. Provider-free long-horizon relationship progression/persistence — ACTIVE
-- Branch: `codex/relationship-long-horizon-persistence`.
-- Canonical reducer zaten age + interaction tabanlı continuous familiarity, relationship-quality gelişimi, injury damping ve recovery üretir.
-- Production `server.ts` persistent Kaira instance'larında `loadKdmState(stateUserId)` ile hydrate eder ve `saveKdmInteraction` ile `kdm.nextDynamicState` kaydeder.
-- `kdmPersistenceService.ts` relationship continuation için gereken durable alanları normalize/save/load zincirinde taşır.
-- Yeni acceptance testi, 40 turluk provider-free horizon'u persistence-style JSON round-trip ile iki fazda çalıştırır; interaction count, familiarity, warmth/trust progression ve firstSeen/lastInteraction continuity doğrulanır.
-- Aynı test production hydrate/save seam'lerinin persistentRelationship policy ile scope edildiğini ve durable relationship fields'in persistence katmanında bulunduğunu kilitler.
-- Bu faz yeni semantic parser, model/provider çağrısı veya ikinci relationship authority eklemez.
+## 10. Provider-free long-horizon relationship progression/persistence — MERGED
+- PR #202 merge: `38c5c8fe990f967610ee1b5bf47ff752293ee572`.
+- Post-merge main FULL CI #2664 PASS.
+- Canonical reducer age + interaction tabanlı continuous familiarity, relationship-quality gelişimi, injury damping ve recovery üretir.
+- 40 turluk provider-free horizon persistence-style JSON round-trip ile iki fazda doğrulandı; interaction count, familiarity, warmth/trust progression ve firstSeen/lastInteraction continuity korundu.
+- Production persistent Kaira instance hydrate/save seam'leri ve durable relationship field continuity acceptance ile kilitlendi.
+- Yeni semantic parser, model/provider çağrısı veya ikinci relationship authority eklenmedi.
 
-## 11. Sıradaki doğrulanmış iş
-- Long-horizon relationship progression/persistence acceptance CI ile doğrulanacak ve merge edilecek.
-- Ardından provider-free memory + relationship combined behavior acceptance hedefi açılacak.
+## 11. Provider-free memory + relationship combined behavior — ACTIVE
+- Branch: `codex/memory-relationship-combined-acceptance`.
+- Hedef helper-level unit tekrarına düşmeden gerçek canonical KDM turn sınırında memory + relationship etkileşimini doğrulamaktır.
+- Aynı canonical semantic event ve aynı established relationship state ile memory var/yok A/B çalıştırılır.
+- Typed autobiographical memory yalnız zaten material olan affective projection'ı derinleştirebilir; relational projection, injury, warmth/trust ve conversation-state sonucunu değiştiremez.
+- Böylece memory ikinci semantic/relationship authority olamaz; relationship buffering ownership'i G4 + canonical relationship reducer zincirinde kalır.
+- Test ayrıca runtime G4 projection'da relational equality + affective amplification ve canonical KDM state transition'da relational equality + daha güçlü negative affect pressure arar.
+- Provider/API yok; yeni parser/regex/phrase patch yok; production behavior değişikliği yok.
+
+## 12. Sıradaki doğrulanmış iş
+- Memory + relationship combined behavior acceptance CI ile doğrulanacak ve merge edilecek.
+- Bu target kapandıktan sonra sıradaki iş açık issue/main/checkpoint üzerinden yeniden ölçülüp seçilecek; kanıtsız yeni feature hedefi icat edilmeyecek.
 - Her behavior değişikliği repo'nun RED→GREEN neighbor-proof ve docs guard protokolüne uymalıdır; characterization-only proof davranış değiştirmez.
 
-## 12. Latest checkpoint
+## 13. Latest checkpoint
 - Date: 2026-09-10
-- Base main: PR #201 sonrası main.
-- Active branch: `codex/relationship-long-horizon-persistence`.
-- Active target: provider-free long-horizon relationship progression/persistence acceptance.
+- Base main: `38c5c8fe990f967610ee1b5bf47ff752293ee572` (PR #202 sonrası).
+- Verified post-merge main FULL CI: #2664 PASS.
+- Active branch: `codex/memory-relationship-combined-acceptance`.
+- Active target: provider-free memory + relationship combined behavior acceptance.
 - External AI API in deterministic tests: NO.
 - New downstream semantic authority: NO.
 - Semantic LLM removal: NO.
-- Next after this target: memory + relationship combined behavior acceptance.
+- Next after this target: re-measure from current main/open issues; no speculative target selected yet.
