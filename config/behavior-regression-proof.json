@@ -168,6 +168,20 @@
       "counterexamples": [
         "counterexample: does not manufacture Kaira self-memory for a third-party recall question"
       ]
+    },
+    {
+      "id": "dismissive-rhetorical-social-devaluation",
+      "invariant": "A directly addressed second-person competence or knowledge question with an independent dismissive stance cue must surface bounded canonical social devaluation, while literal information questions remain non-devaluing and joke or repair context may modulate but not erase the cue.",
+      "redSha": "d0671ef98fb45155a835527e08384459425653a5",
+      "testFile": "src/services/semanticDismissiveRhetoricalNeighborProofRegression.test.ts",
+      "reported": "reported: recognizes the captured dismissive competence question",
+      "neighbors": [
+        "neighbor-1: recognizes a dismissive knowledge question with a different predicate and stance position",
+        "neighbor-2: recognizes a dismissive capability question with a different predicate"
+      ],
+      "counterexamples": [
+        "counterexample: literal information questions remain non-devaluing"
+      ]
     }
   ]
 }

@@ -40,10 +40,13 @@ function hasAffirmativeCue(text: string, cue: RegExp): boolean {
 
   return matches.some((match) => {
     const index = match.index ?? 0;
-    const start = Math.max(0, index - 28);
-    const end = Math.min(text.length, index + match[0].length + 42);
-    const scope = text.slice(start, end);
-    return !NEGATION_PARTICLE_RE.test(scope) && !NEGATED_PREDICATE_RE.test(scope);
+    const afterCue = text.slice(index + match[0].length).trimStart();
+    // Negation belongs to a cue only when it occurs in its immediate predicate
+    // neighborhood. A later negative clause (for example an explanation of what
+    // the speaker did not mean) must not erase an already explicit speech act.
+    const localTrailingScope = afterCue.split(/\s+/u).slice(0, 2).join(" ");
+    return !NEGATION_PARTICLE_RE.test(localTrailingScope) &&
+      !NEGATED_PREDICATE_RE.test(localTrailingScope);
   });
 }
 
