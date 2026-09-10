@@ -67,31 +67,37 @@ Current canonical runtime üzerinde yeniden doğrulanan aileler:
 
 Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; yeni semantic regex/parser/phrase patch eklemez.
 
-## 8. Phase closeout
-- Pre-Gemini bounded Turkish language foundation: **CLOSED**.
-- Açık reproducible deterministic semantic failure: **NONE** (bu fazın ölçülmüş kapsamı içinde).
-- Analyzer winner: **NOT SELECTED BY DESIGN**.
-- Semantic LLM/provider rolü: **UNCHANGED**.
-- External AI/API deterministic proof içinde: **NO**.
-- Yeni downstream semantic authority: **NO**.
-- Yeni raw-text semantic parser: **NO**.
+## 8. Provider-free relationship acceptance — MERGED
+- PR #199 merge: `0151e64503d1b2b75603d324159e06d7fa9bd15a`.
+- Frozen C3 same-stimulus A/B proof gerçek canonical Phase-0 runtime üzerinde geçer.
+- Yeni ve established/high-quality ilişki yalnız typed `DroitDynamicState.relationship` seed'iyle ayrılır.
+- Her iki kol non-zero injury üretir; familiar/high-quality context harm'ı azaltır fakat sıfırlamaz.
+- Aynı turn için canonical `SemanticInterpretation@2` ve `SemanticEvent` eşit kalır.
+- Provider/API çağrısı ve yeni runtime parser eklenmedi.
 
-## 9. Provider-free runtime acceptance — ACTIVE
-- Yeni ölçülmüş hedef: frozen Phase-0 C3 invariant'ını gerçek same-stimulus A/B relationship state karşılaştırmasıyla kanıtlamak.
-- 21/423 Phase-0 corpus korunur; baseline yeniden tanımlanmaz.
-- Yeni ilişki ve established/high-quality ilişki yalnız typed `DroitDynamicState.relationship` seed'iyle ayrılır.
-- Aynı user turn için canonical `SemanticInterpretation@2` ve `SemanticEvent` eşit kalmalıdır.
-- Established/familiar context harm etkisini azaltabilir fakat sıfırlayamaz; insult immunity yasaktır.
-- Bu acceptance provider/API çağırmaz ve runtime semantic parser/regex/phrase patch eklemez.
-- Bu hedef geçince sıradaki provider-free hedef: uzun-horizon relationship progression/persistence; ardından memory + relationship combined behavior.
+## 9. Dismissive rhetorical semantic-floor coverage — ACTIVE
+- Issue #200, PR #199 sonrası bağımsız language-floor gap olarak açıldı.
+- Reproduced family: doğrudan ikinci kişiye yöneltilen, bilgi/yeterlilik sorgusu + bağımsız dismissive stance taşıyan retorik sorular deterministic floor'da sıfır harm bırakabiliyordu.
+- PR #201 branch: `codex/issue-200-dismissive-rhetorical-floor`.
+- Regression proof test-first RED SHA: `d0671ef98fb45155a835527e08384459425653a5`.
+- Fix phrase exact-match kullanmaz; compositional evidence'i mevcut canonical `severity.disrespect`, `challenge`, target, valence ve uncertainty alanlarına map eder.
+- Literal bilgi soruları counterexample olarak non-devaluing kalmalıdır.
+- Joke frame severity/confidence'i modüle eder; explicit repair/apology semantiği korunur.
+- Yeni semantic authority veya provider/API dependency eklenmez.
+- Frozen 21/423 Phase-0 baseline ve PR #199 relationship A/B acceptance korunmalıdır.
 
-## 10. Latest checkpoint
-- Date: 2026-09-09
-- Base main before provider-free acceptance: `b46dde37933e6c53cc8d2c175d7c404386e0d248`.
-- Relationship-aware acceptance branch: `codex/relationship-context-acceptance`.
-- PR #199: OPEN / CI verification in progress.
-- Pre-Gemini bounded language phase: CLOSED; yeniden açılmayacak.
+## 10. Sıradaki doğrulanmış iş
+- Önce PR #201 full CI + Architecture Review tamamen yeşil doğrulanacak ve Issue #200 kapanacak.
+- Ardından provider-free uzun-horizon relationship progression/persistence hedefi gerçek runtime/persistence seam'leri üzerinden ölçülecek.
+- Sonraki hedef memory + relationship combined behavior acceptance'tır.
+- Her yeni behavior değişikliği repo'nun RED→GREEN neighbor-proof ve docs guard protokolüne uymalıdır.
+
+## 11. Latest checkpoint
+- Date: 2026-09-10
+- Base main: `0151e64503d1b2b75603d324159e06d7fa9bd15a` (PR #199 merged).
+- Active PR: #201 — dismissive rhetorical semantic-floor characterization/fix.
+- Active issue: #200.
 - External AI API in deterministic tests: NO.
-- New regex semantic parser: NO.
+- New downstream semantic authority: NO.
 - Semantic LLM removal: NO.
-- Active target: explicit C3 new-vs-familiar runtime A/B proof.
+- Next after #200: long-horizon relationship progression/persistence.
