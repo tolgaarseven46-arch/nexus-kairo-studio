@@ -13,24 +13,24 @@ describe('Kaira chat request coordination identity', () => {
   });
 
   it('creates a non-replayable internal identity when requestId is absent', () => {
-    const result = resolveKairaChatRequestCoordinationIdentity(undefined, () => 'internal-456');
+    const result = resolveKairaChatRequestCoordinationIdentity(undefined, () => '456');
 
     expect(result).toEqual({
       requestId: '',
-      coordinationRequestId: 'internal-456',
+      coordinationRequestId: 'internal:456',
       replayable: false,
     });
   });
 
   it('keeps distinct requestId-less turns distinct while still giving each one a coordination identity', () => {
     let n = 0;
-    const factory = () => `internal-${++n}`;
+    const factory = () => String(++n);
 
     const first = resolveKairaChatRequestCoordinationIdentity('', factory);
     const second = resolveKairaChatRequestCoordinationIdentity('   ', factory);
 
-    expect(first.coordinationRequestId).toBe('internal-1');
-    expect(second.coordinationRequestId).toBe('internal-2');
+    expect(first.coordinationRequestId).toBe('internal:1');
+    expect(second.coordinationRequestId).toBe('internal:2');
     expect(first.coordinationRequestId).not.toBe(second.coordinationRequestId);
     expect(first.replayable).toBe(false);
     expect(second.replayable).toBe(false);
