@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const records = new Map<string, any>();
+const { records, locks } = vi.hoisted(() => ({
+  records: new Map<string, any>(),
+  locks: new Map<string, { ownerToken: string; leaseUntil: number }>(),
+}));
 
 vi.mock('./kairaFirestoreChatIdempotency', () => ({
   firestoreChatIdempotencyBackend: {
@@ -24,6 +27,26 @@ vi.mock('./kairaFirestoreChatIdempotency', () => ({
   },
 }));
 
+vi.mock('./kairaFirestoreStateMutation', () => ({
+  firestoreStateMutationBackend: {
+    async acquire({ key, ownerToken, now, leaseMs }: any) {
+      const existing = locks.get(key);
+      if (existing && existing.leaseUntil > now && existing.ownerToken !== ownerToken) return false;
+      locks.set(key, { ownerToken, leaseUntil: now + leaseMs });
+      return true;
+    },
+    async renew({ key, ownerToken, now, leaseMs }: any) {
+      const existing = locks.get(key);
+      if (!existing || existing.ownerToken !== ownerToken) return false;
+      locks.set(key, { ownerToken, leaseUntil: now + leaseMs });
+      return true;
+    },
+    async release({ key, ownerToken }: any) {
+      if (locks.get(key)?.ownerToken === ownerToken) locks.delete(key);
+    },
+  },
+}));
+
 import {
   claimCoordinatedKairaChatRequest,
   completeCoordinatedKairaChatRequest,
@@ -33,9 +56,11 @@ import {
 const owner = 'user_a::kaira_default';
 const firstKey = `${owner}::req_a`;
 const secondKey = `${owner}::req_b`;
+const otherOwnerKey = 'user_b::kaira_default::req_c';
 
 beforeEach(() => {
   records.clear();
+  locks.clear();
   clearCoordinatedKairaChatIdempotencyForTests();
 });
 
@@ -57,5 +82,16 @@ describe('distinct request state-owner serialization', () => {
     const second = await secondPromise;
     expect(second.kind).toBe('owner');
     await completeCoordinatedKairaChatRequest(secondKey, { ok: true });
+  });
+
+  it('does not serialize unrelated state owners', async () => {
+    const first = await claimCoordinatedKairaChatRequest(firstKey);
+    expect(first.kind).toBe('owner');
+
+    const other = await claimCoordinatedKairaChatRequest(otherOwnerKey);
+    expect(other.kind).toBe('owner');
+
+    await completeCoordinatedKairaChatRequest(firstKey, { ok: true });
+    await completeCoordinatedKairaChatRequest(otherOwnerKey, { ok: true });
   });
 });
