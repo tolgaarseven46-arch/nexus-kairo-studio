@@ -196,6 +196,20 @@
       "counterexamples": [
         "counterexample: genuinely newer request relationship remains authoritative"
       ]
+    },
+    {
+      "id": "request-idless-chat-state-owner-coordination",
+      "invariant": "Every chat execution that can mutate persisted Kaira state must enter state-owner serialization even when the caller omits external requestId, while caller-supplied requestId must retain the existing replayable retry identity contract.",
+      "redSha": "bf2a12a5bcbd893241327fe415640c493bd95650",
+      "testFile": "src/services/kairaChatRequestCoordinationNeighborProofRegression.test.ts",
+      "reported": "reported: requestId-less direct chat execution receives an internal non-replayable coordination identity",
+      "neighbors": [
+        "neighbor-1: whitespace-only requestId follows the same internal coordination path",
+        "neighbor-2: separate requestId-less executions remain distinct rather than becoming accidental retries"
+      ],
+      "counterexamples": [
+        "counterexample: caller-supplied requestId preserves the existing replayable identity contract"
+      ]
     }
   ]
 }
