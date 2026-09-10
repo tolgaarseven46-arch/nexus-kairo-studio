@@ -326,6 +326,64 @@ function targetFromLegacy(t: SemanticEvent["target"]): SemanticTarget {
   }
 }
 
+interface DismissiveRhetoricalReading {
+  active: boolean;
+  disrespect: number;
+  aggression: number;
+  jokingConfidence: number;
+  sincerityConfidence: number;
+  uncertaintyOverall: number;
+  evidence: string[];
+}
+
+// A dismissive rhetorical reading is compositional, not phrase keyed: the turn
+// must directly address the interlocutor, question their knowledge/competence in
+// second-person form, and carry an independent dismissive stance marker. Literal
+// information questions therefore stay neutral even when they use the same verb.
+const SECOND_PERSON_COMPETENCE_QUESTION_RE =
+  /(?<![\p{L}])ne\s+(?:anla|bil|becer|yap)\p{L}*s[ıiuü]n(?![\p{L}])/iu;
+const DISMISSIVE_STANCE_RE =
+  /(?<![\p{L}])(?:harbi|zaten|sanki|güya|anca)(?![\p{L}])/iu;
+
+function readDismissiveRhetoricalDevaluation(
+  message: string,
+  event: SemanticEvent,
+): DismissiveRhetoricalReading {
+  const directSecondPerson = DIRECT_SECOND_PERSON_RE.test(message) && !REPORTING_FRAME_RE.test(message);
+  const competenceQuestion =
+    event.intent === "question" && SECOND_PERSON_COMPETENCE_QUESTION_RE.test(message);
+  const dismissiveStance = DISMISSIVE_STANCE_RE.test(message);
+  const active = directSecondPerson && competenceQuestion && dismissiveStance;
+  const jokeFramed = JOKE_MARKERS_RE.test(message);
+
+  if (!active) {
+    return {
+      active: false,
+      disrespect: 0,
+      aggression: 0,
+      jokingConfidence: 0,
+      sincerityConfidence: 0,
+      uncertaintyOverall: 1,
+      evidence: [],
+    };
+  }
+
+  return {
+    active: true,
+    disrespect: jokeFramed ? 0.18 : 0.42,
+    aggression: jokeFramed ? 0 : 0.08,
+    jokingConfidence: jokeFramed ? 0.78 : 0.15,
+    sincerityConfidence: jokeFramed ? 0.28 : 0.68,
+    uncertaintyOverall: jokeFramed ? 0.58 : 0.34,
+    evidence: [
+      "direct-second-person",
+      "second-person-competence-question",
+      "dismissive-stance-marker",
+      ...(jokeFramed ? ["joke-frame"] : []),
+    ],
+  };
+}
+
 /**
  * Build a canonical interpretation from the regex engine alone (the safety
  * floor). Uncertainty is intentionally wide: the regex layer is deterministic
@@ -334,6 +392,7 @@ function targetFromLegacy(t: SemanticEvent["target"]): SemanticTarget {
  */
 function buildInterpretation(event: SemanticEvent, message: string): SemanticInterpretation {
   const hostility = readLexicalHostility(message, event);
+  const rhetoricalDevaluation = readDismissiveRhetoricalDevaluation(message, event);
   let acts = socialActsFromLegacy(event);
   // ADR-0006 §1: an uncorroborated lexical hit must not stamp the turn as an
   // "insult"/"mockery" social act. Downgrade it to "banter" when joke-framed,
@@ -351,6 +410,31 @@ function buildInterpretation(event: SemanticEvent, message: string): SemanticInt
     // (Turkish suffixed forms: "kaşarsın", "orospusun").
     acts.push("insult");
   }
+  if (rhetoricalDevaluation.active && !acts.includes("challenge")) {
+    acts.push("challenge");
+  }
+
+  const severity = rhetoricalDevaluation.active
+    ? {
+        ...hostility.severity,
+        disrespect: Math.max(hostility.severity.disrespect, rhetoricalDevaluation.disrespect),
+        aggression: Math.max(hostility.severity.aggression, rhetoricalDevaluation.aggression),
+      }
+    : hostility.severity;
+  const target = rhetoricalDevaluation.active
+    ? "kaira"
+    : hostility.target === "unknown"
+      ? targetFromLegacy(event.target)
+      : hostility.target;
+  const jokingConfidence = rhetoricalDevaluation.active
+    ? Math.max(hostility.jokingConfidence, rhetoricalDevaluation.jokingConfidence)
+    : hostility.jokingConfidence;
+  const sincerityConfidence = rhetoricalDevaluation.active
+    ? Math.max(hostility.sincerityConfidence, rhetoricalDevaluation.sincerityConfidence)
+    : hostility.sincerityConfidence;
+  const uncertaintyOverall = rhetoricalDevaluation.active
+    ? Math.min(hostility.uncertaintyOverall, rhetoricalDevaluation.uncertaintyOverall)
+    : hostility.uncertaintyOverall;
 
   return normalizeSemanticInterpretation(
     {
@@ -359,11 +443,11 @@ function buildInterpretation(event: SemanticEvent, message: string): SemanticInt
       normalized: event.normalized,
       primaryIntent: PRIMARY_INTENT_FROM_LEGACY[event.intent] ?? "other",
       secondarySocialActs: acts,
-      target: hostility.target === "unknown" ? targetFromLegacy(event.target) : hostility.target,
-      valence: event.valence,
-      severity: hostility.severity,
-      jokingConfidence: hostility.jokingConfidence,
-      sincerityConfidence: hostility.sincerityConfidence,
+      target,
+      valence: rhetoricalDevaluation.active ? "negative" : event.valence,
+      severity,
+      jokingConfidence,
+      sincerityConfidence,
       affection: clamp01(event.affection ?? 0),
       support: clamp01(event.support ?? 0),
       compliment: clamp01(event.compliment ?? 0),
@@ -378,16 +462,18 @@ function buildInterpretation(event: SemanticEvent, message: string): SemanticInt
         adviceRequested: event.adviceRequested ?? false,
         knowledgeQuery: event.knowledgeQuery ?? null,
         selfMemoryQuery: event.selfMemoryQuery ?? null,
-        relationalAct: event.relationalAct,
-        relationalIntensity: clamp01(event.relationalIntensity ?? 0),
+        relationalAct: rhetoricalDevaluation.active ? "challenge" : event.relationalAct,
+        relationalIntensity: rhetoricalDevaluation.active
+          ? Math.max(clamp01(event.relationalIntensity ?? 0), rhetoricalDevaluation.disrespect)
+          : clamp01(event.relationalIntensity ?? 0),
         stopQuestions: Boolean(event.stopQuestions),
         stopTalking: Boolean(event.stopTalking),
       },
       uncertainty: {
-        overall: hostility.uncertaintyOverall,
+        overall: uncertaintyOverall,
         intent: 0.5,
-        target: hostility.target === "unknown" ? 0.7 : 0.4,
-        severity: hostility.uncertaintyOverall,
+        target: rhetoricalDevaluation.active ? 0.2 : hostility.target === "unknown" ? 0.7 : 0.4,
+        severity: uncertaintyOverall,
       },
       evidence: [
         {
@@ -396,13 +482,18 @@ function buildInterpretation(event: SemanticEvent, message: string): SemanticInt
           cues: [
             event.intent,
             event.relationalAct,
-            `disrespect:${hostility.severity.disrespect.toFixed(2)}`,
-            `joking:${hostility.jokingConfidence.toFixed(2)}`,
+            `disrespect:${severity.disrespect.toFixed(2)}`,
+            `joking:${jokingConfidence.toFixed(2)}`,
             hostility.benignCompound ? "lexical:benign-compound" : null,
             hostility.lexicalCandidateOnly ? "lexical:candidate-only" : null,
             ...hostility.hostilityEvidence.map((c) => `hostility-evidence:${c}`),
+            ...(rhetoricalDevaluation.active
+              ? rhetoricalDevaluation.evidence.map((c) => `devaluation-evidence:${c}`)
+              : []),
           ].filter(Boolean),
-          confidence: hostility.lexicalCandidateOnly || hostility.benignCompound ? 0.35 : 0.5,
+          confidence: rhetoricalDevaluation.active
+            ? 1 - uncertaintyOverall
+            : hostility.lexicalCandidateOnly || hostility.benignCompound ? 0.35 : 0.5,
         },
       ],
     },
