@@ -28,5 +28,7 @@ Clients that require retry replay must still provide a stable external `requestI
 ## Verification
 - Historical RED: `bf2a12a5bcbd893241327fe415640c493bd95650` / Fast CI #185 failed because the request coordination identity boundary did not exist.
 - Focused identity tests distinguish replayable external IDs from non-replayable internal IDs and prove two requestId-less turns receive distinct coordination identities.
+- `kairaChatRequestCoordinationNeighborProofRegression.test.ts` carries the reported case, two neighboring requestId-less variants, and the external-requestId counterexample required by the bug-reduction protocol.
+- `config/behavior-regression-proof.json` registers the same bug class against the historical RED SHA.
 - Server wiring regression proves `/api/chat` no longer gates state-owner coordination on external `requestId` presence and releases the same coordination key on success/failure.
 - Full CI and Architecture Review are required before merge.
