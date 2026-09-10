@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { analyzeKdmInteractionCanonicalTurn } from "./src/services/kdmConsistencyEngine";
+import { selectEffectiveKdmDynamicState } from "./src/services/kdmEffectiveStateSelector";
 import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
 import { normalizeKairaAffectBaseline } from "./src/services/kairaAffectBaseline";
 import { claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";
@@ -740,9 +741,11 @@ app.post("/api/chat", async (req, res) => {
     const memoryMs = Math.round(now() - memoryStart),
       languageStyleMemory = languageStyleMemorySignal(stateUserId, kairaPolicy.persistentUserMemory),
       requestState = normalizeDynamicState(dynamicState),
-      effective = dynamicState?.relationship
-        ? requestState
-        : normalizeDynamicState(persistedState ?? dynamicState),
+      effective = selectEffectiveKdmDynamicState({
+        requestState,
+        persistedState: kairaPolicy.persistentRelationship ? persistedState : null,
+        requestHasRelationship: Boolean(dynamicState?.relationship),
+      }),
       basePersonality = normalizeDroitPersonality(personality),
       responsePersonality = normalizeDroitPersonality(incomingResponsePersonality ?? basePersonality),
       behaviorPolicy = normalizeBehaviorPolicyInput(incomingBehaviorPolicy),

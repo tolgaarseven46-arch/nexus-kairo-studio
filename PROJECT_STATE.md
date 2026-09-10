@@ -90,27 +90,29 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 - Production persistent Kaira instance hydrate/save seam'leri ve durable relationship field continuity acceptance ile kilitlendi.
 - Yeni semantic parser, model/provider çağrısı veya ikinci relationship authority eklenmedi.
 
-## 11. Provider-free memory + relationship combined behavior — ACTIVE
-- Branch: `codex/memory-relationship-combined-acceptance`.
-- Hedef helper-level unit tekrarına düşmeden gerçek canonical KDM turn sınırında memory + relationship etkileşimini doğrulamaktır.
-- Aynı canonical semantic event ve aynı established relationship state ile memory var/yok A/B çalıştırılır.
-- Typed autobiographical memory yalnız zaten material olan affective projection'ı derinleştirebilir; relational projection, injury, warmth/trust ve conversation-state sonucunu değiştiremez.
-- Böylece memory ikinci semantic/relationship authority olamaz; relationship buffering ownership'i G4 + canonical relationship reducer zincirinde kalır.
-- Test ayrıca runtime G4 projection'da relational equality + affective amplification ve canonical KDM state transition'da relational equality + daha güçlü negative affect pressure arar.
-- Provider/API yok; yeni parser/regex/phrase patch yok; production behavior değişikliği yok.
+## 11. Provider-free memory + relationship combined behavior — MERGED
+- PR #203 merge: `47d5f5012c00e50cca6572bb777b0ca3b5d3905d`.
+- Same canonical semantic + same established relationship A/B proof memory var/yok canonical KDM turn sınırında geçti.
+- Typed autobiographical memory yalnız material affective projection'ı derinleştirir; relationship state'i yeniden yorumlamaz.
 
-## 12. Sıradaki doğrulanmış iş
-- Memory + relationship combined behavior acceptance CI ile doğrulanacak ve merge edilecek.
-- Bu target kapandıktan sonra sıradaki iş açık issue/main/checkpoint üzerinden yeniden ölçülüp seçilecek; kanıtsız yeni feature hedefi icat edilmeyecek.
-- Her behavior değişikliği repo'nun RED→GREEN neighbor-proof ve docs guard protokolüne uymalıdır; characterization-only proof davranış değiştirmez.
+## 12. Persistent relationship effective-state arbitration — ACTIVE
+- Branch: `codex/persistence-state-arbitration`.
+- Production failure class: stale request relationship, daha yeni persisted relationship snapshot'ını ezebiliyordu.
+- RED baseline: `42ecf41a741b10de5fb02d820ff2b3f19d17f927`.
+- Timestamp chronology primary; tie/missing chronology interaction count ile çözülür; exact tie persisted lehine fail-closed olur.
+- Genuinely newer request authoritative kalır.
+- `server.ts` canonical effective-state selector üzerinden arbitrate eder.
 
-## 13. Latest checkpoint
+## 13. Sıradaki doğrulanmış iş
+- Fix CI + Architecture Review ile doğrulanıp merge edilecek.
+- Post-merge main CI yeşil doğrulanacak.
+- Sonra açık issue/main/runtime evidence yeniden ölçülecek.
+
+## 14. Latest checkpoint
 - Date: 2026-09-10
-- Base main: `38c5c8fe990f967610ee1b5bf47ff752293ee572` (PR #202 sonrası).
-- Verified post-merge main FULL CI: #2664 PASS.
-- Active branch: `codex/memory-relationship-combined-acceptance`.
-- Active target: provider-free memory + relationship combined behavior acceptance.
+- Base main: `47d5f5012c00e50cca6572bb777b0ca3b5d3905d`.
+- Active branch: `codex/persistence-state-arbitration`.
+- Active target: stale request vs fresher persisted relationship arbitration.
 - External AI API in deterministic tests: NO.
 - New downstream semantic authority: NO.
 - Semantic LLM removal: NO.
-- Next after this target: re-measure from current main/open issues; no speculative target selected yet.
