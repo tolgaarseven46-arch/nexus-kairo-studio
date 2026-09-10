@@ -119,32 +119,34 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 - Post-merge main FULL CI #2672 PASS.
 - ADR: `docs/adr/0092-state-owner-mutation-serialization.md`.
 
-## 15. RequestId-less direct API serialization — ACTIVE / RED→GREEN
-- Active branch: `codex/request-idless-chat-serialization`.
-- Ölçülmüş gap: `/api/chat` external `requestId` olmadan çağrıldığında request coordination ve state-owner lease tamamen bypass ediliyordu.
-- RED commit: `bf2a12a5bcbd893241327fe415640c493bd95650`; Fast CI #185 FAIL.
-- Çözüm: external retry identity ile internal execution coordination identity ayrıldı.
+## 15. RequestId-less direct API serialization — MERGED / CLOSED
+- PR #207 merge: `9809e25e3497c384e0a5132c927429311000fdd1`.
+- Historical RED: `bf2a12a5bcbd893241327fe415640c493bd95650`; Fast CI #185 FAIL.
+- `/api/chat` external `requestId` olmadan çağrıldığında artık request coordination ve state-owner lease bypass edilmez.
 - External `requestId` varsa mevcut replay/dedup contract korunur.
 - External `requestId` yoksa server namespaced `internal:<uuid>` operation identity üretir; bu kimlik yalnız state-owner serialization içindir, caller retry replay garantisi değildir.
-- Response requestId davranışı değişmez: caller vermediyse response hâlâ requestId döndürmez.
+- Response requestId davranışı değişmez: caller vermediyse response fabricated requestId döndürmez.
 - Success/failure aynı coordination claim'i release eder.
-- Server wiring regression requestId varlığına bağlı coordination gate kalmadığını kilitler.
+- Bug-class neighbor/counterexample proof ve historical RED→GREEN gate PASS.
+- PR #207 FULL CI #2683 PASS; Architecture Review #807 PASS.
+- Post-merge main FULL CI #2684 PASS.
+- Geçici diagnostic workflow/output tamamen temizlendi.
 - ADR: `docs/adr/0093-request-idless-chat-coordination-identity.md`.
 
 ## 16. Sıradaki kapılar
-- RequestId-less coordination branch'inin latest Fast CI'sini GREEN doğrula.
-- Normal PR FULL CI + Architecture Review'dan geçir.
-- Yeşilse merge et ve post-merge main FULL CI'yi doğrula.
-- Ardından açık issue/main/runtime evidence'i yeniden ölç; yeni işi yalnız gerçek failure class üzerinden seç.
+- Gerçek `main`, açık PR/issue ve runtime evidence'i yeniden ölç.
+- Yeni işi yalnız ölçülmüş failure class / açık contract gap / doğrulanmış regression üzerinden seç.
+- Ölçülmüş açık yoksa yeni mimari patch üretme; temiz checkpoint'i koru.
 
 ## 17. Latest checkpoint
 - Date: 2026-09-10
-- Base main: `603d120d01cc70bb00430d7ce53ffc8338791e92`.
-- Active branch: `codex/request-idless-chat-serialization`.
-- Active target: requestId-less `/api/chat` state-owner serialization gap closure.
-- Historical RED proof: Fast CI #185 FAIL.
+- Clean main: `9809e25e3497c384e0a5132c927429311000fdd1`.
+- PR #207: MERGED / CLOSED.
+- Post-merge main FULL CI #2684: PASS.
+- Active implementation branch: NONE.
+- Active measured failure class: NONE pending fresh audit.
 - External retry contract preserved: YES.
-- Internal requestId-less coordination identity: YES.
+- RequestId-less state-owner serialization: YES.
 - External AI API in deterministic tests: NO.
 - New downstream semantic authority: NO.
 - Semantic LLM removal: NO.
