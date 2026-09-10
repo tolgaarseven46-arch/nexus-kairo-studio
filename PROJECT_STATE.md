@@ -75,29 +75,33 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 - Aynı turn için canonical `SemanticInterpretation@2` ve `SemanticEvent` eşit kalır.
 - Provider/API çağrısı ve yeni runtime parser eklenmedi.
 
-## 9. Dismissive rhetorical semantic-floor coverage — ACTIVE
-- Issue #200, PR #199 sonrası bağımsız language-floor gap olarak açıldı.
-- Reproduced family: doğrudan ikinci kişiye yöneltilen, bilgi/yeterlilik sorgusu + bağımsız dismissive stance taşıyan retorik sorular deterministic floor'da sıfır harm bırakabiliyordu.
-- PR #201 branch: `codex/issue-200-dismissive-rhetorical-floor`.
-- Regression proof test-first RED SHA: `d0671ef98fb45155a835527e08384459425653a5`.
-- Fix phrase exact-match kullanmaz; compositional evidence'i mevcut canonical `severity.disrespect`, `challenge`, target, valence ve uncertainty alanlarına map eder.
-- Literal bilgi soruları counterexample olarak non-devaluing kalmalıdır.
-- Joke frame severity/confidence'i modüle eder; explicit repair/apology semantiği korunur.
-- Yeni semantic authority veya provider/API dependency eklenmez.
-- Frozen 21/423 Phase-0 baseline ve PR #199 relationship A/B acceptance korunmalıdır.
+## 9. Dismissive rhetorical semantic-floor coverage — MERGED
+- Issue #200 kapandı.
+- PR #201 merge edildi ve dismissive competence/knowledge/capability retorik sorularının bounded canonical social devaluation üretmesi regression proof ile kilitlendi.
+- Literal bilgi soruları non-devaluing kalır; joke frame severity/confidence'i modüle eder; explicit repair/apology semantiği korunur.
+- Yeni semantic authority veya provider/API dependency eklenmedi.
+- Frozen 21/423 Phase-0 baseline ve PR #199 relationship A/B acceptance korundu.
 
-## 10. Sıradaki doğrulanmış iş
-- Önce PR #201 full CI + Architecture Review tamamen yeşil doğrulanacak ve Issue #200 kapanacak.
-- Ardından provider-free uzun-horizon relationship progression/persistence hedefi gerçek runtime/persistence seam'leri üzerinden ölçülecek.
-- Sonraki hedef memory + relationship combined behavior acceptance'tır.
-- Her yeni behavior değişikliği repo'nun RED→GREEN neighbor-proof ve docs guard protokolüne uymalıdır.
+## 10. Provider-free long-horizon relationship progression/persistence — ACTIVE
+- Branch: `codex/relationship-long-horizon-persistence`.
+- Canonical reducer zaten age + interaction tabanlı continuous familiarity, relationship-quality gelişimi, injury damping ve recovery üretir.
+- Production `server.ts` persistent Kaira instance'larında `loadKdmState(stateUserId)` ile hydrate eder ve `saveKdmInteraction` ile `kdm.nextDynamicState` kaydeder.
+- `kdmPersistenceService.ts` relationship continuation için gereken durable alanları normalize/save/load zincirinde taşır.
+- Yeni acceptance testi, 40 turluk provider-free horizon'u persistence-style JSON round-trip ile iki fazda çalıştırır; interaction count, familiarity, warmth/trust progression ve firstSeen/lastInteraction continuity doğrulanır.
+- Aynı test production hydrate/save seam'lerinin persistentRelationship policy ile scope edildiğini ve durable relationship fields'in persistence katmanında bulunduğunu kilitler.
+- Bu faz yeni semantic parser, model/provider çağrısı veya ikinci relationship authority eklemez.
 
-## 11. Latest checkpoint
+## 11. Sıradaki doğrulanmış iş
+- Long-horizon relationship progression/persistence acceptance CI ile doğrulanacak ve merge edilecek.
+- Ardından provider-free memory + relationship combined behavior acceptance hedefi açılacak.
+- Her behavior değişikliği repo'nun RED→GREEN neighbor-proof ve docs guard protokolüne uymalıdır; characterization-only proof davranış değiştirmez.
+
+## 12. Latest checkpoint
 - Date: 2026-09-10
-- Base main: `0151e64503d1b2b75603d324159e06d7fa9bd15a` (PR #199 merged).
-- Active PR: #201 — dismissive rhetorical semantic-floor characterization/fix.
-- Active issue: #200.
+- Base main: PR #201 sonrası main.
+- Active branch: `codex/relationship-long-horizon-persistence`.
+- Active target: provider-free long-horizon relationship progression/persistence acceptance.
 - External AI API in deterministic tests: NO.
 - New downstream semantic authority: NO.
 - Semantic LLM removal: NO.
-- Next after #200: long-horizon relationship progression/persistence.
+- Next after this target: memory + relationship combined behavior acceptance.
