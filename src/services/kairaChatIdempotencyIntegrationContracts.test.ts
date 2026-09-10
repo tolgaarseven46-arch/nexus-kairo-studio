@@ -5,12 +5,14 @@ import path from 'node:path';
 const serverSource = fs.readFileSync(path.resolve(process.cwd(), 'server.ts'), 'utf8');
 
 describe('chat idempotency server integration contracts', () => {
-  it('claims request identity before language understanding and KDM work', () => {
-    const claimIndex = serverSource.indexOf('claimCoordinatedKairaChatRequest<any>(idempotencyKey)');
+  it('claims coordination identity before language understanding and KDM work', () => {
+    const identityIndex = serverSource.indexOf('resolveKairaChatRequestCoordinationIdentity(');
+    const claimIndex = serverSource.indexOf('claimCoordinatedKairaChatRequest<any>(coordinationKey)', identityIndex);
     const languageIndex = serverSource.indexOf('const languageUnderstanding = await resolveServerLanguageUnderstanding', claimIndex);
     const kdmIndex = serverSource.indexOf('analyzeKdmInteractionCanonicalTurn(', claimIndex);
 
-    expect(claimIndex).toBeGreaterThan(-1);
+    expect(identityIndex).toBeGreaterThan(-1);
+    expect(claimIndex).toBeGreaterThan(identityIndex);
     expect(languageIndex).toBeGreaterThan(claimIndex);
     expect(kdmIndex).toBeGreaterThan(claimIndex);
   });
@@ -24,11 +26,11 @@ describe('chat idempotency server integration contracts', () => {
   it('completes both local and AI final responses through one payload gate', () => {
     const occurrences = serverSource.match(/sendChatPayload\(\{/g) ?? [];
     expect(occurrences).toHaveLength(2);
-    expect(serverSource).toContain('completeCoordinatedKairaChatRequest(idempotencyKey, payload)');
+    expect(serverSource).toContain('completeCoordinatedKairaChatRequest(coordinationKey, payload)');
   });
 
-  it('releases an owned claim when the request fails', () => {
-    expect(serverSource).toContain('failCoordinatedKairaChatRequest(idempotencyKey, e)');
-    expect(serverSource).toContain('ownsIdempotencyClaim = false;');
+  it('releases an owned coordination claim when the request fails', () => {
+    expect(serverSource).toContain('failCoordinatedKairaChatRequest(coordinationKey, e)');
+    expect(serverSource).toContain('ownsCoordinationClaim = false;');
   });
 });
