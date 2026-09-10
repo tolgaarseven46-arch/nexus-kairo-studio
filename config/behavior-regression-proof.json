@@ -182,6 +182,20 @@
       "counterexamples": [
         "counterexample: literal information questions remain non-devaluing"
       ]
+    },
+    {
+      "id": "persistent-relationship-state-arbitration",
+      "invariant": "A stale client relationship snapshot must not rewind a fresher persisted Kaira-user relationship state; timestamp is primary chronology, interaction count breaks timestamp ties, and a genuinely newer request remains authoritative.",
+      "redSha": "42ecf41a741b10de5fb02d820ff2b3f19d17f927",
+      "testFile": "src/services/kdmEffectiveStateSelectionNeighborProofRegression.test.ts",
+      "reported": "reported: newer persisted relationship defeats a stale request relationship",
+      "neighbors": [
+        "neighbor-1: higher persisted interaction count wins when timestamps tie",
+        "neighbor-2: valid durable chronology defeats an invalid stale request timestamp"
+      ],
+      "counterexamples": [
+        "counterexample: genuinely newer request relationship remains authoritative"
+      ]
     }
   ]
 }
