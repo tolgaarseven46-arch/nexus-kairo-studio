@@ -49,8 +49,10 @@ describe("dismissive rhetorical semantic floor neighbor proof", () => {
 
   it("preserves explicit repair semantics alongside a dismissive rhetorical cue", () => {
     const repaired = floor("sen ne bilirsin zaten, pardon öyle demek istemedim");
+    const deniedApology = floor("özür dilemiyorum");
 
     expect(repaired.severity.disrespect).toBeGreaterThan(0);
     expect(repaired.apology).toBe(true);
+    expect(deniedApology.apology).toBe(false);
   });
 });
