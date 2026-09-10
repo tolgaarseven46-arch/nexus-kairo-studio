@@ -101,26 +101,44 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 - Timestamp chronology primary; tie/missing chronology interaction count ile çözülür; exact tie persisted lehine fail-closed olur.
 - Genuinely newer request authoritative kalır.
 - `server.ts` canonical `selectEffectiveKdmDynamicState` selector üzerinden arbitrate eder.
-- Post-merge FULL CI'de production davranışından bağımsız tek stale source-string wiring assertion'ı bulundu: `kairaMixedProviderStateContinuityContracts.test.ts` eski inline fallback implementation'ını arıyordu.
-- Geçici diagnostic proof ile full suite sonucu 1/2294 failure olarak izole edildi; test canonical selector contract'ına güncellendi ve diagnostic rerun exit code `0` oldu.
 
-## 13. Active CI regression recovery
-- Branch: `codex/ci-diagnostic-2668`.
-- Production behavior değişmiyor; yalnız stale mixed-provider continuity wiring contract'ı yeni effective-state selector seam'ine hizalanıyor.
-- Geçici diagnostic workflow/output branch'ten temizlendi.
-- Fast CI PASS; full diagnostic test suite PASS (`2294/2294`).
-- Sıradaki kapı: normal PR FULL CI + Architecture Review doğrulaması, merge ve post-merge main CI PASS.
+## 13. Post-#204 CI regression recovery — MERGED / CLOSED
+- PR #205 merge: `27e0680c71613746d25b3a12847642618e6a5593`.
+- Post-#204 FULL CI failure production davranışı değil, stale source-string wiring assertion'ıydı.
+- Geçici diagnostic proof failure'ı `1/2294` olarak izole etti; mixed-provider continuity testi canonical selector seam'ine hizalandı.
+- PR #205 FULL CI #2669 PASS; Architecture Review #789 PASS.
+- Post-merge main FULL CI #2670 PASS.
+- Geçici diagnostic workflow/output tamamen temizlendi.
 
-## 14. Sıradaki doğrulanmış iş
-- CI regression recovery PR'ını normal guard'larla merge et.
-- Post-merge main CI yeşil doğrula.
-- Ardından açık issue/main/runtime evidence'i yeniden ölç; yeni mimari işi yalnız ölçülmüş failure class üzerinden seç.
+## 14. Distinct-request state-owner lost-update race — ACTIVE / RED→GREEN
+- Active branch: `codex/state-owner-mutation-serialization`.
+- Ölçülmüş failure: aynı Kaira state owner için iki farklı request ID mevcut request-id idempotency sınırında eşzamanlı owner olabiliyordu; ikisi aynı persisted snapshot'tan reduce edip last-write-wins ile önceki turu silebilirdi.
+- RED commit: `8b12455aa209ab294beab56c3ed0dacd1db8752d`; Fast CI #171 focused regression FAIL.
+- Çözüm semantic/relationship katmanına patch değildir: ayrı persistence-owned state mutation serialization seam'i eklendi.
+- Firestore transaction lease + expiry + heartbeat aynı state owner'ın request-ID-bearing mutasyonlarını seri hale getirir; farklı owner'lar paralel kalır.
+- Completion/failure lease'i bırakır; distributed backend unavailable olduğunda process-local keyed serialization fallback'i yalnız tek-process ordering garantisi verir.
+- GREEN head: `f6240488dd1337bb913263144acf1bc777b67b89`; Fast CI #172 PASS (focused tests + TypeScript + build).
+- ADR: `docs/adr/0092-state-owner-mutation-serialization.md`.
 
-## 15. Latest checkpoint
+## 15. Bilinen residual API contract gap
+- Studio production chat client her mesaj için `requestId` üretir; normal traffic coordinated state-owner seam'ine girer.
+- `/api/chat` server contract'ında `requestId` halen optional; requestId'siz direct caller idempotency coordinator ve state-owner lease'i bypass eder.
+- Bu gap gizlenmez veya otomatik UUID ile semantik değiştirilmiş retry garantisi varmış gibi kapatılmaz.
+- Sonraki acceptance işi: server request identity contract'ını deterministic RED test ile tanımla; explicit client-required request ID veya ayrı server-owned mutation identity yaklaşımından doğru olanı seç ve doğrula.
+
+## 16. Sıradaki kapılar
+- State-owner serialization branch'ini normal FULL CI + Architecture Review'dan geçir.
+- Yeşilse merge et ve post-merge main FULL CI'yi doğrula.
+- Ardından requestId'siz direct API gap'i için RED contract proof üret; yalnız ölçülmüş sonuca göre çöz.
+- Sonrasında açık issue/main/runtime evidence'i yeniden ölç; yeni işi yalnız gerçek failure class üzerinden seç.
+
+## 17. Latest checkpoint
 - Date: 2026-09-10
-- Base main: `0cac99f9da1ea603ea116e9857a02cb7f59dde3e`.
-- Active branch: `codex/ci-diagnostic-2668`.
-- Active target: post-#204 stale mixed-provider wiring regression recovery.
+- Base main before active branch: `27e0680c71613746d25b3a12847642618e6a5593`.
+- Active branch: `codex/state-owner-mutation-serialization`.
+- Active target: distinct-request persisted-state lost-update prevention.
+- Historical RED proof: Fast CI #171 FAIL.
+- Current GREEN proof: Fast CI #172 PASS.
 - External AI API in deterministic tests: NO.
 - New downstream semantic authority: NO.
 - Semantic LLM removal: NO.
