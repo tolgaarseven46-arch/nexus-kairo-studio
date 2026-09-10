@@ -3,23 +3,28 @@ import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProj
 
 const floor = (message: string) => interpretationFromRegexFloor(message);
 
-describe("dismissive rhetorical semantic floor neighbor proof", () => {
-  it("characterizes reported and neighboring devaluation forms", () => {
-    const reported = floor("sen bu işlerden harbi ne anlarsın");
-    const neighbors = [
-      floor("sen ne bilirsin zaten"),
-      floor("sen bu konuda sanki ne yaparsın"),
-    ];
+const expectDevaluation = (message: string) => {
+  const reading = floor(message);
+  expect(reading.target).toBe("kaira");
+  expect(reading.severity.disrespect).toBeGreaterThan(0);
+  expect(reading.secondarySocialActs).toContain("challenge");
+  expect(reading.discourseFacets.relationalAct).toBe("challenge");
+};
 
-    for (const reading of [reported, ...neighbors]) {
-      expect(reading.target).toBe("kaira");
-      expect(reading.severity.disrespect).toBeGreaterThan(0);
-      expect(reading.secondarySocialActs).toContain("challenge");
-      expect(reading.discourseFacets.relationalAct).toBe("challenge");
-    }
+describe("dismissive rhetorical semantic floor neighbor proof", () => {
+  it("reported: recognizes the captured dismissive competence question", () => {
+    expectDevaluation("sen bu işlerden harbi ne anlarsın");
   });
 
-  it("keeps literal information questions as counterexamples", () => {
+  it("neighbor-1: recognizes a dismissive knowledge question with a different predicate and stance position", () => {
+    expectDevaluation("sen ne bilirsin zaten");
+  });
+
+  it("neighbor-2: recognizes a dismissive capability question with a different predicate", () => {
+    expectDevaluation("sen bu konuda sanki ne yaparsın");
+  });
+
+  it("counterexample: literal information questions remain non-devaluing", () => {
     const literal = [
       floor("bu konuda ne biliyorsun?"),
       floor("bu işlerden ne anlıyorsun?"),
