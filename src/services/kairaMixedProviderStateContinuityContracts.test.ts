@@ -29,10 +29,17 @@ describe('mixed local / AI provider state continuity contracts', () => {
     expect(count('dynamicStateBefore: effective,')).toBe(2);
     expect(count('dynamicStateBefore: requestState,')).toBe(0);
 
-    const persistedFallback = server.indexOf('effective = dynamicState?.relationship');
+    const requestState = server.indexOf('requestState = normalizeDynamicState(dynamicState)');
+    const selector = server.indexOf('effective = selectEffectiveKdmDynamicState({');
+    const persistedInput = server.indexOf('persistedState: kairaPolicy.persistentRelationship ? persistedState : null,', selector);
+    const relationshipPresence = server.indexOf('requestHasRelationship: Boolean(dynamicState?.relationship),', selector);
     const localBranch = server.indexOf(localBranchMarker);
-    expect(persistedFallback).toBeGreaterThan(-1);
-    expect(localBranch).toBeGreaterThan(persistedFallback);
+
+    expect(requestState).toBeGreaterThan(-1);
+    expect(selector).toBeGreaterThan(requestState);
+    expect(persistedInput).toBeGreaterThan(selector);
+    expect(relationshipPresence).toBeGreaterThan(persistedInput);
+    expect(localBranch).toBeGreaterThan(relationshipPresence);
   });
 
   it('records KDM quality metrics on both local and AI response paths', () => {
