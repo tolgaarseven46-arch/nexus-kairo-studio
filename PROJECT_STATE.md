@@ -110,35 +110,41 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 - Post-merge main FULL CI #2670 PASS.
 - Geçici diagnostic workflow/output tamamen temizlendi.
 
-## 14. Distinct-request state-owner lost-update race — ACTIVE / RED→GREEN
-- Active branch: `codex/state-owner-mutation-serialization`.
-- Ölçülmüş failure: aynı Kaira state owner için iki farklı request ID mevcut request-id idempotency sınırında eşzamanlı owner olabiliyordu; ikisi aynı persisted snapshot'tan reduce edip last-write-wins ile önceki turu silebilirdi.
-- RED commit: `8b12455aa209ab294beab56c3ed0dacd1db8752d`; Fast CI #171 focused regression FAIL.
-- Çözüm semantic/relationship katmanına patch değildir: ayrı persistence-owned state mutation serialization seam'i eklendi.
-- Firestore transaction lease + expiry + heartbeat aynı state owner'ın request-ID-bearing mutasyonlarını seri hale getirir; farklı owner'lar paralel kalır.
-- Completion/failure lease'i bırakır; distributed backend unavailable olduğunda process-local keyed serialization fallback'i yalnız tek-process ordering garantisi verir.
-- GREEN head: `f6240488dd1337bb913263144acf1bc777b67b89`; Fast CI #172 PASS (focused tests + TypeScript + build).
+## 14. Distinct-request state-owner lost-update race — MERGED / CLOSED
+- PR #206 merge: `603d120d01cc70bb00430d7ce53ffc8338791e92`.
+- Historical RED: `8b12455aa209ab294beab56c3ed0dacd1db8752d`; Fast CI #171 FAIL.
+- Firestore transaction lease + expiry + heartbeat aynı state owner mutasyonlarını seri hale getirir; farklı owner'lar paralel kalır.
+- Distributed backend unavailable olduğunda process-local keyed fallback yalnız tek-process ordering garantisi verir.
+- PR #206 FULL CI #2671 PASS; Architecture Review #791 PASS.
+- Post-merge main FULL CI #2672 PASS.
 - ADR: `docs/adr/0092-state-owner-mutation-serialization.md`.
 
-## 15. Bilinen residual API contract gap
-- Studio production chat client her mesaj için `requestId` üretir; normal traffic coordinated state-owner seam'ine girer.
-- `/api/chat` server contract'ında `requestId` halen optional; requestId'siz direct caller idempotency coordinator ve state-owner lease'i bypass eder.
-- Bu gap gizlenmez veya otomatik UUID ile semantik değiştirilmiş retry garantisi varmış gibi kapatılmaz.
-- Sonraki acceptance işi: server request identity contract'ını deterministic RED test ile tanımla; explicit client-required request ID veya ayrı server-owned mutation identity yaklaşımından doğru olanı seç ve doğrula.
+## 15. RequestId-less direct API serialization — ACTIVE / RED→GREEN
+- Active branch: `codex/request-idless-chat-serialization`.
+- Ölçülmüş gap: `/api/chat` external `requestId` olmadan çağrıldığında request coordination ve state-owner lease tamamen bypass ediliyordu.
+- RED commit: `bf2a12a5bcbd893241327fe415640c493bd95650`; Fast CI #185 FAIL.
+- Çözüm: external retry identity ile internal execution coordination identity ayrıldı.
+- External `requestId` varsa mevcut replay/dedup contract korunur.
+- External `requestId` yoksa server namespaced `internal:<uuid>` operation identity üretir; bu kimlik yalnız state-owner serialization içindir, caller retry replay garantisi değildir.
+- Response requestId davranışı değişmez: caller vermediyse response hâlâ requestId döndürmez.
+- Success/failure aynı coordination claim'i release eder.
+- Server wiring regression requestId varlığına bağlı coordination gate kalmadığını kilitler.
+- ADR: `docs/adr/0093-request-idless-chat-coordination-identity.md`.
 
 ## 16. Sıradaki kapılar
-- State-owner serialization branch'ini normal FULL CI + Architecture Review'dan geçir.
+- RequestId-less coordination branch'inin latest Fast CI'sini GREEN doğrula.
+- Normal PR FULL CI + Architecture Review'dan geçir.
 - Yeşilse merge et ve post-merge main FULL CI'yi doğrula.
-- Ardından requestId'siz direct API gap'i için RED contract proof üret; yalnız ölçülmüş sonuca göre çöz.
-- Sonrasında açık issue/main/runtime evidence'i yeniden ölç; yeni işi yalnız gerçek failure class üzerinden seç.
+- Ardından açık issue/main/runtime evidence'i yeniden ölç; yeni işi yalnız gerçek failure class üzerinden seç.
 
 ## 17. Latest checkpoint
 - Date: 2026-09-10
-- Base main before active branch: `27e0680c71613746d25b3a12847642618e6a5593`.
-- Active branch: `codex/state-owner-mutation-serialization`.
-- Active target: distinct-request persisted-state lost-update prevention.
-- Historical RED proof: Fast CI #171 FAIL.
-- Current GREEN proof: Fast CI #172 PASS.
+- Base main: `603d120d01cc70bb00430d7ce53ffc8338791e92`.
+- Active branch: `codex/request-idless-chat-serialization`.
+- Active target: requestId-less `/api/chat` state-owner serialization gap closure.
+- Historical RED proof: Fast CI #185 FAIL.
+- External retry contract preserved: YES.
+- Internal requestId-less coordination identity: YES.
 - External AI API in deterministic tests: NO.
 - New downstream semantic authority: NO.
 - Semantic LLM removal: NO.
