@@ -1,4 +1,5 @@
 import express from "express";
+import { randomUUID } from "node:crypto";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
@@ -7,6 +8,7 @@ import { selectEffectiveKdmDynamicState } from "./src/services/kdmEffectiveState
 import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
 import { normalizeKairaAffectBaseline } from "./src/services/kairaAffectBaseline";
 import { claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";
+import { resolveKairaChatRequestCoordinationIdentity } from "./src/services/kairaChatRequestCoordinationIdentity";
 import { normalizeDroitPersonality } from "./src/services/droitPersonalityNormalizer";
 import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
 import { resolveGeneratedReplySemanticVerification } from "./src/services/kairaGeneratedReplySemanticVerification";
@@ -542,8 +544,8 @@ function buildWorldEventInstruction(worldEvent: any) {
 }
 app.post("/api/chat", async (req, res) => {
   const serverStart = now();
-  let idempotencyKey = "";
-  let ownsIdempotencyClaim = false;
+  let coordinationKey = "";
+  let ownsCoordinationClaim = false;
   try {
     const {
       userId = "anonymous",
@@ -575,22 +577,26 @@ app.post("/api/chat", async (req, res) => {
     const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, "_");
     const stateUserId = stateOwnerScope(userId, kairaInstance.instanceId);
     const sessionId = incomingSessionId?.trim() || `session_${stateUserId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
-    const requestId = typeof incomingRequestId === "string" ? incomingRequestId.trim().slice(0, 160) : "";
-    idempotencyKey = requestId ? `${stateUserId}::${kairaInstance.instanceId}::${requestId}` : "";
-    if (idempotencyKey) {
-      const claim = await claimCoordinatedKairaChatRequest<any>(idempotencyKey);
+    const requestIdentity = resolveKairaChatRequestCoordinationIdentity(
+      incomingRequestId,
+      randomUUID,
+    );
+    const requestId = requestIdentity.requestId;
+    coordinationKey = `${stateUserId}::${kairaInstance.instanceId}::${requestIdentity.coordinationRequestId}`;
+    if (coordinationKey) {
+      const claim = await claimCoordinatedKairaChatRequest<any>(coordinationKey);
       if (claim.kind === "replay") return res.json(claim.payload);
       if (claim.kind === "wait") {
         const outcome = await claim.outcome;
         if (outcome.ok === true) return res.json(outcome.payload);
         throw new Error(outcome.errorMessage);
       }
-      ownsIdempotencyClaim = true;
+      ownsCoordinationClaim = true;
     }
     const sendChatPayload = async (payload: any) => {
-      if (idempotencyKey && ownsIdempotencyClaim) {
-        await completeCoordinatedKairaChatRequest(idempotencyKey, payload);
-        ownsIdempotencyClaim = false;
+      if (coordinationKey && ownsCoordinationClaim) {
+        await completeCoordinatedKairaChatRequest(coordinationKey, payload);
+        ownsCoordinationClaim = false;
       }
       return res.json(payload);
     };
@@ -1557,9 +1563,9 @@ app.post("/api/chat", async (req, res) => {
     });
   } catch (e: any) {
     console.error(e);
-    if (idempotencyKey && ownsIdempotencyClaim) {
-      await failCoordinatedKairaChatRequest(idempotencyKey, e);
-      ownsIdempotencyClaim = false;
+    if (coordinationKey && ownsCoordinationClaim) {
+      await failCoordinatedKairaChatRequest(coordinationKey, e);
+      ownsCoordinationClaim = false;
     }
     if (!res.headersSent)
       res.status(500).json({ error: e?.message || "Chat service failed" });
