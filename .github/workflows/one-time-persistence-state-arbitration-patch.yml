@@ -1,40 +1,35 @@
-name: One-time persistence state arbitration patch
+name: Persistence arbitration patch
 
 on:
   push:
-    branches: [codex/persistence-state-arbitration]
+    branches:
+      - codex/persistence-state-arbitration
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout branch
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: codex/persistence-state-arbitration
           fetch-depth: 0
-
-      - name: Apply bounded persistence arbitration wiring
-        shell: bash
+      - name: Patch files
         run: |
-          set -euo pipefail
-          python - <<'PY'
+          python3 - <<'PY'
           from pathlib import Path
           import json
 
-          server = Path('server.ts')
-          text = server.read_text(encoding='utf-8')
-          import_anchor = 'import { analyzeKdmInteractionCanonicalTurn } from "./src/services/kdmConsistencyEngine";\n'
-          selector_import = 'import { selectEffectiveKdmDynamicState } from "./src/services/kdmEffectiveStateSelector";\n'
-          if selector_import not in text:
-              if import_anchor not in text:
-                  raise SystemExit('server import anchor not found')
-              text = text.replace(import_anchor, import_anchor + selector_import, 1)
-
+          p = Path("server.ts")
+          s = p.read_text(encoding="utf-8")
+          anchor = 'import { analyzeKdmInteractionCanonicalTurn } from "./src/services/kdmConsistencyEngine";\n'
+          imp = 'import { selectEffectiveKdmDynamicState } from "./src/services/kdmEffectiveStateSelector";\n'
+          if imp not in s:
+              if anchor not in s: raise SystemExit("import anchor missing")
+              s = s.replace(anchor, anchor + imp, 1)
           old = '''      requestState = normalizeDynamicState(dynamicState),
       effective = dynamicState?.relationship
         ? requestState
@@ -47,54 +42,64 @@ jobs:
         requestHasRelationship: Boolean(dynamicState?.relationship),
       }),
 '''
-          if old in text:
-              text = text.replace(old, new, 1)
-          elif new not in text:
-              raise SystemExit('server effective-state anchor not found')
-          server.write_text(text, encoding='utf-8')
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit("effective-state anchor missing")
+          p.write_text(s, encoding="utf-8")
 
-          wiring_test = Path('src/services/kdmEffectiveStateSelectionWiringContracts.test.ts')
-          wiring_test.write_text('''import { readFileSync } from "node:fs";\nimport { describe, expect, it } from "vitest";\n\ndescribe("KDM effective-state server wiring contract", () => {\n  it("routes request/persisted arbitration through the canonical selector", () => {\n    const server = readFileSync("server.ts", "utf8");\n    expect(server).toContain('import { selectEffectiveKdmDynamicState } from "./src/services/kdmEffectiveStateSelector";');\n    expect(server).toContain("effective = selectEffectiveKdmDynamicState({");\n    expect(server).toContain("persistedState: kairaPolicy.persistentRelationship ? persistedState : null");\n    expect(server).toContain("requestHasRelationship: Boolean(dynamicState?.relationship)");\n    expect(server).not.toContain("effective = dynamicState?.relationship");\n  });\n});\n''', encoding='utf-8')
+          Path("src/services/kdmEffectiveStateSelectionWiringContracts.test.ts").write_text('''import { readFileSync } from "node:fs";\nimport { describe, expect, it } from "vitest";\n\ndescribe("KDM effective-state server wiring contract", () => {\n  it("routes request/persisted arbitration through the canonical selector", () => {\n    const server = readFileSync("server.ts", "utf8");\n    expect(server).toContain('import { selectEffectiveKdmDynamicState } from "./src/services/kdmEffectiveStateSelector";');\n    expect(server).toContain("effective = selectEffectiveKdmDynamicState({");\n    expect(server).toContain("persistedState: kairaPolicy.persistentRelationship ? persistedState : null");\n    expect(server).toContain("requestHasRelationship: Boolean(dynamicState?.relationship)");\n    expect(server).not.toContain("effective = dynamicState?.relationship");\n  });\n});\n''', encoding="utf-8")
 
-          manifest_path = Path('config/behavior-regression-proof.json')
-          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-          cluster_id = 'persistent-relationship-state-arbitration'
-          if not any(c.get('id') == cluster_id for c in manifest['clusters']):
-              manifest['clusters'].append({
-                  'id': cluster_id,
-                  'invariant': 'A stale client relationship snapshot must not rewind a fresher persisted Kaira-user relationship state; timestamp is primary chronology, interaction count breaks timestamp ties, and a genuinely newer request remains authoritative.',
-                  'redSha': '42ecf41a741b10de5fb02d820ff2b3f19d17f927',
-                  'testFile': 'src/services/kdmEffectiveStateSelectionNeighborProofRegression.test.ts',
-                  'reported': 'reported: newer persisted relationship defeats a stale request relationship',
-                  'neighbors': [
-                      'neighbor-1: higher persisted interaction count wins when timestamps tie',
-                      'neighbor-2: valid durable chronology defeats an invalid stale request timestamp'
-                  ],
-                  'counterexamples': [
-                      'counterexample: genuinely newer request relationship remains authoritative'
-                  ]
+          mp = Path("config/behavior-regression-proof.json")
+          m = json.loads(mp.read_text(encoding="utf-8"))
+          if not any(x.get("id") == "persistent-relationship-state-arbitration" for x in m["clusters"]):
+              m["clusters"].append({
+                  "id": "persistent-relationship-state-arbitration",
+                  "invariant": "A stale client relationship snapshot must not rewind a fresher persisted Kaira-user relationship state; timestamp is primary chronology, interaction count breaks timestamp ties, and a genuinely newer request remains authoritative.",
+                  "redSha": "42ecf41a741b10de5fb02d820ff2b3f19d17f927",
+                  "testFile": "src/services/kdmEffectiveStateSelectionNeighborProofRegression.test.ts",
+                  "reported": "reported: newer persisted relationship defeats a stale request relationship",
+                  "neighbors": ["neighbor-1: higher persisted interaction count wins when timestamps tie", "neighbor-2: valid durable chronology defeats an invalid stale request timestamp"],
+                  "counterexamples": ["counterexample: genuinely newer request relationship remains authoritative"]
               })
-          manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          mp.write_text(json.dumps(m, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-          state_path = Path('PROJECT_STATE.md')
-          state = state_path.read_text(encoding='utf-8')
-          marker = '## 11. Provider-free memory + relationship combined behavior — ACTIVE'
-          if marker in state:
-              state = state[:state.index(marker)]
-          state += '''## 11. Provider-free memory + relationship combined behavior — MERGED\n- PR #203 merge: `47d5f5012c00e50cca6572bb777b0ca3b5d3905d`.\n- Same canonical semantic + same established relationship A/B proof memory var/yok canonical KDM turn sınırında geçti.\n- Typed autobiographical memory yalnız zaten material affective projection'ı derinleştirir; relational projection/injury/warmth/trust/conversation state'i yeniden yorumlamaz.\n- Provider/API veya yeni semantic authority eklenmedi.\n\n## 12. Persistent relationship effective-state arbitration — ACTIVE\n- Branch: `codex/persistence-state-arbitration`.\n- Ölçülmüş production failure class: request herhangi bir relationship taşıdığında eski server kuralı persisted snapshot daha yeni olsa bile request'i körlemesine seçebiliyordu; stale tab/client durable relationship state'i geriye sarabilirdi.\n- RED baseline: `42ecf41a741b10de5fb02d820ff2b3f19d17f927`.\n- Canonical boundary selector timestamp chronology'yi önce, eşit/eksik chronology'de interaction count'u kullanır; exact tie persisted state lehine fail-closed olur.\n- Genuinely newer request korunur; persistence körlemesine tek authority yapılmaz.\n- `server.ts` effective-state wiring canonical selector üzerinden geçer.\n- Neighbor-proof: reported + iki komşu RED→GREEN, genuine-newer-request counterexample GREEN kalmalıdır.\n\n## 13. Sıradaki doğrulanmış iş\n- Persistence arbitration fix CI + Architecture Review ile doğrulanıp merge edilecek.\n- Post-merge main CI yeşil doğrulanacak.\n- Ardından açık issue/main/runtime evidence yeniden ölçülerek sıradaki hedef seçilecek; spekülatif feature açılmayacak.\n\n## 14. Latest checkpoint\n- Date: 2026-09-10\n- Base main: `47d5f5012c00e50cca6572bb777b0ca3b5d3905d` (PR #203 sonrası).\n- Active branch: `codex/persistence-state-arbitration`.\n- Active target: stale request vs fresher persisted relationship effective-state arbitration.\n- External AI API in deterministic tests: NO.\n- New downstream semantic authority: NO.\n- Semantic LLM removal: NO.\n'''
-          state_path.write_text(state, encoding='utf-8')
+          sp = Path("PROJECT_STATE.md")
+          st = sp.read_text(encoding="utf-8")
+          marker = "## 11. Provider-free memory + relationship combined behavior — ACTIVE"
+          if marker in st: st = st[:st.index(marker)]
+          tail = '''## 11. Provider-free memory + relationship combined behavior — MERGED
+- PR #203 merge: `47d5f5012c00e50cca6572bb777b0ca3b5d3905d`.
+- Same canonical semantic + same established relationship A/B proof memory var/yok canonical KDM turn sınırında geçti.
+- Typed autobiographical memory yalnız material affective projection'ı derinleştirir; relationship state'i yeniden yorumlamaz.
+
+## 12. Persistent relationship effective-state arbitration — ACTIVE
+- Branch: `codex/persistence-state-arbitration`.
+- Production failure class: stale request relationship, daha yeni persisted relationship snapshot'ını ezebiliyordu.
+- RED baseline: `42ecf41a741b10de5fb02d820ff2b3f19d17f927`.
+- Timestamp chronology primary; tie/missing chronology interaction count ile çözülür; exact tie persisted lehine fail-closed olur.
+- Genuinely newer request authoritative kalır.
+- `server.ts` canonical effective-state selector üzerinden arbitrate eder.
+
+## 13. Sıradaki doğrulanmış iş
+- Fix CI + Architecture Review ile doğrulanıp merge edilecek.
+- Post-merge main CI yeşil doğrulanacak.
+- Sonra açık issue/main/runtime evidence yeniden ölçülecek.
+
+## 14. Latest checkpoint
+- Date: 2026-09-10
+- Base main: `47d5f5012c00e50cca6572bb777b0ca3b5d3905d`.
+- Active branch: `codex/persistence-state-arbitration`.
+- Active target: stale request vs fresher persisted relationship arbitration.
+- External AI API in deterministic tests: NO.
+- New downstream semantic authority: NO.
+- Semantic LLM removal: NO.
+'''
+          sp.write_text(st + tail, encoding="utf-8")
           PY
-
-      - name: Commit patch
-        shell: bash
-        run: |
-          set -euo pipefail
-          if git diff --quiet; then
-            echo "No patch changes needed."
-            exit 0
-          fi
+          if git diff --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server.ts src/services/kdmEffectiveStateSelectionWiringContracts.test.ts config/behavior-regression-proof.json PROJECT_STATE.md
-          git commit -m "fix(persistence): arbitrate stale request relationship state"
+          git commit -m "fix(persistence): wire effective-state arbitration"
           git push origin HEAD:codex/persistence-state-arbitration
