@@ -1,0 +1,49 @@
+name: One-time request coordination proof manifest
+
+on:
+  push:
+    branches:
+      - codex/request-idless-chat-serialization
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/request-idless-chat-serialization
+          fetch-depth: 0
+      - name: Append bug-class proof and clean workflow
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('config/behavior-regression-proof.json')
+          data = json.loads(p.read_text())
+          cluster = {
+            "id": "request-idless-chat-state-owner-coordination",
+            "invariant": "Every chat execution that can mutate persisted Kaira state must enter state-owner serialization even when the caller omits external requestId, while caller-supplied requestId must retain the existing replayable retry identity contract.",
+            "redSha": "bf2a12a5bcbd893241327fe415640c493bd95650",
+            "testFile": "src/services/kairaChatRequestCoordinationNeighborProofRegression.test.ts",
+            "reported": "reported: requestId-less direct chat execution receives an internal non-replayable coordination identity",
+            "neighbors": [
+              "neighbor-1: whitespace-only requestId follows the same internal coordination path",
+              "neighbor-2: separate requestId-less executions remain distinct rather than becoming accidental retries"
+            ],
+            "counterexamples": [
+              "counterexample: caller-supplied requestId preserves the existing replayable identity contract"
+            ]
+          }
+          data['clusters'] = [c for c in data['clusters'] if c.get('id') != cluster['id']] + [cluster]
+          p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+          PY
+          rm .github/workflows/one-time-request-coordination-proof.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add config/behavior-regression-proof.json .github/workflows/one-time-request-coordination-proof.yml
+          git commit -m "test(persistence): register request coordination bug-class proof"
+          git push origin HEAD:codex/request-idless-chat-serialization
