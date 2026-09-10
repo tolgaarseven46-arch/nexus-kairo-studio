@@ -42,7 +42,7 @@
 - QUES morphology yalnız typed `polarQuestionClause` scope ile information request'e promote edilir.
 - Ambiguous QUES promotion yapılmaz; uncertainty yükselir.
 - Zero-parse tamamen abstain eder.
-- PR #195 Architecture Review #769 PASS.
+- PR #195 Architecture Review #770 PASS.
 - PR #195 FULL CI #2641 PASS.
 - Post-merge main FULL CI #2642 PASS.
 
@@ -95,24 +95,32 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 - Same canonical semantic + same established relationship A/B proof memory var/yok canonical KDM turn sınırında geçti.
 - Typed autobiographical memory yalnız material affective projection'ı derinleştirir; relationship state'i yeniden yorumlamaz.
 
-## 12. Persistent relationship effective-state arbitration — ACTIVE
-- Branch: `codex/persistence-state-arbitration`.
+## 12. Persistent relationship effective-state arbitration — MERGED
+- PR #204 merge: `0cac99f9da1ea603ea116e9857a02cb7f59dde3e`.
 - Production failure class: stale request relationship, daha yeni persisted relationship snapshot'ını ezebiliyordu.
-- RED baseline: `42ecf41a741b10de5fb02d820ff2b3f19d17f927`.
 - Timestamp chronology primary; tie/missing chronology interaction count ile çözülür; exact tie persisted lehine fail-closed olur.
 - Genuinely newer request authoritative kalır.
-- `server.ts` canonical effective-state selector üzerinden arbitrate eder.
+- `server.ts` canonical `selectEffectiveKdmDynamicState` selector üzerinden arbitrate eder.
+- Post-merge FULL CI'de production davranışından bağımsız tek stale source-string wiring assertion'ı bulundu: `kairaMixedProviderStateContinuityContracts.test.ts` eski inline fallback implementation'ını arıyordu.
+- Geçici diagnostic proof ile full suite sonucu 1/2294 failure olarak izole edildi; test canonical selector contract'ına güncellendi ve diagnostic rerun exit code `0` oldu.
 
-## 13. Sıradaki doğrulanmış iş
-- Fix CI + Architecture Review ile doğrulanıp merge edilecek.
-- Post-merge main CI yeşil doğrulanacak.
-- Sonra açık issue/main/runtime evidence yeniden ölçülecek.
+## 13. Active CI regression recovery
+- Branch: `codex/ci-diagnostic-2668`.
+- Production behavior değişmiyor; yalnız stale mixed-provider continuity wiring contract'ı yeni effective-state selector seam'ine hizalanıyor.
+- Geçici diagnostic workflow/output branch'ten temizlendi.
+- Fast CI PASS; full diagnostic test suite PASS (`2294/2294`).
+- Sıradaki kapı: normal PR FULL CI + Architecture Review doğrulaması, merge ve post-merge main CI PASS.
 
-## 14. Latest checkpoint
+## 14. Sıradaki doğrulanmış iş
+- CI regression recovery PR'ını normal guard'larla merge et.
+- Post-merge main CI yeşil doğrula.
+- Ardından açık issue/main/runtime evidence'i yeniden ölç; yeni mimari işi yalnız ölçülmüş failure class üzerinden seç.
+
+## 15. Latest checkpoint
 - Date: 2026-09-10
-- Base main: `47d5f5012c00e50cca6572bb777b0ca3b5d3905d`.
-- Active branch: `codex/persistence-state-arbitration`.
-- Active target: stale request vs fresher persisted relationship arbitration.
+- Base main: `0cac99f9da1ea603ea116e9857a02cb7f59dde3e`.
+- Active branch: `codex/ci-diagnostic-2668`.
+- Active target: post-#204 stale mixed-provider wiring regression recovery.
 - External AI API in deterministic tests: NO.
 - New downstream semantic authority: NO.
 - Semantic LLM removal: NO.
