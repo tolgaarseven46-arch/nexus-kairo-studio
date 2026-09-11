@@ -1,4 +1,4 @@
-name: one-time hurt-distancing realization probe
+name: one-time generated-reply semantic probe
 'on':
   push:
     branches:
@@ -6,66 +6,38 @@ name: one-time hurt-distancing realization probe
 permissions:
   contents: read
 jobs:
-  hurt-probe:
+  semantic-probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
-      - name: Probe repeated live hurt-distancing outputs
+      - name: Classify leaked reply through canonical language understanding
         shell: bash
         run: |
           python - <<'PY'
-          import json, urllib.request, urllib.error, uuid, time
-
+          import json, urllib.request
           base = "https://nexus-kairo-studio.onrender.com"
-          state = {
-            "calmness": 38, "anger": 24, "stress": 58, "happiness": 30, "confidence": 62, "surprise": 8,
-            "reactionMode": "hurt",
-            "relationship": {"warmth": 38, "trust": 42, "hurtScore": 48, "conflictScore": 31, "repairProgress": 0,
-              "conversationState": "distancing", "interactionCount": 50, "familiarityDays": 45}
-          }
-          message = "bugün biraz yoğunum"
+          samples = [
+            "yoğunken yazman bile fazla aslında, kendine dön biraz bugün",
+            "hı anladım kolay gelsin sana",
+            "yoğunken yazman da ayrı değerli, tamamdır",
+          ]
           rows = []
-
-          for i in range(8):
-            uid = f"hurt_probe_{i}_{uuid.uuid4().hex[:8]}"
-            payload = {
-              "userId": uid, "userName": "Tolga", "userMessage": message, "history": [],
-              "dynamicState": state, "provider": "openrouter",
-              "kairaInstanceId": "reference", "kairaInstanceType": "reference",
-              "sessionId": "session_" + uid,
-              "requestId": f"hurt-probe-{i}-" + uuid.uuid4().hex[:8],
-            }
-            req = urllib.request.Request(base + "/api/chat", data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers={"Content-Type":"application/json"}, method="POST")
-            try:
-              with urllib.request.urlopen(req, timeout=150) as r:
-                data = json.loads(r.read().decode("utf-8"))
-              kdm = data.get("kdm") or {}
-              plan = kdm.get("responsePlan") or data.get("responsePlan") or {}
-              reply = str(data.get("reply") or data.get("response") or "").strip()
-              row = {
-                "status":"success", "reply":reply,
-                "providerUsed":data.get("providerUsed") or kdm.get("providerUsed") or data.get("activeAiProviderUsed"),
-                "allowAffection":plan.get("allowAffection"),
-                "allowReopeningCloseness":plan.get("allowReopeningCloseness"),
-                "allowHumor":plan.get("allowHumor"), "allowQuestion":plan.get("allowQuestion"),
-                "stance":plan.get("stance"), "register":plan.get("register"),
-                "guardedness":plan.get("guardedness"), "warmthAxis":plan.get("warmthAxis"),
-                "requiredContent":plan.get("requiredContent"),
-              }
-            except urllib.error.HTTPError as e:
-              row = {"status":"http_error","httpStatus":e.code,"body":e.read().decode("utf-8",errors="replace")}
+          for text in samples:
+            payload = {"userMessage": text, "userName":"KAIRO", "characterName":"Tolga", "history":[], "provider":"openrouter"}
+            req = urllib.request.Request(base + "/api/language-understanding", data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers={"Content-Type":"application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=150) as r:
+              out = json.loads(r.read().decode("utf-8"))
+            interp = out.get("interpretation") or out.get("semanticInterpretation") or {}
+            event = out.get("event") or {}
+            row = {"text":text, "interpretation":interp, "event":event, "semanticSource":out.get("semanticSource")}
             rows.append(row)
-            print(f"HURT_PROBE_{i+1}=" + json.dumps(row, ensure_ascii=False, sort_keys=True))
-            time.sleep(1)
-
-          with open("hurt-distancing-probe.json", "w", encoding="utf-8") as f:
-            json.dump({"message":message,"seedState":state,"runs":rows}, f, ensure_ascii=False, indent=2)
-          print("HURT_PROBE_COMPLETE")
+            print("SEMANTIC_PROBE=" + json.dumps(row, ensure_ascii=False, sort_keys=True))
+          with open("generated-reply-semantic-probe.json", "w", encoding="utf-8") as f:
+            json.dump(rows, f, ensure_ascii=False, indent=2)
           PY
-      - name: Upload hurt probe artifact
-        if: always()
+      - name: Upload semantic probe artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hurt-distancing-live-probe
-          path: hurt-distancing-probe.json
+          name: generated-reply-semantic-probe
+          path: generated-reply-semantic-probe.json
           if-no-files-found: error
