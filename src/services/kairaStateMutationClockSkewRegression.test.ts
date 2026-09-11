@@ -22,7 +22,10 @@ vi.mock('firebase/firestore', () => ({
   }),
 }));
 
-import { firestoreStateMutationBackend } from './kairaFirestoreStateMutation';
+import {
+  firestoreStateMutationBackend,
+  STATE_MUTATION_LEASE_CLOCK_SKEW_TOLERANCE_MS,
+} from './kairaFirestoreStateMutation';
 
 describe('Kaira state mutation lease clock-skew regression', () => {
   beforeEach(() => lockStore.clear());
@@ -40,13 +43,32 @@ describe('Kaira state mutation lease clock-skew regression', () => {
     })).toBe(true);
 
     // Instance B observes the same real instant with a wall clock 20 seconds ahead.
-    // A distributed lease must not turn that clock disagreement into concurrent ownership.
-    const contenderNow = holderNow + 20_000;
+    // Bounded clock disagreement must not become concurrent ownership.
     expect(await firestoreStateMutationBackend.acquire({
       key,
       ownerToken: 'holder-b',
-      now: contenderNow,
+      now: holderNow + 20_000,
       leaseMs,
     })).toBe(false);
+  });
+
+  it('still allows crash recovery once lease expiry plus the skew bound has elapsed', async () => {
+    const key = 'instance_clock_skew:user_recovery';
+    const leaseMs = 10_000;
+    const holderNow = 2_000_000;
+
+    expect(await firestoreStateMutationBackend.acquire({
+      key,
+      ownerToken: 'holder-a',
+      now: holderNow,
+      leaseMs,
+    })).toBe(true);
+
+    expect(await firestoreStateMutationBackend.acquire({
+      key,
+      ownerToken: 'holder-b',
+      now: holderNow + leaseMs + STATE_MUTATION_LEASE_CLOCK_SKEW_TOLERANCE_MS + 1,
+      leaseMs,
+    })).toBe(true);
   });
 });
