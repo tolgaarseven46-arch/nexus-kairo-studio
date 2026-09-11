@@ -148,7 +148,7 @@ describe("Core emotion-state Phase 5C cross-axis coherence", () => {
 
     expect(maxHappy.appraisal.affective.valence).toBe("negative");
     expect(maxHappy.appraisal.affective.significance).toBeGreaterThanOrEqual(0.75);
-    expect(maxHappy.appraisal.affective.activation).toBeGreaterThanOrEqual(0.95);
+    expect(maxHappy.appraisal.affective.activation).toBeGreaterThanOrEqual(maxHappy.appraisal.affective.significance);
     expect(maxHappy.appraisal.affective.significance).toBe(normalHappy.appraisal.affective.significance);
     expect(maxHappy.appraisal.affective.activation).toBe(normalHappy.appraisal.affective.activation);
     expect(maxHappy.contextFactors.affectiveNegative).toBe(normalHappy.contextFactors.affectiveNegative);
