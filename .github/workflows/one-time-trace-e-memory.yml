@@ -1,0 +1,120 @@
+name: one-time trace E memory realization
+'on':
+  push:
+    branches:
+      - diag/trace-e-memory
+permissions:
+  contents: read
+jobs:
+  trace-e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Run live memory realization A/B
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, urllib.request, urllib.error, uuid, time
+
+          base = "https://nexus-kairo-studio.onrender.com"
+
+          def get_json(path):
+            with urllib.request.urlopen(base + path, timeout=60) as r:
+              return json.loads(r.read().decode("utf-8"))
+
+          def chat(payload, timeout=150):
+            req = urllib.request.Request(
+              base + "/api/chat",
+              data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+              headers={"Content-Type":"application/json"},
+              method="POST",
+            )
+            try:
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                return {"ok": True, "status": r.status, "data": json.loads(r.read().decode("utf-8"))}
+            except urllib.error.HTTPError as e:
+              return {"ok": False, "status": e.code, "body": e.read().decode("utf-8", errors="replace")}
+
+          runtime = get_json("/api/runtime-info")
+          root = uuid.uuid4().hex[:10]
+          memory_user = f"trace_e_memory_{root}"
+          control_user = f"trace_e_control_{root}"
+
+          setup_payload = {
+            "userId": memory_user,
+            "userName": "Tolga",
+            "userMessage": "kahveyi seviyorum",
+            "history": [],
+            "provider": "openrouter",
+            "kairaInstanceId": "reference",
+            "kairaInstanceType": "reference",
+            "sessionId": "session_" + memory_user,
+            "requestId": "trace-e-setup-" + root,
+          }
+
+          setup_attempts = []
+          setup_ok = None
+          for i in range(3):
+            setup_payload["requestId"] = f"trace-e-setup-{root}-{i+1}"
+            result = chat(setup_payload)
+            setup_attempts.append(result)
+            if result.get("ok"):
+              setup_ok = result
+              break
+            time.sleep(2)
+
+          time.sleep(2)
+          final_message = "ben neyi seviyordum?"
+
+          def final_case(user_id, label):
+            payload = {
+              "userId": user_id,
+              "userName": "Tolga",
+              "userMessage": final_message,
+              "history": [],
+              "provider": "openrouter",
+              "kairaInstanceId": "reference",
+              "kairaInstanceType": "reference",
+              "sessionId": "session_" + user_id,
+              "requestId": f"trace-e-{label}-" + uuid.uuid4().hex[:8],
+            }
+            out = chat(payload)
+            case = {"request": payload, "http": out}
+            if out.get("ok"):
+              data = out["data"]
+              kdm = data.get("kdm") or {}
+              case.update({
+                "reply": str(data.get("reply") or data.get("response") or "").strip(),
+                "providerUsed": data.get("providerUsed") or kdm.get("providerUsed") or data.get("activeAiProviderUsed"),
+                "dialogueDecision": data.get("dialogueDecision") or kdm.get("dialogueDecision"),
+                "responsePlan": kdm.get("responsePlan") or data.get("responsePlan") or {},
+                "semanticEvent": kdm.get("semanticEvent") or data.get("semanticEvent"),
+                "consistency": data.get("consistency"),
+              })
+            return case
+
+          memory_case = final_case(memory_user, "memory")
+          control_case = final_case(control_user, "control")
+
+          results = {
+            "runtimeInfo": runtime,
+            "setup": {"attempts": setup_attempts, "accepted": setup_ok},
+            "finalMessage": final_message,
+            "memoryCase": memory_case,
+            "controlCase": control_case,
+          }
+
+          print("TRACE_E_RUNTIME=" + json.dumps(runtime, ensure_ascii=False, sort_keys=True))
+          print("TRACE_E_SETUP=" + json.dumps(setup_attempts, ensure_ascii=False, sort_keys=True)[:8000])
+          print("TRACE_E_MEMORY=" + json.dumps(memory_case, ensure_ascii=False, sort_keys=True)[:12000])
+          print("TRACE_E_CONTROL=" + json.dumps(control_case, ensure_ascii=False, sort_keys=True)[:12000])
+          with open("trace-e-memory-live.json", "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+          PY
+      - name: Upload Trace E artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trace-e-memory-live
+          path: trace-e-memory-live.json
+          if-no-files-found: error
