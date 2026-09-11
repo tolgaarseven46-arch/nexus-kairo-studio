@@ -141,32 +141,44 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 - Fast CI #205 PASS.
 - PR #209 FULL CI #2688 PASS; Architecture Review #811 PASS.
 - Phase-0 A/B/D/E observability körlüğü current main için stale: typed projector'lar + scenario-complete readiness mevcut; bu yüzden yeni observability patch üretilmedi.
-- Post-merge main FULL CI #2689 started on merge SHA and passed all gates through TypeScript; production build was the final running step at the time the next failure proof branch started.
+- Post-merge main FULL CI #2689 PASS.
 
-## 17. Distributed lease clock-skew takeover — RED→GREEN / ACTIVE PR PREP
-- Branch: `codex/state-lease-clock-skew-red` from clean main `b891c781f5f81a60bc318f42302f04d864f0f2df`.
-- Historical RED commit: `d736ae5934106d83f13b3f13ef92a34f56bddd09`.
-- Fast CI #208 failed exactly on the new production-backend assertion: a contender with a wall clock 20 seconds ahead acquired a lease held by another owner (`expected false`, received `true`).
+## 17. Distributed lease clock-skew takeover — MERGED / CLOSED
+- PR #210 merge: `a2ca9ccedbc9edafd1860f08a1a6d1b49011fc75`.
+- Historical RED commit: `d736ae5934106d83f13b3f13ef92a34f56bddd09`; Fast CI #208 FAIL because a contender 20 seconds ahead acquired an active lease (`expected false`, received `true`).
 - Root cause: `firestoreStateMutationBackend.acquire` treated caller wall-clock `now` as authoritative expiry evidence.
 - Fix: bounded 30-second `STATE_MUTATION_LEASE_CLOCK_SKEW_TOLERANCE_MS`; another owner may take over only after stored `leaseUntil + tolerance`.
 - Neighbor proof preserves crash recovery after lease expiry plus tolerance.
-- Latest Fast CI #211 PASS after fix + neighbor proof + ADR.
+- PR #210 FULL CI #2690 PASS; Architecture Review #812 PASS.
+- Post-merge main commit: `a2ca9ccedbc9edafd1860f08a1a6d1b49011fc75`; main CI #2691 PASS.
 - ADR: `docs/adr/0094-state-mutation-lease-clock-skew-bound.md`.
 - This is bounded-skew safety, not arbitrary-clock correctness.
-- Separate residual candidate remains: heartbeat `renew=false` is not yet propagated to the active holder as ownership loss. Do not patch it before a deterministic measured failure proof.
 
-## 18. Sıradaki kapılar
-- Open PR for clock-skew RED→GREEN package; complete FULL CI + Architecture Review; merge and verify clean main.
-- Then measure the separate lost-lease/heartbeat-renewal candidate with a deterministic RED proof before designing fencing/abort behavior.
+## 18. State lease ownership-loss propagation — RED→GREEN / ACTIVE PR PREP
+- Active branch: `codex/state-lease-ownership-loss-red` from clean main `a2ca9ccedbc9edafd1860f08a1a6d1b49011fc75`.
+- First characterization RED showed a second owner can recover while the old process still retains an unreleased local handle; that condition alone is not the correct safety invariant because blocking recovery until voluntary release would break crash recovery.
+- Correct invariant: once authoritative renewal is rejected, the stale holder must be able to detect ownership loss and must fail before beginning persistence.
+- Measured RED: commit `d1b65a94f023f6473cedf32b0658993167a0a778`; Fast CI #215 FAIL only on new ownership-loss assertion because `assertOwned` was undefined (51/52 focused tests passed).
+- Fix: `KairaStateMutationLease.assertOwned()` + explicit `KairaStateMutationOwnershipLostError`; heartbeat `renew=false` marks local ownership lost.
+- Coordinator propagates request-scoped ownership assertion alongside release semantics.
+- Both local-language and provider/AI chat paths revalidate authoritative lease ownership immediately before persistence begins.
+- Recovery remains allowed for another owner; stale-holder persistence is what fails closed.
+- GREEN: commit `d4b84d0d971daf9f3d16f4af0e2be6c2fc5c58fd`; Fast CI #218 PASS, focused 52/52 tests PASS, TypeScript PASS.
+- ADR 0092 updated with ownership-loss contract and RED→GREEN evidence.
+- No semantic, relationship, behavior, or response authority changed.
+
+## 19. Sıradaki kapılar
+- Open PR for state-lease ownership-loss RED→GREEN package.
+- Complete docs-guard, behavior-guard, FULL CI, Architecture Review, merge, then verify post-merge clean main.
 - Yeni işi yalnız ölçülmüş failure class / açık contract gap / doğrulanmış regression üzerinden seç.
 
-## 19. Latest checkpoint
+## 20. Latest checkpoint
 - Date: 2026-09-11
-- Clean main at branch start: `b891c781f5f81a60bc318f42302f04d864f0f2df` (PR #209 merged).
-- Active branch: `codex/state-lease-clock-skew-red`.
-- Historical clock-skew RED: `d736ae5934106d83f13b3f13ef92a34f56bddd09`; Fast CI #208 FAIL on expected takeover-safety assertion.
-- Clock-skew fix + crash-recovery neighbor: GREEN; Fast CI #211 PASS.
-- Production behavior changed on active branch: YES, only distributed state-mutation lock takeover timing.
+- Clean main at branch start: `a2ca9ccedbc9edafd1860f08a1a6d1b49011fc75` (PR #210 merged).
+- Active branch: `codex/state-lease-ownership-loss-red`.
+- Correct ownership-loss historical RED: `d1b65a94f023f6473cedf32b0658993167a0a778`; Fast CI #215 FAIL on missing fail-closed ownership assertion.
+- Ownership-loss implementation + server pre-persistence wiring: GREEN at `d4b84d0d971daf9f3d16f4af0e2be6c2fc5c58fd`; Fast CI #218 PASS with 52/52 focused tests and TypeScript PASS.
+- Production behavior changed on active branch: YES, only distributed state-mutation lease-loss safety / pre-persistence fencing check.
 - External AI API in deterministic tests: NO.
 - New downstream semantic authority: NO.
-- Next candidate after merge: heartbeat renewal ownership-loss propagation — NOT YET MEASURED.
+- Next action: PR → FULL CI + Architecture Review → merge → post-merge main verification.
