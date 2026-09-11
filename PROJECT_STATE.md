@@ -50,11 +50,11 @@
 - Trace G provider parity production'da Gemini kapalı olduğu için tamamlanmış sayılmıyor.
 - Live/provider keşif testleri maliyet nedeniyle durduruldu; yeni core validation deterministic/local/CI olmalı.
 
-## 8. Core confidence reclassification — ACTIVE
-- `21 senaryo / 423 tur GREEN` artık `production-grade robust core` kanıtı olarak yorumlanmıyor; bu baseline bilinen failure class'ları güçlü biçimde kilitler ama bilinmeyen failure class keşif gücü sınırlıdır.
-- Red-team sonucu: core foundation GREEN, fakat adversarial/system validation henüz yeterli değil.
-- Yeni faz: **Core Adversarial Validation / Soak / Counterfactual Matrix**.
-- Bu fazda yeni feature/provider tuning yok; önce deterministic failure discovery.
+## 8. Core confidence reclassification — DETERMINISTIC HARDENING CLOSED
+- `21 senaryo / 423 tur GREEN` bilinen failure class'ları kilitleyen regression baseline'ıdır; tek başına `production-grade robust core` iddiası değildir.
+- Red-team sonrası açılan **Core Adversarial Validation / Soak / Counterfactual Matrix** deterministic kapsamı Phase 1–4 ile tamamlandı.
+- Long-horizon, injury/repair, mixed soak, extreme relationship state, discourse collision, temporal robustness, uncertainty damping, persistence corruption/version mismatch ve spontaneous conversation sınıfları deterministic CI altında kapsandı.
+- Yeni feature/provider tuning bu hardening fazına dahil edilmedi.
 
 ## 9. Core Adversarial Validation Phase 1 — CLOSED
 - PR #219 merge `6a4601e8f7f3e2420966b4ea377ff76b9463f40a`.
@@ -78,12 +78,15 @@
 - Transactional append/self-fact revision corrupt envelope üzerinde mutate etmiyor.
 - Fast CI, Architecture Review, historical RED→GREEN, full tests, TypeScript ve production build GREEN; provider/API çağrısı yok.
 
-## 12. Core Adversarial Validation Phase 4 — PR #222 ACTIVE
+## 12. Core Adversarial Validation Phase 4 — CLOSED
+- PR #222 squash merge `4659bfbb35cf01b677988c2185946fb96a43380e`.
 - Deterministic 30-case spontaneous conversation probe seti: social routine, standalone acknowledgement, emotional opening, casual statement ve context-bound acknowledgement sınıfları.
 - İlk RED'ler production invariant failure değil, testin exact dialogue move / sentence-count değerini gereksiz yere sabitlemesiydi; assertions actual dialogue-authority invariantlarına daraltıldı.
 - Korunan invariantlar: bounded plan, unsupported speculation yok, standalone acknowledgement ile topic invention yok, explicit Kaira offer sonrası kısa acknowledgement doğru previous-answer binding'i koruyor.
+- Fast CI, Architecture Review, historical RED→GREEN, full tests, TypeScript ve production build GREEN.
 - Production behavior değişmedi; provider/API çağrısı yok.
 
-## 13. Sonraki kapı
-- PR #222 full CI + Architecture Review GREEN ve merge sonrası deterministic adversarial hardening fazı kapanacak.
-- Gerçek provider kabul testleri bu deterministic kapsamın dışında; canlı/provider çağrısı yapılmayacak.
+## 13. Güncel checkpoint
+- Deterministic core adversarial hardening için açık faz kalmadı.
+- Gerçek provider parity / production acceptance ayrı bir kabul sınıfıdır; bu çalışmada canlı/provider çağrısı yapılmadı ve yapılmayacak.
+- Bir sonraki geliştirme ancak yeni ölçülmüş failure class, yeni ürün hedefi veya açıkça başlatılan provider kabul turu ile açılmalı.
