@@ -3,6 +3,7 @@ import { EMPTY_DISCOURSE_STATE } from "../types/discourseState";
 import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
 
 // Red/green authority probe: multiple unresolved threads must force clarification.
+// This commit intentionally retriggers the validated one-time Fast CI patch path.
 function event(overrides: Record<string, unknown> = {}) {
   return {
     raw: "ne yapayım sence",
