@@ -37,51 +37,38 @@
 - Ambiguous open-thread resumption dialogue decision authority altında bounded clarification üretir; semantic authority'ye yeni parser eklenmedi.
 
 ## 6. Provider / canonical boundary — CLOSED
-### PR #214 — provider-neutral semantic runtime identity
-- Merge commit: `c491c8c504788daedb211b0aff93ce5f5b8582b2`.
-- `resolveServerLanguageUnderstanding` artık canonical semantic provider'ı requested transport'tan (`openrouter` / `gemini`) türetmez.
-- Stable canonical runtime identity: `llm_semantic_runtime`.
-- `preferredProvider` yalnız text-generation transport selection/fallback için kullanılır.
-- OpenRouter→Gemini fallback canonical semantic authority adını değiştirmez.
-- Regression contract: `src/services/serverLanguageUnderstandingProviderBoundaryContracts.test.ts`.
-- ADR: `docs/adr/2026-09-11-provider-neutral-canonical-semantic-boundary.md`.
-- PR #214 FULL CI + Architecture Review PASS.
+- PR #214 merge `c491c8c504788daedb211b0aff93ce5f5b8582b2`: canonical semantic runtime identity provider-neutral `llm_semantic_runtime`.
+- PR #215 merge `be345044699939012f7605bdfd6f8136fd106a08`: model-generated provider etiketi trusted canonical provenance değildir.
+- Provider/fallback transport + observability concern olarak kalır; canonical semantic/state authority değildir.
 
-### PR #215 — trusted runtime semantic provenance
-- Merge commit: `be345044699939012f7605bdfd6f8136fd106a08`.
-- Model-generated JSON içindeki `evidence.provider` canonical provenance olarak güvenilmez.
-- `semantic_provider` sonuçlarında LLM evidence provider etiketi server boundary tarafından `llm_semantic_runtime` olarak overwrite edilir.
-- Non-LLM evidence ve `client_shared` / `fallback_regex` kaynakları değiştirilmez.
-- Model kendi canonical provider kimliğini spoof edemez.
-- PR #215 FULL CI #2705 PASS; Architecture Review #823 PASS.
+## 7. Response-generation measured fixes — CLOSED FOR KNOWN FAILURES
+- Trace A PASS: rich context altında forbidden question/advice final metne sızmadı.
+- Trace C/D: dynamic relationship/reaction state final dile gerçekten yansıyor.
+- Trace F PASS: third-party open-thread state final response'a ulaşıyor.
+- PR #217: `-ması/-mesi daha iyi olur` delivered-advice kaçağı regression ile kapatıldı.
+- PR #218 merge `955c1fbfedc44379ffd4260034424d03bf04b3a6`: hurt/distancing canlı probe'da görülen `kendine dön biraz bugün` unsolicited-advice leak'i dar structural regression ile kapatıldı.
+- Trace G provider parity production'da Gemini kapalı olduğu için tamamlanmış sayılmıyor.
+- Live/provider keşif testleri maliyet nedeniyle durduruldu; yeni core validation deterministic/local/CI olmalı.
 
-## 7. L7 semanticFieldProvenance audit — PASS / NO PATCH NEEDED
-- `semanticFieldProvenance` observational sidecar'dır; canonical semantic authority değildir.
-- Current implementation yalnız `typed_turkish_linguistic_evidence` cue'larından field-level provenance üretir.
-- Model-supplied `evidence.provider` bu sidecar'a provider truth olarak taşınmaz.
-- PR #215 sonrası aynı provider-provenance failure class için ek sızıntı doğrulanmadı.
+## 8. Core confidence reclassification — ACTIVE
+- `21 senaryo / 423 tur GREEN` artık `production-grade robust core` kanıtı olarak yorumlanmıyor; bu baseline bilinen failure class'ları güçlü biçimde kilitler ama bilinmeyen failure class keşif gücü sınırlıdır.
+- Red-team sonucu: core foundation GREEN, fakat adversarial/system validation henüz yeterli değil.
+- Yeni faz: **Core Adversarial Validation / Soak / Counterfactual Matrix**.
+- Bu fazda yeni feature/provider tuning yok; önce deterministic failure discovery.
 
-## 8. Current main / CI checkpoint
-- Date: 2026-09-11.
-- Verified main: `891375e9b2c293dbb3a884b5a6c64f89fe8749fa`.
-- PR #214/#215/#216 merged; provider/canonical checkpoint closed.
-- PR #217 merged; nominalized `-ması/-mesi daha iyi olur` advice coverage fixed.
-- Post-merge main CI #2711 PASS.
-- New downstream semantic authority introduced: NO.
-- External AI provider made canonical authority: NO.
+## 9. Core Adversarial Validation Phase 1 — PR #219 ACTIVE
+- Production behavior değişikliği yok; tests-only paket.
+- 120 tur positive long-horizon stability.
+- 120 tur injury → repair trajectory.
+- 150 tur alternating harm / repair / neutral soak.
+- Aynı stimulus altında trust × warmth × familiarity eksenlerinin tüm 8 uç kombinasyonu.
+- Three-way discourse collision: iki unresolved third-party thread + pending Kaira question.
+- Kural: RED çıkarsa assertion gevşetilmez; failure class izole edilir, minimal fix ancak kanıt sonrası yapılır.
+- Provider/API çağrısı yok.
 
-## 9. Response-generation validation — ACTIVE
-- Trace A: PASS. Rich seeded history altında `allowQuestion=false` + `allowAdvice=false`; live final reply soru/tavsiye sızdırmadı.
-- Trace C/D: state realization live output'ta doğrulandı; neutral/close, irritated, hurt/distancing ve repairing farklı register/stance ve metin üretti.
-- Trace F: PASS. Aynı final mesajı third-party Mert thread'i varken Mert'e bağlandı; thread yokken doğal clarification üretti.
-- Trace G şu an blocked: production runtime OpenRouter açık, Gemini kapalı.
-- Yeni ölçülmüş delivered-text failure: hurt/distancing live probe'da plan `allowAdvice=false` iken `yoğunken yazman bile fazla aslında, kendine dön biraz bugün` final gate'ten geçti.
-- Canonical generated-reply semantic probe bu leak'i `support/closeness_bid` olarak yorumladı; mevcut semantic schema generated reply için advice-performed sinyalini güvenilir biçimde taşımıyor. Bu nedenle yeni semantic authority eklenmiyor.
-- Fix scope: mevcut delivered-text advice recognizer'a yalnız ölçülmüş direct self-care direction yüzeyini eklemek (`kendine dön`, `kendine odaklan`) ve supportive acknowledgements için false-positive regression kilitlemek.
-
-## 10. Sıradaki kapılar
-- Bu measured failure RED → minimal recognizer fix → regression → full CI → merge ile kapatılacak.
-- Ardından memory realization Trace E çalıştırılacak.
-- Gemini tekrar production'da aktif olmadan Trace G parity tamamlandı sayılmayacak.
-- Response-generation trace fazında canonical/state testlerini final generated-text E2E kanıtı gibi sunma; gerçek provider candidate/final reply ayrımını gözle.
-- `PROJECT_STATE.md` geçmiş PR günlüğü değildir; ayrıntılı tarih için Git/`AI_CHANGELOG.md`/ADR kullan.
+## 10. Sonraki adversarial kapılar
+- Phase 1 GREEN olduktan sonra temporal robustness: gerçek/simüle wall-clock farkı.
+- Persistence corruption/recovery: interrupted write + version mismatch.
+- General semantic uncertainty damping: düşük-güven semantic input'ın mutation etkisi.
+- Ardından deterministic 20–30 turluk daha serbest/spontane core conversation probes.
+- Gerçek provider kabul testleri yalnız en sonda ve minimum sayıda yapılacak.
