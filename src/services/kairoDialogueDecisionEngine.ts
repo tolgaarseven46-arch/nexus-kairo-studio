@@ -366,7 +366,7 @@ function planDialogueResponseBase(
     };
   }
 
-  if (discourse?.ambiguousThreadResumption) {
+  if (discourse?.ambiguousThreadResumption && event.adviceRequested) {
     return {
       move: "answer_or_clarify",
       allowFollowUpQuestion: true,
