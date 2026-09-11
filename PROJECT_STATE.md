@@ -47,15 +47,18 @@
 - Anger/stress negative pressure'ı artırdı, calmness activation'ı düşürdü, happiness positive affective significance'ı artırdı.
 - Fast CI, full CI, historical RED→GREEN, TypeScript, production build ve Architecture Review GREEN; provider/API çağrısı yok.
 
-## 10. Core Emotion-State Validation Phase 5B — ACTIVE
+## 10. Core Emotion-State Validation Phase 5B — CLOSED
+- PR #225 squash merge `74cafdd9931b194bafb38944d81914b87e92ad22`.
 - Runtime-derived reaction modes: `neutral`, `irritated`, `hurt`, `withdrawn`, `repairing`.
 - 15-case deterministic matrix: 5 coherent relationship/reaction fixture × 3 stimulus sentiment (`neutral`, `negative`, `positive`).
-- Amaç: SpeechIdentity HOW ile BehaviorContract WHAT/WHETHER authority ayrımını aynı state uzayında doğrulamak.
-- İlk Fast CI GREEN: non-neutral reactionMode sentiment değişimiyle silinmiyor; hurt/withdrawn/repairing style hard permissions açmıyor; withdrawn closed, repairing cautious, hurt distant-responsive, irritated firm style üretiyor.
+- SpeechIdentity HOW ile BehaviorContract WHAT/WHETHER authority ayrımı aynı state uzayında doğrulandı.
+- Non-neutral reactionMode sentiment değişimiyle silinmiyor; hurt/withdrawn/repairing style hard permissions açmıyor.
+- Beklenen yönler korunuyor: withdrawn=`closed`, repairing=`repairing-cautious`, hurt=`distant-responsive`, irritated=`firm`; neutral ilişkide stimulus sentiment yalnız HOW tarafını etkileyebiliyor.
+- Fast CI, full CI, historical RED→GREEN, TypeScript, production build ve Architecture Review GREEN.
 - Production behavior değişmedi; provider/API çağrısı yok.
-- Sonraki kapı: full CI + Architecture Review, ardından merge.
 
 ## 11. Güncel checkpoint
-- Phase 5A kapalı; Phase 5B doğrulamada.
+- Core Emotion-State Validation Phase 5A + 5B CLOSED.
+- Toplam yeni deterministic emotion coverage: 12 canonical affect-cell + 15 relationship-derived reaction-mode cell = 27 matrix case; ek cross-case invariants ile authority separation da doğrulandı.
+- Bu sonuç final natural-language provider realization kanıtı değildir; gerçek provider kabul testleri ayrı ve maliyet-kontrollü sınıftır.
 - Yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı.
-- Gerçek provider kabul testleri bu deterministic kapsamın dışında.
