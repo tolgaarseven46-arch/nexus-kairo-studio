@@ -210,6 +210,20 @@
       "counterexamples": [
         "counterexample: caller-supplied requestId preserves the existing replayable identity contract"
       ]
+    },
+    {
+      "id": "ambiguous-open-thread-dialogue-clarification",
+      "invariant": "When canonical discourse state says more than one unresolved thread can own a short continuation, DialogueDecision must ask one bounded clarification before content instead of silently choosing a thread; unambiguous advice remains unchanged.",
+      "redSha": "ee8b3959df3352a1da5a3d84e1fa8d10d12f9980",
+      "testFile": "src/services/kairaAmbiguousThreadResumptionNeighborProofRegression.test.ts",
+      "reported": "reported: ambiguous short advice request requires clarification before content",
+      "neighbors": [
+        "neighbor-1: ambiguous short recommendation request requires clarification before content",
+        "neighbor-2: ambiguous short opinion request requires clarification before content"
+      ],
+      "counterexamples": [
+        "counterexample: unambiguous advice request preserves normal advice handling"
+      ]
     }
   ]
 }
