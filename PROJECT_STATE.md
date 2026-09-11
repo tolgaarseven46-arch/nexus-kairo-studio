@@ -69,14 +69,21 @@
 - İlk implementation normal uncertainty davranışını da fazla zayıflattığı için historical betrayal regression RED oldu; assertion gevşetilmeden damping yalnız yüksek uncertainty bölgesine daraltıldı ve full CI GREEN oldu.
 - Provider/API çağrısı yok.
 
-## 11. Core Adversarial Validation Phase 3 — PR #221 ACTIVE
+## 11. Core Adversarial Validation Phase 3 — CLOSED
+- PR #221 squash merge `e062c70e01a9682bd7449592857ff13125b6960c`.
 - Persistence corruption/recovery gate: interrupted/partial write + schema version mismatch.
 - Measured failure: hydration `schemaVersion` değerini 1'e zorlayıp unknown future version'ı sessizce kabul edebiliyor; eksik top-level arrays da boş diziye çevrilip geçerli state gibi hydrate olabiliyordu.
-- Fix: persisted canonical identity envelope normalize edilmeden önce exact schema version ve required top-level arrays doğrulanır; corrupt/version-mismatched document fail-closed olur.
-- Storage/transport failure `unavailable`, corrupt persisted document `missing` olarak ayrıştırılır.
-- Transactional append/self-fact revision corrupt envelope üzerinde mutate etmez.
-- Provider/API çağrısı yok.
+- Persisted canonical identity envelope artık normalize edilmeden önce exact schema version ve required top-level arrays ile doğrulanıyor; corrupt/version-mismatched document fail-closed oluyor.
+- Storage/transport failure `unavailable`, corrupt persisted document `missing` olarak ayrıştırılıyor.
+- Transactional append/self-fact revision corrupt envelope üzerinde mutate etmiyor.
+- Fast CI, Architecture Review, historical RED→GREEN, full tests, TypeScript ve production build GREEN; provider/API çağrısı yok.
 
-## 12. Sonraki adversarial kapılar
-- Phase 3 sonrası deterministic 20–30 turluk daha serbest/spontane core conversation probes.
-- Gerçek provider kabul testleri yalnız en sonda ve minimum sayıda yapılacak.
+## 12. Core Adversarial Validation Phase 4 — PR #222 ACTIVE
+- Deterministic 30-case spontaneous conversation probe seti: social routine, standalone acknowledgement, emotional opening, casual statement ve context-bound acknowledgement sınıfları.
+- İlk RED'ler production invariant failure değil, testin exact dialogue move / sentence-count değerini gereksiz yere sabitlemesiydi; assertions actual dialogue-authority invariantlarına daraltıldı.
+- Korunan invariantlar: bounded plan, unsupported speculation yok, standalone acknowledgement ile topic invention yok, explicit Kaira offer sonrası kısa acknowledgement doğru previous-answer binding'i koruyor.
+- Production behavior değişmedi; provider/API çağrısı yok.
+
+## 13. Sonraki kapı
+- PR #222 full CI + Architecture Review GREEN ve merge sonrası deterministic adversarial hardening fazı kapanacak.
+- Gerçek provider kabul testleri bu deterministic kapsamın dışında; canlı/provider çağrısı yapılmayacak.
