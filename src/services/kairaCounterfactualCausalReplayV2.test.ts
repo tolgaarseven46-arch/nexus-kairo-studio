@@ -1,3 +1,4 @@
+// Test-only causal replay probe set v2.
 import { describe, expect, it } from "vitest";
 import { reduceDiscourseState } from "./discourseStateReducer";
 import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";
