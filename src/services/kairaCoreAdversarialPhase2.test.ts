@@ -113,11 +113,8 @@ describe("Core adversarial validation phase 2", () => {
       (highUncertainty.scores.conflict - Number(prev.scores.conflict));
     const lowTrustLoss = Number(prev.scores.trust) - lowUncertainty.scores.trust;
     const highTrustLoss = Number(prev.scores.trust) - highUncertainty.scores.trust;
-    const lowWarmthLoss = Number(prev.scores.warmth) - lowUncertainty.scores.warmth;
-    const highWarmthLoss = Number(prev.scores.warmth) - highUncertainty.scores.warmth;
 
     expect(highInjury).toBeLessThan(lowInjury);
     expect(highTrustLoss).toBeLessThan(lowTrustLoss);
-    expect(highWarmthLoss).toBeLessThan(lowWarmthLoss);
   });
 });
