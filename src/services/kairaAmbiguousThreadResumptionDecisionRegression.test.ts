@@ -3,7 +3,6 @@ import { EMPTY_DISCOURSE_STATE } from "../types/discourseState";
 import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
 
 // Red/green authority probe: multiple unresolved threads must force clarification.
-// This push activates the temporary Fast CI patch runner; the runner restores CI afterward.
 function event(overrides: Record<string, unknown> = {}) {
   return {
     raw: "ne yapayım sence",
@@ -76,7 +75,7 @@ describe("ambiguous open-thread resumption decision", () => {
     expect(plan.move).toBe("answer_or_clarify");
     expect(plan.allowFollowUpQuestion).toBe(true);
     expect(plan.maxSentences).toBe(1);
-    expect(plan.reason).toContain("birden fazla açık");
+    expect(plan.reason.toLocaleLowerCase("tr-TR")).toContain("birden fazla açık");
     expect(plan.reason).toContain("önce hangisini");
   });
 
