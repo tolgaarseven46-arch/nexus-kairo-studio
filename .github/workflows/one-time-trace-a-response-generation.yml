@@ -1,0 +1,112 @@
+name: one-time trace A response generation
+'on':
+  push:
+    branches:
+      - diag/trace-a-response-generation-2026-09-11
+permissions:
+  contents: read
+jobs:
+  trace-a:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Run live rich-memory forbidden-question/advice trace
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, urllib.request, urllib.error, uuid, time, sys
+
+          base = "https://nexus-kairo-studio.onrender.com"
+          uid = f"trace_a_{uuid.uuid4().hex[:10]}"
+          session = "session_" + uid
+          history = []
+
+          def post(message, label):
+            payload = {
+              "userId": uid,
+              "userName": "Tolga",
+              "userMessage": message,
+              "history": history,
+              "provider": "openrouter",
+              "kairaInstanceId": "reference",
+              "kairaInstanceType": "reference",
+              "sessionId": session,
+              "requestId": f"trace-a-{label}-" + uuid.uuid4().hex[:10],
+            }
+            req = urllib.request.Request(
+              base + "/api/chat",
+              data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=120) as r:
+              out = json.loads(r.read().decode("utf-8"))
+            reply = str(out.get("reply") or out.get("response") or "").strip()
+            history.append({"sender": "user", "text": message})
+            history.append({"sender": "droit", "text": reply})
+            return out, reply
+
+          def plan_of(out):
+            kdm = out.get("kdm") or {}
+            return kdm.get("responsePlan") or out.get("responsePlan") or {}
+
+          setup = [
+            "Mert benim eski iş arkadaşım, geçen hafta bana borcunu sonunda ödedi.",
+            "Bu arada kedimin adı Köpük; geceleri kapının önünde uyumayı seviyor.",
+            "Yarın sabah erken kalkacağım çünkü önemli bir toplantım var.",
+          ]
+
+          try:
+            for i, msg in enumerate(setup, 1):
+              out, reply = post(msg, f"setup{i}")
+              print(f"SETUP_{i}_USER={msg}")
+              print(f"SETUP_{i}_REPLY={reply.replace(chr(10), ' ')}")
+              time.sleep(2)
+
+            final_message = "Yarın erken kalkacağımı unutma; bana soru sorma ve tavsiye de verme, sadece kısa bir tepki ver."
+            out, reply = post(final_message, "final")
+            plan = plan_of(out)
+            kdm = out.get("kdm") or {}
+
+            print("TRACE_A_FINAL_USER=" + final_message)
+            print("TRACE_A_FINAL_REPLY=" + reply.replace("\n", " "))
+            print("TRACE_A_ALLOW_QUESTION=" + repr(plan.get("allowQuestion")))
+            print("TRACE_A_ALLOW_ADVICE=" + repr(plan.get("allowAdvice")))
+            print("TRACE_A_PROVIDER_USED=" + repr(out.get("providerUsed") or kdm.get("providerUsed") or out.get("activeAiProviderUsed")))
+            print("TRACE_A_RESPONSE_PLAN=" + json.dumps(plan, ensure_ascii=False, sort_keys=True))
+            print("TRACE_A_KDM_KEYS=" + json.dumps(sorted(kdm.keys()), ensure_ascii=False))
+
+            # Machine-readable artifact for later audit. Do not pretend this
+            # establishes semantic quality; it records the real provider output.
+            artifact = {
+              "userId": uid,
+              "setupTurns": setup,
+              "finalUserMessage": final_message,
+              "finalReply": reply,
+              "allowQuestion": plan.get("allowQuestion"),
+              "allowAdvice": plan.get("allowAdvice"),
+              "providerUsed": out.get("providerUsed") or kdm.get("providerUsed") or out.get("activeAiProviderUsed"),
+              "responsePlan": plan,
+            }
+            with open("trace-a-live.json", "w", encoding="utf-8") as f:
+              json.dump(artifact, f, ensure_ascii=False, indent=2)
+
+            # The trace is only valid if the canonical plan actually forbids both.
+            if plan.get("allowQuestion") is not False or plan.get("allowAdvice") is not False:
+              print("TRACE_A_INVALID_PLAN: expected allowQuestion=false and allowAdvice=false")
+              sys.exit(2)
+            if not reply:
+              print("TRACE_A_EMPTY_REPLY")
+              sys.exit(3)
+            print("TRACE_A_LIVE_CAPTURE_PASS")
+          except Exception as e:
+            print(f"TRACE_A_LIVE_CAPTURE_ERROR={type(e).__name__}: {e}")
+            sys.exit(1)
+          PY
+      - name: Upload Trace A artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trace-a-live-response
+          path: trace-a-live.json
+          if-no-files-found: ignore
