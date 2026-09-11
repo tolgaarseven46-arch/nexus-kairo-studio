@@ -1,0 +1,51 @@
+name: one-time trace E setup probe
+'on':
+  push:
+    branches:
+      - diag/trace-e-memory
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Probe fact-sharing setup candidates
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, urllib.request, urllib.error, uuid
+          base = "https://nexus-kairo-studio.onrender.com"
+          samples = [
+            "kahveyi seviyorum",
+            "en sevdiğim içecek kahve",
+            "özellikle sabahları kahve içmeyi seviyorum",
+            "favori içeceğim kahve",
+            "bu arada kahveyi baya seviyorum",
+          ]
+          rows=[]
+          for i,text in enumerate(samples):
+            uid=f"trace_e_setup_probe_{i}_{uuid.uuid4().hex[:8]}"
+            payload={
+              "userId":uid,"userName":"Tolga","userMessage":text,"history":[],"provider":"openrouter",
+              "kairaInstanceId":"reference","kairaInstanceType":"reference",
+              "sessionId":"session_"+uid,"requestId":f"trace-e-probe-{i}-"+uuid.uuid4().hex[:8],
+            }
+            req=urllib.request.Request(base+"/api/chat",data=json.dumps(payload,ensure_ascii=False).encode("utf-8"),headers={"Content-Type":"application/json"},method="POST")
+            try:
+              with urllib.request.urlopen(req,timeout=150) as r:
+                data=json.loads(r.read().decode("utf-8"))
+              kdm=data.get("kdm") or {}
+              rows.append({"text":text,"ok":True,"reply":data.get("reply") or data.get("response"),"responsePlan":kdm.get("responsePlan") or data.get("responsePlan"),"consistency":data.get("consistency")})
+            except urllib.error.HTTPError as e:
+              rows.append({"text":text,"ok":False,"status":e.code,"body":e.read().decode("utf-8",errors="replace")})
+          print("TRACE_E_SETUP_PROBE="+json.dumps(rows,ensure_ascii=False,sort_keys=True))
+          with open("trace-e-setup-probe.json","w",encoding="utf-8") as f: json.dump(rows,f,ensure_ascii=False,indent=2)
+          PY
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trace-e-setup-probe
+          path: trace-e-setup-probe.json
+          if-no-files-found: error
