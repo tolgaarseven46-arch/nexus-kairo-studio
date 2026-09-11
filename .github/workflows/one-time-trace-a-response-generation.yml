@@ -8,7 +8,7 @@ permissions:
 jobs:
   trace-a:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - name: Run live rich-memory forbidden-question/advice trace
         shell: bash
@@ -22,29 +22,42 @@ jobs:
           history = []
 
           def post(message, label):
-            payload = {
-              "userId": uid,
-              "userName": "Tolga",
-              "userMessage": message,
-              "history": history,
-              "provider": "openrouter",
-              "kairaInstanceId": "reference",
-              "kairaInstanceType": "reference",
-              "sessionId": session,
-              "requestId": f"trace-a-{label}-" + uuid.uuid4().hex[:10],
-            }
-            req = urllib.request.Request(
-              base + "/api/chat",
-              data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-              headers={"Content-Type": "application/json"},
-              method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=120) as r:
-              out = json.loads(r.read().decode("utf-8"))
-            reply = str(out.get("reply") or out.get("response") or "").strip()
-            history.append({"sender": "user", "text": message})
-            history.append({"sender": "droit", "text": reply})
-            return out, reply
+            last_error = None
+            for attempt in range(1, 5):
+              payload = {
+                "userId": uid,
+                "userName": "Tolga",
+                "userMessage": message,
+                "history": history,
+                "provider": "gemini",
+                "kairaInstanceId": "reference",
+                "kairaInstanceType": "reference",
+                "sessionId": session,
+                "requestId": f"trace-a-{label}-" + uuid.uuid4().hex[:10],
+              }
+              req = urllib.request.Request(
+                base + "/api/chat",
+                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+              )
+              try:
+                with urllib.request.urlopen(req, timeout=120) as r:
+                  raw = r.read().decode("utf-8")
+                  out = json.loads(raw)
+                reply = str(out.get("reply") or out.get("response") or "").strip()
+                history.append({"sender": "user", "text": message})
+                history.append({"sender": "droit", "text": reply})
+                return out, reply
+              except urllib.error.HTTPError as e:
+                body = e.read().decode("utf-8", errors="replace")
+                print(f"HTTP_ERROR label={label} attempt={attempt} status={e.code} body={body[:3000]}")
+                last_error = e
+              except Exception as e:
+                print(f"CALL_ERROR label={label} attempt={attempt} error={type(e).__name__}: {e}")
+                last_error = e
+              time.sleep(8 * attempt)
+            raise last_error or RuntimeError("live call failed")
 
           def plan_of(out):
             kdm = out.get("kdm") or {}
@@ -76,8 +89,6 @@ jobs:
             print("TRACE_A_RESPONSE_PLAN=" + json.dumps(plan, ensure_ascii=False, sort_keys=True))
             print("TRACE_A_KDM_KEYS=" + json.dumps(sorted(kdm.keys()), ensure_ascii=False))
 
-            # Machine-readable artifact for later audit. Do not pretend this
-            # establishes semantic quality; it records the real provider output.
             artifact = {
               "userId": uid,
               "setupTurns": setup,
@@ -91,7 +102,6 @@ jobs:
             with open("trace-a-live.json", "w", encoding="utf-8") as f:
               json.dump(artifact, f, ensure_ascii=False, indent=2)
 
-            # The trace is only valid if the canonical plan actually forbids both.
             if plan.get("allowQuestion") is not False or plan.get("allowAdvice") is not False:
               print("TRACE_A_INVALID_PLAN: expected allowQuestion=false and allowAdvice=false")
               sys.exit(2)
