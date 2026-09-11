@@ -29,7 +29,10 @@ export async function resolveServerLanguageUnderstanding(
 ): Promise<LanguageUnderstandingResult> {
   const morphologyProvider = createConfiguredZemberekMorphologyProvider();
   const semanticProvider = createLlmSemanticUnderstandingProvider({
-    name: `llm_semantic_${input.preferredProvider}`,
+    // Canonical semantic evidence must not encode the requested transport/provider.
+    // Runtime provider identity (and fallback) belongs to observability, while this
+    // boundary remains stable across OpenRouter/Gemini switching.
+    name: "llm_semantic_runtime",
     generate: ({ system, prompt, temperature }) =>
       input.generateText(system, [{ role: "user", content: prompt }], temperature, input.preferredProvider),
   });
