@@ -7,7 +7,7 @@ import { analyzeKdmInteractionCanonicalTurn } from "./src/services/kdmConsistenc
 import { selectEffectiveKdmDynamicState } from "./src/services/kdmEffectiveStateSelector";
 import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
 import { normalizeKairaAffectBaseline } from "./src/services/kairaAffectBaseline";
-import { claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";
+import { assertCoordinatedKairaChatStateOwnership, claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";
 import { resolveKairaChatRequestCoordinationIdentity } from "./src/services/kairaChatRequestCoordinationIdentity";
 import { normalizeDroitPersonality } from "./src/services/droitPersonalityNormalizer";
 import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
@@ -593,6 +593,11 @@ app.post("/api/chat", async (req, res) => {
       }
       ownsCoordinationClaim = true;
     }
+    const assertStateMutationOwnership = async () => {
+      if (coordinationKey && ownsCoordinationClaim) {
+        await assertCoordinatedKairaChatStateOwnership(coordinationKey);
+      }
+    };
     const sendChatPayload = async (payload: any) => {
       if (coordinationKey && ownsCoordinationClaim) {
         await completeCoordinatedKairaChatRequest(coordinationKey, payload);
@@ -899,6 +904,7 @@ app.post("/api/chat", async (req, res) => {
         learnLanguageReply(stateUserId, reply);
       }
       const postStart = now();
+      await assertStateMutationOwnership();
       const livedMemoryRuntime = await persistWorldEventAndMaybeConsolidateLivedMemory({
         userId,
         instance: kairaInstance,
@@ -1402,6 +1408,7 @@ app.post("/api/chat", async (req, res) => {
       ? await attachActivityPermission(reply)
       : finalDelivery.persistedReply;
     const postStart = now();
+    await assertStateMutationOwnership();
     const livedMemoryRuntime = await persistWorldEventAndMaybeConsolidateLivedMemory({
       userId,
       instance: kairaInstance,

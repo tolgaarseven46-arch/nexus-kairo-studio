@@ -4,8 +4,16 @@ export interface KairaStateMutationBackend {
   release(input: { key: string; ownerToken: string }): Promise<void>;
 }
 
+export class KairaStateMutationOwnershipLostError extends Error {
+  constructor() {
+    super('Kaira state-owner mutation lease ownership was lost');
+    this.name = 'KairaStateMutationOwnershipLostError';
+  }
+}
+
 export interface KairaStateMutationLease {
   ownerToken: string;
+  assertOwned: () => Promise<void>;
   release: () => Promise<void>;
 }
 
@@ -30,7 +38,13 @@ export function createDistributedStateMutationCoordinator(
   return {
     async acquire(key: string): Promise<KairaStateMutationLease> {
       const normalizedKey = key.trim();
-      if (!normalizedKey) return { ownerToken: '', release: async () => undefined };
+      if (!normalizedKey) {
+        return {
+          ownerToken: '',
+          assertOwned: async () => undefined,
+          release: async () => undefined,
+        };
+      }
       const token = ownerToken();
       const deadline = Date.now() + waitMs;
 
@@ -39,14 +53,36 @@ export function createDistributedStateMutationCoordinator(
         if (await backend.acquire({ key: normalizedKey, ownerToken: token, now, leaseMs })) {
           let released = false;
           let renewing = false;
+          let ownershipLost = false;
+          const markOwnershipLost = () => {
+            ownershipLost = true;
+          };
+          const renewAuthoritatively = async () => {
+            if (released || ownershipLost) throw new KairaStateMutationOwnershipLostError();
+            const renewed = await backend.renew({
+              key: normalizedKey,
+              ownerToken: token,
+              now: Date.now(),
+              leaseMs,
+            });
+            if (!renewed) {
+              markOwnershipLost();
+              throw new KairaStateMutationOwnershipLostError();
+            }
+          };
           const renewEveryMs = Math.max(5_000, Math.floor(leaseMs / 3));
           const timer = setInterval(async () => {
-            if (released || renewing) return;
+            if (released || ownershipLost || renewing) return;
             renewing = true;
             try {
-              await backend.renew({ key: normalizedKey, ownerToken: token, now: Date.now(), leaseMs });
+              await renewAuthoritatively();
             } catch (error) {
-              console.warn('[Kaira State Mutation] lease renewal failed:', error);
+              if (error instanceof KairaStateMutationOwnershipLostError) {
+                clearInterval(timer);
+                console.warn('[Kaira State Mutation] lease ownership lost');
+              } else {
+                console.warn('[Kaira State Mutation] lease renewal failed:', error);
+              }
             } finally {
               renewing = false;
             }
@@ -55,6 +91,7 @@ export function createDistributedStateMutationCoordinator(
 
           return {
             ownerToken: token,
+            assertOwned: renewAuthoritatively,
             release: async () => {
               if (released) return;
               released = true;
