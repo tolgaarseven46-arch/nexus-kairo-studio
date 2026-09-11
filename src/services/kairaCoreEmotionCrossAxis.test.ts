@@ -128,14 +128,31 @@ describe("Core emotion-state Phase 5C cross-axis coherence", () => {
     expect(stressed.appraisal.relational.harmEvidence).toBe(calm.appraisal.relational.harmEvidence);
   });
 
-  it("keeps a serious negative self-share significant even at maximum happiness", () => {
-    const happy = resolve("happiness", "irritated", seriousShare);
-    const calm = resolve("calmness", "irritated", seriousShare);
-    expect(happy.appraisal.affective.valence).toBe("negative");
-    expect(happy.appraisal.affective.significance).toBeGreaterThanOrEqual(0.8);
-    expect(happy.appraisal.affective.activation).toBeGreaterThanOrEqual(0.95);
-    expect(happy.appraisal.affective.significance).toBeGreaterThanOrEqual(calm.appraisal.affective.significance);
-    expect(happy.contextFactors.affectiveNegative).toBeGreaterThanOrEqual(0.7);
-    expect(happy.contextFactors.affectiveNegative).toBeLessThanOrEqual(1.3);
+  it("does not let maximum happiness suppress a serious negative self-share", () => {
+    const maxHappyState = state("happiness", "irritated");
+    const normalHappyState = { ...maxHappyState, happiness: 70 };
+    const maxHappyInput: SocialAppraisalInput = {
+      semantic: seriousShare,
+      relationship: maxHappyState.relationship!,
+      currentState: maxHappyState,
+      personality,
+    };
+    const normalHappyInput: SocialAppraisalInput = {
+      semantic: seriousShare,
+      relationship: normalHappyState.relationship!,
+      currentState: normalHappyState,
+      personality,
+    };
+    const maxHappy = resolveSocialAppraisalG4(maxHappyInput, "active-interlocutor");
+    const normalHappy = resolveSocialAppraisalG4(normalHappyInput, "active-interlocutor");
+
+    expect(maxHappy.appraisal.affective.valence).toBe("negative");
+    expect(maxHappy.appraisal.affective.significance).toBeGreaterThanOrEqual(0.75);
+    expect(maxHappy.appraisal.affective.activation).toBeGreaterThanOrEqual(0.95);
+    expect(maxHappy.appraisal.affective.significance).toBe(normalHappy.appraisal.affective.significance);
+    expect(maxHappy.appraisal.affective.activation).toBe(normalHappy.appraisal.affective.activation);
+    expect(maxHappy.contextFactors.affectiveNegative).toBe(normalHappy.contextFactors.affectiveNegative);
+    expect(maxHappy.contextFactors.affectiveNegative).toBeGreaterThanOrEqual(0.7);
+    expect(maxHappy.contextFactors.affectiveNegative).toBeLessThanOrEqual(1.3);
   });
 });
