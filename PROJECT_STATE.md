@@ -63,15 +63,26 @@
 
 ## 8. Current main / CI checkpoint
 - Date: 2026-09-11.
-- Verified main after provider/canonical work: `be345044699939012f7605bdfd6f8136fd106a08` (PR #215 merged).
+- Verified main after provider/canonical work: `0dcb5965750b30f59fa29623f6378857f87ccdc4`.
 - PR #214: merged, full CI + Architecture Review green.
 - PR #215: merged, full CI #2705 + Architecture Review #823 green.
+- PR #216: active checkpoint refresh merged.
 - Open provider/canonical PR: none at this checkpoint.
 - New downstream semantic authority introduced: NO.
 - External AI provider made canonical authority: NO.
 - Provider fallback may change transport/observability metadata but not canonical semantic identity/state authority.
 
-## 9. Sıradaki kapılar
+## 9. Response-generation validation — ACTIVE
+- Claude response-generation audit sonucu: canonical/core architecture için yeni patch gerekçesi yok; gerçek provider final-text trace fazı açık.
+- Güncel kod auditinde G4 social appraisal'ın tur başına bir kez çözüldüğü ve relationship/affect/reactionMode zincirinin aynı appraisal sonucundan beslendiği doğrulandı.
+- Canonical prompt builder WHAT/WHETHER kararlarını tek `KairaResponsePlan` authority'sinde serialize eder; speech identity HOW-only kalır.
+- Discourse state dialogue decision katmanına gerçek input olarak taşınır; final natural-language realization ayrıca trace edilmelidir.
+- Ölçülmüş delivered-text failure: `isTurkishAdviceAct("aranızda kalması daha iyi olur")` current main üzerinde `false` döndürdü. Bu, advice permission authority değişikliği değil; final delivery structural recognizer coverage açığıdır.
+- PR #217 bu dar bug-class için nominalized `-ması/-mesi daha iyi olur` recognizer coverage + false-positive regression ekler. `yarın hava daha iyi olur` advice olarak sınıflandırılmamalıdır.
+- PR #217 sonrası sıradaki doğrulama sırası: TRACE A (forbidden question/advice + rich memory) → TRACE C/D (same stimulus, different relationship/reaction state) → TRACE F (third-party resume) → TRACE E (memory phrasing) → TRACE G (Gemini/OpenRouter parity).
+
+## 10. Sıradaki kapılar
 - Yeni işi yalnız gerçek `main` üzerinde ölçülmüş failure class / açık contract gap / doğrulanmış regression üzerinden seç.
 - Provider/canonical boundary için yeni patch üretmeden önce concrete counterexample veya inconsistent runtime evidence göster.
+- Response-generation trace fazında canonical/state testlerini final generated-text E2E kanıtı gibi sunma; gerçek provider candidate/final reply ayrımını gözle.
 - `PROJECT_STATE.md` geçmiş PR günlüğü değildir; ayrıntılı tarih için Git/`AI_CHANGELOG.md`/ADR kullan.
