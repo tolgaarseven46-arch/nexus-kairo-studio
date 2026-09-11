@@ -5,6 +5,8 @@ const NECESSITY_ADVICE_RE =
   /\b(?:[\p{L}]+\s+){0,3}(?:geçmen|yapman|gitmen|kalman|yatman|uyuman|dinlenmen)\s+lazım\b/iu;
 const IMPERATIVE_ADVICE_RE =
   /\b(?:biraz\s+|azıcık\s+|direkt\s+)?(?:dinlen|uyu|yat)(?:\s+bence)?\b/iu;
+const NOMINALIZED_BETTER_ADVICE_RE =
+  /\b[\p{L}]+(?:ması|mesi)\s+daha\s+iyi\s+olur\b/iu;
 
 /**
  * Structural delivered-text recognizer only. It does not decide whether advice
@@ -18,6 +20,7 @@ export function isTurkishAdviceAct(text: string): boolean {
     EXPLICIT_ADVICE_RE.test(normalized) ||
     ADVICE_SUFFIX_RE.test(normalized) ||
     NECESSITY_ADVICE_RE.test(normalized) ||
-    IMPERATIVE_ADVICE_RE.test(normalized)
+    IMPERATIVE_ADVICE_RE.test(normalized) ||
+    NOMINALIZED_BETTER_ADVICE_RE.test(normalized)
   );
 }
