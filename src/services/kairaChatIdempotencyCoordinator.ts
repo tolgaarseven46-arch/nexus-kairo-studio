@@ -6,14 +6,21 @@ import {
 } from './kairaChatIdempotency';
 import { createDistributedChatIdempotency } from './kairaDistributedChatIdempotency';
 import { firestoreChatIdempotencyBackend } from './kairaFirestoreChatIdempotency';
-import { createDistributedStateMutationCoordinator } from './kairaDistributedStateMutation';
+import {
+  createDistributedStateMutationCoordinator,
+  KairaStateMutationOwnershipLostError,
+} from './kairaDistributedStateMutation';
 import { firestoreStateMutationBackend } from './kairaFirestoreStateMutation';
 
 const distributed = createDistributedChatIdempotency<any>(firestoreChatIdempotencyBackend);
 const stateMutations = createDistributedStateMutationCoordinator(firestoreStateMutationBackend);
 const distributedOwners = new Map<string, string>();
 const localFallbackKeys = new Set<string>();
-const stateMutationReleases = new Map<string, () => Promise<void>>();
+type StateMutationHandle = {
+  assertOwned: () => Promise<void>;
+  release: () => Promise<void>;
+};
+const stateMutationHandles = new Map<string, StateMutationHandle>();
 const localStateTails = new Map<string, Promise<void>>();
 
 function stateOwnerKey(requestKey: string) {
@@ -21,7 +28,7 @@ function stateOwnerKey(requestKey: string) {
   return separator > 0 ? requestKey.slice(0, separator) : requestKey;
 }
 
-async function acquireLocalStateMutation(key: string): Promise<() => Promise<void>> {
+async function acquireLocalStateMutation(key: string): Promise<StateMutationHandle> {
   const previous = localStateTails.get(key) ?? Promise.resolve();
   let releaseCurrent!: () => void;
   const current = new Promise<void>((resolve) => { releaseCurrent = resolve; });
@@ -29,11 +36,16 @@ async function acquireLocalStateMutation(key: string): Promise<() => Promise<voi
   localStateTails.set(key, tail);
   await previous;
   let released = false;
-  return async () => {
-    if (released) return;
-    released = true;
-    releaseCurrent();
-    if (localStateTails.get(key) === tail) localStateTails.delete(key);
+  return {
+    assertOwned: async () => {
+      if (released) throw new KairaStateMutationOwnershipLostError();
+    },
+    release: async () => {
+      if (released) return;
+      released = true;
+      releaseCurrent();
+      if (localStateTails.get(key) === tail) localStateTails.delete(key);
+    },
   };
 }
 
@@ -41,19 +53,30 @@ async function acquireStateMutation(requestKey: string) {
   const ownerKey = stateOwnerKey(requestKey);
   try {
     const lease = await stateMutations.acquire(ownerKey);
-    stateMutationReleases.set(requestKey, lease.release);
+    stateMutationHandles.set(requestKey, {
+      assertOwned: lease.assertOwned,
+      release: lease.release,
+    });
   } catch (error) {
     console.warn('[Kaira State Mutation] distributed lease unavailable; using process-local serialization:', error);
-    stateMutationReleases.set(requestKey, await acquireLocalStateMutation(ownerKey));
+    stateMutationHandles.set(requestKey, await acquireLocalStateMutation(ownerKey));
   }
 }
 
+export async function assertCoordinatedKairaChatStateOwnership(requestKey: string) {
+  const normalizedKey = requestKey.trim();
+  if (!normalizedKey) return;
+  const handle = stateMutationHandles.get(normalizedKey);
+  if (!handle) throw new KairaStateMutationOwnershipLostError();
+  await handle.assertOwned();
+}
+
 async function releaseStateMutation(requestKey: string) {
-  const release = stateMutationReleases.get(requestKey);
-  stateMutationReleases.delete(requestKey);
-  if (!release) return;
+  const handle = stateMutationHandles.get(requestKey);
+  stateMutationHandles.delete(requestKey);
+  if (!handle) return;
   try {
-    await release();
+    await handle.release();
   } catch (error) {
     console.warn('[Kaira State Mutation] lease release failed:', error);
   }
@@ -133,6 +156,6 @@ export async function failCoordinatedKairaChatRequest(key: string, error: unknow
 export function clearCoordinatedKairaChatIdempotencyForTests() {
   distributedOwners.clear();
   localFallbackKeys.clear();
-  stateMutationReleases.clear();
+  stateMutationHandles.clear();
   localStateTails.clear();
 }
