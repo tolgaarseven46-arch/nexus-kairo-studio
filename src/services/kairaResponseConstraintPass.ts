@@ -29,6 +29,7 @@ import { findKairaAmbiguityPreservationIssues } from "./kairaAmbiguityPreservati
 import { findKairaSelfCorrectionAccountabilityIssues } from "./kairaSelfCorrectionAccountability";
 import { removeForbiddenQuestionUnits } from "./kairaDeliveredQuestionConstraint";
 import { findGeneratedClaimProvenanceIssues } from "./kairaGeneratedClaimProvenance";
+import { buildKairaRecoveryFallback } from "./kairaRecoveryPolicy";
 
 export type KairaConstraintWorldItems = Parameters<typeof enforceWorldModelRecallResponse>[1];
 export type KairaConstraintWorldContext = Parameters<typeof enforceWorldModelRecallResponse>[2];
@@ -224,6 +225,7 @@ export function runKairaResponseConstraintPass(
 
   if (first.issues.length > 0) {
     const fallbackCandidates = [
+      String(buildKairaRecoveryFallback(input.plan, first.issues) ?? "").trim(),
       String(input.fallbackFactory?.() ?? "").trim(),
       String(kairaSocialMoveFallback(input.plan) ?? "").trim(),
     ].filter((candidate, index, all) => candidate && all.indexOf(candidate) === index);
