@@ -63,26 +63,25 @@
 
 ## 8. Current main / CI checkpoint
 - Date: 2026-09-11.
-- Verified main after provider/canonical work: `0dcb5965750b30f59fa29623f6378857f87ccdc4`.
-- PR #214: merged, full CI + Architecture Review green.
-- PR #215: merged, full CI #2705 + Architecture Review #823 green.
-- PR #216: active checkpoint refresh merged.
-- Open provider/canonical PR: none at this checkpoint.
+- Verified main: `891375e9b2c293dbb3a884b5a6c64f89fe8749fa`.
+- PR #214/#215/#216 merged; provider/canonical checkpoint closed.
+- PR #217 merged; nominalized `-ması/-mesi daha iyi olur` advice coverage fixed.
+- Post-merge main CI #2711 PASS.
 - New downstream semantic authority introduced: NO.
 - External AI provider made canonical authority: NO.
-- Provider fallback may change transport/observability metadata but not canonical semantic identity/state authority.
 
 ## 9. Response-generation validation — ACTIVE
-- Claude response-generation audit sonucu: canonical/core architecture için yeni patch gerekçesi yok; gerçek provider final-text trace fazı açık.
-- Güncel kod auditinde G4 social appraisal'ın tur başına bir kez çözüldüğü ve relationship/affect/reactionMode zincirinin aynı appraisal sonucundan beslendiği doğrulandı.
-- Canonical prompt builder WHAT/WHETHER kararlarını tek `KairaResponsePlan` authority'sinde serialize eder; speech identity HOW-only kalır.
-- Discourse state dialogue decision katmanına gerçek input olarak taşınır; final natural-language realization ayrıca trace edilmelidir.
-- Ölçülmüş delivered-text failure: `isTurkishAdviceAct("aranızda kalması daha iyi olur")` current main üzerinde `false` döndürdü. Bu, advice permission authority değişikliği değil; final delivery structural recognizer coverage açığıdır.
-- PR #217 bu dar bug-class için nominalized `-ması/-mesi daha iyi olur` recognizer coverage + false-positive regression ekler. `yarın hava daha iyi olur` advice olarak sınıflandırılmamalıdır.
-- PR #217 sonrası sıradaki doğrulama sırası: TRACE A (forbidden question/advice + rich memory) → TRACE C/D (same stimulus, different relationship/reaction state) → TRACE F (third-party resume) → TRACE E (memory phrasing) → TRACE G (Gemini/OpenRouter parity).
+- Trace A: PASS. Rich seeded history altında `allowQuestion=false` + `allowAdvice=false`; live final reply soru/tavsiye sızdırmadı.
+- Trace C/D: state realization live output'ta doğrulandı; neutral/close, irritated, hurt/distancing ve repairing farklı register/stance ve metin üretti.
+- Trace F: PASS. Aynı final mesajı third-party Mert thread'i varken Mert'e bağlandı; thread yokken doğal clarification üretti.
+- Trace G şu an blocked: production runtime OpenRouter açık, Gemini kapalı.
+- Yeni ölçülmüş delivered-text failure: hurt/distancing live probe'da plan `allowAdvice=false` iken `yoğunken yazman bile fazla aslında, kendine dön biraz bugün` final gate'ten geçti.
+- Canonical generated-reply semantic probe bu leak'i `support/closeness_bid` olarak yorumladı; mevcut semantic schema generated reply için advice-performed sinyalini güvenilir biçimde taşımıyor. Bu nedenle yeni semantic authority eklenmiyor.
+- Fix scope: mevcut delivered-text advice recognizer'a yalnız ölçülmüş direct self-care direction yüzeyini eklemek (`kendine dön`, `kendine odaklan`) ve supportive acknowledgements için false-positive regression kilitlemek.
 
 ## 10. Sıradaki kapılar
-- Yeni işi yalnız gerçek `main` üzerinde ölçülmüş failure class / açık contract gap / doğrulanmış regression üzerinden seç.
-- Provider/canonical boundary için yeni patch üretmeden önce concrete counterexample veya inconsistent runtime evidence göster.
+- Bu measured failure RED → minimal recognizer fix → regression → full CI → merge ile kapatılacak.
+- Ardından memory realization Trace E çalıştırılacak.
+- Gemini tekrar production'da aktif olmadan Trace G parity tamamlandı sayılmayacak.
 - Response-generation trace fazında canonical/state testlerini final generated-text E2E kanıtı gibi sunma; gerçek provider candidate/final reply ayrımını gözle.
 - `PROJECT_STATE.md` geçmiş PR günlüğü değildir; ayrıntılı tarih için Git/`AI_CHANGELOG.md`/ADR kullan.
