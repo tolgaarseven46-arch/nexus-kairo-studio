@@ -5,9 +5,6 @@ on:
     branches:
       - 'codex/**'
 
-permissions:
-  contents: write
-
 jobs:
   fast-validate:
     runs-on: ubuntu-latest
@@ -16,11 +13,6 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
-
-      - name: One-time ambiguous-thread decision patch
-        run: >-
-          python -c "from pathlib import Path; p=Path('src/services/kairoDialogueDecisionEngine.ts'); t=p.read_text(); n='  if (event.discourseAct === \"recall_request\") {'; i='  if (discourse?.ambiguousThreadResumption) {\n    return {\n      move: \"answer_or_clarify\",\n      allowFollowUpQuestion: true,\n      allowSpeculation: false,\n      maxSentences: 1,\n      maxWords: 18,\n      hasSupportedTargetClaim: false,\n      reason:\n        \"Birden fazla açık konuşma thread’i bu isteğin hedefi olabilir. Yanlış bağlam uydurma; içerik cevabı vermeden önce hangisini kastettiğini tek kısa soruyla netleştir.\",\n    };\n  }\n\n'; assert n in t, 'target seam not found'; p.write_text(t.replace(n,i+n,1))"
-          && git checkout origin/main -- .github/workflows/fast-ci.yml
 
       - name: Setup Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -32,14 +24,6 @@ jobs:
 
       - name: Fast canonical validation
         run: node scripts/run-fast-ci.mjs
-
-      - name: Commit validated patch
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/services/kairoDialogueDecisionEngine.ts .github/workflows/fast-ci.yml
-          git commit -m "fix(dialogue): clarify ambiguous thread resumption"
-          git push origin HEAD:codex/counterfactual-causal-replay-v2
 
       - name: Upload fast-ci evidence
         if: always()

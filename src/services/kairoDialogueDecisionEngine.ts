@@ -366,6 +366,19 @@ function planDialogueResponseBase(
     };
   }
 
+  if (discourse?.ambiguousThreadResumption) {
+    return {
+      move: "answer_or_clarify",
+      allowFollowUpQuestion: true,
+      allowSpeculation: false,
+      maxSentences: 1,
+      maxWords: 18,
+      hasSupportedTargetClaim: false,
+      reason:
+        "Birden fazla açık konuşma thread’i bu isteğin hedefi olabilir. Yanlış bağlam uydurma; içerik cevabı vermeden önce hangisini kastettiğini tek kısa soruyla netleştir.",
+    };
+  }
+
   if (event.discourseAct === "recall_request") {
     return {
       move: "grounded_recall",
