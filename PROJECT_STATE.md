@@ -57,8 +57,16 @@
 - Fast CI, full CI, historical RED→GREEN, TypeScript, production build ve Architecture Review GREEN.
 - Production behavior değişmedi; provider/API çağrısı yok.
 
-## 11. Güncel checkpoint
-- Core Emotion-State Validation Phase 5A + 5B CLOSED.
-- Toplam yeni deterministic emotion coverage: 12 canonical affect-cell + 15 relationship-derived reaction-mode cell = 27 matrix case; ek cross-case invariants ile authority separation da doğrulandı.
-- Bu sonuç final natural-language provider realization kanıtı değildir; gerçek provider kabul testleri ayrı ve maliyet-kontrollü sınıftır.
+## 11. Core Emotion-State Validation Phase 5C — CLOSED
+- Affect × reactionMode kesişimi için 6 deterministic cross-axis kombinasyon eklendi.
+- `stress+repairing`, `anger+hurt`, `happiness+hurt`, `calmness+withdrawn`, `stress+irritated`, `happiness+repairing` kombinasyonlarında SpeechIdentity HOW ile BehaviorContract WHAT/WHETHER ayrımı korundu.
+- Ek boundedness/isolation proof: diğer state alanları sabitken happiness 70→100 değişimi yüksek-yüklü negatif event appraisal valence/significance/activation değerini azaltmadı.
+- İlk RED'ler production failure değildi; aynı fixture'da birden fazla affect alanını değiştiren test tasarımı ve canonical olmayan mutlak eşik kaynaklıydı. Tek-değişken A/B ile gerçek invariant izole edildi.
+- Production behavior değişmedi; provider/API çağrısı yok.
+
+## 12. Güncel checkpoint
+- Core Emotion-State Validation Phase 5A + 5B + 5C CLOSED.
+- Deterministic emotion coverage: 27 ana matrix cell + 6 cross-axis combination + boundedness/isolation proof.
+- Bir sonraki sınıf maliyet-kontrollü `Live Acceptance Session v1`: kullanıcı Kaira ile tek doğal 20–30 mesajlık gerçek provider sohbeti yapacak; ardından transcript + KNT/debug üzerinden core → final prompt → provider realization → verification/final-delivery gate → persistence zinciri audit edilecek.
+- Live acceptance keşif/probe turu değildir: aynı mesajı tekrar tekrar koşturma yok, tek session, minimum retry.
 - Yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı.
