@@ -23,6 +23,8 @@ export interface ResolveServerLanguageUnderstandingInput {
   generateText: ServerSemanticGenerateText;
 }
 
+const CANONICAL_SEMANTIC_PROVIDER = "llm_semantic_runtime";
+
 /** Server bridge: canonical authority is SemanticInterpretation@2. */
 export async function resolveServerLanguageUnderstanding(
   input: ResolveServerLanguageUnderstandingInput,
@@ -32,15 +34,29 @@ export async function resolveServerLanguageUnderstanding(
     // Canonical semantic evidence must not encode the requested transport/provider.
     // Runtime provider identity (and fallback) belongs to observability, while this
     // boundary remains stable across OpenRouter/Gemini switching.
-    name: "llm_semantic_runtime",
+    name: CANONICAL_SEMANTIC_PROVIDER,
     generate: ({ system, prompt, temperature }) =>
       input.generateText(system, [{ role: "user", content: prompt }], temperature, input.preferredProvider),
   });
 
-  return understandTurkishMessage(input.message, {
+  const result = await understandTurkishMessage(input.message, {
     incomingSemanticInterpretation: input.incomingSemanticInterpretation,
     morphologyProvider,
     semanticProvider,
     context: input.context,
   });
+
+  if (result.semanticSource !== "semantic_provider") return result;
+  return {
+    ...result,
+    semanticProvider: CANONICAL_SEMANTIC_PROVIDER,
+    interpretation: {
+      ...result.interpretation,
+      evidence: result.interpretation.evidence.map((evidence) =>
+        evidence.source === "llm"
+          ? { ...evidence, provider: CANONICAL_SEMANTIC_PROVIDER }
+          : evidence,
+      ),
+    },
+  };
 }
