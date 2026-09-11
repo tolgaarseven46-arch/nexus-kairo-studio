@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { EMPTY_DISCOURSE_STATE } from "../types/discourseState";
 import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
 
+// Red/green authority probe: multiple unresolved threads must force clarification.
 function event(overrides: Record<string, unknown> = {}) {
   return {
     raw: "ne yapayım sence",
