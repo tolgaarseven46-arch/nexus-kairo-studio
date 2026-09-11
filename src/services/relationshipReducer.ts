@@ -317,7 +317,13 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   const repAmp = Math.min(inj.repetitionCap, 1 + Math.max(0, repeatedNegativeCount - 1) * inj.repetitionAmplify);
   const severityScale = inj.severityFloor + inj.severityWeight * (kind === "negative" ? Math.max(sevLoad, signal.severity.disrespect) : 0);
   const goodHistoryAbsorb = 1 - inj.goodHistoryAbsorb * relationshipQuality01;
-  const injuryScale = repAmp * severityScale * damping * goodHistoryAbsorb;
+  // Durable injury should remain backward-compatible for ordinary low uncertainty,
+  // while genuinely ambiguous semantics damp mutation strongly. A cubic curve keeps
+  // the normal 0.0-0.2 range effectively unchanged and only bends hard near 1.0.
+  const mutationUncertaintyConfidence = clamp01(
+    1 - config.redline.uncertaintyDampen * Math.pow(clamp01(signal.uncertainty), 3),
+  );
+  const injuryScale = repAmp * severityScale * damping * goodHistoryAbsorb * mutationUncertaintyConfidence;
 
   let conflict = conflictBefore;
   let hurt = hurtBefore;
