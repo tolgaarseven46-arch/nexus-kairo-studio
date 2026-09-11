@@ -4,6 +4,11 @@ import type { KairaStateMutationBackend } from './kairaDistributedStateMutation'
 
 const COLLECTION = 'kairaStateMutationLocks';
 
+// Firestore transactions do not expose an authoritative server "now" for comparing
+// an existing numeric lease deadline. Treat a bounded amount of forward wall-clock
+// disagreement as uncertainty instead of evidence that the holder has expired.
+export const STATE_MUTATION_LEASE_CLOCK_SKEW_TOLERANCE_MS = 30_000;
+
 function docId(key: string) {
   return encodeURIComponent(key).replace(/%/g, '_').slice(0, 1400);
 }
@@ -18,8 +23,9 @@ export const firestoreStateMutationBackend: KairaStateMutationBackend = {
     return runTransaction(db, async (tx) => {
       const snapshot = await tx.get(ref);
       const existing = snapshot.exists() ? snapshot.data() as { ownerToken?: string; leaseUntil?: number } : null;
-      if (existing && typeof existing.leaseUntil === 'number' && existing.leaseUntil > now && existing.ownerToken !== ownerToken) {
-        return false;
+      if (existing && typeof existing.leaseUntil === 'number' && existing.ownerToken !== ownerToken) {
+        const takeoverAfter = existing.leaseUntil + STATE_MUTATION_LEASE_CLOCK_SKEW_TOLERANCE_MS;
+        if (takeoverAfter > now) return false;
       }
       tx.set(ref, {
         ownerToken,

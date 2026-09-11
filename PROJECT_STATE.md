@@ -133,29 +133,40 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 - Geçici diagnostic workflow/output tamamen temizlendi.
 - ADR: `docs/adr/0093-request-idless-chat-coordination-identity.md`.
 
-## 16. Multi-turn counterfactual replay proof — PR #209 / IN PROGRESS
-- Branch: `codex/counterfactual-replay-proof` from clean main `1f7e64cca951833dd0e88cd4ec54b67060da98be`.
+## 16. Multi-turn counterfactual replay proof — MERGED / CLOSED
+- PR #209 merge: `b891c781f5f81a60bc318f42302f04d864f0f2df`.
 - Test-only proof; production behavior ve semantic authority değişmedi.
 - Üç bağımsız history intervention kanıtı eklendi: lived self-fact revision, pending-question discourse dependency ve third-party open-thread resumption.
 - Her proof aynı final input/state transition noktasını koruyup yalnız önceki history evidence'ını değiştirerek downstream canonical state'in farklılaştığını doğrular.
-- Fast CI #205: PASS.
-- PR #209 ilk FULL CI #2687: `behavior-guard` PASS; `docs-guard` yalnız bu checkpoint dosyası eksik olduğu için RED oldu. Bu commit docs-guard gereğini kapatır; validate job ayrıca devam etmektedir.
+- Fast CI #205 PASS.
+- PR #209 FULL CI #2688 PASS; Architecture Review #811 PASS.
 - Phase-0 A/B/D/E observability körlüğü current main için stale: typed projector'lar + scenario-complete readiness mevcut; bu yüzden yeni observability patch üretilmedi.
-- Fresh concurrency audit ayrı residual risk adayı gösterdi: Firestore lease expiry caller wall-clock `now` ile kıyaslanıyor ve failed heartbeat renewal aktif holder'a ownership loss olarak propagate edilmiyor. Bu PR o konuyu karıştırmıyor; ayrı measured failure proof gerektiriyor.
+- Post-merge main FULL CI #2689 started on merge SHA and passed all gates through TypeScript; production build was the final running step at the time the next failure proof branch started.
 
-## 17. Sıradaki kapılar
-- PR #209 CI zincirini tamamen yeşile getir ve merge sonrası main'i yeniden doğrula.
-- Ardından lease clock-skew / lost-lease safety adayını önce deterministic RED proof ile ölç; kanıtlanmadan production patch üretme.
+## 17. Distributed lease clock-skew takeover — RED→GREEN / ACTIVE PR PREP
+- Branch: `codex/state-lease-clock-skew-red` from clean main `b891c781f5f81a60bc318f42302f04d864f0f2df`.
+- Historical RED commit: `d736ae5934106d83f13b3f13ef92a34f56bddd09`.
+- Fast CI #208 failed exactly on the new production-backend assertion: a contender with a wall clock 20 seconds ahead acquired a lease held by another owner (`expected false`, received `true`).
+- Root cause: `firestoreStateMutationBackend.acquire` treated caller wall-clock `now` as authoritative expiry evidence.
+- Fix: bounded 30-second `STATE_MUTATION_LEASE_CLOCK_SKEW_TOLERANCE_MS`; another owner may take over only after stored `leaseUntil + tolerance`.
+- Neighbor proof preserves crash recovery after lease expiry plus tolerance.
+- Latest Fast CI #211 PASS after fix + neighbor proof + ADR.
+- ADR: `docs/adr/0094-state-mutation-lease-clock-skew-bound.md`.
+- This is bounded-skew safety, not arbitrary-clock correctness.
+- Separate residual candidate remains: heartbeat `renew=false` is not yet propagated to the active holder as ownership loss. Do not patch it before a deterministic measured failure proof.
+
+## 18. Sıradaki kapılar
+- Open PR for clock-skew RED→GREEN package; complete FULL CI + Architecture Review; merge and verify clean main.
+- Then measure the separate lost-lease/heartbeat-renewal candidate with a deterministic RED proof before designing fencing/abort behavior.
 - Yeni işi yalnız ölçülmüş failure class / açık contract gap / doğrulanmış regression üzerinden seç.
 
-## 18. Latest checkpoint
+## 19. Latest checkpoint
 - Date: 2026-09-11
-- Clean main before active branch: `1f7e64cca951833dd0e88cd4ec54b67060da98be`.
-- Active PR: #209 — counterfactual replay proof.
-- Active branch: `codex/counterfactual-replay-proof`.
-- Fast CI #205: PASS.
-- Full CI #2687: rerun/update pending after docs checkpoint commit.
-- Production behavior changed by PR #209: NO.
+- Clean main at branch start: `b891c781f5f81a60bc318f42302f04d864f0f2df` (PR #209 merged).
+- Active branch: `codex/state-lease-clock-skew-red`.
+- Historical clock-skew RED: `d736ae5934106d83f13b3f13ef92a34f56bddd09`; Fast CI #208 FAIL on expected takeover-safety assertion.
+- Clock-skew fix + crash-recovery neighbor: GREEN; Fast CI #211 PASS.
+- Production behavior changed on active branch: YES, only distributed state-mutation lock takeover timing.
 - External AI API in deterministic tests: NO.
 - New downstream semantic authority: NO.
-- Next candidate failure class: distributed lease clock-skew / ownership-loss safety — NOT YET MEASURED.
+- Next candidate after merge: heartbeat renewal ownership-loss propagation — NOT YET MEASURED.
