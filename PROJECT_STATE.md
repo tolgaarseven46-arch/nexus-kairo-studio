@@ -86,7 +86,15 @@
 - Fast CI, Architecture Review, historical RED→GREEN, full tests, TypeScript ve production build GREEN.
 - Production behavior değişmedi; provider/API çağrısı yok.
 
-## 13. Güncel checkpoint
-- Deterministic core adversarial hardening için açık faz kalmadı.
+## 13. Core Emotion-State Validation Phase 5 — PILOT ACTIVE
+- Güncel canonical resting affect alanları yalnız `anger`, `stress`, `happiness`, `calmness`; `hurt`, `irritated`, `withdrawn`, `repairing` ayrı baseline state değil, relationship/appraisal projection'larıdır.
+- 12-case deterministic pilot: 4 affect-dominant fixture × 3 canonical stimulus (`neutral`, `criticism`, `apology`).
+- Pilot invariantları: current affect semantic/relationship direction üretmez; G4 yalnız mevcut affective projection magnitude/activation'ı bounded modüle eder; exact-zero effect korunur.
+- İlk Fast CI GREEN: anger/stress negative affective significance/activation'ı artırıyor, calmness activation'ı düşürüyor, happiness positive affective significance'ı artırıyor; aynı stimulus için relationship harm/repair meaning sabit kalıyor.
+- Production behavior değişmedi; provider/API çağrısı yok.
+- Sonraki kapı: full CI + Architecture Review; GREEN olursa pilot merge edilip relationship-derived reactionMode matrix için ayrı test tasarımı değerlendirilecek.
+
+## 14. Güncel checkpoint
+- Deterministic core adversarial hardening Phase 1–4 kapalı; Phase 5 emotion-state pilot doğrulamada.
 - Gerçek provider parity / production acceptance ayrı bir kabul sınıfıdır; bu çalışmada canlı/provider çağrısı yapılmadı ve yapılmayacak.
-- Bir sonraki geliştirme ancak yeni ölçülmüş failure class, yeni ürün hedefi veya açıkça başlatılan provider kabul turu ile açılmalı.
+- Yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı.
