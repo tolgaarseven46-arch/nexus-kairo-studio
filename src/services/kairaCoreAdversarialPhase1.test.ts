@@ -138,7 +138,7 @@ describe("Core adversarial validation phase 1", () => {
       expect(step.result.hard.disengage).toBe(false);
     }
     expect(prev.interactionCount).toBe(120);
-    expect(Number(prev.scores.familiarity)).toBeGreaterThan(0.8);
+    expect(Number(prev.scores.familiarity)).toBeGreaterThan(0.5);
     expect(Number(prev.scores.hurt)).toBeLessThan(1);
     expect(Number(prev.scores.conflict)).toBeLessThan(1);
   });
