@@ -27,6 +27,7 @@ import { requestCanonicalLanguageUnderstanding, type ClientLanguageUnderstanding
 import { resolveKairaInstanceContext, type KairaInstanceType } from "./kairaInstanceContext";
 import { normalizeFineTuneProfile } from "./fineTuneProfileNormalizer";
 import { acquireKairaChatRequestIdentity, buildKairaChatRetryFingerprint, completeKairaChatRequestIdentity } from "./kairaChatRetryIdentity";
+import { KAIRA_CHAT_CLIENT_TIMEOUT_MS, kairaChatClientTimeoutMessage } from "./kairaChatTransportPolicy";
 
 export type KairoProvider = "gemini" | "openrouter";
 export type KairoProviderUsed = KairoProvider | "local_language" | "deterministic_fallback";
@@ -260,7 +261,7 @@ export const droitChatService = {
       ?.activityPermissionRequestId;
     const payload = { sessionId: resolvedSessionId, requestId, userId, userName, userMessage, semanticInterpretation: languageUnderstanding.interpretation, semanticEvent, character: characterInfo, personality, responsePersonality: runtimePersonality, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorPolicy, dynamicState, affectBaseline, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName, semanticInterpretation: m.semanticInterpretation, semanticSource: m.semanticSource })), activityPermissionRequestId, provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 35000);
+    const timeout = setTimeout(() => controller.abort(), KAIRA_CHAT_CLIENT_TIMEOUT_MS);
     try {
       const res = await fetch("/api/chat", { method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Sunucu hatası: ${res.status}`); }
@@ -304,7 +305,7 @@ export const droitChatService = {
       completeKairaChatRequestIdentity(retryFingerprint);
       return { reply, profile: authoritativeBehaviorProfile, dynamicState: nextDynamicState, reasoningTrace, consistency, providerUsed: data.providerUsed, timings, sessionId: data.sessionId || resolvedSessionId, turnId: data.turnId, kairaInstanceId: data.kairaInstanceId || kairaInstance.instanceId, kairaInstanceType: data.kairaInstanceType || kairaInstance.instanceType, languageUnderstanding: { ...languageUnderstanding, interpretation: canonicalSemanticInterpretation, event: canonicalSemanticEvent }, worldStateAppraisal: data.kdm?.worldStateAppraisal, worldReasoningPolicy: data.kdm?.worldReasoningPolicy, worldMemoryGuard: data.kdm?.worldMemoryGuard, epistemicAccess: data.kdm?.epistemicAccess, responsePlan: data.kdm?.responsePlan, controlledSpontaneity: data.kdm?.controlledSpontaneity, activityPermission: data.activityPermission ?? null, activityPermissionResolution: data.activityPermissionResolution };
     } catch (err: any) {
-      if (err?.name === "AbortError") throw new Error("Kaira yanıtı 35 saniyeyi aştı. OpenRouter/model gecikmesi olabilir.");
+      if (err?.name === "AbortError") throw new Error(kairaChatClientTimeoutMessage());
       throw err;
     } finally { clearTimeout(timeout); }
   },
