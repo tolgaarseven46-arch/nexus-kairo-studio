@@ -62,14 +62,21 @@
 - İlk RED production failure değildi: 120 turun yaklaşık 10 saatlik simulated age olduğu durumda familiarity `>0.8` beklentisi canonical curve ile uyumsuz test varsayımıydı; assertion canonical curve'e hizalandı (`>0.5`) ve full CI #2716 + Architecture Review PASS oldu.
 - Production behavior değişmedi; provider/API çağrısı yok.
 
-## 10. Core Adversarial Validation Phase 2 — PR #220 ACTIVE
-- Tests-only; production behavior değişikliği yok.
-- Temporal robustness: 0m / 5m / 60m / 1d elapsed-time recovery monotonicity ve time-only full-reset olmaması.
-- Semantic uncertainty mutation damping: aynı canonical signal için yüksek belirsizlik, düşük belirsizliğe göre relationship mutation'ı azaltmalı.
-- RED çıkarsa assertion gevşetilmez; failure class reducer contract/code üzerinden izole edilir.
+## 10. Core Adversarial Validation Phase 2 — CLOSED
+- PR #220 merged; final head `344f88aab78c712d1c957c6496fa2e33b24423ba`.
+- Temporal robustness: 0m / 5m / 60m / 1d elapsed-time recovery monotonicity ve time-only full-reset olmaması GREEN.
+- Semantic uncertainty mutation damping: yüksek belirsizliğin durable relationship mutation'ı azaltması doğrulandı.
+- İlk implementation normal uncertainty davranışını da fazla zayıflattığı için historical betrayal regression RED oldu; assertion gevşetilmeden damping yalnız yüksek uncertainty bölgesine daraltıldı ve full CI GREEN oldu.
 - Provider/API çağrısı yok.
 
-## 11. Sonraki adversarial kapılar
-- Persistence corruption/recovery: interrupted write + version mismatch.
-- Phase 2 sonrası deterministic 20–30 turluk daha serbest/spontane core conversation probes.
+## 11. Core Adversarial Validation Phase 3 — PR #221 ACTIVE
+- Persistence corruption/recovery gate: interrupted/partial write + schema version mismatch.
+- Measured failure: hydration `schemaVersion` değerini 1'e zorlayıp unknown future version'ı sessizce kabul edebiliyor; eksik top-level arrays da boş diziye çevrilip geçerli state gibi hydrate olabiliyordu.
+- Fix: persisted canonical identity envelope normalize edilmeden önce exact schema version ve required top-level arrays doğrulanır; corrupt/version-mismatched document fail-closed olur.
+- Storage/transport failure `unavailable`, corrupt persisted document `missing` olarak ayrıştırılır.
+- Transactional append/self-fact revision corrupt envelope üzerinde mutate etmez.
+- Provider/API çağrısı yok.
+
+## 12. Sonraki adversarial kapılar
+- Phase 3 sonrası deterministic 20–30 turluk daha serbest/spontane core conversation probes.
 - Gerçek provider kabul testleri yalnız en sonda ve minimum sayıda yapılacak.

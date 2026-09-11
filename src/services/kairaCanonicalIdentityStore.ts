@@ -40,6 +40,18 @@ function cloneMemory(memory: KairaAutobiographicalMemory): KairaAutobiographical
   };
 }
 
+function hasCanonicalIdentityEnvelope(
+  data: Partial<KairaCanonicalIdentityState>,
+): boolean {
+  return (
+    typeof data.kairaInstanceId === "string" &&
+    data.kairaInstanceId.trim().length > 0 &&
+    data.schemaVersion === 1 &&
+    Array.isArray(data.selfFacts) &&
+    Array.isArray(data.autobiographicalMemories)
+  );
+}
+
 function stateFromData(
   ownerId: string,
   data: Partial<KairaCanonicalIdentityState>,
@@ -107,11 +119,17 @@ export async function loadKairaCanonicalIdentity(
   const snapshot = await getDoc(doc(db, CANONICAL_IDENTITY_COLLECTION, ownerId));
   if (!snapshot.exists()) return null;
 
-  const state = stateFromData(ownerId, snapshot.data() as Partial<KairaCanonicalIdentityState>);
+  const data = snapshot.data() as Partial<KairaCanonicalIdentityState>;
+  if (!hasCanonicalIdentityEnvelope(data)) return null;
+  const state = stateFromData(ownerId, data);
   if (resolveKairaInstanceContext({ instanceId: state.kairaInstanceId }).instanceId !== ownerId) {
     return null;
   }
-  if (validateKairaCanonicalIdentity(state).length) return null;
+  try {
+    if (validateKairaCanonicalIdentity(state).length) return null;
+  } catch {
+    return null;
+  }
   return state;
 }
 
@@ -165,7 +183,11 @@ export async function appendKairaAutobiographicalMemoryAtomic(
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists()) return { status: "missing_identity", memoryId: null } as const;
 
-    const current = stateFromData(ownerId, snapshot.data() as Partial<KairaCanonicalIdentityState>);
+    const data = snapshot.data() as Partial<KairaCanonicalIdentityState>;
+    if (!hasCanonicalIdentityEnvelope(data)) {
+      throw new Error("Invalid existing Kaira canonical identity: persistence envelope");
+    }
+    const current = stateFromData(ownerId, data);
     if (resolveKairaInstanceContext({ instanceId: current.kairaInstanceId }).instanceId !== ownerId) {
       throw new Error("Canonical identity owner mismatch");
     }
@@ -222,7 +244,11 @@ export async function applyKairaSelfFactRevisionAtomic(
   return runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists()) return { status: "missing_identity", decision: null } as const;
-    const current = stateFromData(ownerId, snapshot.data() as Partial<KairaCanonicalIdentityState>);
+    const data = snapshot.data() as Partial<KairaCanonicalIdentityState>;
+    if (!hasCanonicalIdentityEnvelope(data)) {
+      throw new Error("Invalid existing Kaira canonical identity: persistence envelope");
+    }
+    const current = stateFromData(ownerId, data);
     const issues = validateKairaCanonicalIdentity(current);
     if (issues.length) throw new Error(`Invalid existing Kaira canonical identity: ${issues.map((issue) => issue.invariant).join(", ")}`);
 
