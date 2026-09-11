@@ -56,19 +56,20 @@
 - Yeni faz: **Core Adversarial Validation / Soak / Counterfactual Matrix**.
 - Bu fazda yeni feature/provider tuning yok; önce deterministic failure discovery.
 
-## 9. Core Adversarial Validation Phase 1 — PR #219 ACTIVE
-- Production behavior değişikliği yok; tests-only paket.
-- 120 tur positive long-horizon stability.
-- 120 tur injury → repair trajectory.
-- 150 tur alternating harm / repair / neutral soak.
-- Aynı stimulus altında trust × warmth × familiarity eksenlerinin tüm 8 uç kombinasyonu.
-- Three-way discourse collision: iki unresolved third-party thread + pending Kaira question.
-- Kural: RED çıkarsa assertion gevşetilmez; failure class izole edilir, minimal fix ancak kanıt sonrası yapılır.
+## 9. Core Adversarial Validation Phase 1 — CLOSED
+- PR #219 merge `6a4601e8f7f3e2420966b4ea377ff76b9463f40a`.
+- 120 tur positive long-horizon stability, 120 tur injury → repair, 150 tur mixed soak, 8 trust × warmth × familiarity uç kombinasyonu ve three-way discourse collision GREEN.
+- İlk RED production failure değildi: 120 turun yaklaşık 10 saatlik simulated age olduğu durumda familiarity `>0.8` beklentisi canonical curve ile uyumsuz test varsayımıydı; assertion canonical curve'e hizalandı (`>0.5`) ve full CI #2716 + Architecture Review PASS oldu.
+- Production behavior değişmedi; provider/API çağrısı yok.
+
+## 10. Core Adversarial Validation Phase 2 — PR #220 ACTIVE
+- Tests-only; production behavior değişikliği yok.
+- Temporal robustness: 0m / 5m / 60m / 1d elapsed-time recovery monotonicity ve time-only full-reset olmaması.
+- Semantic uncertainty mutation damping: aynı canonical signal için yüksek belirsizlik, düşük belirsizliğe göre relationship mutation'ı azaltmalı.
+- RED çıkarsa assertion gevşetilmez; failure class reducer contract/code üzerinden izole edilir.
 - Provider/API çağrısı yok.
 
-## 10. Sonraki adversarial kapılar
-- Phase 1 GREEN olduktan sonra temporal robustness: gerçek/simüle wall-clock farkı.
+## 11. Sonraki adversarial kapılar
 - Persistence corruption/recovery: interrupted write + version mismatch.
-- General semantic uncertainty damping: düşük-güven semantic input'ın mutation etkisi.
-- Ardından deterministic 20–30 turluk daha serbest/spontane core conversation probes.
+- Phase 2 sonrası deterministic 20–30 turluk daha serbest/spontane core conversation probes.
 - Gerçek provider kabul testleri yalnız en sonda ve minimum sayıda yapılacak.
