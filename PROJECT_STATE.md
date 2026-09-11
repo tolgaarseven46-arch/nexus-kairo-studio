@@ -57,8 +57,16 @@
 - Fast CI, full CI, historical RED→GREEN, TypeScript, production build ve Architecture Review GREEN.
 - Production behavior değişmedi; provider/API çağrısı yok.
 
-## 11. Güncel checkpoint
-- Core Emotion-State Validation Phase 5A + 5B CLOSED.
-- Toplam yeni deterministic emotion coverage: 12 canonical affect-cell + 15 relationship-derived reaction-mode cell = 27 matrix case; ek cross-case invariants ile authority separation da doğrulandı.
-- Bu sonuç final natural-language provider realization kanıtı değildir; gerçek provider kabul testleri ayrı ve maliyet-kontrollü sınıftır.
+## 11. Core Emotion-State Validation Phase 5C — CLOSED
+- Claude red-team sonrası affect × reactionMode kesişimi için dar cross-axis coherence paketi eklendi.
+- 6 çapraz kombinasyon: stress+repairing, anger+hurt, happiness+hurt, calmness+withdrawn, stress+irritated, happiness+repairing; negative/positive canonical stimuluslarla HOW/WHAT authority ayrımı birlikte doğrulandı.
+- Ek boundedness proof: maximum happiness, aynı diğer state değerleri sabitken ciddi negative self-share significance/activation değerini azaltmıyor; semantic valence negatif kalıyor ve significance yüksek kalıyor.
+- İlk iki RED production failure değildi: test fixture'ları happiness ile calmness etkisini aynı assertion'da karıştırmış ve canonical olmayan mutlak activation eşiği dayatmıştı. Happiness tek değişken olacak şekilde A/B izole edildi; gerçek invariant GREEN.
+- Production behavior değişmedi; provider/API çağrısı yok.
+
+## 12. Güncel checkpoint
+- Core Emotion-State Validation Phase 5A + 5B + 5C CLOSED.
+- Toplam deterministic emotion coverage: 27 ana matrix cell + 6 cross-axis combination + boundedness/isolation proof.
+- Bir sonraki sınıf: maliyet-kontrollü **Live Acceptance Session v1** — kullanıcı Kaira ile tek doğal 20–30 mesajlık gerçek provider sohbeti yapacak; amaç core → final prompt → provider realization → verification/final-delivery gate → persistence zincirini uçtan uca gözlemlemek.
+- Live acceptance keşif/probe turu değildir: aynı senaryoyu tekrar tekrar koşturma yok; tek session, minimum retry, oturum sonunda KNT/debug transcript üzerinden tur bazlı audit yapılır.
 - Yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı.
