@@ -317,7 +317,7 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   const repAmp = Math.min(inj.repetitionCap, 1 + Math.max(0, repeatedNegativeCount - 1) * inj.repetitionAmplify);
   const severityScale = inj.severityFloor + inj.severityWeight * (kind === "negative" ? Math.max(sevLoad, signal.severity.disrespect) : 0);
   const goodHistoryAbsorb = 1 - inj.goodHistoryAbsorb * relationshipQuality01;
-  const injuryScale = repAmp * severityScale * damping * goodHistoryAbsorb;
+  const injuryScale = repAmp * severityScale * damping * goodHistoryAbsorb * contextualHarmConfidence;
 
   let conflict = conflictBefore;
   let hurt = hurtBefore;
