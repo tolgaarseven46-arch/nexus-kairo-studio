@@ -21,7 +21,7 @@ function signal(uncertainty: number): RelationshipTurnSignal {
   return {
     valence: "negative",
     targetsKaira: true,
-    severity: { ...ZERO, disrespect: 0.62, aggression: 0.18 },
+    severity: { ...ZERO, disrespect: 0.85, aggression: 0.18 },
     jokingConfidence: 0,
     sincerityConfidence: 0.92,
     apology: false,
