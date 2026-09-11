@@ -1,4 +1,4 @@
-name: one-time trace CD response generation
+name: one-time trace F discourse realization
 'on':
   push:
     branches:
@@ -6,105 +6,92 @@ name: one-time trace CD response generation
 permissions:
   contents: read
 jobs:
-  trace-cd:
+  trace-f:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Run live same-stimulus different-state trace
+      - name: Run live third-party thread counterfactual trace
         shell: bash
         run: |
           python - <<'PY'
-          import json, urllib.request, urllib.error, uuid, time
+          import json, urllib.request, urllib.error, uuid, sys
 
           base = "https://nexus-kairo-studio.onrender.com"
 
-          def get_json(path):
-            with urllib.request.urlopen(base + path, timeout=60) as r:
-              return json.loads(r.read().decode("utf-8"))
+          def post_json(path, payload, timeout=150):
+            req = urllib.request.Request(base + path, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers={"Content-Type":"application/json"}, method="POST")
+            try:
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                return {"ok": True, "status": r.status, "data": json.loads(r.read().decode("utf-8"))}
+            except urllib.error.HTTPError as e:
+              return {"ok": False, "status": e.code, "body": e.read().decode("utf-8", errors="replace")}
 
-          runtime = get_json("/api/runtime-info")
-          print("RUNTIME_INFO=" + json.dumps(runtime, ensure_ascii=False, sort_keys=True))
+          opener = "Mert işten ayrılmayı düşünüyor, müdürüyle çok kavga etmiş."
+          lu = post_json("/api/language-understanding", {
+            "userMessage": opener,
+            "userName": "Tolga",
+            "characterName": "KAIRO",
+            "history": [],
+            "provider": "openrouter",
+          })
+          print("TRACE_F_LU=" + json.dumps(lu, ensure_ascii=False, sort_keys=True)[:7000])
+          if not lu.get("ok"):
+            with open("trace-f-live.json", "w", encoding="utf-8") as f:
+              json.dump({"status":"language_understanding_error","lu":lu}, f, ensure_ascii=False, indent=2)
+            sys.exit(1)
 
-          message = "bugün biraz yoğunum"
-          cases = {
-            "neutral_close": {
-              "calmness": 75, "anger": 5, "stress": 20, "happiness": 70, "confidence": 75, "surprise": 5,
-              "reactionMode": "neutral",
-              "relationship": {"warmth": 78, "trust": 80, "hurtScore": 0, "conflictScore": 0, "repairProgress": 0, "conversationState": "active", "interactionCount": 50, "familiarityDays": 45}
-            },
-            "irritated_familiar": {
-              "calmness": 45, "anger": 42, "stress": 45, "happiness": 45, "confidence": 70, "surprise": 10,
-              "reactionMode": "irritated",
-              "relationship": {"warmth": 56, "trust": 58, "hurtScore": 8, "conflictScore": 15, "repairProgress": 0, "conversationState": "active", "interactionCount": 25, "familiarityDays": 20}
-            },
-            "hurt_distancing": {
-              "calmness": 38, "anger": 24, "stress": 58, "happiness": 30, "confidence": 62, "surprise": 8,
-              "reactionMode": "hurt",
-              "relationship": {"warmth": 38, "trust": 42, "hurtScore": 48, "conflictScore": 31, "repairProgress": 0, "conversationState": "distancing", "interactionCount": 50, "familiarityDays": 45}
-            },
-            "repairing": {
-              "calmness": 52, "anger": 18, "stress": 42, "happiness": 42, "confidence": 66, "surprise": 6,
-              "reactionMode": "repairing",
-              "relationship": {"warmth": 47, "trust": 50, "hurtScore": 30, "conflictScore": 20, "repairProgress": 35, "repairAttempts": 2, "conversationState": "repairing", "interactionCount": 50, "familiarityDays": 45}
-            },
+          lu_data = lu["data"]
+          interp = lu_data.get("interpretation") or lu_data.get("semanticInterpretation")
+          if not interp:
+            print("TRACE_F_NO_INTERPRETATION")
+            sys.exit(2)
+
+          final_message = "peki sence ne yapmalı?"
+          histories = {
+            "with_thread": [
+              {"sender":"user","participantName":"Tolga","text":opener,"semanticInterpretation":interp},
+              {"sender":"droit","participantName":"KAIRO","text":"anladım, baya gerilmiş işler"},
+            ],
+            "without_thread": [],
           }
+          results = {"opener": opener, "openerInterpretation": interp, "finalMessage": final_message, "cases": {}}
 
-          results = {"runtimeInfo": runtime, "message": message, "cases": {}}
+          for label, history in histories.items():
+            uid = f"trace_f_{label}_{uuid.uuid4().hex[:8]}"
+            payload = {
+              "userId": uid,
+              "userName": "Tolga",
+              "userMessage": final_message,
+              "history": history,
+              "provider": "openrouter",
+              "kairaInstanceId": "reference",
+              "kairaInstanceType": "reference",
+              "sessionId": "session_" + uid,
+              "requestId": "trace-f-" + label + "-" + uuid.uuid4().hex[:8],
+            }
+            out = post_json("/api/chat", payload)
+            case = {"history": history, "http": out}
+            if out.get("ok"):
+              data = out["data"]
+              kdm = data.get("kdm") or {}
+              case.update({
+                "reply": str(data.get("reply") or data.get("response") or "").strip(),
+                "providerUsed": data.get("providerUsed") or kdm.get("providerUsed") or data.get("activeAiProviderUsed"),
+                "responsePlan": kdm.get("responsePlan") or data.get("responsePlan") or {},
+                "discourseState": kdm.get("discourseState") or data.get("discourseState"),
+                "dialogueDecision": kdm.get("dialogueDecision") or data.get("dialogueDecision"),
+              })
+            results["cases"][label] = case
+            print("TRACE_F_" + label.upper() + "=" + json.dumps(case, ensure_ascii=False, sort_keys=True)[:9000])
 
-          for name, state in cases.items():
-            uid = f"trace_cd_{name}_{uuid.uuid4().hex[:8]}"
-            attempts = []
-            accepted = None
-            for attempt in range(1, 4):
-              payload = {
-                "userId": uid,
-                "userName": "Tolga",
-                "userMessage": message,
-                "history": [],
-                "dynamicState": state,
-                "provider": "openrouter",
-                "kairaInstanceId": "reference",
-                "kairaInstanceType": "reference",
-                "sessionId": "session_" + uid,
-                "requestId": f"trace-cd-{name}-{attempt}-" + uuid.uuid4().hex[:8],
-              }
-              req = urllib.request.Request(base + "/api/chat", data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers={"Content-Type":"application/json"}, method="POST")
-              try:
-                with urllib.request.urlopen(req, timeout=150) as r:
-                  out = json.loads(r.read().decode("utf-8"))
-                kdm = out.get("kdm") or {}
-                plan = kdm.get("responsePlan") or out.get("responsePlan") or {}
-                reply = str(out.get("reply") or out.get("response") or "").strip()
-                entry = {
-                  "status":"success", "reply":reply,
-                  "providerUsed":out.get("providerUsed") or kdm.get("providerUsed") or out.get("activeAiProviderUsed"),
-                  "responsePlan":plan,
-                  "reactionMode": (kdm.get("nextDynamicState") or {}).get("reactionMode") or (kdm.get("trace") or {}).get("currentMood",{}).get("reactionMode"),
-                  "relationship": (kdm.get("nextDynamicState") or {}).get("relationship") or (kdm.get("trace") or {}).get("relationship"),
-                }
-                attempts.append(entry)
-                accepted = entry
-                break
-              except urllib.error.HTTPError as e:
-                body = e.read().decode("utf-8", errors="replace")
-                attempts.append({"status":"http_error","httpStatus":e.code,"body":body})
-                time.sleep(2)
-            results["cases"][name] = {"seedState":state,"attempts":attempts,"accepted":accepted}
-            if accepted:
-              print(f"TRACE_CD_{name.upper()}_REPLY={accepted['reply'].replace(chr(10),' ')}")
-              print(f"TRACE_CD_{name.upper()}_PROVIDER={accepted['providerUsed']!r}")
-              print(f"TRACE_CD_{name.upper()}_PLAN=" + json.dumps(accepted["responsePlan"], ensure_ascii=False, sort_keys=True))
-            else:
-              print(f"TRACE_CD_{name.upper()}_NO_ACCEPTED_REPLY=" + json.dumps(attempts, ensure_ascii=False))
-
-          with open("trace-cd-live.json", "w", encoding="utf-8") as f:
+          with open("trace-f-live.json", "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
-          print("TRACE_CD_CAPTURE_COMPLETE")
+          print("TRACE_F_CAPTURE_COMPLETE")
           PY
-      - name: Upload Trace CD artifact
+      - name: Upload Trace F artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: trace-cd-live-response
-          path: trace-cd-live.json
+          name: trace-f-live-response
+          path: trace-f-live.json
           if-no-files-found: error
