@@ -1,0 +1,54 @@
+name: One-time ambiguous thread decision patch
+
+on:
+  push:
+    branches:
+      - 'codex/counterfactual-causal-replay-v2'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: codex/counterfactual-causal-replay-v2
+          fetch-depth: 0
+
+      - name: Patch DialogueDecision ambiguity seam
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/services/kairoDialogueDecisionEngine.ts')
+          text = path.read_text()
+          needle = '  if (event.discourseAct === "recall_request") {'
+          if needle not in text:
+              raise SystemExit('target seam not found')
+          insert = '''  if (discourse?.ambiguousThreadResumption) {
+            return {
+              move: "answer_or_clarify",
+              allowFollowUpQuestion: true,
+              allowSpeculation: false,
+              maxSentences: 1,
+              maxWords: 18,
+              hasSupportedTargetClaim: false,
+              reason:
+                "Birden fazla açık konuşma thread'i bu isteğin hedefi olabilir. Yanlış bağlam uydurma; içerik cevabı vermeden önce hangisini kastettiğini tek kısa soruyla netleştir.",
+            };
+          }
+
+'''
+          text = text.replace(needle, insert + needle, 1)
+          path.write_text(text)
+          PY
+
+      - name: Remove one-time workflow and commit
+        run: |
+          rm .github/workflows/one-time-ambiguous-thread-decision-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/kairoDialogueDecisionEngine.ts .github/workflows/one-time-ambiguous-thread-decision-patch.yml
+          git commit -m "fix(dialogue): clarify ambiguous thread resumption"
+          git push origin HEAD:codex/counterfactual-causal-replay-v2
