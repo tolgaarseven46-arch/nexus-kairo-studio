@@ -64,9 +64,17 @@
 - İlk RED'ler production failure değildi; aynı fixture'da birden fazla affect alanını değiştiren test tasarımı ve canonical olmayan mutlak eşik kaynaklıydı. Tek-değişken A/B ile gerçek invariant izole edildi.
 - Production behavior değişmedi; provider/API çağrısı yok.
 
-## 12. Güncel checkpoint
+## 12. Live Acceptance Transport — ACTIVE FIX
+- İlk gerçek provider oturumunda browser `/api/chat` isteğinin 35 saniyede client-side `AbortController` ile kesildiği ölçüldü.
+- Bu sınır provider'ın kendi timeout'u değildi; geç provider cevabını client tarafında kaybetme ve kullanıcı resend'i üzerinden ikinci ücretli çağrı riski yaratıyordu.
+- Client deadline 35s → 75s taşındı ve tek transport policy sabitine alındı.
+- Ambiguous timeout mesajı kullanıcıyı aynı mesajı hemen tekrar göndermemesi konusunda uyarıyor.
+- Bu fix için provider çağrısı yapılmadı; deterministic transport-policy regression testi eklendi.
+
+## 13. Güncel checkpoint
 - Core Emotion-State Validation Phase 5A + 5B + 5C CLOSED.
 - Deterministic emotion coverage: 27 ana matrix cell + 6 cross-axis combination + boundedness/isolation proof.
-- Bir sonraki sınıf maliyet-kontrollü `Live Acceptance Session v1`: kullanıcı Kaira ile tek doğal 20–30 mesajlık gerçek provider sohbeti yapacak; ardından transcript + KNT/debug üzerinden core → final prompt → provider realization → verification/final-delivery gate → persistence zinciri audit edilecek.
-- Live acceptance keşif/probe turu değildir: aynı mesajı tekrar tekrar koşturma yok, tek session, minimum retry.
+- Live Acceptance Session v1 ilk turunda ölçülen premature 35s client abort için PR #228 doğrulanıyor.
+- Live acceptance yeniden başlamadan önce PR #228 full CI/Architecture Review GREEN ve merge olmalı.
+- Server tarafındaki provider retry/fallback maliyet davranışı ayrı cost-safety incelemesinde takip edilmeli; canlı keşif çağrısı yapılmamalı.
 - Yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı.
