@@ -133,20 +133,29 @@ Bu characterization mevcut canonical behavior'ı regression proof ile kilitler; 
 - Geçici diagnostic workflow/output tamamen temizlendi.
 - ADR: `docs/adr/0093-request-idless-chat-coordination-identity.md`.
 
-## 16. Sıradaki kapılar
-- Gerçek `main`, açık PR/issue ve runtime evidence'i yeniden ölç.
-- Yeni işi yalnız ölçülmüş failure class / açık contract gap / doğrulanmış regression üzerinden seç.
-- Ölçülmüş açık yoksa yeni mimari patch üretme; temiz checkpoint'i koru.
+## 16. Multi-turn counterfactual replay proof — PR #209 / IN PROGRESS
+- Branch: `codex/counterfactual-replay-proof` from clean main `1f7e64cca951833dd0e88cd4ec54b67060da98be`.
+- Test-only proof; production behavior ve semantic authority değişmedi.
+- Üç bağımsız history intervention kanıtı eklendi: lived self-fact revision, pending-question discourse dependency ve third-party open-thread resumption.
+- Her proof aynı final input/state transition noktasını koruyup yalnız önceki history evidence'ını değiştirerek downstream canonical state'in farklılaştığını doğrular.
+- Fast CI #205: PASS.
+- PR #209 ilk FULL CI #2687: `behavior-guard` PASS; `docs-guard` yalnız bu checkpoint dosyası eksik olduğu için RED oldu. Bu commit docs-guard gereğini kapatır; validate job ayrıca devam etmektedir.
+- Phase-0 A/B/D/E observability körlüğü current main için stale: typed projector'lar + scenario-complete readiness mevcut; bu yüzden yeni observability patch üretilmedi.
+- Fresh concurrency audit ayrı residual risk adayı gösterdi: Firestore lease expiry caller wall-clock `now` ile kıyaslanıyor ve failed heartbeat renewal aktif holder'a ownership loss olarak propagate edilmiyor. Bu PR o konuyu karıştırmıyor; ayrı measured failure proof gerektiriyor.
 
-## 17. Latest checkpoint
-- Date: 2026-09-10
-- Clean main: `9809e25e3497c384e0a5132c927429311000fdd1`.
-- PR #207: MERGED / CLOSED.
-- Post-merge main FULL CI #2684: PASS.
-- Active implementation branch: NONE.
-- Active measured failure class: NONE pending fresh audit.
-- External retry contract preserved: YES.
-- RequestId-less state-owner serialization: YES.
+## 17. Sıradaki kapılar
+- PR #209 CI zincirini tamamen yeşile getir ve merge sonrası main'i yeniden doğrula.
+- Ardından lease clock-skew / lost-lease safety adayını önce deterministic RED proof ile ölç; kanıtlanmadan production patch üretme.
+- Yeni işi yalnız ölçülmüş failure class / açık contract gap / doğrulanmış regression üzerinden seç.
+
+## 18. Latest checkpoint
+- Date: 2026-09-11
+- Clean main before active branch: `1f7e64cca951833dd0e88cd4ec54b67060da98be`.
+- Active PR: #209 — counterfactual replay proof.
+- Active branch: `codex/counterfactual-replay-proof`.
+- Fast CI #205: PASS.
+- Full CI #2687: rerun/update pending after docs checkpoint commit.
+- Production behavior changed by PR #209: NO.
 - External AI API in deterministic tests: NO.
 - New downstream semantic authority: NO.
-- Semantic LLM removal: NO.
+- Next candidate failure class: distributed lease clock-skew / ownership-loss safety — NOT YET MEASURED.
