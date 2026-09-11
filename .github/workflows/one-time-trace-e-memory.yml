@@ -43,7 +43,7 @@ jobs:
           setup_payload = {
             "userId": memory_user,
             "userName": "Tolga",
-            "userMessage": "kahveyi seviyorum",
+            "userMessage": "bu arada kahveyi baya seviyorum",
             "history": [],
             "provider": "openrouter",
             "kairaInstanceId": "reference",
