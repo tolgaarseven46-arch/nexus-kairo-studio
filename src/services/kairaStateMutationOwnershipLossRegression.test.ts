@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe('Kaira state mutation lease ownership-loss regression', () => {
-  it('does not hand the same state owner to a second caller while the first caller still has an unreleased lease handle', async () => {
+  it('makes authoritative renewal loss observable to the active holder without blocking crash recovery', async () => {
     vi.useFakeTimers();
 
     let backendOwner: string | null = null;
@@ -29,8 +29,7 @@ describe('Kaira state mutation lease ownership-loss regression', () => {
         if (ownerToken !== backendOwner) return false;
         if (ownerToken === firstOwnerToken && firstRenewal) {
           firstRenewal = false;
-          // Simulate authoritative lock loss between heartbeats: deletion,
-          // administrative recovery, or another backend-side ownership change.
+          // Simulate authoritative ownership loss between heartbeats.
           backendOwner = null;
           return false;
         }
@@ -49,24 +48,21 @@ describe('Kaira state mutation lease ownership-loss regression', () => {
 
     const first = await coordinator.acquire('kaira_default:user_a');
 
-    // The first heartbeat loses authoritative ownership. The caller has not
-    // released its lease handle and receives no ownership-loss signal.
+    // Heartbeat reaches an authoritative `false`: this process no longer owns
+    // the distributed state mutation lease.
     await vi.advanceTimersByTimeAsync(5_000);
 
-    let secondResolved = false;
-    const secondPromise = coordinator.acquire('kaira_default:user_a').then((lease) => {
-      secondResolved = true;
-      return lease;
-    });
-    await vi.advanceTimersByTimeAsync(25);
+    // Crash recovery must remain possible; another caller can become owner.
+    const second = await coordinator.acquire('kaira_default:user_a');
+    expect(second.ownerToken).not.toBe(first.ownerToken);
 
-    // Safety invariant: while caller A still holds an unreleased lease handle,
-    // caller B must not be allowed to enter the same state-owner critical section.
-    expect(secondResolved).toBe(false);
+    // The stale holder must have an explicit fail-closed ownership check before
+    // it is allowed to perform persistence. Current production exposes only
+    // `ownerToken` + `release`, so this assertion is the intended RED contract.
+    expect(typeof (first as any).assertOwned).toBe('function');
+    await expect((first as any).assertOwned()).rejects.toThrow(/ownership|lease/i);
 
     await first.release();
-    await vi.advanceTimersByTimeAsync(25);
-    const second = await secondPromise;
     await second.release();
   });
 });
