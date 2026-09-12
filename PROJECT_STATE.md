@@ -71,10 +71,19 @@
 - Ambiguous timeout mesajı kullanıcıyı aynı mesajı hemen tekrar göndermemesi konusunda uyarıyor.
 - Bu fix için provider çağrısı yapılmadı; deterministic transport-policy regression testi eklendi.
 
-## 13. Güncel checkpoint
+## 13. Canonical behavior-situation authority — ACTIVE PR #230
+- Production audit'te personality, motivation, values, preferences, social orientation ve expression-style motorlarının canonical `SemanticInterpretation@2` üretildikten sonra `userMessage` üzerinden kendi regex semantiklerini tekrar çıkardığı doğrulandı.
+- PR #230 bu ikinci semantic authority'yi kaldırıyor: tek `projectCanonicalBehaviorSituations()` projection'ı canonical interpretation'dan typed situation üretip altı behavior motoruna dağıtıyor.
+- Dyadic hostility/coercion yalnız canonical `target === "kaira"` olduğunda personality/social/expression baskısına dönüşüyor; third-party hostility Kaira-user çatışmasına sızmıyor.
+- Canonical schema'da henüz açıkça temsil edilmeyen alanlar downstream lexical tahminle yeniden oluşturulmuyor; neutral/fail-closed kalıyor. Başlıca açık kümeler: normative event facets (`deception`, `unfairness`, `betrayal`, `harm`, `irresponsibility`), interaction affordances (`novelty`, `competition`) ve environmental/goal affordances'ın bazıları (`instability`, daha zengin achievement/influence bağlamı).
+- `boundaryEngine` ve `behaviorIntegrationEngine` production'da canonical `SemanticEvent` tüketiyor; raw-text fallback'leri compatibility cleanup adayı olarak ayrı takip edilecek.
+- Regression contract downstream behavior motorlarında raw-text reparse'i yasaklıyor ve third-party target isolation'ı kilitliyor.
+
+## 14. Güncel checkpoint
 - Core Emotion-State Validation Phase 5A + 5B + 5C CLOSED.
 - Deterministic emotion coverage: 27 ana matrix cell + 6 cross-axis combination + boundedness/isolation proof.
-- Live Acceptance Session v1 ilk turunda ölçülen premature 35s client abort için PR #228 doğrulanıyor.
-- Live acceptance yeniden başlamadan önce PR #228 full CI/Architecture Review GREEN ve merge olmalı.
+- Live Acceptance transport fix hattı ayrı olarak korunuyor.
+- PR #230 canonical behavior-situation authority düzeltmesini doğruluyor; full CI + Architecture Review GREEN olmadan merge edilmeyecek.
+- PR #230 sonrası kalan mimari iş: gerçekten gerekli olduğu testlerle kanıtlanırsa eksik behavior-situation kavramlarını canonical language schema/evidence katmanında açıkça modellemek; downstream regex geri getirilmemeli.
 - Server tarafındaki provider retry/fallback maliyet davranışı ayrı cost-safety incelemesinde takip edilmeli; canlı keşif çağrısı yapılmamalı.
 - Yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı.
