@@ -31,8 +31,8 @@ export function resolveKairaFinalDelivery(
   const hasCandidate = candidate.length > 0;
   const accepted = consistency.accepted === true && hasCandidate;
   const issues = [...consistency.issues];
-  if (!hasCandidate && !issues.includes("empty_final_delivery_candidate")) {
-    issues.push("empty_final_delivery_candidate");
+  if (!hasCandidate && !issues.includes("final_delivery_empty_reply")) {
+    issues.push("final_delivery_empty_reply");
   }
 
   return {
