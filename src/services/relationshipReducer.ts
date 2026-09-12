@@ -18,6 +18,8 @@
  *   - injury asymmetry is DERIVED from severity / repetition / history / repair
  *     quality — no fixed "N turns" constant.
  *   - maturity damping has NO conflict/hurt term (that was the amplifier bug).
+ *   - high-confidence severe coercion/privacy is bounded after maturity/history
+ *     attenuation and nudges conversation state to at least distancing.
  *   - withdrawn/hurt affect deltas are CAPS scaled by this-turn signal, not
  *     floors: a neutral turn while withdrawn produces ~0 extra stress.
  *   - K2: conversationState is ONE input to the axes. Outside a hard-stop reason
@@ -30,6 +32,7 @@ import {
   DEFAULT_RELATIONSHIP_REDUCER_CONFIG,
   type RelationshipReducerConfig,
 } from "./relationshipReducerConfig";
+import { RELATIONSHIP_SEVERE_EVENT_POLICY } from "./relationshipSevereEventPolicy";
 import { severityLoad, type SeverityVector } from "../types/semanticInterpretation";
 
 export interface RelationshipScores {
@@ -290,6 +293,17 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
   const kind: "positive" | "negative" | "neutral" =
     rawNegative && !targetsKaira ? "neutral" : rawNegative ? "negative" : signal.valence === "positive" ? "positive" : "neutral";
 
+  const severePolicy = RELATIONSHIP_SEVERE_EVENT_POLICY;
+  const severeProtected =
+    kind === "negative" &&
+    targetsKaira &&
+    (signal.severity.coercion >= severePolicy.coercionMinSeverity ||
+      signal.severity.privacy >= severePolicy.privacyMinSeverity) &&
+    signal.sincerityConfidence >= severePolicy.minSincerityConfidence &&
+    signal.uncertainty <= severePolicy.maxUncertainty &&
+    signal.jokingConfidence <= severePolicy.maxJokingConfidence;
+  rationale.push(`severe-event:${severeProtected ? "qualified" : "none"}`);
+
   const samePattern = Boolean(signal.negativePattern && signal.negativePattern === prev.lastNegativePattern);
   const repeatedNegativeCount = kind === "negative" ? (samePattern ? priorRepeated + 1 : 1) : priorRepeated;
 
@@ -344,6 +358,12 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
     trust = clamp100(trust - 4 * injuryScale);
     lastConflictAt = timing.nowIso;
     lastNegativePattern = signal.negativePattern ?? lastNegativePattern;
+
+    if (severeProtected) {
+      conflict = clamp100(Math.max(conflict, conflictBefore + severePolicy.minConflictDelta));
+      hurt = clamp100(Math.max(hurt, hurtBefore + severePolicy.minHurtDelta));
+      rationale.push("severe-event:injury-floor");
+    }
   } else {
     conflict = clamp100(conflict - recoveredConflictDrop);
     hurt = clamp100(hurt - recoveredHurtDrop);
@@ -416,7 +436,11 @@ export function reduceRelationshipTurn(input: RelationshipReducerInput): Relatio
       conversationState = reactivate ? "active" : "repairing";
     }
   } else if (kind === "negative" && targetsKaira) {
-    conversationState = conflict >= cs.distancingConflict || hurt >= cs.distancingHurt ? "distancing" : conversationState;
+    conversationState =
+      severeProtected || conflict >= cs.distancingConflict || hurt >= cs.distancingHurt
+        ? "distancing"
+        : conversationState;
+    if (severeProtected) rationale.push("severe-event:distancing-floor");
   } else if (prev.conversationState === "distancing" && conflict < cs.activeFromDistancingConflict && hurt < cs.activeFromDistancingHurt) {
     conversationState = "active";
   }
