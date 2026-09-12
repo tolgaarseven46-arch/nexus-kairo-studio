@@ -64,12 +64,13 @@
 - İlk RED'ler production failure değildi; aynı fixture'da birden fazla affect alanını değiştiren test tasarımı ve canonical olmayan mutlak eşik kaynaklıydı. Tek-değişken A/B ile gerçek invariant izole edildi.
 - Production behavior değişmedi; provider/API çağrısı yok.
 
-## 12. Live Acceptance Transport — ACTIVE FIX
+## 12. Live Acceptance Transport — CLOSED
+- PR #228 merge commit `a2c688ce7e1cdb2c4f96bf07cbfeb8d2c02673d7` ile `main`e alındı.
 - İlk gerçek provider oturumunda browser `/api/chat` isteğinin 35 saniyede client-side `AbortController` ile kesildiği ölçüldü.
-- Bu sınır provider'ın kendi timeout'u değildi; geç provider cevabını client tarafında kaybetme ve kullanıcı resend'i üzerinden ikinci ücretli çağrı riski yaratıyordu.
 - Client deadline 35s → 75s taşındı ve tek transport policy sabitine alındı.
-- Ambiguous timeout mesajı kullanıcıyı aynı mesajı hemen tekrar göndermemesi konusunda uyarıyor.
-- Bu fix için provider çağrısı yapılmadı; deterministic transport-policy regression testi eklendi.
+- Ambiguous timeout mesajı aynı mesajın hemen yeniden gönderilmemesi konusunda uyarıyor.
+- Deterministic transport-policy regression testi eklendi; provider çağrısı yapılmadı.
+- PR head `1ae0e2cd5ce7930aa6ae57145258cbf99fe73eb6` üzerinde CI ve Architecture Review GREEN.
 
 ## 13. Canonical behavior-situation authority — CLOSED
 - PR #230 merge commit `4aaf8e6ab597fd28218f27159bc2c1950e62de6f` ile `main`e alındı.
@@ -88,12 +89,18 @@
 - RED/GREEN regression proof: `kairaProviderAttemptBudgetRegression.test.ts`.
 - PR head `06d5086f8bca8121bca73276fe071a057e79df36` üzerinde full CI ve Architecture Review GREEN.
 
-## 15. Güncel checkpoint
+## 15. State-to-response realization audit — ACTIVE
+- Response plan; question/advice/social-move/content-engagement/humor/affection/counter-flirt/forgiveness/reopening ve sentence/word/emoji budget ihlallerini deterministic olarak denetliyor.
+- Final-delivery gate'in belgelenmiş invariant'ına karşı yeni RED bulundu: upstream `accepted=true` verse bile boş candidate mevcut implementationda boş assistant mesajı persist edebiliyor.
+- RED proof branch: `codex/close-live-transport-realization-gate`, PR #233, Fast CI failure beklenen şekilde doğrulandı.
+- Hedef fix: final-delivery gate boş candidate'i kendi ownership sınırında fail-closed reddetmeli ve fallback persist etmeli; provider çağrısı gerekmiyor.
+
+## 16. Güncel checkpoint
 - Core Emotion-State Validation Phase 5A + 5B + 5C CLOSED.
 - Deterministic emotion coverage: 27 ana matrix cell + 6 cross-axis combination + boundedness/isolation proof.
-- Live Acceptance transport fix hattı ayrı olarak korunuyor.
+- Live Acceptance Transport CLOSED; PR #228 main üzerinde.
 - PR #230 CLOSED; canonical behavior-situation authority `main` üzerinde doğrulandı.
 - PR #231 CLOSED; provider outbound-attempt budget `main` üzerinde generation başına primary + tek recovery ile sınırlandı.
-- PR #230 sonrası kalan mimari iş: gerçekten gerekli olduğu testlerle kanıtlanırsa eksik behavior-situation kavramlarını canonical language schema/evidence katmanında açıkça modellemek; downstream regex geri getirilmemeli.
+- Aktif tek ölçülmüş realization RED: PR #233 final-delivery empty-candidate fail-closed invariantı.
+- PR #230 sonrası eksik behavior-situation kavramları yalnız yeni testlerle gerçekten gerekli olduğu kanıtlanırsa canonical language schema/evidence katmanında modellenmeli; downstream regex geri getirilmemeli.
 - Provider tarafında yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı; canlı keşif çağrısı yapılmamalı.
-- Yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı.
