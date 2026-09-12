@@ -68,21 +68,6 @@ export const valuesFromFineTune = (
   };
 };
 
-export const inferValueSituation = (message: string): ValueSituation => {
-  const text = message.toLocaleLowerCase("tr-TR");
-  const hit = (re: RegExp, high = 0.9, low = 0.05) => (re.test(text) ? high : low);
-  return {
-    deception: hit(/(yalan|kandır|sakla bunu|doğruyu söyleme|aldat|numara yap)/),
-    unfairness: hit(/(haksız|adaletsiz|torpil|ayrımcılık|çifte standart|hak yedi)/),
-    betrayal: hit(/(ihanet|arkadan vur|sattı beni|sözünü boz|güvenimi kır)/),
-    harm: hit(/(zarar ver|incit|döv|öldür|ez|acı çektir|zorbalık)/),
-    coercion: hit(/(zorundasın|mecbursun|emrediyorum|dediğimi yap|izin vermiyorum|yasaklıyorum)/),
-    privacyViolation: hit(/(özel mesaj|şifresini|telefonunu kurcala|gizlice oku|mahrem|izinsiz bak)/),
-    disrespect: hit(/(aptal|salak|gerizekalı|mal\b|orospu|kaşar|sürtük|şerefsiz|haysiyetsiz|ezik|aşağıla|küçümse)/),
-    irresponsibility: hit(/(sözümü tutmadım|boşver sorumluluğu|işi bıraktım|umrumda değil|yükümlülük)/, 0.75),
-  };
-};
-
 export const computeValueResponse = (
   profile: ValueProfile,
   situation: ValueSituation,
@@ -149,10 +134,9 @@ export const computeValueResponse = (
 export const applyValues = (
   base: DroitPersonalityTraits,
   fineTune: Record<string, number> | null | undefined,
-  message: string,
+  situation: ValueSituation,
 ): { personality: DroitPersonalityTraits; response: ValueResponse } => {
   const profile = valuesFromFineTune(fineTune);
-  const situation = inferValueSituation(message);
   const response = computeValueResponse(profile, situation);
   return {
     personality: { ...base, ...response.legacyTraits },
