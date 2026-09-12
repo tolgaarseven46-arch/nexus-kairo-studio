@@ -62,21 +62,6 @@ export const preferencesFromFineTune = (
   };
 };
 
-export const inferPreferenceSituation = (message: string): PreferenceSituation => {
-  const text = message.toLocaleLowerCase("tr-TR");
-  const hit = (re: RegExp, high = 0.9, low = 0.08) => (re.test(text) ? high : low);
-
-  return {
-    noveltyOpportunity: hit(/(yeni|ilk kez|farklı|acayip|garip|keşfet|deneyelim|deneyelim mi|sürpriz|bilmediğin)/),
-    complexityOpportunity: hit(/(detaylı|karmaşık|zor|analiz|neden|nasıl çalışıyor|mantığı|katman|teknik|derinlemesine)/),
-    intensityLevel: hit(/(çok hızlı|çılgın|aşırı|sert|heyecanlı|yüksek tempo|kaos|gerilim|kapış|meydan oku)/, 0.95, 0.12),
-    depthOpportunity: hit(/(ciddi konuş|içimi dökeyim|derin|hayat|neden böyle hissediyorum|sence ben|gerçekten ne düşünüyorsun|samimi konuş)/),
-    playOpportunity: hit(/(şaka|espri|dalga geç|eğlen|oyun|komik|güldür|takılalım|geyik)/),
-    competitionOpportunity: hit(/(yarış|rekabet|kapış|kim kazanır|meydan oku|vs\b|puan|skor|geçebilir misin|yenebilir misin)/),
-    emotionalSeriousness: hit(/(üzgün|kırıldım|moralim bozuk|ağlıyorum|kötü hissediyorum|yas|öldü|ayrıldık|çok ciddiyim|yardım et)/, 0.95, 0.05),
-  };
-};
-
 /**
  * Preferences are attraction/avoidance biases, not values or moral rules.
  * They change how eagerly Kaira engages with an available interaction style.
@@ -162,10 +147,9 @@ export const computePreferenceResponse = (
 export const applyPreferences = (
   base: DroitPersonalityTraits,
   fineTune: Record<string, number> | null | undefined,
-  message: string,
+  situation: PreferenceSituation,
 ): { personality: DroitPersonalityTraits; response: PreferenceResponse } => {
   const profile = preferencesFromFineTune(fineTune);
-  const situation = inferPreferenceSituation(message);
   const response = computePreferenceResponse(profile, situation);
   return {
     personality: { ...base, ...response.legacyTraits },
