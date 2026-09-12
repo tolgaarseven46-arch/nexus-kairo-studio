@@ -39,6 +39,26 @@ export type SemanticSocialAct =
 export type SemanticTarget = "kaira" | "third_party" | "self" | "event" | "unknown";
 export type SemanticValence = "positive" | "negative" | "neutral";
 export type InterpretationEvidenceSource = "llm" | "regex" | "reconciled";
+export type SemanticIntentionality = "intentional" | "unintentional" | "unknown";
+export type SemanticCommitmentViolation = "present" | "absent" | "unknown";
+export type SemanticDeception = "present" | "absent" | "unknown";
+
+/**
+ * Canonical current-turn attribution evidence. This describes only what the
+ * current utterance explicitly supports; it does not decide betrayal/unfairness.
+ * Appraisal may combine it with prior typed world-memory evidence later.
+ */
+export interface SemanticAttribution {
+  actorId?: string;
+  /** Canonical scope/proposition key used to compare this turn with prior world events. */
+  scopeKey?: string;
+  intentionality: SemanticIntentionality;
+  commitmentViolation: SemanticCommitmentViolation;
+  deception: SemanticDeception;
+  confidence: number;
+  /** Provider/reconciliation evidence labels; never raw-history reparsing. */
+  provenance: string[];
+}
 
 export type SemanticSocialRoutine =
   | "none"
@@ -193,6 +213,7 @@ export type SemanticGroundingField =
   | "knowledgeQuery"
   | "selfMemoryQuery"
   | "worldMemory"
+  | "attribution"
   | "relationalAct"
   | "stopQuestions"
   | "stopTalking";
@@ -241,6 +262,8 @@ export interface SemanticInterpretation {
   discourseFacets: SemanticDiscourseFacets;
   /** Structured world-memory semantics; optional for legacy/fallback producers. */
   worldMemory?: SemanticWorldMemorySemantics;
+  /** Typed current-turn attribution; optional for legacy producers/snapshots. */
+  attribution?: SemanticAttribution;
   uncertainty: InterpretationUncertainty;
   evidence: InterpretationEvidence[];
   grounding?: SemanticGroundingTrace;
