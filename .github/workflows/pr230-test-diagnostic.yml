@@ -1,0 +1,36 @@
+name: PR230 Test Diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: Run test shard ${{ matrix.shard }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t TESTS < <(find src -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) | sort)
+          SELECTED=()
+          for i in "${!TESTS[@]}"; do
+            if (( i % 8 == ${{ matrix.shard }} )); then
+              SELECTED+=("${TESTS[$i]}")
+            fi
+          done
+          echo "Shard ${{ matrix.shard }}: ${#SELECTED[@]} tests"
+          printf '%s\n' "${SELECTED[@]}"
+          npx vitest run "${SELECTED[@]}"
