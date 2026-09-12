@@ -9,10 +9,11 @@ function observation(input: {
   id: string;
   modality: "commitment" | "none";
   lifecycle: "unspecified" | "cancelled";
+  createdAt?: string;
 }): WorldEventObservation {
   return {
     id: input.id,
-    createdAt: CREATED_AT,
+    createdAt: input.createdAt ?? CREATED_AT,
     event: {
       raw: input.id,
       proposition: {
@@ -30,7 +31,7 @@ function observation(input: {
 }
 
 describe("world-event lifecycle equal-timestamp order stability", () => {
-  it("derives the same lifecycle truth from the same evidence multiset regardless of storage order", () => {
+  it("fails closed identically for the same simultaneous evidence regardless of storage order", () => {
     const commitment = observation({
       id: "commitment-generation",
       modality: "commitment",
@@ -45,10 +46,55 @@ describe("world-event lifecycle equal-timestamp order stability", () => {
     const commitmentFirst = resolvePlanLifecycle([commitment, cancellation], SCOPE);
     const cancellationFirst = resolvePlanLifecycle([cancellation, commitment], SCOPE);
 
-    expect(commitmentFirst.state).toBe(cancellationFirst.state);
-    expect(commitmentFirst.generationObservationId).toBe(cancellationFirst.generationObservationId);
+    expect(commitmentFirst.state).toBe("unknown");
+    expect(cancellationFirst.state).toBe("unknown");
+    expect(commitmentFirst.generationObservationId).toBe("commitment-generation");
+    expect(cancellationFirst.generationObservationId).toBe("commitment-generation");
     expect(new Set(commitmentFirst.evidenceObservationIds)).toEqual(
-      new Set(cancellationFirst.evidenceObservationIds),
+      new Set(["commitment-generation", "commitment-cancelled"]),
     );
+    expect(new Set(cancellationFirst.evidenceObservationIds)).toEqual(
+      new Set(["commitment-generation", "commitment-cancelled"]),
+    );
+  });
+
+  it("still applies a lifecycle outcome that is strictly newer than the plan generation", () => {
+    const commitment = observation({
+      id: "older-plan",
+      modality: "commitment",
+      lifecycle: "unspecified",
+      createdAt: "2026-09-13T00:00:00.000Z",
+    });
+    const cancellation = observation({
+      id: "newer-cancellation",
+      modality: "none",
+      lifecycle: "cancelled",
+      createdAt: "2026-09-13T00:01:00.000Z",
+    });
+
+    const resolution = resolvePlanLifecycle([commitment, cancellation], SCOPE);
+
+    expect(resolution.state).toBe("cancelled");
+    expect(resolution.generationObservationId).toBe("older-plan");
+  });
+
+  it("keeps an older lifecycle outcome outside a strictly newer plan generation", () => {
+    const cancellation = observation({
+      id: "older-cancellation",
+      modality: "none",
+      lifecycle: "cancelled",
+      createdAt: "2026-09-13T00:00:00.000Z",
+    });
+    const commitment = observation({
+      id: "newer-plan",
+      modality: "commitment",
+      lifecycle: "unspecified",
+      createdAt: "2026-09-13T00:01:00.000Z",
+    });
+
+    const resolution = resolvePlanLifecycle([cancellation, commitment], SCOPE);
+
+    expect(resolution.state).toBe("planned");
+    expect(resolution.generationObservationId).toBe("newer-plan");
   });
 });
