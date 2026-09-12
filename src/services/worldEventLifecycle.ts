@@ -89,6 +89,17 @@ function isPlanEvidence(event: LifecycleCanonicalWorldEvent): boolean {
   return ["commitment", "plan", "intention"].includes(event.modality?.kind || "");
 }
 
+function validTimestamp(value?: string): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function hasLifecycleOutcome(event: LifecycleCanonicalWorldEvent): boolean {
+  const kind = event.lifecycle?.kind;
+  return Boolean(kind && kind !== "unspecified");
+}
+
 /**
  * Derives the current lifecycle for the newest immutable plan generation of one
  * canonical proposition. A newer plan/commitment/intention starts a fresh
@@ -117,15 +128,37 @@ export function resolvePlanLifecycle(
     };
   }
 
+  const planTimestamp = validTimestamp(plan.createdAt);
+  if (planTimestamp !== null) {
+    const tiedOutcomes = matching.filter((item) => {
+      if (item === plan || !hasLifecycleOutcome(item.event)) return false;
+      const itemTimestamp = validTimestamp(item.createdAt);
+      return itemTimestamp !== null && itemTimestamp === planTimestamp;
+    });
+
+    if (tiedOutcomes.length) {
+      const evidenceObservationIds = [plan, ...tiedOutcomes]
+        .map((item) => item.id)
+        .filter((id): id is string => Boolean(id))
+        .sort();
+
+      return {
+        propositionKey,
+        state: "unknown",
+        latestObservationId: plan.id,
+        planObservationId: plan.id,
+        generationObservationId: plan.id,
+        evidenceObservationIds,
+      };
+    }
+  }
+
   const planIndex = matching.indexOf(plan);
   // matching is newest -> oldest. Only rows newer than the newest plan belong
   // to the current generation's outcome window; the plan itself is included as
   // the generation anchor.
   const generation = matching.slice(0, planIndex + 1);
-  const latestSignal = generation.find((item) => {
-    const kind = item.event.lifecycle?.kind;
-    return Boolean(kind && kind !== "unspecified");
-  });
+  const latestSignal = generation.find((item) => hasLifecycleOutcome(item.event));
 
   const signalState = latestSignal?.event.lifecycle?.kind;
   const state: PlanLifecycleState = signalState && signalState !== "unspecified"
