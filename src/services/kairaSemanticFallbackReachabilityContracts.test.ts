@@ -15,10 +15,11 @@ describe("semantic fallback production reachability contracts", () => {
 
   it("server production dialogue planning supplies languageUnderstanding.event at every call site", () => {
     const source = read("server.ts");
+    const callSiteCount = source.match(/planDialogueResponse\(/g)?.length ?? 0;
     const calls = [...source.matchAll(/planDialogueResponse\([\s\S]*?\n\s*\);/g)].map((match) => match[0]);
 
-    expect(calls.length).toBeGreaterThan(0);
-    expect(calls).toHaveLength(2);
+    expect(callSiteCount).toBeGreaterThan(0);
+    expect(calls).toHaveLength(callSiteCount);
     for (const call of calls) {
       expect(call).toContain("languageUnderstanding.event");
     }
