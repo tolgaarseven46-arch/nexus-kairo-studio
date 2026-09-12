@@ -84,7 +84,7 @@
 - Yeni invariant: generation başına toplam en fazla `2` outbound provider attempt = primary + tek recovery.
 - Same-provider retry ile cross-provider fallback aynı shared budget'ı tüketir; ikinci recovery/üçüncü ücretli çağrı yoktur.
 - Bu değişiklik yalnız provider orchestration/cost-safety sınırındadır; canonical semantic/KDM authority değişmez.
-- RED contract: `kairaProviderAttemptBudgetContracts.test.ts`.
+- RED/GREEN regression proof: `kairaProviderAttemptBudgetRegression.test.ts`.
 
 ## 15. Güncel checkpoint
 - Core Emotion-State Validation Phase 5A + 5B + 5C CLOSED.
