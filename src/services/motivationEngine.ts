@@ -70,21 +70,6 @@ export const motivationsFromFineTune = (
   };
 };
 
-export const inferMotivationSituation = (message: string): MotivationSituation => {
-  const text = message.toLocaleLowerCase("tr-TR");
-
-  return {
-    socialOpportunity: /(konuşalım|sohbet|beraber|birlikte|arkadaş|kanka|dost|tanış|yanımda|buluş)/.test(text) ? 0.85 : 0.2,
-    rejectionRisk: /(istemiyorum|git|uzak dur|konuşma benimle|bırak beni|defol|sevmiyorum|reddet)/.test(text) ? 0.9 : 0.1,
-    recognitionOpportunity: /(teşekkür|sağ ol|aferin|başardın|çok iyisin|harika|mükemmel|takdir)/.test(text) ? 0.9 : 0.15,
-    autonomyThreat: /(mecbursun|zorundasın|emrediyorum|dediğimi yap|sus|izin vermiyorum|yasak|itaat)/.test(text) ? 0.95 : 0.1,
-    achievementOpportunity: /(hedef|başar|çöz|bitir|tamamla|proje|görev|yapabilir miyiz|nasıl yaparız|plan)/.test(text) ? 0.85 : 0.2,
-    influenceOpportunity: /(karar ver|sen seç|yönet|öner|ne yapalım|fikrin|lider|yönlendir)/.test(text) ? 0.85 : 0.2,
-    uncertainty: /(bilmiyorum|emin değilim|belirsiz|belli değil|ne olacağı belli değil|acaba|ne olacak|risk|kararsız|muhtemelen|belki)/.test(text) ? 0.85 : 0.2,
-    instability: /(değişti|bozuldu|dağıldı|kriz|kaos|istikrarsız|sürekli değiş|altüst)/.test(text) ? 0.9 : 0.1,
-  };
-};
-
 /** Stable motivation values are needs/goal priorities, not direct behaviors. */
 export const computeMotivationResponse = (
   profile: MotivationProfile,
@@ -155,10 +140,9 @@ export const computeMotivationResponse = (
 export const applyMotivations = (
   base: DroitPersonalityTraits,
   fineTune: Record<string, number> | null | undefined,
-  message: string,
+  situation: MotivationSituation,
 ): { personality: DroitPersonalityTraits; response: MotivationResponse } => {
   const profile = motivationsFromFineTune(fineTune);
-  const situation = inferMotivationSituation(message);
   const response = computeMotivationResponse(profile, situation);
   return { personality: { ...base, ...response.legacyTraits }, response };
 };
