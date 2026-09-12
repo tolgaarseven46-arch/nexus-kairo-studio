@@ -25,13 +25,18 @@ function activeMatchingCommitment(
 ): Readonly<SocialAppraisalCommitmentContext> | undefined {
   const attribution = semantic.attribution;
   if (!attribution?.actorId || !attribution.scopeKey) return undefined;
-  return commitments.find((commitment) =>
+
+  const matches = commitments.filter((commitment) =>
     commitment.kind === "commitment" &&
     commitment.state === "active" &&
     commitment.actorId === attribution.actorId &&
     commitment.scopeKey === attribution.scopeKey &&
     commitment.counterpartyId === "kaira",
   );
+
+  return matches.find(
+    (commitment) => commitment.confidence > 0 && commitment.provenance.length > 0,
+  ) ?? matches[0];
 }
 
 export function assessCommitmentBetrayal(
