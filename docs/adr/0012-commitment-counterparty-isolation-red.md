@@ -1,19 +1,26 @@
-# ADR 0012 — Commitment counterparty isolation RED characterization
+# ADR 0012 — Commitment counterparty isolation
 
-Status: characterization only; production behavior unchanged.
+Status: Accepted.
 
-## Question
-Can an active commitment with no resolved counterparty identity be promoted into Kaira-directed betrayal solely because the current turn contains a canonical intentional commitment violation for the same actor and scope?
+## Context
+An active commitment projected from canonical world-event memory may have no resolved `counterpartyId` when the underlying proposition has no target key. SocialAppraisal previously treated that unresolved identity as compatible with Kaira, so a same-actor/same-scope intentional violation could be promoted into Kaira-directed betrayal without typed evidence that the prior commitment was actually made to Kaira.
 
-## Expected invariant
-No. Dyadic betrayal requires typed evidence that the prior commitment was directed to Kaira. Missing counterparty identity must fail closed and must not become `betrayal=present`.
+The RED characterization on PR #239 reproduced this through the real runtime SocialAppraisal seam. CI failed in the full `Tests` step while all earlier architecture/runtime/harness guards remained green.
+
+## Decision
+Dyadic betrayal requires explicit typed counterparty evidence.
+
+- `counterpartyId === "kaira"` may match the active Kaira-user dyad.
+- an explicit different counterparty is `betrayal=absent` with counterparty mismatch;
+- a missing counterparty is unresolved evidence and therefore `betrayal=unknown`;
+- missing identity must never be interpreted as Kaira by default.
+
+World-memory projection remains unchanged and continues to preserve missing target identity as missing. The fix belongs only in SocialAppraisal matching/evidence assessment; no new memory or semantic authority is introduced.
 
 ## Proof
-`socialAppraisalCommitmentCounterpartyIsolation.test.ts` exercises the real runtime SocialAppraisal seam with:
-- same actor;
-- same scope;
-- active prior commitment;
-- canonical intentional current-turn violation;
-- missing prior `counterpartyId`.
+`socialAppraisalCommitmentCounterpartyIsolation.test.ts` locks three neighbors through the real runtime seam:
+1. missing counterparty -> `unknown`;
+2. explicit third party -> `absent`;
+3. explicit Kaira -> `present`.
 
-The test intentionally expects a non-present betrayal result. If current behavior promotes the unresolved commitment into Kaira-directed betrayal, CI should go RED before any production patch is considered.
+Provider/API calls are not used.
