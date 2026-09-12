@@ -96,13 +96,45 @@
 - `resolveKairaFinalDelivery()` artık non-empty candidate invariantını kendi ownership sınırında uygular; boş candidate `final_delivery_empty_reply` issue koduyla fail-closed reddedilir ve mevcut safe fallback persist edilir.
 - Canonical semantic/KDM authority değişmedi; provider çağrısı yapılmadı.
 
-## 16. Güncel checkpoint
+## 16. Semantic fallback production reachability — CLOSED
+- PR #235 merge edildi.
+- Client production path `integrateBehaviorLayers` çağrısına canonical `semanticEvent` geçiriyor.
+- Server production call site'larının tamamı `planDialogueResponse` için `languageUnderstanding.event` geçiriyor.
+- Consumer içindeki `interpretSemanticEvent(...)` yolları compatibility/defensive fallback olarak kalıyor; normal production wiring canonical semantic authority'yi bypass etmiyor.
+- Architecture contract regression gelecekte canonical event'i düşüren bir call site oluşursa CI'ı kıracak.
+- Runtime behavior değişmedi; provider/API çağrısı yok.
+
+## 17. Severe-event maturity attenuation — CLOSED
+- PR #236 merge edildi.
+- Mature/high-trust ilişkilerde familiarity/history attenuation severe direct single-axis coercion veya privacy harm sinyalini tamamen eritemez.
+- High-confidence severe single-axis harm attenuation sonrası durable injury floor korur ve en az `distancing` conversation-state nudge üretir.
+- Tek severe axis kendi başına hard-stop zorlamaz; existing combined coercion + privacy redline değişmedi.
+- Low-confidence/ambiguous severe reading yeni korumayı tetiklemez; mild joking disrespect relationship-sensitive kalır.
+- Policy canonical `RelationshipReducer` seam'inde ve typed `relationshipSevereEventPolicy.ts` ownership sınırında tutulur; downstream ikinci behavior authority yok.
+- Provider/API çağrısı yok.
+
+## 18. Commitment / betrayal appraisal boundary — CLOSED
+- PR #237 merge commit `d42960d64e5aca8e0f6205094efc779ad88a8331` ile `main`e alındı.
+- Commitment ayrı bir memory authority olmadı; mevcut world-event/world-memory lifecycle içinde typed evidence/context olarak kaldı.
+- Current-turn intentionality canonical `SemanticInterpretation@2` attribution/provenance üzerinden gelir; downstream raw-text reparse yok.
+- SocialAppraisal bounded commitment context üzerinden betrayal assessment üretir; `RelationshipReducer` aggregate-only kalır ve appraisal projection tüketir.
+- Unfairness comparative/norm evidence yoksa fail-closed `unknown` kalır.
+- Provider transport seçimi canonical semantic provenance'e sızmaz; provider-boundary contract semantic invariant olarak güncellendi.
+- Deterministic commitment/betrayal regression, historical RED→GREEN proof, full test suite, TypeScript ve production build GREEN; Architecture Review ve behavior/docs guards GREEN.
+- Provider/API çağrısı yok.
+
+## 19. Güncel checkpoint
 - Core Emotion-State Validation Phase 5A + 5B + 5C CLOSED.
 - Deterministic emotion coverage: 27 ana matrix cell + 6 cross-axis combination + boundedness/isolation proof.
 - Live Acceptance Transport CLOSED; PR #228 main üzerinde.
 - PR #230 CLOSED; canonical behavior-situation authority `main` üzerinde doğrulandı.
 - PR #231 CLOSED; provider outbound-attempt budget `main` üzerinde generation başına primary + tek recovery ile sınırlandı.
 - Ölçülmüş final-delivery empty-candidate realization failure PR #233 ile fail-closed kapatıldı.
+- PR #235 CLOSED; normal production call path canonical semantic event'i behavior/dialogue katmanlarına taşır, fallback production-reachable değildir.
+- PR #236 CLOSED; severe high-confidence single-axis harm mature relationship attenuation tarafından sıfırlanamaz.
+- PR #237 CLOSED; commitment evidence mevcut world-memory lifecycle içinde kalır, betrayal/unfairness SocialAppraisal ownership'indedir ve intentionality canonical semantic attribution'dan gelir.
+- Açık PR yok.
 - Yeni realization/behavior production patch yalnız yeni ölçülmüş RED failure sonrası açılmalı.
+- Yeni relationship/social-appraisal production patch yalnız ölçülmüş counterexample veya RED failure sonrası açılmalı; mevcut authority sınırlarını genişletmek için varsayımsal patch yapılmamalı.
 - PR #230 sonrası eksik behavior-situation kavramları yalnız yeni testlerle gerçekten gerekli olduğu kanıtlanırsa canonical language schema/evidence katmanında modellenmeli; downstream regex geri getirilmemeli.
 - Provider tarafında yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı; canlı keşif çağrısı yapılmamalı.
