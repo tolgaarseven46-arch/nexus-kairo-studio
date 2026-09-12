@@ -18,188 +18,35 @@ jobs:
           ref: codex/provider-attempt-cost-safety
       - name: Apply bounded provider attempt patch
         shell: bash
+        env:
+          PROVIDER_BLOCK_B64: Y29uc3QgS0FJUkFfUFJPVklERVJfTUFYX09VVEJPVU5EX0FUVEVNUFRTID0gMjsKdHlwZSBLYWlyYVByb3ZpZGVyQXR0ZW1wdEJ1ZGdldCA9IHsKICB1c2VkOiBudW1iZXI7CiAgbWF4OiBudW1iZXI7Cn07CmZ1bmN0aW9uIGNyZWF0ZUthaXJhUHJvdmlkZXJBdHRlbXB0QnVkZ2V0KCk6IEthaXJhUHJvdmlkZXJBdHRlbXB0QnVkZ2V0IHsKICByZXR1cm4geyB1c2VkOiAwLCBtYXg6IEtBSVJBX1BST1ZJREVSX01BWF9PVVRCT1VORF9BVFRFTVBUUyB9Owp9CmZ1bmN0aW9uIGNvbnN1bWVLYWlyYVByb3ZpZGVyQXR0ZW1wdCgKICBidWRnZXQ6IEthaXJhUHJvdmlkZXJBdHRlbXB0QnVkZ2V0LAogIHByb3ZpZGVyOiAib3BlbnJvdXRlciIgfCAiZ2VtaW5pIiwKKSB7CiAgaWYgKGJ1ZGdldC51c2VkID49IGJ1ZGdldC5tYXgpIHsKICAgIHRocm93IG5ldyBFcnJvcigKICAgICAgYFByb3ZpZGVyIGF0dGVtcHQgYnVkZ2V0IGV4aGF1c3RlZCBiZWZvcmUgJHtwcm92aWRlcn0gY2FsbCAoJHtidWRnZXQudXNlZH0vJHtidWRnZXQubWF4fSkuYCwKICAgICk7CiAgfQogIGJ1ZGdldC51c2VkICs9IDE7Cn0KYXN5bmMgZnVuY3Rpb24gY2FsbE9wZW5Sb3V0ZXIoCiAgbWVzc2FnZXM6IGFueVtdLAogIHRlbXBlcmF0dXJlOiBudW1iZXIsCiAgYXR0ZW1wdEJ1ZGdldDogS2FpcmFQcm92aWRlckF0dGVtcHRCdWRnZXQsCikgewogIGNvbnN0IGtleSA9IHByb2Nlc3MuZW52Lk9QRU5ST1VURVJfQVBJX0tFWTsKICBpZiAoIWtleSkgdGhyb3cgbmV3IEVycm9yKCJPUEVOUk9VVEVSX0FQSV9LRVkgYnVsdW5hbWFkxLEuIik7CiAgY29uc3QgZnJlZU1vZGVsID0gIm9wZW5yb3V0ZXIvZnJlZSI7CiAgY29uc3QgcHJpbWFyeU1vZGVsID0gcHJvY2Vzcy5lbnYuT1BFTlJPVVRFUl9NT0RFTD8udHJpbSgpIHx8IGZyZWVNb2RlbDsKICBjb25zdCByZXF1ZXN0TW9kZWwgPSBhc3luYyAobW9kZWw6IHN0cmluZywgbWF4VG9rZW5zPzogbnVtYmVyKSA9PiB7CiAgICBjb25zdW1lS2FpcmFQcm92aWRlckF0dGVtcHQoYXR0ZW1wdEJ1ZGdldCwgIm9wZW5yb3V0ZXIiKTsKICAgIGNvbnN0IHJlc3BvbnNlID0gYXdhaXQgZmV0Y2goCiAgICAgICJodHRwczovL29wZW5yb3V0ZXIuYWkvYXBpL3YxL2NoYXQvY29tcGxldGlvbnMiLAogICAgICB7CiAgICAgICAgbWV0aG9kOiAiUE9TVCIsCiAgICAgICAgaGVhZGVyczogewogICAgICAgICAgQXV0aG9yaXphdGlvbjogYEJlYXJlciAke2tleS50cmltKCl9YCwKICAgICAgICAgICJDb250ZW50LVR5cGUiOiAiYXBwbGljYXRpb24vanNvbiIsCiAgICAgICAgICAiWC1UaXRsZSI6ICJORVhVUyBLYWlybyBTdHVkaW8iLAogICAgICAgIH0sCiAgICAgICAgYm9keTogSlNPTi5zdHJpbmdpZnkoewogICAgICAgICAgbW9kZWwsCiAgICAgICAgICBtZXNzYWdlcywKICAgICAgICAgIHRlbXBlcmF0dXJlLAogICAgICAgICAgLi4uKG1heFRva2VucyA/IHsgbWF4X3Rva2VuczogbWF4VG9rZW5zIH0gOiB7fSksCiAgICAgICAgfSksCiAgICAgIH0sCiAgICApOwogICAgY29uc3QgZGF0YSA9IGF3YWl0IHJlc3BvbnNlLmpzb24oKS5jYXRjaCgoKSA9PiAoe30pKTsKICAgIHJldHVybiB7IHJlc3BvbnNlLCBkYXRhIH07CiAgfTsKCiAgbGV0IHsgcmVzcG9uc2UsIGRhdGEgfSA9IGF3YWl0IHJlcXVlc3RNb2RlbChwcmltYXJ5TW9kZWwpOwogIGxldCB0ZXh0ID0gcmVzcG9uc2Uub2sgPyBleHRyYWN0T3BlblJvdXRlclRleHQoZGF0YSkgOiAiIjsKICBsZXQgc2hvdWxkUmVjb3ZlciA9IGZhbHNlOwogIGxldCByZWNvdmVyeU1heFRva2VuczogbnVtYmVyIHwgdW5kZWZpbmVkOwoKICBpZiAoIXJlc3BvbnNlLm9rKSB7CiAgICBjb25zdCBhZmZvcmRhYmxlVG9rZW5zID0gTnVtYmVyKAogICAgICBTdHJpbmcoZGF0YT8uZXJyb3I/Lm1lc3NhZ2UgfHwgIiIpLm1hdGNoKC9jYW4gb25seSBhZmZvcmRccysoXGQrKS9pKT8uWzFdLAogICAgKTsKICAgIGlmIChhZmZvcmRhYmxlVG9rZW5zID49IDQwKSB7CiAgICAgIHNob3VsZFJlY292ZXIgPSB0cnVlOwogICAgICByZWNvdmVyeU1heFRva2VucyA9IE1hdGgubWF4KDMyLCBhZmZvcmRhYmxlVG9rZW5zIC0gOCk7CiAgICB9IGVsc2UgewogICAgICB0aHJvdyBuZXcgRXJyb3IoCiAgICAgICAgZGF0YT8uZXJyb3I/Lm1lc3NhZ2UgfHwgYE9wZW5Sb3V0ZXIgaGF0YXPEsTogSFRUUCAke3Jlc3BvbnNlLnN0YXR1c31gLAogICAgICApOwogICAgfQogIH0gZWxzZSBpZiAoIXRleHQpIHsKICAgIHNob3VsZFJlY292ZXIgPSB0cnVlOwogIH0KCiAgaWYgKHNob3VsZFJlY292ZXIpIHsKICAgICh7IHJlc3BvbnNlLCBkYXRhIH0gPSBhd2FpdCByZXF1ZXN0TW9kZWwocHJpbWFyeU1vZGVsLCByZWNvdmVyeU1heFRva2VucykpOwogICAgaWYgKCFyZXNwb25zZS5vaykKICAgICAgdGhyb3cgbmV3IEVycm9yKAogICAgICAgIGRhdGE/LmVycm9yPy5tZXNzYWdlIHx8IGBPcGVuUm91dGVyIGhhdGFzxLE6IEhUVFAgJHtyZXNwb25zZS5zdGF0dXN9YCwKICAgICAgKTsKICAgIHRleHQgPSBleHRyYWN0T3BlblJvdXRlclRleHQoZGF0YSk7CiAgfQoKICBpZiAoIXRleHQpIHRocm93IG5ldyBFcnJvcigiT3BlblJvdXRlciBib8WfIHlhbsSxdCBkw7ZuZMO8cmTDvC4iKTsKICByZXR1cm4gdGV4dDsKfQphc3luYyBmdW5jdGlvbiBjYWxsR2VtaW5pKAogIHN5c3RlbTogc3RyaW5nLAogIG1lc3NhZ2VzOiBhbnlbXSwKICBhdHRlbXB0QnVkZ2V0OiBLYWlyYVByb3ZpZGVyQXR0ZW1wdEJ1ZGdldCwKKSB7CiAgY29uc3VtZUthaXJhUHJvdmlkZXJBdHRlbXB0KGF0dGVtcHRCdWRnZXQsICJnZW1pbmkiKTsKICBjb25zdCByZXNwb25zZSA9IGF3YWl0IGdldEdlbWluaUNsaWVudCgpLm1vZGVscy5nZW5lcmF0ZUNvbnRlbnQoewogICAgbW9kZWw6ICJnZW1pbmktMy42LWZsYXNoIiwKICAgIGNvbnRlbnRzOiBtZXNzYWdlcy5tYXAoKG0pID0+ICh7CiAgICAgIHJvbGU6IG0ucm9sZSA9PT0gImFzc2lzdGFudCIgPyAibW9kZWwiIDogInVzZXIiLAogICAgICBwYXJ0czogW3sgdGV4dDogbS5jb250ZW50IH1dLAogICAgfSkpLAogICAgY29uZmlnOiB7IHN5c3RlbUluc3RydWN0aW9uOiBzeXN0ZW0gfSwKICB9KTsKICByZXR1cm4gKHJlc3BvbnNlPy50ZXh0IHx8ICIiKS50cmltKCk7Cn0K
+          GENERATE_BLOCK_B64: YXN5bmMgZnVuY3Rpb24gZ2VuZXJhdGVUZXh0UmVzdWx0KAogIHN5c3RlbTogc3RyaW5nLAogIG1lc3NhZ2VzOiBhbnlbXSwKICB0ZW1wZXJhdHVyZTogbnVtYmVyLAogIHByZWZlcnJlZFByb3ZpZGVyOiBzdHJpbmcsCik6IFByb21pc2U8R2VuZXJhdGVkVGV4dFJlc3VsdD4gewogIGNvbnN0IGhhc09wZW5Sb3V0ZXIgPSBCb29sZWFuKHByb2Nlc3MuZW52Lk9QRU5ST1VURVJfQVBJX0tFWT8udHJpbSgpKTsKICBjb25zdCBoYXNHZW1pbmkgPSBCb29sZWFuKHByb2Nlc3MuZW52LkdFTUlOSV9BUElfS0VZPy50cmltKCkpOwogIGNvbnN0IGF0dGVtcHRCdWRnZXQgPSBjcmVhdGVLYWlyYVByb3ZpZGVyQXR0ZW1wdEJ1ZGdldCgpOwoKICBpZiAocHJlZmVycmVkUHJvdmlkZXIgPT09ICJvcGVucm91dGVyIiAmJiBoYXNPcGVuUm91dGVyKSB7CiAgICB0cnkgewogICAgICBjb25zdCB0ZXh0ID0gYXdhaXQgY2FsbE9wZW5Sb3V0ZXIoCiAgICAgICAgW3sgcm9sZTogInN5c3RlbSIsIGNvbnRlbnQ6IHN5c3RlbSB9LCAuLi5tZXNzYWdlc10sCiAgICAgICAgdGVtcGVyYXR1cmUsCiAgICAgICAgYXR0ZW1wdEJ1ZGdldCwKICAgICAgKTsKICAgICAgcmV0dXJuIHsgdGV4dCwgcHJvdmlkZXJVc2VkOiAib3BlbnJvdXRlciIgfTsKICAgIH0gY2F0Y2ggKG9wZW5Sb3V0ZXJFcnIpIHsKICAgICAgY29uc29sZS53YXJuKCJbUHJvdmlkZXJdIE9wZW5Sb3V0ZXIgZmFpbGVkLCBmYWxsaW5nIGJhY2sgdG8gR2VtaW5pOiIsIG9wZW5Sb3V0ZXJFcnIpOwogICAgICBpZiAoaGFzR2VtaW5pICYmIGF0dGVtcHRCdWRnZXQudXNlZCA8IGF0dGVtcHRCdWRnZXQubWF4KSB7CiAgICAgICAgY29uc3QgdGV4dCA9IGF3YWl0IGNhbGxHZW1pbmkoc3lzdGVtLCBtZXNzYWdlcywgYXR0ZW1wdEJ1ZGdldCk7CiAgICAgICAgcmV0dXJuIHsgdGV4dCwgcHJvdmlkZXJVc2VkOiAiZ2VtaW5pIiB9OwogICAgICB9CiAgICAgIHRocm93IG9wZW5Sb3V0ZXJFcnI7CiAgICB9CiAgfQoKICBpZiAoaGFzR2VtaW5pKSB7CiAgICBjb25zdCB0ZXh0ID0gYXdhaXQgY2FsbEdlbWluaShzeXN0ZW0sIG1lc3NhZ2VzLCBhdHRlbXB0QnVkZ2V0KTsKICAgIHJldHVybiB7IHRleHQsIHByb3ZpZGVyVXNlZDogImdlbWluaSIgfTsKICB9CgogIGlmIChoYXNPcGVuUm91dGVyKSB7CiAgICBjb25zdCB0ZXh0ID0gYXdhaXQgY2FsbE9wZW5Sb3V0ZXIoCiAgICAgIFt7IHJvbGU6ICJzeXN0ZW0iLCBjb250ZW50OiBzeXN0ZW0gfSwgLi4ubWVzc2FnZXNdLAogICAgICB0ZW1wZXJhdHVyZSwKICAgICAgYXR0ZW1wdEJ1ZGdldCwKICAgICk7CiAgICByZXR1cm4geyB0ZXh0LCBwcm92aWRlclVzZWQ6ICJvcGVucm91dGVyIiB9OwogIH0KCiAgdGhyb3cgbmV3IEVycm9yKCJZYXBheSB6ZWthIGFuYWh0YXLEsSAoR0VNSU5JX0FQSV9LRVkgdmV5YSBPUEVOUk9VVEVSX0FQSV9LRVkpIGJ1bHVuYW1hZMSxLiIpOwp9Cg==
+          STATE_SECTION_B64: IyMgMTMuIENhbm9uaWNhbCBiZWhhdmlvci1zaXR1YXRpb24gYXV0aG9yaXR5IOKAlCBDTE9TRUQKLSBQUiAjMjMwIG1lcmdlIGNvbW1pdCBgNGFhZjhlNmFiNTk3ZmQyODIxOGYyNzE1OWJjMmMxOTUwZTYyZGU2ZmAgaWxlIGBtYWluYGUgYWzEsW5kxLEuCi0gUGVyc29uYWxpdHksIG1vdGl2YXRpb24sIHZhbHVlcywgcHJlZmVyZW5jZXMsIHNvY2lhbCBvcmllbnRhdGlvbiB2ZSBleHByZXNzaW9uLXN0eWxlIG1vdG9ybGFyxLFuZGFraSBkb3duc3RyZWFtIHJhdy10ZXh0IHNlbWFudGljIHJlcGFyc2Uga2FsZMSxcsSxbGTEsS4KLSBgcHJvamVjdENhbm9uaWNhbEJlaGF2aW9yU2l0dWF0aW9ucygpYCBjYW5vbmljYWwgYFNlbWFudGljSW50ZXJwcmV0YXRpb25AMmAgw7x6ZXJpbmRlbiB0eXBlZCBzaXR1YXRpb24gw7xyZXRpcCBiZWhhdmlvciBtb3RvcmxhcsSxbmEgZGHEn8SxdMSxeW9yLgotIER5YWRpYyBob3N0aWxpdHkvY29lcmNpb24geWFsbsSxeiBjYW5vbmljYWwgYHRhcmdldCA9PT0gImthaXJhImAgb2xkdcSfdW5kYSBLYWlyYS11c2VyIGRhdnJhbsSxxZ8gYmFza8Sxc8SxbmEgZMO2bsO8xZ/DvHlvcjsgdGhpcmQtcGFydHkgaXNvbGF0aW9uIHJlZ3Jlc3Npb24gaWxlIGtpbGl0bGkuCi0gRnVsbCBDSSwgVHlwZVNjcmlwdCwgcHJvZHVjdGlvbiBidWlsZCB2ZSBBcmNoaXRlY3R1cmUgUmV2aWV3IEdSRUVOLgoKIyMgMTQuIFByb3ZpZGVyIG91dGJvdW5kIGF0dGVtcHQgY29zdC1zYWZldHkg4oCUIEFDVElWRSBQUiAjMjMxCi0gRGV0ZXJtaW5pc3RpYyBzZXJ2ZXIgYXVkaXQsIHRlayBnZW5lcmF0aW9uJ8SxbiBPcGVuUm91dGVyIGluaXRpYWwgKyBhZmZvcmRhYmxlLXRva2VuIHJldHJ5ICsgZW1wdHktcmVzcG9uc2UgcmV0cnkgKyBHZW1pbmkgZmFsbGJhY2sgw7x6ZXJpbmRlbiBiaXJkZW4gZmF6bGEgw7xjcmV0bGkgb3V0Ym91bmQgw6dhxJ9yxLF5YSBkw7Zuw7zFn2ViaWxkacSfaW5pIGRvxJ9ydWxhZMSxLgotIENhbmzEsSBwcm92aWRlci9BUEkga2XFn2lmIMOnYcSfcsSxc8SxIHlhcMSxbG1hZMSxOyByaXNrIHN0YXRpay9ydW50aW1lLWNvbnRyb2wgY29udHJhY3QgaWxlIMO2bMOnw7xsZMO8LgotIFllbmkgaW52YXJpYW50OiBnZW5lcmF0aW9uIGJhxZ/EsW5hIHRvcGxhbSBlbiBmYXpsYSBgMmAgb3V0Ym91bmQgcHJvdmlkZXIgYXR0ZW1wdCA9IHByaW1hcnkgKyB0ZWsgcmVjb3ZlcnkuCi0gU2FtZS1wcm92aWRlciByZXRyeSBpbGUgY3Jvc3MtcHJvdmlkZXIgZmFsbGJhY2sgYXluxLEgc2hhcmVkIGJ1ZGdldCfEsSB0w7xrZXRpcjsgaWtpbmNpIHJlY292ZXJ5L8O8w6fDvG5jw7wgw7xjcmV0bGkgw6dhxJ9yxLEgeW9rdHVyLgotIEJ1IGRlxJ9pxZ9pa2xpayB5YWxuxLF6IHByb3ZpZGVyIG9yY2hlc3RyYXRpb24vY29zdC1zYWZldHkgc8SxbsSxcsSxbmRhZMSxcjsgY2Fub25pY2FsIHNlbWFudGljL0tETSBhdXRob3JpdHkgZGXEn2nFn21lei4KLSBSRUQgY29udHJhY3Q6IGBrYWlyYVByb3ZpZGVyQXR0ZW1wdEJ1ZGdldENvbnRyYWN0cy50ZXN0LnRzYC4KCg==
         run: |
           python - <<'PY'
+          import base64
+          import os
           from pathlib import Path
 
           server_path = Path('server.ts')
           server = server_path.read_text()
+          provider_block = base64.b64decode(os.environ['PROVIDER_BLOCK_B64']).decode()
+          generate_block = base64.b64decode(os.environ['GENERATE_BLOCK_B64']).decode()
 
           start = server.index('async function callOpenRouter')
           end = server.index('type AiProviderUsed', start)
-          provider_block = '''const KAIRA_PROVIDER_MAX_OUTBOUND_ATTEMPTS = 2;
-type KairaProviderAttemptBudget = {
-  used: number;
-  max: number;
-};
-function createKairaProviderAttemptBudget(): KairaProviderAttemptBudget {
-  return { used: 0, max: KAIRA_PROVIDER_MAX_OUTBOUND_ATTEMPTS };
-}
-function consumeKairaProviderAttempt(
-  budget: KairaProviderAttemptBudget,
-  provider: "openrouter" | "gemini",
-) {
-  if (budget.used >= budget.max) {
-    throw new Error(
-      `Provider attempt budget exhausted before ${provider} call (${budget.used}/${budget.max}).`,
-    );
-  }
-  budget.used += 1;
-}
-async function callOpenRouter(
-  messages: any[],
-  temperature: number,
-  attemptBudget: KairaProviderAttemptBudget,
-) {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) throw new Error("OPENROUTER_API_KEY bulunamadı.");
-  const freeModel = "openrouter/free";
-  const primaryModel = process.env.OPENROUTER_MODEL?.trim() || freeModel;
-  const requestModel = async (model: string, maxTokens?: number) => {
-    consumeKairaProviderAttempt(attemptBudget, "openrouter");
-    const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${key.trim()}`,
-          "Content-Type": "application/json",
-          "X-Title": "NEXUS Kairo Studio",
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature,
-          ...(maxTokens ? { max_tokens: maxTokens } : {}),
-        }),
-      },
-    );
-    const data = await response.json().catch(() => ({}));
-    return { response, data };
-  };
-
-  let { response, data } = await requestModel(primaryModel);
-  let text = response.ok ? extractOpenRouterText(data) : "";
-  let shouldRecover = false;
-  let recoveryMaxTokens: number | undefined;
-
-  if (!response.ok) {
-    const affordableTokens = Number(
-      String(data?.error?.message || "").match(/can only afford\\s+(\\d+)/i)?.[1],
-    );
-    if (affordableTokens >= 40) {
-      shouldRecover = true;
-      recoveryMaxTokens = Math.max(32, affordableTokens - 8);
-    } else {
-      throw new Error(
-        data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`,
-      );
-    }
-  } else if (!text) {
-    shouldRecover = true;
-  }
-
-  if (shouldRecover) {
-    ({ response, data } = await requestModel(primaryModel, recoveryMaxTokens));
-    if (!response.ok)
-      throw new Error(
-        data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`,
-      );
-    text = extractOpenRouterText(data);
-  }
-
-  if (!text) throw new Error("OpenRouter boş yanıt döndürdü.");
-  return text;
-}
-async function callGemini(
-  system: string,
-  messages: any[],
-  attemptBudget: KairaProviderAttemptBudget,
-) {
-  consumeKairaProviderAttempt(attemptBudget, "gemini");
-  const response = await getGeminiClient().models.generateContent({
-    model: "gemini-3.6-flash",
-    contents: messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    })),
-    config: { systemInstruction: system },
-  });
-  return (response?.text || "").trim();
-}
-'''
           server = server[:start] + provider_block + server[end:]
 
           start = server.index('async function generateTextResult')
           end = server.index('async function generateText(', start)
-          generate_block = '''async function generateTextResult(
-  system: string,
-  messages: any[],
-  temperature: number,
-  preferredProvider: string,
-): Promise<GeneratedTextResult> {
-  const hasOpenRouter = Boolean(process.env.OPENROUTER_API_KEY?.trim());
-  const hasGemini = Boolean(process.env.GEMINI_API_KEY?.trim());
-  const attemptBudget = createKairaProviderAttemptBudget();
-
-  if (preferredProvider === "openrouter" && hasOpenRouter) {
-    try {
-      const text = await callOpenRouter(
-        [{ role: "system", content: system }, ...messages],
-        temperature,
-        attemptBudget,
-      );
-      return { text, providerUsed: "openrouter" };
-    } catch (openRouterErr) {
-      console.warn("[Provider] OpenRouter failed, falling back to Gemini:", openRouterErr);
-      if (hasGemini && attemptBudget.used < attemptBudget.max) {
-        const text = await callGemini(system, messages, attemptBudget);
-        return { text, providerUsed: "gemini" };
-      }
-      throw openRouterErr;
-    }
-  }
-
-  if (hasGemini) {
-    const text = await callGemini(system, messages, attemptBudget);
-    return { text, providerUsed: "gemini" };
-  }
-
-  if (hasOpenRouter) {
-    const text = await callOpenRouter(
-      [{ role: "system", content: system }, ...messages],
-      temperature,
-      attemptBudget,
-    );
-    return { text, providerUsed: "openrouter" };
-  }
-
-  throw new Error("Yapay zeka anahtarı (GEMINI_API_KEY veya OPENROUTER_API_KEY) bulunamadı.");
-}
-'''
           server = server[:start] + generate_block + server[end:]
           server_path.write_text(server)
 
           state_path = Path('PROJECT_STATE.md')
           state = state_path.read_text()
+          replacement = base64.b64decode(os.environ['STATE_SECTION_B64']).decode()
           section13 = state.index('## 13. Canonical behavior-situation authority')
           checkpoint = state.index('## 14. Güncel checkpoint', section13)
-          replacement = '''## 13. Canonical behavior-situation authority — CLOSED
-- PR #230 merge commit `4aaf8e6ab597fd28218f27159bc2c1950e62de6f` ile `main`e alındı.
-- Personality, motivation, values, preferences, social orientation ve expression-style motorlarındaki downstream raw-text semantic reparse kaldırıldı.
-- `projectCanonicalBehaviorSituations()` canonical `SemanticInterpretation@2` üzerinden typed situation üretip behavior motorlarına dağıtıyor.
-- Dyadic hostility/coercion yalnız canonical `target === "kaira"` olduğunda Kaira-user davranış baskısına dönüşüyor; third-party isolation regression ile kilitli.
-- Full CI, TypeScript, production build ve Architecture Review GREEN.
-
-## 14. Provider outbound attempt cost-safety — ACTIVE PR #231
-- Deterministic server audit, tek generation'ın OpenRouter initial + affordable-token retry + empty-response retry + Gemini fallback üzerinden birden fazla ücretli outbound çağrıya dönüşebildiğini doğruladı.
-- Canlı provider/API keşif çağrısı yapılmadı; risk statik/runtime-control contract ile ölçüldü.
-- Yeni invariant: generation başına toplam en fazla `2` outbound provider attempt = primary + tek recovery.
-- Same-provider retry ile cross-provider fallback aynı shared budget'ı tüketir; ikinci recovery/üçüncü ücretli çağrı yoktur.
-- Bu değişiklik yalnız provider orchestration/cost-safety sınırındadır; canonical semantic/KDM authority değişmez.
-- RED contract: `kairaProviderAttemptBudgetContracts.test.ts`.
-
-'''
           state = state[:section13] + replacement + state[checkpoint:]
           state = state.replace('## 14. Güncel checkpoint', '## 15. Güncel checkpoint', 1)
           state = state.replace('- PR #230 canonical behavior-situation authority düzeltmesini doğruluyor; full CI + Architecture Review GREEN olmadan merge edilmeyecek.\n', '- PR #230 CLOSED; canonical behavior-situation authority `main` üzerinde doğrulandı.\n')
@@ -208,9 +55,9 @@ async function callGemini(
           state_path.write_text(state)
           PY
 
-          rm .github/workflows/provider-attempt-budget-oneshot.yml
+          rm -f .github/workflows/provider-attempt-budget-oneshot.yml .provider-attempt-patch-trigger
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add server.ts PROJECT_STATE.md .github/workflows/provider-attempt-budget-oneshot.yml
+          git add server.ts PROJECT_STATE.md .github/workflows/provider-attempt-budget-oneshot.yml .provider-attempt-patch-trigger
           git commit -m "fix(provider): enforce shared outbound attempt budget"
           git push origin HEAD:codex/provider-attempt-cost-safety
