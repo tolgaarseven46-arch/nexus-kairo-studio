@@ -71,19 +71,26 @@
 - Ambiguous timeout mesajı kullanıcıyı aynı mesajı hemen tekrar göndermemesi konusunda uyarıyor.
 - Bu fix için provider çağrısı yapılmadı; deterministic transport-policy regression testi eklendi.
 
-## 13. Canonical behavior-situation authority — ACTIVE PR #230
-- Production audit'te personality, motivation, values, preferences, social orientation ve expression-style motorlarının canonical `SemanticInterpretation@2` üretildikten sonra `userMessage` üzerinden kendi regex semantiklerini tekrar çıkardığı doğrulandı.
-- PR #230 bu ikinci semantic authority'yi kaldırıyor: tek `projectCanonicalBehaviorSituations()` projection'ı canonical interpretation'dan typed situation üretip altı behavior motoruna dağıtıyor.
-- Dyadic hostility/coercion yalnız canonical `target === "kaira"` olduğunda personality/social/expression baskısına dönüşüyor; third-party hostility Kaira-user çatışmasına sızmıyor.
-- Canonical schema'da henüz açıkça temsil edilmeyen alanlar downstream lexical tahminle yeniden oluşturulmuyor; neutral/fail-closed kalıyor. Başlıca açık kümeler: normative event facets (`deception`, `unfairness`, `betrayal`, `harm`, `irresponsibility`), interaction affordances (`novelty`, `competition`) ve environmental/goal affordances'ın bazıları (`instability`, daha zengin achievement/influence bağlamı).
-- `boundaryEngine` ve `behaviorIntegrationEngine` production'da canonical `SemanticEvent` tüketiyor; raw-text fallback'leri compatibility cleanup adayı olarak ayrı takip edilecek.
-- Regression contract downstream behavior motorlarında raw-text reparse'i yasaklıyor ve third-party target isolation'ı kilitliyor.
+## 13. Canonical behavior-situation authority — CLOSED
+- PR #230 merge commit `4aaf8e6ab597fd28218f27159bc2c1950e62de6f` ile `main`e alındı.
+- Personality, motivation, values, preferences, social orientation ve expression-style motorlarındaki downstream raw-text semantic reparse kaldırıldı.
+- `projectCanonicalBehaviorSituations()` canonical `SemanticInterpretation@2` üzerinden typed situation üretip behavior motorlarına dağıtıyor.
+- Dyadic hostility/coercion yalnız canonical `target === "kaira"` olduğunda Kaira-user davranış baskısına dönüşüyor; third-party isolation regression ile kilitli.
+- Full CI, TypeScript, production build ve Architecture Review GREEN.
 
-## 14. Güncel checkpoint
+## 14. Provider outbound attempt cost-safety — ACTIVE PR #231
+- Deterministic server audit, tek generation'ın OpenRouter initial + affordable-token retry + empty-response retry + Gemini fallback üzerinden birden fazla ücretli outbound çağrıya dönüşebildiğini doğruladı.
+- Canlı provider/API keşif çağrısı yapılmadı; risk statik/runtime-control contract ile ölçüldü.
+- Yeni invariant: generation başına toplam en fazla `2` outbound provider attempt = primary + tek recovery.
+- Same-provider retry ile cross-provider fallback aynı shared budget'ı tüketir; ikinci recovery/üçüncü ücretli çağrı yoktur.
+- Bu değişiklik yalnız provider orchestration/cost-safety sınırındadır; canonical semantic/KDM authority değişmez.
+- RED contract: `kairaProviderAttemptBudgetContracts.test.ts`.
+
+## 15. Güncel checkpoint
 - Core Emotion-State Validation Phase 5A + 5B + 5C CLOSED.
 - Deterministic emotion coverage: 27 ana matrix cell + 6 cross-axis combination + boundedness/isolation proof.
 - Live Acceptance transport fix hattı ayrı olarak korunuyor.
-- PR #230 canonical behavior-situation authority düzeltmesini doğruluyor; full CI + Architecture Review GREEN olmadan merge edilmeyecek.
+- PR #230 CLOSED; canonical behavior-situation authority `main` üzerinde doğrulandı.
 - PR #230 sonrası kalan mimari iş: gerçekten gerekli olduğu testlerle kanıtlanırsa eksik behavior-situation kavramlarını canonical language schema/evidence katmanında açıkça modellemek; downstream regex geri getirilmemeli.
-- Server tarafındaki provider retry/fallback maliyet davranışı ayrı cost-safety incelemesinde takip edilmeli; canlı keşif çağrısı yapılmamalı.
+- PR #231 provider retry/fallback cost-safety hattını deterministic olarak doğruluyor; canlı keşif çağrısı yapılmıyor.
 - Yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı.

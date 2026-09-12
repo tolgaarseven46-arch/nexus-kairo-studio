@@ -162,12 +162,36 @@ function extractOpenRouterText(data: any) {
       .trim();
   return "";
 }
-async function callOpenRouter(messages: any[], temperature: number) {
+const KAIRA_PROVIDER_MAX_OUTBOUND_ATTEMPTS = 2;
+type KairaProviderAttemptBudget = {
+  used: number;
+  max: number;
+};
+function createKairaProviderAttemptBudget(): KairaProviderAttemptBudget {
+  return { used: 0, max: KAIRA_PROVIDER_MAX_OUTBOUND_ATTEMPTS };
+}
+function consumeKairaProviderAttempt(
+  budget: KairaProviderAttemptBudget,
+  provider: "openrouter" | "gemini",
+) {
+  if (budget.used >= budget.max) {
+    throw new Error(
+      `Provider attempt budget exhausted before ${provider} call (${budget.used}/${budget.max}).`,
+    );
+  }
+  budget.used += 1;
+}
+async function callOpenRouter(
+  messages: any[],
+  temperature: number,
+  attemptBudget: KairaProviderAttemptBudget,
+) {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("OPENROUTER_API_KEY bulunamadı.");
   const freeModel = "openrouter/free";
   const primaryModel = process.env.OPENROUTER_MODEL?.trim() || freeModel;
   const requestModel = async (model: string, maxTokens?: number) => {
+    consumeKairaProviderAttempt(attemptBudget, "openrouter");
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -188,31 +212,55 @@ async function callOpenRouter(messages: any[], temperature: number) {
     const data = await response.json().catch(() => ({}));
     return { response, data };
   };
+
   let { response, data } = await requestModel(primaryModel);
-  const affordableTokens = Number(
-    String(data?.error?.message || "").match(/can only afford\s+(\d+)/i)?.[1],
-  );
-  if (!response.ok && affordableTokens >= 40) {
-    ({ response, data } = await requestModel(
-      primaryModel,
-      Math.max(32, affordableTokens - 8),
-    ));
-  }
-  if (!response.ok)
-    throw new Error(
-      data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`,
+  let text = response.ok ? extractOpenRouterText(data) : "";
+  let shouldRecover = false;
+  let recoveryMaxTokens: number | undefined;
+
+  if (!response.ok) {
+    const affordableTokens = Number(
+      String(data?.error?.message || "").match(/can only afford\s+(\d+)/i)?.[1],
     );
-  let text = extractOpenRouterText(data);
-  if (!text) {
-    ({ response, data } = await requestModel(primaryModel));
+    if (affordableTokens >= 40) {
+      shouldRecover = true;
+      recoveryMaxTokens = Math.max(32, affordableTokens - 8);
+    } else {
+      throw new Error(
+        data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`,
+      );
+    }
+  } else if (!text) {
+    shouldRecover = true;
+  }
+
+  if (shouldRecover) {
+    ({ response, data } = await requestModel(primaryModel, recoveryMaxTokens));
     if (!response.ok)
       throw new Error(
         data?.error?.message || `OpenRouter hatası: HTTP ${response.status}`,
       );
     text = extractOpenRouterText(data);
   }
+
   if (!text) throw new Error("OpenRouter boş yanıt döndürdü.");
   return text;
+}
+async function callGemini(
+  system: string,
+  messages: any[],
+  attemptBudget: KairaProviderAttemptBudget,
+) {
+  consumeKairaProviderAttempt(attemptBudget, "gemini");
+  const response = await getGeminiClient().models.generateContent({
+    model: "gemini-3.6-flash",
+    contents: messages.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    })),
+    config: { systemInstruction: system },
+  });
+  return (response?.text || "").trim();
 }
 type AiProviderUsed = "gemini" | "openrouter" | "deterministic_fallback";
 type GeneratedTextResult = {
@@ -227,47 +275,36 @@ async function generateTextResult(
 ): Promise<GeneratedTextResult> {
   const hasOpenRouter = Boolean(process.env.OPENROUTER_API_KEY?.trim());
   const hasGemini = Boolean(process.env.GEMINI_API_KEY?.trim());
+  const attemptBudget = createKairaProviderAttemptBudget();
 
   if (preferredProvider === "openrouter" && hasOpenRouter) {
     try {
       const text = await callOpenRouter(
         [{ role: "system", content: system }, ...messages],
         temperature,
+        attemptBudget,
       );
       return { text, providerUsed: "openrouter" };
     } catch (openRouterErr) {
       console.warn("[Provider] OpenRouter failed, falling back to Gemini:", openRouterErr);
-      if (hasGemini) {
-        const response = await getGeminiClient().models.generateContent({
-          model: "gemini-3.6-flash",
-          contents: messages.map((m) => ({
-            role: m.role === "assistant" ? "model" : "user",
-            parts: [{ text: m.content }],
-          })),
-          config: { systemInstruction: system },
-        });
-        return { text: (response?.text || "").trim(), providerUsed: "gemini" };
+      if (hasGemini && attemptBudget.used < attemptBudget.max) {
+        const text = await callGemini(system, messages, attemptBudget);
+        return { text, providerUsed: "gemini" };
       }
       throw openRouterErr;
     }
   }
 
   if (hasGemini) {
-    const response = await getGeminiClient().models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: messages.map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      })),
-      config: { systemInstruction: system },
-    });
-    return { text: (response?.text || "").trim(), providerUsed: "gemini" };
+    const text = await callGemini(system, messages, attemptBudget);
+    return { text, providerUsed: "gemini" };
   }
 
   if (hasOpenRouter) {
     const text = await callOpenRouter(
       [{ role: "system", content: system }, ...messages],
       temperature,
+      attemptBudget,
     );
     return { text, providerUsed: "openrouter" };
   }
