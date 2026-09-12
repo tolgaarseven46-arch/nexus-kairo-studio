@@ -27,7 +27,7 @@ describe("temperament behavior preview before canonical KDM handoff", () => {
 
   it("keeps the projected temperament state available only to behavior synthesis", () => {
     expect(client).toContain("dynamicState: temperamentAdjustedState,");
-    expect(client).toContain("const socialRuntime = applySocialOrientation(preferenceRuntime.personality, fineTune, userMessage, temperamentAdjustedState)");
+    expect(client).toContain("const socialRuntime = applySocialOrientation(preferenceRuntime.personality, fineTune, behaviorSituations.social, temperamentAdjustedState)");
   });
 
   it("sends resting affect baseline through a separate typed request field", () => {
