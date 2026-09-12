@@ -33,20 +33,24 @@ export function projectCanonicalBehaviorSituations(
   const severity = interpretation.severity;
   const relationalIntensity = clamp01(facets.relationalIntensity);
   const targetIsKaira = interpretation.target === "kaira";
+  const dyadicDisrespect = targetIsKaira ? severity.disrespect : 0;
+  const dyadicAggression = targetIsKaira ? severity.aggression : 0;
+  const dyadicCoercion = targetIsKaira ? severity.coercion : 0;
 
-  const challengeLoad = acts.has("challenge") || facets.relationalAct === "challenge"
+  const challengeLoad = targetIsKaira && (acts.has("challenge") || facets.relationalAct === "challenge")
     ? Math.max(0.6, relationalIntensity)
-    : acts.has("mockery") || facets.relationalAct === "mockery"
+    : targetIsKaira && (acts.has("mockery") || facets.relationalAct === "mockery")
       ? Math.max(0.55, relationalIntensity)
       : 0;
   const rejectionLoad = interpretation.primaryIntent === "rejection" && targetIsKaira ? 0.9 : 0;
-  const complaintLoad = interpretation.primaryIntent === "complaint" ? 0.6 : 0;
+  const complaintLoad = interpretation.primaryIntent === "complaint" && targetIsKaira ? 0.6 : 0;
   const conflict = max01(
-    severity.disrespect,
-    severity.aggression,
+    dyadicDisrespect,
+    dyadicAggression,
     challengeLoad,
     rejectionLoad,
     complaintLoad,
+    0.1,
   );
   const ambiguity = max01(interpretation.uncertainty.overall, interpretation.uncertainty.intent);
   const decisionDemand = facets.adviceRequested
@@ -71,7 +75,7 @@ export function projectCanonicalBehaviorSituations(
     interpretation.primaryIntent === "greeting" || interpretation.primaryIntent === "smalltalk" ? 0.45 : 0,
   );
   const recognitionOpportunity = clamp01(interpretation.compliment);
-  const autonomyThreat = clamp01(severity.coercion);
+  const autonomyThreat = clamp01(dyadicCoercion);
   const achievementOpportunity = facets.adviceRequested
     ? 0.55
     : interpretation.primaryIntent === "information_request"
@@ -111,7 +115,7 @@ export function projectCanonicalBehaviorSituations(
   const vulnerabilitySignal = interpretation.primaryIntent === "emotional_share"
     ? Math.max(0.7, interpretation.emotionalLoad)
     : clamp01(interpretation.emotionalLoad * 0.6);
-  const challengeSignal = max01(challengeLoad, severity.disrespect * 0.7);
+  const challengeSignal = max01(challengeLoad, dyadicDisrespect * 0.7);
   const requestSignal = interpretation.primaryIntent === "command"
     ? 0.8
     : facets.adviceRequested
@@ -126,10 +130,10 @@ export function projectCanonicalBehaviorSituations(
 
   const seriousContext = emotionalSeriousness;
   const hostileContext = max01(
-    severity.disrespect,
-    severity.coercion,
-    severity.aggression,
-    interpretation.primaryIntent === "insult" ? 1 : 0,
+    dyadicDisrespect,
+    dyadicCoercion,
+    dyadicAggression,
+    interpretation.primaryIntent === "insult" && targetIsKaira ? 1 : 0,
   );
   const playfulContext = interpretation.primaryIntent === "banter" || acts.has("banter")
     ? 1
@@ -181,7 +185,7 @@ export function projectCanonicalBehaviorSituations(
       vulnerabilitySignal: Math.max(0.05, vulnerabilitySignal),
       challengeSignal: Math.max(0.1, challengeSignal),
       requestSignal,
-      coercionSignal: Math.max(0.05, severity.coercion),
+      coercionSignal: Math.max(0.05, dyadicCoercion),
       intimacySignal: Math.max(0.05, intimacySignal),
       // Betrayal is intentionally neutral until canonical semantics owns it.
       betrayalSignal: 0.05,
