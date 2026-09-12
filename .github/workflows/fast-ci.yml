@@ -5,9 +5,6 @@ on:
     branches:
       - 'codex/**'
 
-permissions:
-  contents: write
-
 jobs:
   fast-validate:
     runs-on: ubuntu-latest
@@ -16,21 +13,6 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
-          ref: codex/provider-attempt-cost-safety
-
-      - name: Apply provider cost-safety patch
-        if: ${{ startsWith(github.event.head_commit.message, 'chore') }}
-        run: python scripts/one_time_provider_attempt_patch.py
-
-      - name: Commit provider cost-safety patch
-        if: ${{ startsWith(github.event.head_commit.message, 'chore') }}
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add server.ts PROJECT_STATE.md
-          git commit -m "fix(provider): enforce shared outbound attempt budget"
-          git push origin HEAD:codex/provider-attempt-cost-safety
 
       - name: Setup Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
