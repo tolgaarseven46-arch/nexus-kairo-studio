@@ -14,4 +14,6 @@ Yes. `scopeKey` identifies the commitment scope, but person-specific truth must 
 ## Proof
 `socialAppraisalCommitmentScopePersonIsolation.test.ts` feeds two active commitments with the same scope key but different actors and requires two projected contexts. A single projected row is a deterministic RED proving cross-person collapse at the world-memory projection seam.
 
+PR #242 targets `main` so the repository's full CI policy executes this characterization.
+
 No provider/API calls are required.
