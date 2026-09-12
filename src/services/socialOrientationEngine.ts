@@ -48,20 +48,6 @@ export const socialOrientationFromFineTune = (fineTune: Record<string, number> |
   };
 };
 
-export const inferSocialSituation = (message: string): SocialSituation => {
-  const text = message.toLocaleLowerCase("tr-TR");
-  const hit = (re: RegExp, high = 0.9, low = 0.05) => (re.test(text) ? high : low);
-  return {
-    affiliationOpportunity: hit(/(kanka|dostum|beraber|birlikte|sohbet|tanış|arkadaş|özledim|seviyorum)/, 0.85, 0.15),
-    vulnerabilitySignal: hit(/(üzgün|kırıldım|moralim(?: çok)? bozuk|yalnızım|korkuyorum|bunaldım|canım sıkkın|yardım et)/),
-    challengeSignal: hit(/(yanlışsın|haksızsın|saçma|itiraz|katılmıyorum|hayır|olmaz|sen kimsin)/, 0.8, 0.1),
-    requestSignal: hit(/(yapar mısın|eder misin|yardım eder misin|lütfen|rica|şunu yap|bunu yap)/, 0.75, 0.15),
-    coercionSignal: hit(/(zorundasın|mecbursun|emrediyorum|dediğimi yap|sus|kes|itaat et)/),
-    intimacySignal: hit(/(sana güveniyorum|sırrım|özel bir şey|kimseye söyleme|aramızda kalsın|seni seviyorum)/, 0.9, 0.05),
-    betrayalSignal: hit(/(ihanet|güvenimi kırdın|beni sattın|arkamdan|yalan söyledin)/),
-  };
-};
-
 export const computeSocialOrientationResponse = (
   profile: SocialOrientationProfile,
   situation: SocialSituation,
@@ -113,11 +99,10 @@ export const computeSocialOrientationResponse = (
 export const applySocialOrientation = (
   base: DroitPersonalityTraits,
   fineTune: Record<string, number> | null | undefined,
-  message: string,
+  situation: SocialSituation,
   dynamicState?: DroitDynamicState,
 ): { personality: DroitPersonalityTraits; response: SocialOrientationResponse } => {
   const profile = socialOrientationFromFineTune(fineTune);
-  const situation = inferSocialSituation(message);
   const response = computeSocialOrientationResponse(profile, situation, dynamicState);
   return { personality: { ...base, ...response.legacyTraits }, response };
 };
