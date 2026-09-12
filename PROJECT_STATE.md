@@ -89,11 +89,12 @@
 - RED/GREEN regression proof: `kairaProviderAttemptBudgetRegression.test.ts`.
 - PR head `06d5086f8bca8121bca73276fe071a057e79df36` üzerinde full CI ve Architecture Review GREEN.
 
-## 15. State-to-response realization audit — ACTIVE
+## 15. State-to-response realization audit — CLOSED FOR MEASURED EMPTY-DELIVERY FAILURE
 - Response plan; question/advice/social-move/content-engagement/humor/affection/counter-flirt/forgiveness/reopening ve sentence/word/emoji budget ihlallerini deterministic olarak denetliyor.
-- Final-delivery gate'in belgelenmiş invariant'ına karşı yeni RED bulundu: upstream `accepted=true` verse bile boş candidate mevcut implementationda boş assistant mesajı persist edebiliyor.
-- RED proof branch: `codex/close-live-transport-realization-gate`, PR #233, Fast CI failure beklenen şekilde doğrulandı.
-- Hedef fix: final-delivery gate boş candidate'i kendi ownership sınırında fail-closed reddetmeli ve fallback persist etmeli; provider çağrısı gerekmiyor.
+- Ölçülmüş failure: upstream `accepted=true` verse bile boş/whitespace candidate final-delivery katmanından boş assistant mesajı olarak persist edebiliyordu.
+- PR #233 regression proof `kairaFinalDeliveryGate.test.ts` ile RED olarak kanıtlandı.
+- `resolveKairaFinalDelivery()` artık non-empty candidate invariantını kendi ownership sınırında uygular; boş candidate `final_delivery_empty_reply` issue koduyla fail-closed reddedilir ve mevcut safe fallback persist edilir.
+- Canonical semantic/KDM authority değişmedi; provider çağrısı yapılmadı.
 
 ## 16. Güncel checkpoint
 - Core Emotion-State Validation Phase 5A + 5B + 5C CLOSED.
@@ -101,6 +102,7 @@
 - Live Acceptance Transport CLOSED; PR #228 main üzerinde.
 - PR #230 CLOSED; canonical behavior-situation authority `main` üzerinde doğrulandı.
 - PR #231 CLOSED; provider outbound-attempt budget `main` üzerinde generation başına primary + tek recovery ile sınırlandı.
-- Aktif tek ölçülmüş realization RED: PR #233 final-delivery empty-candidate fail-closed invariantı.
+- Ölçülmüş final-delivery empty-candidate realization failure PR #233 ile fail-closed kapatıldı.
+- Yeni realization/behavior production patch yalnız yeni ölçülmüş RED failure sonrası açılmalı.
 - PR #230 sonrası eksik behavior-situation kavramları yalnız yeni testlerle gerçekten gerekli olduğu kanıtlanırsa canonical language schema/evidence katmanında modellenmeli; downstream regex geri getirilmemeli.
 - Provider tarafında yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı; canlı keşif çağrısı yapılmamalı.
