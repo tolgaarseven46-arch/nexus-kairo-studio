@@ -4,6 +4,7 @@ import {
   SEMANTIC_INTERPRETATION_SCHEMA_VERSION,
   type InterpretationEvidence,
   type InterpretationUncertainty,
+  type SemanticAttribution,
   type SemanticDiscourseAct,
   type SemanticDiscourseFacets,
   type SemanticInterpretation,
@@ -50,7 +51,7 @@ const GROUNDING_FIELDS = new Set<SemanticGroundingField>([
   "primaryIntent", "secondarySocialActs", "target", "valence", "severity",
   "affection", "support", "compliment", "emotionalLoad", "apology",
   "repairAttempt", "stopRequest", "socialRoutine", "discourseAct", "repairSignal",
-  "adviceRequested", "knowledgeQuery", "selfMemoryQuery", "worldMemory", "relationalAct",
+  "adviceRequested", "knowledgeQuery", "selfMemoryQuery", "worldMemory", "attribution", "relationalAct",
   "stopQuestions", "stopTalking",
 ]);
 
@@ -152,6 +153,31 @@ function normalizeWorldMemory(value: unknown): SemanticInterpretation["worldMemo
   }
   return { claims, query };
 }
+function normalizeAttribution(value: unknown): SemanticAttribution | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const v = value as Record<string, unknown>;
+  const intentionality = v.intentionality === "intentional" || v.intentionality === "unintentional"
+    ? v.intentionality
+    : "unknown";
+  const commitmentViolation = v.commitmentViolation === "present" || v.commitmentViolation === "absent"
+    ? v.commitmentViolation
+    : "unknown";
+  const deception = v.deception === "present" || v.deception === "absent" ? v.deception : "unknown";
+  const actorId = canonicalMemoryKey(v.actorId);
+  const scopeKey = canonicalMemoryKey(v.scopeKey);
+  const provenance = Array.isArray(v.provenance)
+    ? v.provenance.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim().slice(0, 128)).slice(0, 8)
+    : [];
+  return {
+    ...(actorId ? { actorId } : {}),
+    ...(scopeKey ? { scopeKey } : {}),
+    intentionality,
+    commitmentViolation,
+    deception,
+    confidence: clamp01(v.confidence),
+    provenance,
+  };
+}
 
 function normalizeSelfMemoryQuery(value: unknown): SemanticDiscourseFacets["selfMemoryQuery"] {
   if (!value || typeof value !== "object") return null;
@@ -213,6 +239,7 @@ export function normalizeSemanticInterpretation(value: unknown, message = ""): S
     : [];
   const discourseFacets = normalizeDiscourseFacets(v.discourseFacets);
   const worldMemory = normalizeWorldMemory(v.worldMemory);
+  const attribution = normalizeAttribution(v.attribution);
   return {
     schemaVersion: SEMANTIC_INTERPRETATION_SCHEMA_VERSION,
     raw,
@@ -228,6 +255,7 @@ export function normalizeSemanticInterpretation(value: unknown, message = ""): S
     apology: asBool(v.apology), repairAttempt: asBool(v.repairAttempt), stopRequest: discourseFacets.stopTalking,
     discourseFacets,
     ...(worldMemory ? { worldMemory } : {}),
+    ...(attribution ? { attribution } : {}),
     uncertainty: normalizeUncertainty(v.uncertainty), evidence: normalizeEvidence(v.evidence),
     ...(normalizeGrounding(v.grounding) ? { grounding: normalizeGrounding(v.grounding) } : {}),
   };
