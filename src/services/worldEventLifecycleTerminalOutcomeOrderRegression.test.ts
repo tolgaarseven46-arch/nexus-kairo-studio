@@ -73,4 +73,26 @@ describe("world-event lifecycle terminal outcome order stability", () => {
     expect(resolution.state).toBe("cancelled");
     expect(resolution.latestObservationId).toBe("cancelled");
   });
+
+  it("does not fail closed for duplicate same-state outcomes in the latest temporal bucket", () => {
+    const commitment = plan("plan", "2026-09-13T01:00:00.000Z");
+    const executedA = outcome("executed-a", "2026-09-13T01:01:00.000Z", "executed");
+    const executedB = outcome("executed-b", "2026-09-13T01:01:00.000Z", "executed");
+
+    const resolution = resolvePlanLifecycle([commitment, executedA, executedB], SCOPE);
+
+    expect(resolution.state).toBe("executed");
+  });
+
+  it("does not let an older ambiguous outcome bucket poison a newer definitive outcome", () => {
+    const commitment = plan("plan", "2026-09-13T01:00:00.000Z");
+    const executed = outcome("older-executed", "2026-09-13T01:01:00.000Z", "executed");
+    const cancelled = outcome("older-cancelled", "2026-09-13T01:01:00.000Z", "cancelled");
+    const newest = outcome("newest-executed", "2026-09-13T01:02:00.000Z", "executed");
+
+    const resolution = resolvePlanLifecycle([commitment, executed, cancelled, newest], SCOPE);
+
+    expect(resolution.state).toBe("executed");
+    expect(resolution.latestObservationId).toBe("newest-executed");
+  });
 });
