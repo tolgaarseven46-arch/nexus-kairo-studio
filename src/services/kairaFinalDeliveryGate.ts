@@ -27,14 +27,20 @@ export function resolveKairaFinalDelivery(
   candidateReply: string,
   consistency: KairaFinalConsistencySnapshot,
 ): KairaFinalDeliveryDecision {
-  const accepted = consistency.accepted === true;
   const candidate = String(candidateReply ?? "").trim();
+  const hasCandidate = candidate.length > 0;
+  const accepted = consistency.accepted === true && hasCandidate;
+  const issues = [...consistency.issues];
+  if (!hasCandidate && !issues.includes("empty_final_delivery_candidate")) {
+    issues.push("empty_final_delivery_candidate");
+  }
+
   return {
     accepted,
     candidateReply: candidate,
     persistedReply: accepted ? candidate : KAIRA_FINAL_REJECTION_FALLBACK,
     score: consistency.score,
-    issues: [...consistency.issues],
+    issues,
   };
 }
 
