@@ -1,17 +1,26 @@
-# ADR 0015 — Commitment lifecycle equal-timestamp order RED characterization
+# ADR 0015 — Commitment lifecycle equal-timestamp order stability
 
-Status: characterization only; production behavior unchanged.
+Status: accepted; measured RED → narrow GREEN.
 
 ## Question
 Can the same canonical lifecycle evidence multiset produce different current commitment truth solely because storage/input order differs when observations share the same valid timestamp?
 
-## Expected invariant
-No. Durable world-memory truth must not depend on array/storage order. This characterization intentionally does not decide whether an exactly simultaneous commitment + cancellation should resolve to planned, cancelled, or fail-closed unknown; it only requires permutation stability for the same evidence.
+## Measured RED
+Yes. CI run `34721674972` passed docs/behavior guards, architecture/runtime/harness/replay gates and Historical RED→GREEN, then failed at the full `Tests` step. With one commitment-generation observation and one cancellation observation sharing the same proposition identity and identical valid `createdAt`, one input permutation resolved `planned` while the other resolved `cancelled`.
 
-## Candidate failure
-`compareObservationRecency()` returns `0` when valid timestamps are equal. `resolvePlanLifecycle()` then uses sorted array order to choose the newest plan generation and its outcome window. Stable sort can therefore preserve caller order and let storage order affect lifecycle truth.
+## Root cause
+`compareObservationRecency()` correctly reports equal valid timestamps as equal recency. `resolvePlanLifecycle()` then used the stable sorted array order to choose the newest plan generation and its outcome window, allowing caller/storage order to become accidental temporal authority.
 
-## Proof
-`worldEventLifecycleEqualTimestampOrderRegression.test.ts` supplies one commitment-generation observation and one cancellation observation with the same canonical proposition identity and identical `createdAt`, then resolves both permutations. State, generation anchor and evidence identity must be permutation-stable.
+## Decision
+When a selected plan-generation observation and a lifecycle outcome for the same proposition have the same valid timestamp, their temporal relation is not established. `resolvePlanLifecycle()` therefore fails closed to `unknown` and retains both evidence identities. It does not use observation ID, insertion order, or another synthetic tie-breaker to invent semantic time.
 
-No production change and no provider/API call are part of this RED probe.
+This is deliberately narrow:
+- a strictly newer lifecycle outcome still closes the older plan generation;
+- an older lifecycle outcome still cannot contaminate a strictly newer plan generation;
+- the generic temporal comparator is unchanged;
+- lifecycle/world-memory ownership remains unchanged.
+
+## Regression proof
+`worldEventLifecycleEqualTimestampOrderRegression.test.ts` locks both input permutations to the same fail-closed `unknown` result and separately protects the two neighboring distinct-timestamp lifecycle behaviors.
+
+No provider/API calls are required.
