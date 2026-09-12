@@ -30,7 +30,7 @@ function activeMatchingCommitment(
     commitment.state === "active" &&
     commitment.actorId === attribution.actorId &&
     commitment.scopeKey === attribution.scopeKey &&
-    (!commitment.counterpartyId || commitment.counterpartyId === "kaira"),
+    commitment.counterpartyId === "kaira",
   );
 }
 
@@ -58,15 +58,23 @@ export function assessCommitmentBetrayal(
   );
   if (!sameActor) return absent("betrayal:party-mismatch");
 
-  const sameScope = commitments.some((commitment) =>
+  const sameScopeCommitments = commitments.filter((commitment) =>
     commitment.state === "active" &&
     commitment.actorId === attribution.actorId &&
     commitment.scopeKey === attribution.scopeKey,
   );
-  if (!sameScope) return absent("betrayal:scope-mismatch");
+  if (sameScopeCommitments.length === 0) return absent("betrayal:scope-mismatch");
 
   const commitment = activeMatchingCommitment(semantic, commitments);
-  if (!commitment) return absent("betrayal:counterparty-mismatch");
+  if (!commitment) {
+    const unresolvedCounterparty = sameScopeCommitments.some(
+      (candidate) => !candidate.counterpartyId,
+    );
+    if (unresolvedCounterparty) {
+      return unknown("betrayal:counterparty-evidence-missing");
+    }
+    return absent("betrayal:counterparty-mismatch");
+  }
 
   if (attribution.intentionality === "unknown" || attribution.provenance.length === 0) {
     return unknown("betrayal:intentionality-evidence-missing");
