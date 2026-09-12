@@ -67,4 +67,27 @@ describe("world-event lifecycle plan-generation order stability", () => {
     expect(resolution.generationObservationId).toBe("newer-plan");
     expect(resolution.planObservationId).toBe("newer-plan");
   });
+
+  it("lets a valid timestamp outrank invalid plan evidence", () => {
+    const valid = plan("valid-plan", "2026-09-13T01:00:00.000Z");
+    const invalid = plan("invalid-plan", "not-a-time");
+
+    const resolution = resolvePlanLifecycle([invalid, valid], SCOPE);
+
+    expect(resolution.state).toBe("planned");
+    expect(resolution.generationObservationId).toBe("valid-plan");
+    expect(resolution.planObservationId).toBe("valid-plan");
+  });
+
+  it("does not let an older ambiguous pair hide a strictly newer plan", () => {
+    const olderA = plan("older-a", "2026-09-13T01:00:00.000Z");
+    const olderB = plan("older-b", "2026-09-13T01:00:00.000Z");
+    const newer = plan("newer-plan", "2026-09-13T01:01:00.000Z");
+
+    const resolution = resolvePlanLifecycle([olderA, newer, olderB], SCOPE);
+
+    expect(resolution.state).toBe("planned");
+    expect(resolution.generationObservationId).toBe("newer-plan");
+    expect(resolution.planObservationId).toBe("newer-plan");
+  });
 });
