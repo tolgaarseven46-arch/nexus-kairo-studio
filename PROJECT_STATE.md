@@ -123,7 +123,17 @@
 - Deterministic commitment/betrayal regression, historical RED→GREEN proof, full test suite, TypeScript ve production build GREEN; Architecture Review ve behavior/docs guards GREEN.
 - Provider/API çağrısı yok.
 
-## 19. Güncel checkpoint
+## 19. Commitment counterparty isolation — CLOSED
+- PR #239 merge commit `1e7245c16f675ad6909a7e687d35bfe2741a1301` ile `main`e alındı.
+- Ölçülmüş RED: same-actor/same-scope active commitment kaydında `counterpartyId` eksikken matcher bu belirsizliği Kaira eşleşmesi sayıp Kaira-directed betrayal üretebiliyordu.
+- Canonical world-memory projection doğru biçimde target yoksa `counterpartyId` üretmiyor; ownership hatası projection/memory katmanında değil SocialAppraisal matching sınırındaydı.
+- GREEN contract: explicit `counterpartyId === "kaira"` eşleşebilir; explicit third-party `absent`; missing counterparty `unknown` ve `betrayal:counterparty-evidence-missing` ile fail-closed.
+- Üç komşu regression real runtime seam üzerinden kilitlendi: missing → unknown, third-party → absent, Kaira → present.
+- İlk RED CI run `34718540156` full `Tests` adımında beklenen şekilde kırıldı; önceki architecture/runtime/harness ve historical proof katmanları yeşildi.
+- GREEN head `f61338d4f619e33e355265fa46cd69df6e0c66f9` üzerinde CI run `34718795905` ve Architecture Review run `34718795904` GREEN.
+- Yeni memory/semantic authority yok; provider/API çağrısı yok.
+
+## 20. Güncel checkpoint
 - Core Emotion-State Validation Phase 5A + 5B + 5C CLOSED.
 - Deterministic emotion coverage: 27 ana matrix cell + 6 cross-axis combination + boundedness/isolation proof.
 - Live Acceptance Transport CLOSED; PR #228 main üzerinde.
@@ -133,7 +143,8 @@
 - PR #235 CLOSED; normal production call path canonical semantic event'i behavior/dialogue katmanlarına taşır, fallback production-reachable değildir.
 - PR #236 CLOSED; severe high-confidence single-axis harm mature relationship attenuation tarafından sıfırlanamaz.
 - PR #237 CLOSED; commitment evidence mevcut world-memory lifecycle içinde kalır, betrayal/unfairness SocialAppraisal ownership'indedir ve intentionality canonical semantic attribution'dan gelir.
-- Açık PR yok.
+- PR #239 CLOSED; unresolved commitment counterparty artık Kaira-directed betrayal'a yükseltilemez.
+- Açık production failure bilinmiyor; yeni patch yalnız yeni ölçülmüş RED/counterexample sonrası açılmalı.
 - Yeni realization/behavior production patch yalnız yeni ölçülmüş RED failure sonrası açılmalı.
 - Yeni relationship/social-appraisal production patch yalnız ölçülmüş counterexample veya RED failure sonrası açılmalı; mevcut authority sınırlarını genişletmek için varsayımsal patch yapılmamalı.
 - PR #230 sonrası eksik behavior-situation kavramları yalnız yeni testlerle gerçekten gerekli olduğu kanıtlanırsa canonical language schema/evidence katmanında modellenmeli; downstream regex geri getirilmemeli.
