@@ -110,4 +110,8 @@ describe("SocialAppraisal commitment evidence ordering", () => {
     expect(incompleteFirst.betrayal?.status).toBe("present");
     expect(incompleteFirst.betrayal?.confidence).toBe(validFirst.betrayal?.confidence);
   });
+
+  it("keeps an incomplete-only Kaira-directed commitment uncertain", () => {
+    expect(appraise([incomplete]).betrayal?.status).toBe("unknown");
+  });
 });
