@@ -160,11 +160,22 @@
 - Observation ID, insertion order veya sentetik tie-breaker semantic zaman otoritesi yapılmadı; generic temporal comparator değişmedi.
 - Regression iki eşzamanlı permutation'ı `unknown` olarak kilitler; ayrıca strictly-newer cancellation → `cancelled` ve strictly-newer plan / older cancellation → `planned` davranışları korunur.
 - GREEN behavior head `fa185267ac4827c17b7585d5ad04c36c6603922c` üzerinde CI run `34721987139` ve Architecture Review run `34721987156` tamamen GREEN; full Tests, TypeScript ve production build GREEN.
+- PR #244 merge commit `bb46135f028366dfd6b6aafbf8a25ecce8b8a696` ile `main`e alındı.
 - Provider/API çağrısı yok.
 
-## 23. Güncel checkpoint
-- `main` merge öncesi doğrulanan SHA `0fa31233b4066b039b7ce5983ed13edff96761d7`; PR #244 bu checkpoint'i `main`e taşıyacak.
-- Commitment evidence-order, person-isolation ve equal-timestamp lifecycle order measured RED sınıfları doğru ownership seam'lerinde minimal fix'lerle kapatıldı.
+## 23. Commitment lifecycle invalid-timestamp order stability — CLOSED
+- PR #245 ölçülmüş RED ile açıldı: aynı proposition için plan generation ve cancellation temporal olarak geçersiz `createdAt` değerleri taşıdığında aynı evidence multiset'i yalnız input/storage sırasına göre farklı lifecycle truth üretebiliyordu.
+- RED CI run `34722582940`: docs/behavior guards, architecture/runtime/harness/replay katmanları, proof manifest ve Historical RED→GREEN GREEN; full `Tests` FAIL; TypeScript/build skip.
+- Root cause: iki timestamp de invalid olduğunda `compareObservationRecency()` `0` dönüyor; #244 guard'ı yalnız eşit geçerli timestamp'i kapsadığı için stable sort caller order'ını current-generation sınırına sızdırabiliyordu.
+- GREEN: seçili plan ile lifecycle outcome ya aynı geçerli timestamp'i taşıyorsa ya da ikisinin timestamp'i de geçersiz ve order edilemiyorsa resolver fail-closed `unknown` döner; evidence kimlikleri korunur.
+- Mixed valid/invalid temporal policy değişmedi; observation ID/insertion-order tie-breaker eklenmedi; generic temporal comparator değişmedi.
+- Regression invalid-timestamp iki permutation'ı, equal-valid permutation'ları ve strictly ordered komşu lifecycle davranışlarını kilitler.
+- GREEN behavior head `f39b8f35eb63e9259e1985b1fdccf2cc3bcfaa51` üzerinde CI run `34722993619` ve Architecture Review run `34722993537` tamamen GREEN; full Tests, TypeScript ve production build GREEN.
+- Provider/API çağrısı yok.
+
+## 24. Güncel checkpoint
+- `main` doğrulanan SHA `bb46135f028366dfd6b6aafbf8a25ecce8b8a696`; PR #245 bu checkpoint'i `main`e taşıyacak.
+- Commitment evidence-order, person-isolation, equal-timestamp ve invalid-timestamp lifecycle order measured RED sınıfları doğru ownership seam'lerinde minimal fix'lerle kapatıldı.
 - Açık production failure bilinmiyor; yeni patch yalnız yeni ölçülmüş RED/counterexample sonrası açılmalı.
 - Yeni realization/behavior production patch yalnız yeni ölçülmüş RED failure sonrası açılmalı.
 - Yeni relationship/social-appraisal/world-lifecycle production patch yalnız ölçülmüş counterexample veya RED failure sonrası açılmalı; mevcut authority sınırlarını genişletmek için varsayımsal patch yapılmamalı.

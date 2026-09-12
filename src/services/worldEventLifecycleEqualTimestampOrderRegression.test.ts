@@ -58,6 +58,35 @@ describe("world-event lifecycle equal-timestamp order stability", () => {
     );
   });
 
+  it("fails closed identically when lifecycle ordering cannot be established because timestamps are invalid", () => {
+    const commitment = observation({
+      id: "invalid-time-plan",
+      modality: "commitment",
+      lifecycle: "unspecified",
+      createdAt: "not-a-time",
+    });
+    const cancellation = observation({
+      id: "invalid-time-cancellation",
+      modality: "none",
+      lifecycle: "cancelled",
+      createdAt: "also-not-a-time",
+    });
+
+    const commitmentFirst = resolvePlanLifecycle([commitment, cancellation], SCOPE);
+    const cancellationFirst = resolvePlanLifecycle([cancellation, commitment], SCOPE);
+
+    expect(commitmentFirst.state).toBe("unknown");
+    expect(cancellationFirst.state).toBe("unknown");
+    expect(commitmentFirst.generationObservationId).toBe("invalid-time-plan");
+    expect(cancellationFirst.generationObservationId).toBe("invalid-time-plan");
+    expect(new Set(commitmentFirst.evidenceObservationIds)).toEqual(
+      new Set(["invalid-time-plan", "invalid-time-cancellation"]),
+    );
+    expect(new Set(cancellationFirst.evidenceObservationIds)).toEqual(
+      new Set(["invalid-time-plan", "invalid-time-cancellation"]),
+    );
+  });
+
   it("still applies a lifecycle outcome that is strictly newer than the plan generation", () => {
     const commitment = observation({
       id: "older-plan",

@@ -100,6 +100,22 @@ function hasLifecycleOutcome(event: LifecycleCanonicalWorldEvent): boolean {
   return Boolean(kind && kind !== "unspecified");
 }
 
+function isTemporallyAmbiguousWithPlan(
+  plan: WorldEventObservation,
+  item: WorldEventObservation,
+): boolean {
+  if (item === plan || !hasLifecycleOutcome(item.event)) return false;
+
+  const planTimestamp = validTimestamp(plan.createdAt);
+  const itemTimestamp = validTimestamp(item.createdAt);
+
+  if (planTimestamp !== null && itemTimestamp !== null) {
+    return itemTimestamp === planTimestamp;
+  }
+
+  return planTimestamp === null && itemTimestamp === null;
+}
+
 /**
  * Derives the current lifecycle for the newest immutable plan generation of one
  * canonical proposition. A newer plan/commitment/intention starts a fresh
@@ -128,29 +144,21 @@ export function resolvePlanLifecycle(
     };
   }
 
-  const planTimestamp = validTimestamp(plan.createdAt);
-  if (planTimestamp !== null) {
-    const tiedOutcomes = matching.filter((item) => {
-      if (item === plan || !hasLifecycleOutcome(item.event)) return false;
-      const itemTimestamp = validTimestamp(item.createdAt);
-      return itemTimestamp !== null && itemTimestamp === planTimestamp;
-    });
+  const ambiguousOutcomes = matching.filter((item) => isTemporallyAmbiguousWithPlan(plan, item));
+  if (ambiguousOutcomes.length) {
+    const evidenceObservationIds = [plan, ...ambiguousOutcomes]
+      .map((item) => item.id)
+      .filter((id): id is string => Boolean(id))
+      .sort();
 
-    if (tiedOutcomes.length) {
-      const evidenceObservationIds = [plan, ...tiedOutcomes]
-        .map((item) => item.id)
-        .filter((id): id is string => Boolean(id))
-        .sort();
-
-      return {
-        propositionKey,
-        state: "unknown",
-        latestObservationId: plan.id,
-        planObservationId: plan.id,
-        generationObservationId: plan.id,
-        evidenceObservationIds,
-      };
-    }
+    return {
+      propositionKey,
+      state: "unknown",
+      latestObservationId: plan.id,
+      planObservationId: plan.id,
+      generationObservationId: plan.id,
+      evidenceObservationIds,
+    };
   }
 
   const planIndex = matching.indexOf(plan);
