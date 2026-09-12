@@ -41,8 +41,8 @@ function commitmentObservation(input: {
 }
 
 describe("SocialAppraisal commitment world-memory person isolation", () => {
-  it("preserves separate active commitments when actor/counterparty differ but scopeKey matches", () => {
-    const observations = [
+  it("preserves separate active commitments when actors differ but scopeKey matches", () => {
+    const projected = buildSocialAppraisalCommitmentContext([
       commitmentObservation({
         id: "commitment-alice",
         actorId: "user:alice",
@@ -55,14 +55,35 @@ describe("SocialAppraisal commitment world-memory person isolation", () => {
         targetId: "kaira",
         createdAt: "2026-09-12T11:00:00.000Z",
       }),
-    ];
-
-    const projected = buildSocialAppraisalCommitmentContext(observations);
+    ]);
 
     expect(projected).toHaveLength(2);
     expect(projected.map((item) => item.actorId).sort()).toEqual(["user:alice", "user:bob"]);
     expect(projected.every((item) => item.scopeKey === "commitment:shared_scope")).toBe(true);
     expect(projected.every((item) => item.counterpartyId === "kaira")).toBe(true);
+    expect(projected.every((item) => item.state === "active")).toBe(true);
+  });
+
+  it("preserves separate active commitments when counterparties differ but actor/scope match", () => {
+    const projected = buildSocialAppraisalCommitmentContext([
+      commitmentObservation({
+        id: "commitment-kaira",
+        actorId: "user:alice",
+        targetId: "kaira",
+        createdAt: "2026-09-12T10:00:00.000Z",
+      }),
+      commitmentObservation({
+        id: "commitment-third-party",
+        actorId: "user:alice",
+        targetId: "user:charlie",
+        createdAt: "2026-09-12T11:00:00.000Z",
+      }),
+    ]);
+
+    expect(projected).toHaveLength(2);
+    expect(projected.map((item) => item.counterpartyId).sort()).toEqual(["kaira", "user:charlie"]);
+    expect(projected.every((item) => item.actorId === "user:alice")).toBe(true);
+    expect(projected.every((item) => item.scopeKey === "commitment:shared_scope")).toBe(true);
     expect(projected.every((item) => item.state === "active")).toBe(true);
   });
 });
