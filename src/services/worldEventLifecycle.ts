@@ -189,7 +189,33 @@ export function resolvePlanLifecycle(
   // to the current generation's outcome window; the plan itself is included as
   // the generation anchor.
   const generation = matching.slice(0, planIndex + 1);
-  const latestSignal = generation.find((item) => hasLifecycleOutcome(item.event));
+  const lifecycleOutcomes = generation.filter((item) => hasLifecycleOutcome(item.event));
+  const latestSignal = lifecycleOutcomes[0];
+
+  if (latestSignal) {
+    const latestSignalKind = latestSignal.event.lifecycle?.kind;
+    const conflictingLatestSignals = lifecycleOutcomes.filter(
+      (item) =>
+        item !== latestSignal &&
+        isTemporallyIndistinguishable(latestSignal, item) &&
+        item.event.lifecycle?.kind !== latestSignalKind,
+    );
+
+    if (conflictingLatestSignals.length) {
+      const evidenceObservationIds = [latestSignal, ...conflictingLatestSignals]
+        .map((item) => item.id)
+        .filter((id): id is string => Boolean(id))
+        .sort();
+
+      return {
+        propositionKey,
+        state: "unknown",
+        planObservationId: plan.id,
+        generationObservationId: plan.id,
+        evidenceObservationIds,
+      };
+    }
+  }
 
   const signalState = latestSignal?.event.lifecycle?.kind;
   const state: PlanLifecycleState = signalState && signalState !== "unspecified"

@@ -173,9 +173,27 @@
 - GREEN behavior head `f39b8f35eb63e9259e1985b1fdccf2cc3bcfaa51` üzerinde CI run `34722993619` ve Architecture Review run `34722993537` tamamen GREEN; full Tests, TypeScript ve production build GREEN.
 - Provider/API çağrısı yok.
 
-## 24. Güncel checkpoint
-- `main` doğrulanan SHA `bb46135f028366dfd6b6aafbf8a25ecce8b8a696`; PR #245 bu checkpoint'i `main`e taşıyacak.
-- Commitment evidence-order, person-isolation, equal-timestamp ve invalid-timestamp lifecycle order measured RED sınıfları doğru ownership seam'lerinde minimal fix'lerle kapatıldı.
+## 24. Commitment plan-generation order stability — CLOSED
+- PR #246 merge commit `f36b60b8c568499f67123ed6906cd6b7961db9af` ile `main`e alındı.
+- Ölçülmüş RED: aynı proposition için iki candidate plan generation temporal olarak ayırt edilemediğinde stable sort caller/storage order'ı hangi generation'ın "newest" sayılacağını belirleyebiliyordu.
+- GREEN: competing plan generation'lar aynı geçerli timestamp'i taşıyorsa veya ikisinin timestamp'i de geçersizse resolver fail-closed `unknown` döner; evidence kimlikleri korunur.
+- Mixed valid/invalid policy değişmedi; valid timestamp temporal authority olarak invalid evidence'ın önünde kalır. Generic comparator ve canonical ownership değişmedi.
+- Regression equal-valid, both-invalid ve strictly-newer valid plan kontrollerini kilitler.
+- Full Tests, TypeScript, production build ve Architecture Review GREEN; provider/API çağrısı yok.
+
+## 25. Commitment terminal-outcome order stability — READY TO MERGE
+- PR #247 branch `codex/commitment-terminal-outcome-order-red`.
+- Ölçülmüş RED CI run `34725297521`: docs/behavior guards, deterministic pre-gates ve Historical RED→GREEN GREEN; full `Tests` FAIL; TypeScript/build skip.
+- Root cause: current plan generation içindeki iki farklı terminal lifecycle state aynı temporal bucket'ta olduğunda `generation.find(...)` stable sort caller order'ına göre ilk state'i authoritative truth yapabiliyordu.
+- GREEN: yalnız latest lifecycle-outcome temporal bucket incelenir; temporally indistinguishable farklı lifecycle kind'ları `unknown` fail-closed üretir ve conflicting evidence kimlikleri korunur.
+- Aynı-state duplicate outcome ambiguity sayılmaz; daha eski ambiguous bucket strictly newer definitive outcome'u zehirlemez; normal strictly-newer outcome davranışı korunur.
+- Global temporal comparator, lifecycle ownership ve canonical semantic authority değişmedi.
+- GREEN head `bfa41432b8ba944909d801b737efea2396c96f72` üzerinde CI run `34725601193` tamamen GREEN; Architecture Review run `34725601140` GREEN; full Tests, TypeScript ve production build GREEN.
+- Provider/API çağrısı yok.
+
+## 26. Güncel checkpoint
+- `main` doğrulanan SHA `f36b60b8c568499f67123ed6906cd6b7961db9af`; PR #247 final checkpoint CI sonrası merge edilecek.
+- Commitment evidence-order, person-isolation, plan/outcome temporal ambiguity, plan-generation ambiguity ve terminal-outcome ambiguity measured RED sınıfları mevcut ownership seam'lerinde minimal fail-closed fix'lerle kapatıldı veya merge'e hazırlandı.
 - Açık production failure bilinmiyor; yeni patch yalnız yeni ölçülmüş RED/counterexample sonrası açılmalı.
 - Yeni realization/behavior production patch yalnız yeni ölçülmüş RED failure sonrası açılmalı.
 - Yeni relationship/social-appraisal/world-lifecycle production patch yalnız ölçülmüş counterexample veya RED failure sonrası açılmalı; mevcut authority sınırlarını genişletmek için varsayımsal patch yapılmamalı.
