@@ -26,11 +26,29 @@ export interface SocialAppraisalAutobiographicalContext {
   meanEmotionalIntensity: number;
 }
 
+export type SocialAppraisalCommitmentState = "active" | "fulfilled" | "cancelled" | "failed" | "unknown";
+
+/**
+ * Bounded projection of an existing canonical world-event commitment generation.
+ * This is not a memory store: worldModel remains the owner of persisted truth and
+ * lifecycle; appraisal receives only the minimum typed evidence needed to compare
+ * a current canonical attribution with an already-resolved prior commitment.
+ */
+export interface SocialAppraisalCommitmentContext {
+  kind: "commitment";
+  state: SocialAppraisalCommitmentState;
+  actorId: string;
+  counterpartyId?: string;
+  scopeKey: string;
+  confidence: number;
+  provenance: readonly string[];
+}
+
 export interface SocialAppraisalMemoryContext {
   /** Structured summaries only. SocialAppraisal must never reparse raw history. */
   relationshipEpisodes?: readonly unknown[];
   autobiographical?: Readonly<SocialAppraisalAutobiographicalContext> | null;
-  world?: readonly unknown[];
+  world?: readonly Readonly<SocialAppraisalCommitmentContext>[];
 }
 
 export interface SocialAppraisalInput {
@@ -49,6 +67,13 @@ export interface SocialAppraisalInput {
 }
 
 export type AppraisalValence = "negative" | "neutral" | "positive";
+export type AppraisalEvidenceStatus = "present" | "absent" | "unknown";
+
+export interface SocialAppraisalEvidenceAssessment {
+  status: AppraisalEvidenceStatus;
+  confidence: number;
+  reasons: readonly string[];
+}
 
 /** Relationship-facing projection. Zero magnitude is a first-class result. */
 export interface RelationalAppraisalProjection {
@@ -79,6 +104,10 @@ export interface SocialAppraisalResult {
   confidence: number;
   relational: RelationalAppraisalProjection;
   affective: AffectiveAppraisalProjection;
+  /** Cross-turn commitment assessment owned by appraisal, not RelationshipReducer. */
+  betrayal?: SocialAppraisalEvidenceAssessment;
+  /** Comparative/normative unfairness remains unknown until explicit evidence exists. */
+  unfairness?: SocialAppraisalEvidenceAssessment;
   /** True only when both projections have zero material significance. */
   noMaterialEffect: boolean;
   /** Auditable construct-level reasons/provenance, never hidden raw-text reparses. */
