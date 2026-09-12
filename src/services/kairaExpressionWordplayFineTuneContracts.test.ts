@@ -18,7 +18,11 @@ describe('expression wordplay fine-tune wiring', () => {
       'expression.humor.wordplay': 100,
       'expression.humor.contextInhibition': 0,
     });
-    const response = computeExpressionStyle(profile, 'bir kelime oyunu yap');
+    const response = computeExpressionStyle(profile, {
+      seriousContext: 0,
+      hostileContext: 0,
+      playfulContext: 1,
+    });
     expect(response.humor.enabled).toBe(true);
     expect(response.humor.dominantMode).toBe('wordplay');
     expect(response.humor.strength).toBeGreaterThan(0.5);
