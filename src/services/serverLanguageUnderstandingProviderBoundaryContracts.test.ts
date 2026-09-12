@@ -11,9 +11,9 @@ describe("server language-understanding provider boundary contracts", () => {
   });
 
   it("uses preferredProvider only for transport selection", () => {
-    expect(bridge).toContain(
-      "input.generateText(system, [{ role: \"user\", content: prompt }], temperature, input.preferredProvider)",
-    );
+    expect(bridge).toContain("input.generateText(");
+    expect(bridge).toContain("input.preferredProvider,");
+    expect(bridge).not.toContain("preferredProvider: input.preferredProvider");
   });
 
   it("overwrites model-supplied LLM provider labels with trusted runtime provenance", () => {

@@ -5,6 +5,11 @@ import {
   type KairaCanonicalIdentityLoadResult,
 } from "./kairaCanonicalIdentityStore";
 import { buildSocialAppraisalAutobiographicalContext } from "./socialAppraisalAutobiographicalContext";
+import { buildSocialAppraisalCommitmentContext } from "./socialAppraisalWorldMemoryContext";
+import {
+  loadRecentWorldEventObservations,
+  type WorldEventObservation,
+} from "./worldModelEventStore";
 
 export type SocialAppraisalAutobiographicalRuntimeStatus =
   | "loaded"
@@ -21,13 +26,19 @@ export interface SocialAppraisalAutobiographicalRuntimeDependencies {
   loadIdentity?: (
     instance: Pick<KairaInstanceContext, "instanceId" | "instanceType">,
   ) => Promise<KairaCanonicalIdentityLoadResult>;
+  loadWorldObservations?: (
+    userId: string | undefined,
+    maxItems: number,
+    kairaInstanceId: string,
+  ) => Promise<WorldEventObservation[]>;
 }
 
 /**
  * Persistence-aware upstream seam for G4.
  *
- * The runtime may load canonical identity, but it only exports the bounded
- * active-user projection. Raw autobiographical records never cross into KDM/G4.
+ * The runtime may load canonical identity and existing canonical world events,
+ * but it exports only bounded typed projections. Raw autobiographical records and
+ * raw world-event text never cross into KDM/G4; no second memory authority exists.
  */
 export async function loadSocialAppraisalAutobiographicalRuntime(
   input: {
@@ -46,8 +57,18 @@ export async function loadSocialAppraisalAutobiographicalRuntime(
     loaded.state,
     input.userId,
   );
+  const loadWorld = dependencies.loadWorldObservations ?? loadRecentWorldEventObservations;
+  const observations = await loadWorld(input.userId, 40, input.instance.instanceId).catch(() => []);
+  const world = buildSocialAppraisalCommitmentContext(observations);
+
   return {
     status: "loaded",
-    memory: autobiographical ? { autobiographical } : undefined,
+    memory:
+      autobiographical || world.length > 0
+        ? {
+            ...(autobiographical ? { autobiographical } : {}),
+            ...(world.length > 0 ? { world } : {}),
+          }
+        : undefined,
   };
 }

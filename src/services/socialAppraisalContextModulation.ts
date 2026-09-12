@@ -3,6 +3,7 @@ import type {
   SocialAppraisalResult,
 } from "../types/socialAppraisal";
 import { normalizeDroitPersonality } from "./droitPersonalityNormalizer";
+import { applyCommitmentAppraisalEvidence } from "./socialAppraisalCommitmentBetrayal";
 import {
   resolveSocialAppraisalG3,
   type SocialAppraisalRelationshipScope,
@@ -115,7 +116,9 @@ function computeContextFactors(
   );
 
   // Exact-zero / one-sided projections stay one-sided. A factor is observable but
-  // cannot manufacture significance from a zero base magnitude.
+  // cannot manufacture significance from a zero base magnitude. Typed commitment
+  // betrayal is resolved before this stage and therefore counts as an existing
+  // appraisal projection, not as a G4 modulation invention.
   return {
     relationalHarm: base.relational.harmEvidence > 0 ? relationalHarm : 1,
     relationalRepair: base.relational.repairEvidence > 0 ? relationalRepair : 1,
@@ -188,15 +191,17 @@ function modulate(
  * G4 bounded context modulation.
  *
  * Authority rule:
- * - G3 owns resolved social meaning and projection direction.
+ * - G3 owns current-turn resolved social meaning and projection direction.
+ * - a typed commitment appraisal may combine canonical current-turn attribution
+ *   with a bounded projection of prior world-model commitment lifecycle evidence;
+ *   it never reparses raw history or mutates world-memory truth.
  * - G4 may only scale existing projection magnitudes from typed personality,
  *   current state, existing relationship context, and bounded typed memory summaries.
  * - autobiographical context may deepen an already-material affective projection,
  *   but cannot alter relational direction/harm/repair or create effect from zero.
  * - typed relationship grounding may resolve an otherwise-unknown target, but
  *   cannot override an explicit self/third-party/event target.
- * - G4 cannot create a projection from exact zero, change target/intent/valence,
- *   or reinterpret raw/canonical semantics.
+ * - G4 cannot change target/intent/valence or reinterpret raw/canonical semantics.
  */
 export function resolveSocialAppraisalG4(
   input: Readonly<SocialAppraisalInput>,
@@ -209,10 +214,16 @@ export function resolveSocialAppraisalG4(
     input.dyadicNorm,
     relationshipScope,
   );
+  const commitmentAppraisal = applyCommitmentAppraisalEvidence(
+    g3.appraisal,
+    input.semantic,
+    input.memory?.world,
+  );
 
-  if (g3.appraisal.noMaterialEffect) {
+  if (commitmentAppraisal.noMaterialEffect) {
     return {
       ...g3,
+      appraisal: commitmentAppraisal,
       contextFactors: {
         relationalHarm: 1,
         relationalRepair: 1,
@@ -224,10 +235,10 @@ export function resolveSocialAppraisalG4(
     };
   }
 
-  const contextFactors = computeContextFactors(input, g3.appraisal);
+  const contextFactors = computeContextFactors(input, commitmentAppraisal);
   return {
     ...g3,
-    appraisal: modulate(g3.appraisal, contextFactors),
+    appraisal: modulate(commitmentAppraisal, contextFactors),
     contextFactors,
   };
 }
