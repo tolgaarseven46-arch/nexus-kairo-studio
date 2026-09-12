@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   computeSocialOrientationResponse,
-  inferSocialSituation,
   socialOrientationFromFineTune,
+  type SocialSituation,
 } from "./socialOrientationEngine";
 
 const baseProfile = socialOrientationFromFineTune({
@@ -16,22 +16,39 @@ const baseProfile = socialOrientationFromFineTune({
   "social.trust.disclosure": 50,
 });
 
+const baseSituation: SocialSituation = {
+  affiliationOpportunity: 0.15,
+  vulnerabilitySignal: 0.05,
+  challengeSignal: 0.1,
+  requestSignal: 0.15,
+  coercionSignal: 0.05,
+  intimacySignal: 0.05,
+  betrayalSignal: 0.05,
+};
+
 describe("socialOrientationEngine", () => {
-  it("raises care pressure when the other person is vulnerable", () => {
-    const situation = inferSocialSituation("moralim çok bozuk, biraz konuşabilir miyiz?");
-    const result = computeSocialOrientationResponse(baseProfile, situation);
+  it("raises care pressure when the typed situation signals vulnerability", () => {
+    const result = computeSocialOrientationResponse(baseProfile, {
+      ...baseSituation,
+      vulnerabilitySignal: 0.9,
+    });
     expect(result.behaviorSignals.carePressure).toBeGreaterThan(0.5);
   });
 
-  it("raises resistance when the user is coercive", () => {
-    const situation = inferSocialSituation("dediğimi yapmak zorundasın");
-    const result = computeSocialOrientationResponse(baseProfile, situation);
+  it("raises resistance when the typed situation signals coercion", () => {
+    const result = computeSocialOrientationResponse(baseProfile, {
+      ...baseSituation,
+      coercionSignal: 0.9,
+    });
     expect(result.behaviorSignals.resistancePressure).toBeGreaterThan(0.5);
     expect(result.effective.compliance).toBeLessThan(baseProfile.compliance);
   });
 
   it("uses relationship hurt to reduce closeness and disclosure", () => {
-    const situation = inferSocialSituation("aramızda kalsın, sana özel bir şey söyleyeceğim");
+    const situation: SocialSituation = {
+      ...baseSituation,
+      intimacySignal: 0.9,
+    };
     const safe = computeSocialOrientationResponse(baseProfile, situation, {
       calmness: 70,
       anger: 10,
