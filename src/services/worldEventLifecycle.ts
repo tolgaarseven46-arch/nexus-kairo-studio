@@ -100,20 +100,26 @@ function hasLifecycleOutcome(event: LifecycleCanonicalWorldEvent): boolean {
   return Boolean(kind && kind !== "unspecified");
 }
 
+function isTemporallyIndistinguishable(
+  left: WorldEventObservation,
+  right: WorldEventObservation,
+): boolean {
+  const leftTimestamp = validTimestamp(left.createdAt);
+  const rightTimestamp = validTimestamp(right.createdAt);
+
+  if (leftTimestamp !== null && rightTimestamp !== null) {
+    return leftTimestamp === rightTimestamp;
+  }
+
+  return leftTimestamp === null && rightTimestamp === null;
+}
+
 function isTemporallyAmbiguousWithPlan(
   plan: WorldEventObservation,
   item: WorldEventObservation,
 ): boolean {
   if (item === plan || !hasLifecycleOutcome(item.event)) return false;
-
-  const planTimestamp = validTimestamp(plan.createdAt);
-  const itemTimestamp = validTimestamp(item.createdAt);
-
-  if (planTimestamp !== null && itemTimestamp !== null) {
-    return itemTimestamp === planTimestamp;
-  }
-
-  return planTimestamp === null && itemTimestamp === null;
+  return isTemporallyIndistinguishable(plan, item);
 }
 
 /**
@@ -134,13 +140,30 @@ export function resolvePlanLifecycle(
     return { propositionKey, state: "unknown", evidenceObservationIds: [] };
   }
 
-  const plan = matching.find((item) => isPlanEvidence(item.event));
+  const planCandidates = matching.filter((item) => isPlanEvidence(item.event));
+  const plan = planCandidates[0];
   if (!plan) {
     return {
       propositionKey,
       state: "unknown",
       latestObservationId: matching[0].id,
       evidenceObservationIds: matching.map((item) => item.id).filter((id): id is string => Boolean(id)),
+    };
+  }
+
+  const ambiguousPlans = planCandidates.filter(
+    (item) => item !== plan && isTemporallyIndistinguishable(plan, item),
+  );
+  if (ambiguousPlans.length) {
+    const evidenceObservationIds = [plan, ...ambiguousPlans]
+      .map((item) => item.id)
+      .filter((id): id is string => Boolean(id))
+      .sort();
+
+    return {
+      propositionKey,
+      state: "unknown",
+      evidenceObservationIds,
     };
   }
 
