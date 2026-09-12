@@ -27,7 +27,8 @@ function sameCommitmentIdentity(
   identity: Readonly<CommitmentIdentity>,
 ): boolean {
   const proposition = item.event.proposition;
-  return proposition?.key === identity.scopeKey
+  if (!proposition) return false;
+  return proposition.key === identity.scopeKey
     && proposition.actorKey === identity.actorId
     && proposition.targetKey === identity.counterpartyId;
 }
