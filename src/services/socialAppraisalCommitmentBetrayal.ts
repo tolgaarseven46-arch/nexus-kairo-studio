@@ -104,6 +104,11 @@ export function applyCommitmentAppraisalEvidence(
   semantic: Readonly<SemanticInterpretation>,
   commitments: readonly Readonly<SocialAppraisalCommitmentContext>[] = [],
 ): SocialAppraisalResult {
+  // Keep ordinary G4 appraisal byte-for-byte compatible when the canonical
+  // current-turn semantic boundary did not emit commitment attribution. Prior
+  // world-memory evidence alone cannot manufacture a betrayal/unfairness concern.
+  if (!semantic.attribution) return { ...base };
+
   const betrayal = assessCommitmentBetrayal(semantic, commitments);
   const unfairness = assessUnfairness();
   if (betrayal.status !== "present") {
