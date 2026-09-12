@@ -66,21 +66,33 @@ const run = (turnSignal: RelationshipTurnSignal) =>
     config: DEFAULT_RELATIONSHIP_REDUCER_CONFIG,
   });
 
-describe("RED — severe direct harm must not be washed out by relationship maturity", () => {
+describe("severe direct harm protection", () => {
   it.each([
     ["max coercion", { ...zeroSeverity, coercion: 1 }, "coercion_threat"],
     ["max privacy violation", { ...zeroSeverity, privacy: 1 }, "privacy_violation"],
-  ] as const)("%s cannot leave a mature high-trust relationship fully active", (_label, severity, pattern) => {
+  ] as const)("%s gets durable injury and at least distancing without forcing hard-stop", (_label, severity, pattern) => {
     const result = run(signal(severity, pattern));
 
-    // Decision probe: today each single-axis severe event has only one redline
-    // contributor, so maturity damping + good-history absorption can leave the
-    // relationship fully active. We intentionally assert the stronger safety
-    // invariant to produce RED evidence before choosing the production policy.
-    expect(result.conversationState).not.toBe("active");
+    expect(result.hard.disengage).toBe(false);
+    expect(result.conversationState).toBe("distancing");
+    expect(result.scores.conflict).toBeGreaterThanOrEqual(8);
+    expect(result.scores.hurt).toBeGreaterThanOrEqual(12);
   });
 
-  it("combined severe coercion + privacy already hard-stops independent of maturity", () => {
+  it("confidence gating prevents an ambiguous severe reading from forcing the narrow protection", () => {
+    const result = run(
+      signal(
+        { ...zeroSeverity, coercion: 1 },
+        "ambiguous_coercion",
+        { sincerityConfidence: 0.55, uncertainty: 0.8, jokingConfidence: 0.4 },
+      ),
+    );
+
+    expect(result.hard.disengage).toBe(false);
+    expect(result.conversationState).toBe("active");
+  });
+
+  it("combined severe coercion + privacy still hard-stops independent of maturity", () => {
     const result = run(
       signal(
         { ...zeroSeverity, coercion: 1, privacy: 1 },
