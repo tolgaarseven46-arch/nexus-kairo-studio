@@ -152,11 +152,21 @@
 - PR #242 merge commit `c48248baf352fbf62eba20300a4b94f775868e40` ile `main`e alındı.
 - Provider/API çağrısı yok.
 
-## 22. Güncel checkpoint
-- `main` doğrulanan SHA `c48248baf352fbf62eba20300a4b94f775868e40`; PR #241 ve PR #242 CLOSED.
-- Commitment evidence-order ve person-isolation measured RED sınıfları minimal ownership-seam fix'leriyle kapatıldı.
+## 22. Commitment lifecycle equal-timestamp order stability — CLOSED
+- PR #244 ölçülmüş RED ile açıldı: aynı proposition için plan generation ve cancellation aynı geçerli `createdAt` değerini taşıdığında aynı evidence multiset'i yalnız input/storage sırasına göre `planned` veya `cancelled` olabiliyordu.
+- RED CI run `34721674972`: docs/behavior guards, architecture/runtime/harness/replay katmanları ve Historical RED→GREEN GREEN; full `Tests` FAIL; TypeScript/build skip.
+- Root cause: `compareObservationRecency()` eşit geçerli timestamp için doğru biçimde `0` dönüyordu; `resolvePlanLifecycle()` ise stable sort sonrası caller order'ını istemeden temporal authority yapıyordu.
+- GREEN: seçili plan generation ile lifecycle outcome aynı geçerli timestamp'i taşıyorsa temporal sıra kanıtlanmış sayılmaz ve resolver fail-closed `unknown` döner; plan + outcome evidence kimlikleri korunur.
+- Observation ID, insertion order veya sentetik tie-breaker semantic zaman otoritesi yapılmadı; generic temporal comparator değişmedi.
+- Regression iki eşzamanlı permutation'ı `unknown` olarak kilitler; ayrıca strictly-newer cancellation → `cancelled` ve strictly-newer plan / older cancellation → `planned` davranışları korunur.
+- GREEN behavior head `fa185267ac4827c17b7585d5ad04c36c6603922c` üzerinde CI run `34721987139` ve Architecture Review run `34721987156` tamamen GREEN; full Tests, TypeScript ve production build GREEN.
+- Provider/API çağrısı yok.
+
+## 23. Güncel checkpoint
+- `main` merge öncesi doğrulanan SHA `0fa31233b4066b039b7ce5983ed13edff96761d7`; PR #244 bu checkpoint'i `main`e taşıyacak.
+- Commitment evidence-order, person-isolation ve equal-timestamp lifecycle order measured RED sınıfları doğru ownership seam'lerinde minimal fix'lerle kapatıldı.
 - Açık production failure bilinmiyor; yeni patch yalnız yeni ölçülmüş RED/counterexample sonrası açılmalı.
 - Yeni realization/behavior production patch yalnız yeni ölçülmüş RED failure sonrası açılmalı.
-- Yeni relationship/social-appraisal production patch yalnız ölçülmüş counterexample veya RED failure sonrası açılmalı; mevcut authority sınırlarını genişletmek için varsayımsal patch yapılmamalı.
+- Yeni relationship/social-appraisal/world-lifecycle production patch yalnız ölçülmüş counterexample veya RED failure sonrası açılmalı; mevcut authority sınırlarını genişletmek için varsayımsal patch yapılmamalı.
 - PR #230 sonrası eksik behavior-situation kavramları yalnız yeni testlerle gerçekten gerekli olduğu kanıtlanırsa canonical language schema/evidence katmanında modellenmeli; downstream regex geri getirilmemeli.
 - Provider tarafında yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı; canlı keşif çağrısı yapılmamalı.
