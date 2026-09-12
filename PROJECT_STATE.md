@@ -78,19 +78,22 @@
 - Dyadic hostility/coercion yalnız canonical `target === "kaira"` olduğunda Kaira-user davranış baskısına dönüşüyor; third-party isolation regression ile kilitli.
 - Full CI, TypeScript, production build ve Architecture Review GREEN.
 
-## 14. Provider outbound attempt cost-safety — ACTIVE PR #231
+## 14. Provider outbound attempt cost-safety — CLOSED
+- PR #231 merge commit `849fcfadc18d6538867ed83627f423438c9a2e0f` ile `main`e alındı.
 - Deterministic server audit, tek generation'ın OpenRouter initial + affordable-token retry + empty-response retry + Gemini fallback üzerinden birden fazla ücretli outbound çağrıya dönüşebildiğini doğruladı.
 - Canlı provider/API keşif çağrısı yapılmadı; risk statik/runtime-control contract ile ölçüldü.
-- Yeni invariant: generation başına toplam en fazla `2` outbound provider attempt = primary + tek recovery.
-- Same-provider retry ile cross-provider fallback aynı shared budget'ı tüketir; ikinci recovery/üçüncü ücretli çağrı yoktur.
-- Bu değişiklik yalnız provider orchestration/cost-safety sınırındadır; canonical semantic/KDM authority değişmez.
+- Generation başına toplam en fazla `2` outbound provider attempt = primary + tek recovery invariant'ı uygulanıyor.
+- Same-provider retry ile cross-provider fallback aynı shared budget'ı tüketiyor; ikinci recovery/üçüncü ücretli çağrı engelleniyor.
+- Değişiklik yalnız provider orchestration/cost-safety sınırında; canonical semantic/KDM authority değişmedi.
 - RED/GREEN regression proof: `kairaProviderAttemptBudgetRegression.test.ts`.
+- PR head `06d5086f8bca8121bca73276fe071a057e79df36` üzerinde full CI ve Architecture Review GREEN.
 
 ## 15. Güncel checkpoint
 - Core Emotion-State Validation Phase 5A + 5B + 5C CLOSED.
 - Deterministic emotion coverage: 27 ana matrix cell + 6 cross-axis combination + boundedness/isolation proof.
 - Live Acceptance transport fix hattı ayrı olarak korunuyor.
 - PR #230 CLOSED; canonical behavior-situation authority `main` üzerinde doğrulandı.
+- PR #231 CLOSED; provider outbound-attempt budget `main` üzerinde generation başına primary + tek recovery ile sınırlandı.
 - PR #230 sonrası kalan mimari iş: gerçekten gerekli olduğu testlerle kanıtlanırsa eksik behavior-situation kavramlarını canonical language schema/evidence katmanında açıkça modellemek; downstream regex geri getirilmemeli.
-- PR #231 provider retry/fallback cost-safety hattını deterministic olarak doğruluyor; canlı keşif çağrısı yapılmıyor.
+- Provider tarafında yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı; canlı keşif çağrısı yapılmamalı.
 - Yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı.
