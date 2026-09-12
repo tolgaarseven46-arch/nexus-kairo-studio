@@ -57,17 +57,6 @@ export const personalityTendenciesFromFineTune = (
   };
 };
 
-export const inferPersonalitySituation = (message: string): PersonalitySituation => {
-  const text = message.toLocaleLowerCase("tr-TR");
-  const conflict = /(aptal|salak|saçma|yanlış|haksız|yeter|sinir|kızgın|defol|siktir|amk|aq\b|tartış|itiraz)/.test(text) ? 0.85 : 0.1;
-  const ambiguity = /(emin değilim|bilmiyorum|acaba|belki|olabilir|sence|ne dersin|kararsız)/.test(text) ? 0.8 : 0.2;
-  const emotionalLoad = /(üzgün|moralim|kötü hissed|bunaldım|kırıldım|sinirliyim|kızgınım|mutluyum|seviyorum)/.test(text) ? 0.8 : 0.15;
-  const decisionDemand = /(hangisi|seç|karar|ne yapayım|yapayım mı|olur mu|hangisini|öner|tercih)/.test(text) ? 0.85 : 0.2;
-  const correctionSignal = /(yanlış anladın|öyle değil|hayır|düzelt|demek istediğim|kastettiğim|aksine)/.test(text) ? 0.9 : 0.05;
-
-  return { conflict, ambiguity, emotionalLoad, decisionDemand, correctionSignal };
-};
-
 /**
  * Converts stable personality tendencies into runtime tendencies for the current
  * situation. Stable sliders are propensities; context determines how strongly
@@ -147,10 +136,9 @@ export const computePersonalityTendencyResponse = (
 export const applyPersonalityTendencies = (
   base: DroitPersonalityTraits,
   fineTune: Record<string, number> | null | undefined,
-  message: string,
+  situation: PersonalitySituation,
 ): { personality: DroitPersonalityTraits; response: PersonalityTendencyResponse } => {
   const profile = personalityTendenciesFromFineTune(fineTune);
-  const situation = inferPersonalitySituation(message);
   const response = computePersonalityTendencyResponse(profile, situation);
 
   return {

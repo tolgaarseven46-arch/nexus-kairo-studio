@@ -16,6 +16,12 @@ export interface ExpressionStyleProfile {
   questionDrive: number;
 }
 
+export interface ExpressionSituation {
+  seriousContext: number;
+  hostileContext: number;
+  playfulContext: number;
+}
+
 export interface ExpressionStyleResponse {
   humor: {
     enabled: boolean;
@@ -60,20 +66,18 @@ export const expressionStyleFromFineTune = (
 
 export const computeExpressionStyle = (
   profile: ExpressionStyleProfile,
-  message: string,
+  situation: ExpressionSituation,
   dynamicState?: DroitDynamicState,
 ): ExpressionStyleResponse => {
-  const text = message.toLocaleLowerCase("tr-TR");
   const relationship = dynamicState?.relationship;
   const hurt = clamp01((relationship?.hurtScore ?? 0) / 100);
   const conflict = clamp01((relationship?.conflictScore ?? 0) / 100);
   const warmth = clamp01((relationship?.warmth ?? 50) / 100);
   const stress = clamp01((dynamicState?.stress ?? 0) / 100);
   const anger = clamp01((dynamicState?.anger ?? 0) / 100);
-
-  const seriousContext = /(ölüm|öldü|hastane|acı|korkuyorum|üzgün|ağlıyorum|yardım et|tehdit|özür|barışalım)/.test(text) ? 1 : 0;
-  const hostileContext = /(aptal|salak|gerizekalı|orospu|kaşar|sürtük|şerefsiz|siktir|defol|zorundasın|mecbursun)/.test(text) ? 1 : 0;
-  const playfulContext = /(şaka|komik|gül|haha|hahaha|lol|dalga|eğlen|kelime oyunu|laf oyunu|sözcük oyunu)/.test(text) ? 1 : 0.25;
+  const seriousContext = clamp01(situation.seriousContext);
+  const hostileContext = clamp01(situation.hostileContext);
+  const playfulContext = clamp01(situation.playfulContext);
 
   const inhibition = clamp01(
     n(profile.contextInhibition) * 0.45 +
@@ -124,7 +128,6 @@ export const computeExpressionStyle = (
     },
     inhibition,
     legacyTraits: {
-      // Important: context inhibition is inverse to humor propensity; do not bridge it directly.
       humor: clamp100(strength * 100),
       communication: clamp100(profile.verbosity),
       seriousness: clamp100(45 + inhibition * 40 + seriousContext * 15),
@@ -135,10 +138,10 @@ export const computeExpressionStyle = (
 export const applyExpressionStyle = (
   base: DroitPersonalityTraits,
   fineTune: Record<string, number> | null | undefined,
-  message: string,
+  situation: ExpressionSituation,
   dynamicState?: DroitDynamicState,
 ): { personality: DroitPersonalityTraits; response: ExpressionStyleResponse } => {
   const profile = expressionStyleFromFineTune(fineTune);
-  const response = computeExpressionStyle(profile, message, dynamicState);
+  const response = computeExpressionStyle(profile, situation, dynamicState);
   return { personality: { ...base, ...response.legacyTraits }, response };
 };

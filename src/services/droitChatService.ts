@@ -21,6 +21,7 @@ import { createClientBehaviorPolicy } from "./behaviorPolicyInput";
 import type { SemanticEvent } from "./semanticEventEngine";
 import { interpretationFromRegexFloor } from "./semanticInterpretationLegacyProjection";
 import { projectSemanticEvent } from "./semanticInterpretationProjection";
+import { projectCanonicalBehaviorSituations } from "./behaviorSituationProjection";
 import { saveTestSessionLayerAudit } from "./testSessionLayerAuditService";
 import { auth } from "../lib/firebase";
 import { requestCanonicalLanguageUnderstanding, type ClientLanguageUnderstandingResult } from "./clientLanguageUnderstanding";
@@ -224,16 +225,17 @@ export const droitChatService = {
       };
     }
     const semanticEvent = languageUnderstanding.event;
+    const behaviorSituations = projectCanonicalBehaviorSituations(languageUnderstanding.interpretation);
     const appraisalEvent = appraisalEventFromSemantic(semanticEvent);
     const temperamentAdjustedState = projectTemperamentForBehavior(semanticEvent, dynamicState, fineTune);
     const affectBaseline = kairaAffectBaselineFromFineTune(fineTune);
-    const personalityRuntime = applyPersonalityTendencies(personality, fineTune, userMessage);
-    const motivationRuntime = applyMotivations(personalityRuntime.personality, fineTune, userMessage);
-    const valueRuntime = applyValues(motivationRuntime.personality, fineTune, userMessage);
-    const preferenceRuntime = applyPreferences(valueRuntime.personality, fineTune, userMessage);
-    const socialRuntime = applySocialOrientation(preferenceRuntime.personality, fineTune, userMessage, temperamentAdjustedState);
+    const personalityRuntime = applyPersonalityTendencies(personality, fineTune, behaviorSituations.personality);
+    const motivationRuntime = applyMotivations(personalityRuntime.personality, fineTune, behaviorSituations.motivation);
+    const valueRuntime = applyValues(motivationRuntime.personality, fineTune, behaviorSituations.values);
+    const preferenceRuntime = applyPreferences(valueRuntime.personality, fineTune, behaviorSituations.preferences);
+    const socialRuntime = applySocialOrientation(preferenceRuntime.personality, fineTune, behaviorSituations.social, temperamentAdjustedState);
     const boundaryRuntime = applyBoundaries(socialRuntime.personality, fineTune, userMessage, temperamentAdjustedState, semanticEvent);
-    const expressionRuntime = applyExpressionStyle(boundaryRuntime.personality, fineTune, userMessage, temperamentAdjustedState);
+    const expressionRuntime = applyExpressionStyle(boundaryRuntime.personality, fineTune, behaviorSituations.expression, temperamentAdjustedState);
     const integrationRuntime = integrateBehaviorLayers({
       personality: expressionRuntime.personality,
       dynamicState: temperamentAdjustedState,

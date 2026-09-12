@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeExpressionStyle, expressionStyleFromFineTune, type ExpressionStyleProfile } from './expressionStyleEngine';
+import {
+  computeExpressionStyle,
+  expressionStyleFromFineTune,
+  type ExpressionSituation,
+  type ExpressionStyleProfile,
+} from './expressionStyleEngine';
 import { integrateBehaviorLayers } from './behaviorIntegrationEngine';
 import { createClientBehaviorPolicy, normalizeBehaviorPolicyInput } from './behaviorPolicyInput';
 
@@ -9,6 +14,10 @@ const neutralHumor: ExpressionStyleProfile = {
   contextInhibition: 0, verbosity: 50, informality: 50, emotionalDisplay: 50, questionDrive: 50,
 };
 const neutralState = { anger: 0, stress: 0, relationship: { hurtScore: 0, conflictScore: 0, warmth: 80, conversationState: 'active' } } as any;
+const neutralSituation: ExpressionSituation = { seriousContext: 0, hostileContext: 0, playfulContext: 0.25 };
+const playfulSituation: ExpressionSituation = { seriousContext: 0, hostileContext: 0, playfulContext: 1 };
+const hostilePlayfulSituation: ExpressionSituation = { seriousContext: 0, hostileContext: 1, playfulContext: 1 };
+const seriousSituation: ExpressionSituation = { seriousContext: 1, hostileContext: 0, playfulContext: 0.25 };
 
 function integrate(expression: any) {
   return integrateBehaviorLayers({
@@ -25,15 +34,19 @@ function integrate(expression: any) {
   });
 }
 
-const humorCases: Array<{ key: keyof ExpressionStyleProfile; mode: NonNullable<ReturnType<typeof computeExpressionStyle>['humor']['dominantMode']>; message: string }> = [
-  { key: 'absurd', mode: 'absurd', message: 'şaka yap eğlenelim komik olsun' },
-  { key: 'irony', mode: 'irony', message: 'şaka yap eğlenelim komik olsun' },
-  { key: 'sarcasm', mode: 'sarcasm', message: 'aptalca bir şey ama şaka yap' },
-  { key: 'dark', mode: 'dark', message: 'şaka yap eğlenelim komik olsun' },
-  { key: 'affiliative', mode: 'affiliative', message: 'kanka beraber biraz gülelim' },
-  { key: 'aggressive', mode: 'aggressive', message: 'aptalca bir şey ama dalga geç' },
-  { key: 'selfDirected', mode: 'selfDirected', message: 'şaka yap eğlenelim komik olsun' },
-  { key: 'wordplay', mode: 'wordplay', message: 'kelime oyunu yap komik olsun' },
+const humorCases: Array<{
+  key: keyof ExpressionStyleProfile;
+  mode: NonNullable<ReturnType<typeof computeExpressionStyle>['humor']['dominantMode']>;
+  situation: ExpressionSituation;
+}> = [
+  { key: 'absurd', mode: 'absurd', situation: playfulSituation },
+  { key: 'irony', mode: 'irony', situation: playfulSituation },
+  { key: 'sarcasm', mode: 'sarcasm', situation: hostilePlayfulSituation },
+  { key: 'dark', mode: 'dark', situation: playfulSituation },
+  { key: 'affiliative', mode: 'affiliative', situation: playfulSituation },
+  { key: 'aggressive', mode: 'aggressive', situation: hostilePlayfulSituation },
+  { key: 'selfDirected', mode: 'selfDirected', situation: playfulSituation },
+  { key: 'wordplay', mode: 'wordplay', situation: playfulSituation },
 ];
 
 describe('expression downstream coverage', () => {
@@ -56,10 +69,10 @@ describe('expression downstream coverage', () => {
     expect(p).toMatchObject({ absurd: 61, irony: 62, sarcasm: 63, dark: 64, affiliative: 65, aggressive: 66, selfDirected: 67, wordplay: 68, contextInhibition: 69, verbosity: 70, informality: 71, emotionalDisplay: 72, questionDrive: 73 });
   });
 
-  for (const { key, mode, message } of humorCases) {
+  for (const { key, mode, situation } of humorCases) {
     it('keeps ' + mode + ' humor live through integrated humor pressure and policy mode', () => {
-      const low = computeExpressionStyle({ ...neutralHumor, [key]: 0 }, message, neutralState);
-      const high = computeExpressionStyle({ ...neutralHumor, [key]: 100 }, message, neutralState);
+      const low = computeExpressionStyle({ ...neutralHumor, [key]: 0 }, situation, neutralState);
+      const high = computeExpressionStyle({ ...neutralHumor, [key]: 100 }, situation, neutralState);
       expect(high.humor.dominantMode).toBe(mode);
       expect(high.humor.strength).toBeGreaterThan(low.humor.strength);
       const integrated = integrate(high);
@@ -71,32 +84,31 @@ describe('expression downstream coverage', () => {
   }
 
   it('keeps context inhibition live by suppressing humor without creating a boundary decision', () => {
-    const message = 'şaka yap eğlenelim komik olsun';
-    const low = computeExpressionStyle({ ...neutralHumor, absurd: 90, contextInhibition: 0 }, message, neutralState);
-    const high = computeExpressionStyle({ ...neutralHumor, absurd: 90, contextInhibition: 90 }, message, neutralState);
+    const low = computeExpressionStyle({ ...neutralHumor, absurd: 90, contextInhibition: 0 }, playfulSituation, neutralState);
+    const high = computeExpressionStyle({ ...neutralHumor, absurd: 90, contextInhibition: 90 }, playfulSituation, neutralState);
     expect(high.inhibition).toBeGreaterThan(low.inhibition);
     expect(integrate(high).pressures.humor).toBeLessThan(integrate(low).pressures.humor);
     expect(integrate(high).decision.distance).toBeCloseTo(integrate(low).decision.distance, 6);
   });
 
   it('keeps verbosity live at final response length', () => {
-    const low = computeExpressionStyle({ ...neutralHumor, verbosity: 10 }, 'normal sohbet', neutralState);
-    const high = computeExpressionStyle({ ...neutralHumor, verbosity: 90 }, 'normal sohbet', neutralState);
+    const low = computeExpressionStyle({ ...neutralHumor, verbosity: 10 }, neutralSituation, neutralState);
+    const high = computeExpressionStyle({ ...neutralHumor, verbosity: 90 }, neutralSituation, neutralState);
     expect(low.speech.brevity).toBeGreaterThan(high.speech.brevity);
     expect(integrate(low).decision.responseLength).toBe('short');
     expect(integrate(high).decision.responseLength).toBe('medium');
   });
 
   it('keeps question drive live at final askQuestion decision', () => {
-    const low = computeExpressionStyle({ ...neutralHumor, questionDrive: 10 }, 'normal sohbet', neutralState);
-    const high = computeExpressionStyle({ ...neutralHumor, questionDrive: 90 }, 'normal sohbet', neutralState);
+    const low = computeExpressionStyle({ ...neutralHumor, questionDrive: 10 }, neutralSituation, neutralState);
+    const high = computeExpressionStyle({ ...neutralHumor, questionDrive: 90 }, neutralSituation, neutralState);
     expect(integrate(low).decision.askQuestion).toBe(false);
     expect(integrate(high).decision.askQuestion).toBe(true);
   });
 
   it('keeps informality and emotional display live through the client behavior policy seam', () => {
-    const low = computeExpressionStyle({ ...neutralHumor, informality: 10, emotionalDisplay: 10 }, 'normal sohbet', neutralState);
-    const high = computeExpressionStyle({ ...neutralHumor, informality: 90, emotionalDisplay: 90 }, 'normal sohbet', neutralState);
+    const low = computeExpressionStyle({ ...neutralHumor, informality: 10, emotionalDisplay: 10 }, neutralSituation, neutralState);
+    const high = computeExpressionStyle({ ...neutralHumor, informality: 90, emotionalDisplay: 90 }, neutralSituation, neutralState);
     const lowIntegrated = integrate(low);
     const highIntegrated = integrate(high);
     const lowPolicy = normalizeBehaviorPolicyInput(createClientBehaviorPolicy(lowIntegrated.decision, lowIntegrated.pressures, low));
@@ -106,8 +118,8 @@ describe('expression downstream coverage', () => {
   });
 
   it('context-gates dark humor in a serious situation instead of forcing the slider preference', () => {
-    const playful = computeExpressionStyle({ ...neutralHumor, dark: 100 }, 'şaka yap eğlenelim komik olsun', neutralState);
-    const serious = computeExpressionStyle({ ...neutralHumor, dark: 100 }, 'çok üzgünüm yardım et', neutralState);
+    const playful = computeExpressionStyle({ ...neutralHumor, dark: 100 }, playfulSituation, neutralState);
+    const serious = computeExpressionStyle({ ...neutralHumor, dark: 100 }, seriousSituation, neutralState);
     expect(playful.humor.strength).toBeGreaterThan(serious.humor.strength);
     expect(serious.inhibition).toBeGreaterThan(playful.inhibition);
   });
