@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   computePersonalityTendencyResponse,
-  inferPersonalitySituation,
   personalityTendenciesFromFineTune,
 } from "./personalityTendencyEngine";
 
@@ -44,11 +43,36 @@ describe("personalityTendencyEngine", () => {
     expect(response.effective.stubbornness).toBeLessThan(25);
   });
 
-  it("detects decision and correction contexts independently", () => {
-    const decision = inferPersonalitySituation("Sence hangisini seçmeliyim?");
-    const correction = inferPersonalitySituation("Hayır yanlış anladın, öyle değil.");
+  it("responds to decision and correction contexts independently", () => {
+    const profile = {
+      confidence: 70,
+      directness: 65,
+      stubbornness: 30,
+      analysisDepth: 75,
+      cognitiveFlexibility: 85,
+      decisiveness: 80,
+    };
 
-    expect(decision.decisionDemand).toBeGreaterThan(0.8);
-    expect(correction.correctionSignal).toBeGreaterThan(0.8);
+    const decision = computePersonalityTendencyResponse(profile, {
+      conflict: 0,
+      ambiguity: 0.2,
+      emotionalLoad: 0,
+      decisionDemand: 1,
+      correctionSignal: 0,
+    });
+    const correction = computePersonalityTendencyResponse(profile, {
+      conflict: 0,
+      ambiguity: 0.2,
+      emotionalLoad: 0,
+      decisionDemand: 0,
+      correctionSignal: 1,
+    });
+
+    expect(decision.behaviorSignals.decisionPressure).toBeGreaterThan(
+      correction.behaviorSignals.decisionPressure,
+    );
+    expect(correction.behaviorSignals.revisionReadiness).toBeGreaterThan(
+      decision.behaviorSignals.revisionReadiness,
+    );
   });
 });
