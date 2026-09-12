@@ -81,21 +81,40 @@ function appraise(memory: SocialAppraisalMemoryContext) {
   }).runtimeAppraisal;
 }
 
-describe("SocialAppraisal commitment counterparty isolation", () => {
-  it("fails closed when prior commitment has no counterparty identity", () => {
-    const result = appraise({
-      world: [
-        {
-          kind: "commitment",
-          state: "active",
-          actorId: "current_user",
-          scopeKey: "commitment:project_report",
-          confidence: 0.96,
-          provenance: ["world_event:commitment-1"],
-        },
-      ],
-    });
+function commitment(counterpartyId?: string): SocialAppraisalMemoryContext {
+  return {
+    world: [
+      {
+        kind: "commitment",
+        state: "active",
+        actorId: "current_user",
+        ...(counterpartyId ? { counterpartyId } : {}),
+        scopeKey: "commitment:project_report",
+        confidence: 0.96,
+        provenance: ["world_event:commitment-1"],
+      },
+    ],
+  };
+}
 
-    expect(result.betrayal?.status).not.toBe("present");
+describe("SocialAppraisal commitment counterparty isolation", () => {
+  it("fails closed to unknown when prior commitment has no counterparty identity", () => {
+    const result = appraise(commitment());
+
+    expect(result.betrayal?.status).toBe("unknown");
+    expect(result.betrayal?.reasons).toContain("betrayal:counterparty-evidence-missing");
+  });
+
+  it("keeps an explicit third-party commitment absent from Kaira-directed betrayal", () => {
+    const result = appraise(commitment("person:other"));
+
+    expect(result.betrayal?.status).toBe("absent");
+    expect(result.betrayal?.reasons).toContain("betrayal:counterparty-mismatch");
+  });
+
+  it("still allows an explicit Kaira-directed commitment to produce betrayal", () => {
+    const result = appraise(commitment("kaira"));
+
+    expect(result.betrayal?.status).toBe("present");
   });
 });
