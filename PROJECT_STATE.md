@@ -133,27 +133,28 @@
 - GREEN head `f61338d4f619e33e355265fa46cd69df6e0c66f9` üzerinde CI run `34718795905` ve Architecture Review run `34718795904` GREEN.
 - Yeni memory/semantic authority yok; provider/API çağrısı yok.
 
-## 20. Commitment evidence-order stability — READY / UNMERGED
+## 20. Commitment evidence-order stability — CLOSED
 - PR #241 head `a18222ade5692747280166ea51348a608f6f1ade`.
 - Ölçülmüş RED: aynı actor/scope/Kaira evidence setinde incomplete kayıt önce gelince `unknown`, valid kayıt önce gelince `present`; storage order appraisal truth'a sızıyordu.
 - GREEN: exact Kaira match'ler içinde positive confidence + provenance taşıyan usable kayıt tercih edilir; usable kayıt yoksa mevcut incomplete-first fail-closed `unknown` davranışı korunur. Yeni confidence-ranking authority eklenmedi.
 - Regression hem iki permutation'ı hem incomplete-only → `unknown` davranışını kilitler.
 - CI run `34719708478` ve Architecture Review run `34719708474` GREEN; full Tests, TypeScript ve production build GREEN.
-- PR #241 mergeable ve teknik olarak hazır; ancak bu oturumda `merge_pull_request`, direct `main` ref update ve direct `main` file update execution safety katmanı tarafından engellendi; repository auto-merge kapalı.
+- PR #241, PR #242 entegrasyonu ile `main`e ulaştı ve GitHub tarafından merged/closed olarak kaydedildi.
 
-## 21. Commitment scope/person isolation — READY / UNMERGED
-- PR #242 branch `codex/commitment-scope-person-isolation-red`; #241 head'inden türetildiği için #241 fix'ini de içerir ve `main`e karşı full CI çalıştırır.
+## 21. Commitment scope/person isolation — CLOSED
+- PR #242 branch `codex/commitment-scope-person-isolation-red`; #241 head'inden türetildiği için #241 fix'ini de içerdi.
 - Ölçülmüş RED CI run `34720216666`: behavior/docs guards, architecture/runtime/harness/replay katmanları ve Historical RED→GREEN GREEN; full `Tests` RED; TypeScript/build skip.
 - Root cause: `buildSocialAppraisalCommitmentContext()` commitment evidence'ı yalnız `scopeKey` ile deduplicate edip lifecycle resolver'a aynı scope'taki farklı kişileri birlikte veriyordu.
 - GREEN: projection identity existing typed `(scopeKey, actorKey, targetKey)` tuple'ıdır; her identity kendi observation kümesiyle mevcut `resolvePlanLifecycle()` resolver'ına gider. Lifecycle/SocialAppraisal/semantic authority değişmedi.
 - Regression aynı scope + farklı actor ve aynı actor/scope + farklı counterparty ayrımını kilitler.
-- GREEN head `608a6f94890b48caec0aafe3a1c182a8317c752b` üzerinde CI run `34720669691` tamamen GREEN; Architecture Review run `34720669683` GREEN; Tests, TypeScript ve production build GREEN.
+- GREEN head `608a6f94890b48caec0aafe3a1c182a8317c752b` üzerinde CI run `34720669691` tamamen GREEN; Architecture Review run `34720669683` GREEN.
+- Final checkpoint head `92a60ae4f446e85fb0b80f47416c2da2b679aa00` üzerinde CI run `34720900819` ve Architecture Review run `34720900816` tamamen GREEN; full Tests, TypeScript ve production build GREEN.
+- PR #242 merge commit `c48248baf352fbf62eba20300a4b94f775868e40` ile `main`e alındı.
 - Provider/API çağrısı yok.
 
 ## 22. Güncel checkpoint
-- `main` son doğrulanan SHA `2dc4f9434f81dbd820bb15507a63242409284e10` ve PR #240 checkpoint'indedir.
-- PR #241 teknik olarak tamamen GREEN fakat execution safety nedeniyle bu oturumdan merge edilemedi.
-- PR #242 #241'i içerir; measured person-isolation RED → minimal GREEN zinciri tamamlandı ve full CI/Architecture Review GREEN.
+- `main` doğrulanan SHA `c48248baf352fbf62eba20300a4b94f775868e40`; PR #241 ve PR #242 CLOSED.
+- Commitment evidence-order ve person-isolation measured RED sınıfları minimal ownership-seam fix'leriyle kapatıldı.
 - Açık production failure bilinmiyor; yeni patch yalnız yeni ölçülmüş RED/counterexample sonrası açılmalı.
 - Yeni realization/behavior production patch yalnız yeni ölçülmüş RED failure sonrası açılmalı.
 - Yeni relationship/social-appraisal production patch yalnız ölçülmüş counterexample veya RED failure sonrası açılmalı; mevcut authority sınırlarını genişletmek için varsayımsal patch yapılmamalı.
