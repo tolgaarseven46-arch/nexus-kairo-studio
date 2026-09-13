@@ -1,6 +1,6 @@
 # ADR — Fragmented-message text episode boundary
 
-Status: Characterization checkpoint; no production change.
+Status: Accepted / GREEN.
 
 ## Context
 
@@ -11,34 +11,30 @@ Discord-style conversation does not guarantee that one transport message equals 
 
 as two consecutive messages while expressing one semantic episode.
 
-ADR-0025 established that fragmented-message episode assembly belongs at the batching/input boundary around `SemanticInterpretation@2`, not inside a second parser or semantic authority. The current Studio/chat path still forwards each raw `userMessage` directly to canonical language understanding, so transport-message boundaries are effectively treated as semantic-turn boundaries.
+ADR-0025 established that fragmented-message episode assembly belongs at the batching/input boundary around `SemanticInterpretation@2`, not inside a second parser or semantic authority. The previous Studio/chat path forwarded each raw `userMessage` directly to canonical language understanding, so transport-message boundaries were effectively treated as semantic-turn boundaries.
 
 ## Decision
 
-Characterize a typed pre-semantic text-episode boundary before changing runtime behavior.
+The chat input boundary now supports a typed pre-semantic text episode:
 
-The target contract is:
+- ordered `TextEpisodeFragment[]` values carry the fragments belonging to one episode;
+- `TextEpisodeInput` is accepted by `SendKairoChatOptions`;
+- fragments are deterministically assembled into `episodeText` before canonical language understanding;
+- when an episode is supplied, the same assembled text is used consistently across retry identity, canonical LU, fallback interpretation, behavior boundaries/integration, and the server chat payload;
+- when no episode is supplied, the existing single-message `userMessage` behavior remains unchanged.
 
-- an ordered `TextEpisodeFragment[]` carrying the text fragments that belong to one episode;
-- a bounded `TextEpisodeInput` accepted by the chat/runtime input boundary;
-- canonical language understanding receives the assembled episode text rather than an individual raw transport message.
+The transport/ingestion adapter still owns *when* consecutive messages are grouped or flushed. `SemanticInterpretation@2` remains the sole current-turn meaning authority and does not infer transport batching policy.
 
-The transport/ingestion adapter owns *when* consecutive messages are grouped or flushed. `SemanticInterpretation@2` remains the sole current-turn meaning authority and does not infer transport batching policy.
-
-This characterization deliberately does **not** choose a debounce, settle-window, or Discord-specific timing threshold. Such values are adapter policy and require separate evidence/calibration.
+No debounce, settle-window, or Discord-specific timing threshold is introduced here. Those remain adapter policy requiring separate evidence/calibration.
 
 ## Safety and compatibility invariant
 
-A single-message input must remain representable as an episode containing one fragment. Episode assembly must not introduce a parallel semantic interpretation path or alter downstream reducer, relationship, memory, or persistence authority.
+A single-message input remains valid. Episode assembly introduces no parallel semantic interpretation path and does not move reducer, relationship, memory, persistence, reply/mention, or provider authority.
+
+## Verification
+
+The characterization moved RED → GREEN. On head `00743adabc5347f543927236b3f8501838f8fcfa`, Architecture Review classify, docs-guard, behavior-guard, architecture contracts, autonomous runtime contracts, beta runtime regression, Phase-0 harness/report, beta conversation acceptance/KNT replay, bug-class proof manifest, Historical RED→GREEN, full tests, TypeScript, and production build all passed.
 
 ## Scope
 
-This checkpoint includes only the typed fragmented-text input boundary and canonical-LU handoff characterization.
-
-It explicitly excludes:
-
-- persistence-integrity fixes already characterized separately;
-- reply/mention metadata, which is the next text-reality stage;
-- long-history retrieval;
-- image/GIF/audio/video interpretation;
-- production batching/timer policy.
+This decision covers only the typed fragmented-text input boundary and canonical-LU handoff. Production batching/timer policy and multimodal interpretation remain outside this change.
