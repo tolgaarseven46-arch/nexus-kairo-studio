@@ -1,6 +1,6 @@
 # ADR — Reply and mention text-context boundary
 
-Status: Characterization checkpoint; no production change.
+Status: Accepted / GREEN.
 
 ## Context
 
@@ -10,13 +10,13 @@ Discord-style transports already know when a message is a reply and which platfo
 - a reply such as `aynen` may be semantically incomplete without the replied-to message and author;
 - reconstructing reply/mention ownership later from raw text would create a weaker lexical authority beside canonical language understanding.
 
-The current chat input carries `userMessage` plus coarse user/session fields but no typed reply or mention context. The client language-understanding request likewise only carries message text, user/character names, history, and provider.
+Before this change, the chat input carried `userMessage` plus coarse user/session fields but no typed reply or mention context. The client language-understanding request likewise only carried message text, user/character names, history, and provider.
 
 ## Decision
 
-Characterize a typed text-interaction context at the transport-to-language-understanding boundary.
+Use a typed text-interaction context at the transport-to-language-understanding boundary.
 
-The target contract carries:
+The contract carries:
 
 - a reply reference with stable `messageId` and `authorId` identity;
 - zero or more mention references with stable entity ids;
@@ -27,12 +27,14 @@ Canonical `SemanticInterpretation@2` remains the sole current-turn meaning autho
 
 ## Safety and compatibility invariant
 
-Plain single-message text without reply/mention metadata must remain valid. Display names or `@name` text may remain conversational surface evidence, but they must not override stable platform metadata when that metadata is present.
+Plain single-message text without reply/mention metadata remains valid. Display names or `@name` text may remain conversational surface evidence, but they must not override stable platform metadata when that metadata is present.
 
-This characterization does not yet decide Discord-specific role/channel mention handling, retrieval policy for old replied-to content, or long-history retrieval.
+This change does not decide Discord-specific role/channel mention handling or retrieval policy for old replied-to content.
 
-## Scope
+## Resolution
 
-This checkpoint is characterization only. It does not change production runtime behavior.
+`TextReplyReference`, `TextMentionReference`, and `TextInteractionContext` are now explicit typed contracts. `SendKairoChatOptions` can carry `messageContext`, and `droitChatService` forwards that context to `requestCanonicalLanguageUnderstanding` as structured `interactionContext`. The client language-understanding request forwards the same field in JSON without modifying `userMessage`.
 
-Multimodal interpretation remains parked. Long-history retrieval remains the next text-reality stage after reply/mention metadata characterization.
+The characterization moved RED → GREEN with architecture contracts, autonomous runtime contracts, beta regression, Phase-0 deterministic harness/report, beta conversation/KNT replay, proof manifest, historical proof, full tests, TypeScript, production build, docs/behavior guards, and Architecture Review all GREEN.
+
+Multimodal interpretation remains parked. Long-history provenance was handled separately by PR #266.
