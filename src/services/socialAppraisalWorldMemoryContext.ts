@@ -24,8 +24,9 @@ function lifecycleProjection(
     case "failed":
       return { state: "failed", previousState: "active", lifecycleOutcome: "failed" };
     default:
-      // Lifecycle ambiguity must not erase the last established active obligation.
-      return { state: "active", previousState: "active", lifecycleOutcome: "unknown" };
+      // Lifecycle ambiguity preserves the prior active obligation as history,
+      // but must remain explicitly unresolved for downstream appraisal.
+      return { state: "unknown", previousState: "active", lifecycleOutcome: "unknown" };
   }
 }
 
