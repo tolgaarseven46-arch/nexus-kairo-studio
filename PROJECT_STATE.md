@@ -40,7 +40,7 @@
 - PR #251: trust/warmth aynı tutulurken yalnız history/maturity farkının aynı mild direct injury’yi farklı damp ettiği tek-değişken A/B proof GREEN.
 - PR #252: gerçek `saveKdmInteraction()` → `loadKdmState()` normalization/hydration round-trip sonrası aynı maturity-bearing state aynı reducer davranışını üretir; GREEN.
 
-## 6. Commitment / betrayal lifecycle + appraisal — ACTIVE: PR #258
+## 6. Commitment / betrayal lifecycle + appraisal — CLOSED
 - PR #237: commitment/betrayal typed appraisal boundary.
 - PR #239: unresolved counterparty isolation; missing counterparty fail-closed `unknown`.
 - PR #241/#242: evidence-order stability + person/scope/counterparty lifecycle isolation.
@@ -49,12 +49,14 @@
 - PR #247: conflicting terminal-outcome temporal bucket caller/storage order’dan bağımsız; ambiguity → `unknown`.
 - PR #248: canonical lifecycle `unknown` SocialAppraisal’da `absent`a düşmez; betrayal uncertainty korunur.
 - PR #250: `betrayal: unknown` downstream application seviyesinde relational/affective mutation, confidence escalation veya material effect üretmez.
-- 13 Eylül authority audit’i yeni bir temsil boşluğu kanıtladı: mevcut `SemanticAttribution` controllability / communicationConsent / externalCause taşımıyordu ve SocialAppraisal commitment projection current `state` ile prior state/lifecycle outcome’u ayırmıyordu.
-- Characterization RED branch `codex/lifecycle-socialappraisal-mapping-contract`, RED commit `3d7949059071de07a5ca120510ff1e7e596e6ee4`, Fast CI run `34762500294`: 8 lifecycle mapping senaryosunun 5’i RED, 3’ü mevcut davranışla GREEN.
-- PR #258 aynı mevcut semantic authority’yi typed alanlarla genişletir; yeni authority, downstream raw-text reparse, regex veya phrase heuristic eklemez. Missing/legacy attribution evidence `unknown` fail-closed normalize edilir.
-- Commitment projection `state / previousState / lifecycleOutcome` olarak ayrılır: postponed aktif obligation’ı korur; failed/cancelled terminal outcome prior active state’i silmez; unknown lifecycle fail-closed kalır.
-- GREEN head `f95b377d8f74f16020e55920a6bfa4c6643c9b51`, Fast CI run `34763424188`: lifecycle mapping contract 8/8 GREEN, toplam 59/59 test ve `tsc --noEmit` GREEN.
-- PR #258 full CI / Architecture Review kapanmadan bu extension CLOSED sayılmaz.
+- 13 Eylül authority audit’i `SemanticAttribution` içinde controllability / communicationConsent / externalCause temsil boşluğunu ve commitment projection’da current state ile prior state/lifecycle outcome ayrımı ihtiyacını kanıtladı.
+- Characterization RED commit `3d7949059071de07a5ca120510ff1e7e596e6ee4`, Fast CI run `34762500294`: 8 lifecycle mapping senaryosunun 5’i RED, 3’ü mevcut davranışla GREEN.
+- PR #258 aynı mevcut semantic authority’yi typed alanlarla genişletti; yeni authority, downstream raw-text reparse, regex veya phrase heuristic eklenmedi. Missing/legacy attribution evidence `unknown` fail-closed normalize edilir.
+- Commitment projection `state / previousState / lifecycleOutcome` olarak ayrıldı: postponed aktif obligation’ı korur; failed/cancelled terminal outcome prior active state’i silmez; ambiguous/unknown lifecycle current state `unknown` olurken `previousState: active` korunur.
+- İlk full-suite kırılımında iki regression runtime’ın ambiguous lifecycle’ı `active` projekte ettiğini kanıtladı; minimal fix commit `a4e41cd00250b10ddf9ce592f3757de2655da77b` ile current state `unknown`, prior state `active` korunacak şekilde düzeltildi.
+- Final CI run `34772256739`: docs-guard, behavior-guard, architecture contracts, autonomous runtime contracts, beta runtime regression, Phase-0 harness/report, beta conversation/KNT replay, proof manifest, Historical RED→GREEN, full Tests, TypeScript ve production build GREEN.
+- Architecture Review run `34772256580` GREEN; insan `/arch-approve` gerekmiyor.
+- PR #258 squash merge commit `3f419870c3bfe8d45745f6cb850b5f05a6d9d287` ile `main`e merge edildi.
 
 ## 7. Automated pre-beta system acceptance — CLOSED
 - PR #253 merge commit `f27f9bd0142cd618b952b012b7856059849e078a`.
@@ -63,20 +65,20 @@
 - Bir kullanıcının progression’ı diğer kullanıcının state’ini mutate etmez.
 - İki ayrı user ID gerçek `saveKdmInteraction()` / `loadKdmState()` normalization path’inden geçer; yalnız Firestore transport in-memory mock’tur; cross-user persistence contamination yoktur.
 - Long-horizon state SpeechIdentity → BehaviorContract → final-delivery zincirine girer; HOW/WHAT authority ayrımı ve forbidden advice korunur; accepted final reply non-empty kalır.
-- CI run `34759029702`: docs-guard, behavior-guard, architecture contracts, autonomous runtime contracts, beta runtime regression, Phase-0 harness/report, beta conversation/KNT replay, proof manifest, Historical RED→GREEN, full Tests, TypeScript ve production build GREEN.
-- Architecture Review run `34759029689` GREEN.
+- CI run `34759029702` tamamen GREEN; Architecture Review run `34759029689` GREEN.
 - Ölçülen production RED çıkmadı; runtime patch yapılmadı.
 - PR #254 automated pre-beta checkpoint closure/docs sync olarak merge edildi.
 
 ## 8. Güncel teknik durum
-- PR #258’de measured lifecycle→SocialAppraisal representation gap’i kapanıyor; merge edilene kadar commitment/betrayal lifecycle alanı açık implementation işi sayılır.
-- Bunun dışındaki otomatik pre-beta deterministic architecture/system acceptance kapsamında bilinen açık implementation işi yok.
+- Güncel doğrulanmış `main`: `3f419870c3bfe8d45745f6cb850b5f05a6d9d287` (PR #258 merge).
+- Açık PR yok; açık issue yok.
+- Otomatik pre-beta deterministic architecture/system acceptance kapsamında bilinen açık implementation işi yok.
 - Yeni relationship/social-appraisal/world-lifecycle/behavior/realization/provider production patch yalnız yeni ölçülmüş RED/counterexample sonrası açılmalı.
 - Eksik behavior-situation kavramı ancak test ile gerçekten gerekli olduğu kanıtlanırsa canonical language schema/evidence katmanında modellenmeli; downstream regex/classifier geri getirilmemeli.
 - Provider live parity / maliyetli gerçek-provider keşfi ayrı acceptance sınıfıdır ve deterministic mimari proof yerine geçmez.
 
 ## 9. Live beta / real-human acceptance — ACTIVE PHASE
-- Sıradaki ana aşama gerçek insan beta / live conversation acceptance'tır; PR #258 gate’leri kapanmadan yeni lifecycle/appraisal davranışı merge edilmiş kabul edilmez.
+- Sıradaki ana aşama gerçek insan beta / live conversation acceptance'tır. PR #258 merge edildiği için lifecycle/appraisal gate artık beta girişini bloklamıyor.
 - `docs/beta/live-beta-protocol.md` beta giriş kriterlerini, minimum session/turn evidence'ını, failure class/severity modelini, deterministic RED promotion zincirini ve exit criteria'yı tanımlar.
 - `.github/ISSUE_TEMPLATE/live-beta-failure.md` her gerçek beta failure'ı için standart capture/replay handoff formatıdır.
 - Bir beta gözlemi production bug sayılmaz; önce exact failing window + runtime evidence + owning seam + deterministic replay/counterexample gerekir.
