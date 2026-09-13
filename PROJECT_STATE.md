@@ -7,195 +7,71 @@
 - Morphology / syntax / discourse katmanları typed evidence üretir; semantic truth canonical L6 gateway'de oluşur.
 - Downstream raw-text reparse veya ikinci semantic authority yok.
 - `RelationshipReducer`, social appraisal, memory, dialogue decision, behavior/response ve persistence ownership sınırları korunur.
+- SpeechIdentity yalnız HOW; BehaviorContract WHAT/WHETHER authority’sidir.
 - Provider/API seçimi canonical semantic truth veya deterministic architecture proof değildir.
 - Yeni regex/classifier/phrase patch yalnız ölçülmüş failure class ile gerekçelendirilir.
-- Runtime provider/fallback kimliği observability concern'dür; canonical semantic authority provider-neutral kalır.
+- Yeni production patch yalnız deterministic counterexample / measured RED sonrası açılır.
 
-## 2. Language / canonical foundation — CLOSED
-- PR #192–#196 tamamlandı; frozen Phase-0 baseline 21 senaryo / 423 tur korunuyor.
+## 2. Foundation — CLOSED
+- Language/canonical foundation: PR #192–#196; frozen Phase-0 baseline 21 senaryo / 423 tur korunuyor.
+- Relationship/memory/persistence foundation: PR #199, #202–#205.
+- State mutation concurrency/ownership: PR #206, #207, #210, #211; lease ownership loss fail-closed.
+- Counterfactual/discourse authority: PR #209, #213.
+- Provider/canonical boundary: PR #214, #215; canonical authority provider-neutral.
 
-## 3. Relationship / memory / persistence foundation — CLOSED
-- PR #199, #202, #203, #204, #205 tamamlandı.
+## 3. Core adversarial + emotion-state validation — CLOSED
+- PR #219–#222: long-horizon, relationship edge combinations, discourse collision, temporal robustness, uncertainty damping, persistence corruption/version mismatch, spontaneous conversation probes.
+- PR #224: affect baseline / Phase 5A.
+- PR #225: relationship-derived reaction-mode matrix / Phase 5B; SpeechIdentity HOW vs BehaviorContract WHAT/WHETHER separation.
+- Phase 5C: affect × reactionMode cross-axis boundedness/isolation proof.
+- Known deterministic gates, TypeScript, build and Architecture Review are GREEN.
 
-## 4. State mutation concurrency / ownership — CLOSED
-- PR #206, #207, #210, #211 tamamlandı; lease ownership loss fail-closed.
+## 4. Runtime/response/provider safety — CLOSED FOR KNOWN FAILURES
+- PR #217/#218: measured advice-leak regressions closed.
+- PR #228: live transport timeout policy closed.
+- PR #230: canonical behavior-situation projection; downstream raw-text semantic reparse removed from production behavior path.
+- PR #231: generation başına shared outbound provider attempt budget max 2.
+- PR #233: final-delivery empty reply fail-closed; accepted turn boş reply persist edemez.
+- PR #235: canonical semantic event production reachability closed.
+- Provider/API live keşif testleri maliyet nedeniyle deterministic acceptance’tan ayrıdır.
 
-## 5. Counterfactual / discourse authority — CLOSED
-- PR #209 ve #213 tamamlandı.
+## 5. Relationship maturity / severe harm — CLOSED
+- PR #236: mature/high-trust relationship severe coercion/privacy injury floor; severe harm maturity attenuation ile tamamen eriyemez.
+- PR #251: trust/warmth aynı tutulurken yalnız history/maturity farkının aynı mild direct injury’yi farklı damp ettiği tek-değişken A/B proof GREEN.
+- PR #252: gerçek `saveKdmInteraction()` → `loadKdmState()` normalization/hydration round-trip sonrası aynı maturity-bearing state aynı reducer davranışını üretir; GREEN.
 
-## 6. Provider / canonical boundary — CLOSED
-- PR #214 ve #215 tamamlandı; canonical semantic authority provider-neutral.
+## 6. Commitment / betrayal lifecycle + appraisal — CLOSED FOR KNOWN FAILURES
+- PR #237: commitment/betrayal typed appraisal boundary.
+- PR #239: unresolved counterparty isolation; missing counterparty fail-closed `unknown`.
+- PR #241/#242: evidence-order stability + person/scope/counterparty lifecycle isolation.
+- PR #244/#245: equal/invalid timestamp lifecycle ambiguity fail-closed.
+- PR #246: plan-generation temporal ambiguity fail-closed.
+- PR #247: conflicting terminal-outcome temporal bucket caller/storage order’dan bağımsız; ambiguity → `unknown`.
+- PR #248: canonical lifecycle `unknown` SocialAppraisal’da `absent`a düşmez; betrayal uncertainty korunur.
+- PR #250: `betrayal: unknown` downstream application seviyesinde relational/affective mutation, confidence escalation veya material effect üretmez.
+- Bu alanda bilinen açık production failure yok.
 
-## 7. Response-generation measured fixes — CLOSED FOR KNOWN FAILURES
-- Trace A PASS; Trace C/D state realization görüldü; Trace F PASS.
-- PR #217 ve #218 advice leak regression'ları kapatıldı.
-- Trace G provider parity Gemini kapalı olduğu için ayrı acceptance sınıfı.
-- Live/provider keşif testleri maliyet nedeniyle durduruldu.
+## 7. Automated pre-beta system acceptance — CLOSED
+- PR #253 merge commit `f27f9bd0142cd618b952b012b7856059849e078a`.
+- Provider-free deterministic acceptance toplam 120 relationship turn çalıştırır: iki kullanıcı × 60 turn.
+- Supportive ve mixed history aynı canonical `RelationshipReducer` altında farklı ilişki geçmişi üretir; aynı final mild direct negative probe history-dependent relational output verir.
+- Bir kullanıcının progression’ı diğer kullanıcının state’ini mutate etmez.
+- İki ayrı user ID gerçek `saveKdmInteraction()` / `loadKdmState()` normalization path’inden geçer; yalnız Firestore transport in-memory mock’tur; cross-user persistence contamination yoktur.
+- Long-horizon state SpeechIdentity → BehaviorContract → final-delivery zincirine girer; HOW/WHAT authority ayrımı ve forbidden advice korunur; accepted final reply non-empty kalır.
+- CI run `34759029702`: docs-guard, behavior-guard, architecture contracts, autonomous runtime contracts, beta runtime regression, Phase-0 harness/report, beta conversation/KNT replay, proof manifest, Historical RED→GREEN, full Tests, TypeScript ve production build GREEN.
+- Architecture Review run `34759029689` GREEN.
+- Ölçülen production RED çıkmadı; runtime patch yapılmadı.
 
-## 8. Core Adversarial Validation Phase 1–4 — CLOSED
-- PR #219: long-horizon + 8 ilişki uç kombinasyonu + three-way discourse collision.
-- PR #220: temporal robustness + semantic uncertainty mutation damping.
-- PR #221: persistence corruption/version mismatch fail-closed.
-- PR #222: 30-case spontaneous conversation probes.
-- Full CI / Architecture Review GREEN; provider/API çağrısı yok.
+## 8. Güncel checkpoint
+- Doğrulanmış `main`: `f27f9bd0142cd618b952b012b7856059849e078a` (#253 sonrası).
+- PR #250–#253 zinciri CLOSED.
+- Açık production failure bilinmiyor.
+- Otomatik pre-beta deterministic architecture/system acceptance kapsamında şu an bilinen açık iş yok.
+- Yeni relationship/social-appraisal/world-lifecycle/behavior/realization/provider production patch yalnız yeni ölçülmüş RED/counterexample sonrası açılmalı.
+- Eksik behavior-situation kavramı ancak test ile gerçekten gerekli olduğu kanıtlanırsa canonical language schema/evidence katmanında modellenmeli; downstream regex/classifier geri getirilmemeli.
+- Provider live parity / maliyetli gerçek-provider keşfi ayrı acceptance sınıfıdır ve deterministic mimari proof yerine geçmez.
 
-## 9. Core Emotion-State Validation Phase 5A — CLOSED
-- PR #224 squash merge `1fdbc00ac853f0520a6ef9970be32198bb3c149d`.
-- Canonical resting affect alanları: `anger`, `stress`, `happiness`, `calmness`.
-- 12-case pilot: 4 affect-dominant fixture × 3 canonical stimulus (`neutral`, `criticism`, `apology`).
-- Sonuç: current affect semantic/relationship direction üretmedi; exact-zero korundu; G4 yalnız bounded affective magnitude/activation modülasyonu yaptı.
-- Anger/stress negative pressure'ı artırdı, calmness activation'ı düşürdü, happiness positive affective significance'ı artırdı.
-- Fast CI, full CI, historical RED→GREEN, TypeScript, production build ve Architecture Review GREEN; provider/API çağrısı yok.
-
-## 10. Core Emotion-State Validation Phase 5B — CLOSED
-- PR #225 squash merge `74cafdd9931b194bafb38944d81914b87e92ad22`.
-- Runtime-derived reaction modes: `neutral`, `irritated`, `hurt`, `withdrawn`, `repairing`.
-- 15-case deterministic matrix: 5 coherent relationship/reaction fixture × 3 stimulus sentiment (`neutral`, `negative`, `positive`).
-- SpeechIdentity HOW ile BehaviorContract WHAT/WHETHER authority ayrımı aynı state uzayında doğrulandı.
-- Non-neutral reactionMode sentiment değişimiyle silinmiyor; hurt/withdrawn/repairing style hard permissions açmıyor.
-- Beklenen yönler korunuyor: withdrawn=`closed`, repairing=`repairing-cautious`, hurt=`distant-responsive`, irritated=`firm`; neutral ilişkide stimulus sentiment yalnız HOW tarafını etkileyebiliyor.
-- Fast CI, full CI, historical RED→GREEN, TypeScript, production build ve Architecture Review GREEN.
-- Production behavior değişmedi; provider/API çağrısı yok.
-
-## 11. Core Emotion-State Validation Phase 5C — CLOSED
-- Affect × reactionMode kesişimi için 6 deterministic cross-axis kombinasyon eklendi.
-- `stress+repairing`, `anger+hurt`, `happiness+hurt`, `calmness+withdrawn`, `stress+irritated`, `happiness+repairing` kombinasyonlarında SpeechIdentity HOW ile BehaviorContract WHAT/WHETHER ayrımı korundu.
-- Ek boundedness/isolation proof: diğer state alanları sabitken happiness 70→100 değişimi yüksek-yüklü negatif event appraisal valence/significance/activation değerini azaltmadı.
-- İlk RED'ler production failure değildi; aynı fixture'da birden fazla affect alanını değiştiren test tasarımı ve canonical olmayan mutlak eşik kaynaklıydı. Tek-değişken A/B ile gerçek invariant izole edildi.
-- Production behavior değişmedi; provider/API çağrısı yok.
-
-## 12. Live Acceptance Transport — CLOSED
-- PR #228 merge commit `a2c688ce7e1cdb2c4f96bf07cbfeb8d2c02673d7` ile `main`e alındı.
-- İlk gerçek provider oturumunda browser `/api/chat` isteğinin 35 saniyede client-side `AbortController` ile kesildiği ölçüldü.
-- Client deadline 35s → 75s taşındı ve tek transport policy sabitine alındı.
-- Ambiguous timeout mesajı aynı mesajın hemen yeniden gönderilmemesi konusunda uyarıyor.
-- Deterministic transport-policy regression testi eklendi; provider çağrısı yapılmadı.
-- PR head `1ae0e2cd5ce7930aa6ae57145258cbf99fe73eb6` üzerinde CI ve Architecture Review GREEN.
-
-## 13. Canonical behavior-situation authority — CLOSED
-- PR #230 merge commit `4aaf8e6ab597fd28218f27159bc2c1950e62de6f` ile `main`e alındı.
-- Personality, motivation, values, preferences, social orientation ve expression-style motorlarındaki downstream raw-text semantic reparse kaldırıldı.
-- `projectCanonicalBehaviorSituations()` canonical `SemanticInterpretation@2` üzerinden typed situation üretip behavior motorlarına dağıtıyor.
-- Dyadic hostility/coercion yalnız canonical `target === "kaira"` olduğunda Kaira-user davranış baskısına dönüşüyor; third-party isolation regression ile kilitli.
-- Full CI, TypeScript, production build ve Architecture Review GREEN.
-
-## 14. Provider outbound attempt cost-safety — CLOSED
-- PR #231 merge commit `849fcfadc18d6538867ed83627f423438c9a2e0f` ile `main`e alındı.
-- Deterministic server audit, tek generation'ın OpenRouter initial + affordable-token retry + empty-response retry + Gemini fallback üzerinden birden fazla ücretli outbound çağrıya dönüşebildiğini doğruladı.
-- Canlı provider/API keşif çağrısı yapılmadı; risk statik/runtime-control contract ile ölçüldü.
-- Generation başına toplam en fazla `2` outbound provider attempt = primary + tek recovery invariant'ı uygulanıyor.
-- Same-provider retry ile cross-provider fallback aynı shared budget'ı tüketiyor; ikinci recovery/üçüncü ücretli çağrı engelleniyor.
-- Değişiklik yalnız provider orchestration/cost-safety sınırında; canonical semantic/KDM authority değişmedi.
-- RED/GREEN regression proof: `kairaProviderAttemptBudgetRegression.test.ts`.
-- PR head `06d5086f8bca8121bca73276fe071a057e79df36` üzerinde full CI ve Architecture Review GREEN.
-
-## 15. State-to-response realization audit — CLOSED FOR MEASURED EMPTY-DELIVERY FAILURE
-- Response plan; question/advice/social-move/content-engagement/humor/affection/counter-flirt/forgiveness/reopening ve sentence/word/emoji budget ihlallerini deterministic olarak denetliyor.
-- Ölçülmüş failure: upstream `accepted=true` verse bile boş/whitespace candidate final-delivery katmanından boş assistant mesajı olarak persist edebiliyordu.
-- PR #233 regression proof `kairaFinalDeliveryGate.test.ts` ile RED olarak kanıtlandı.
-- `resolveKairaFinalDelivery()` artık non-empty candidate invariantını kendi ownership sınırında uygular; boş candidate `final_delivery_empty_reply` issue koduyla fail-closed reddedilir ve mevcut safe fallback persist edilir.
-- Canonical semantic/KDM authority değişmedi; provider çağrısı yapılmadı.
-
-## 16. Semantic fallback production reachability — CLOSED
-- PR #235 merge edildi.
-- Client production path `integrateBehaviorLayers` çağrısına canonical `semanticEvent` geçiriyor.
-- Server production call site'larının tamamı `planDialogueResponse` için `languageUnderstanding.event` geçiriyor.
-- Consumer içindeki `interpretSemanticEvent(...)` yolları compatibility/defensive fallback olarak kalıyor; normal production wiring canonical semantic authority'yi bypass etmiyor.
-- Architecture contract regression gelecekte canonical event'i düşüren bir call site oluşursa CI'ı kıracak.
-- Runtime behavior değişmedi; provider/API çağrısı yok.
-
-## 17. Severe-event maturity attenuation — CLOSED
-- PR #236 merge edildi.
-- Mature/high-trust ilişkilerde familiarity/history attenuation severe direct single-axis coercion veya privacy harm sinyalini tamamen eritemez.
-- High-confidence severe single-axis harm attenuation sonrası durable injury floor korur ve en az `distancing` conversation-state nudge üretir.
-- Tek severe axis kendi başına hard-stop zorlamaz; existing combined coercion + privacy redline değişmedi.
-- Low-confidence/ambiguous severe reading yeni korumayı tetiklemez; mild joking disrespect relationship-sensitive kalır.
-- Policy canonical `RelationshipReducer` seam'inde ve typed `relationshipSevereEventPolicy.ts` ownership sınırında tutulur; downstream ikinci behavior authority yok.
-- Provider/API çağrısı yok.
-
-## 18. Commitment / betrayal appraisal boundary — CLOSED
-- PR #237 merge commit `d42960d64e5aca8e0f6205094efc779ad88a8331` ile `main`e alındı.
-- Commitment ayrı bir memory authority olmadı; mevcut world-event/world-memory lifecycle içinde typed evidence/context olarak kaldı.
-- Current-turn intentionality canonical `SemanticInterpretation@2` attribution/provenance üzerinden gelir; downstream raw-text reparse yok.
-- SocialAppraisal bounded commitment context üzerinden betrayal assessment üretir; `RelationshipReducer` aggregate-only kalır ve appraisal projection tüketir.
-- Unfairness comparative/norm evidence yoksa fail-closed `unknown` kalır.
-- Provider transport seçimi canonical semantic provenance'e sızmaz; provider-boundary contract semantic invariant olarak güncellendi.
-- Deterministic commitment/betrayal regression, historical RED→GREEN proof, full test suite, TypeScript ve production build GREEN; Architecture Review ve behavior/docs guards GREEN.
-- Provider/API çağrısı yok.
-
-## 19. Commitment counterparty isolation — CLOSED
-- PR #239 merge commit `1e7245c16f675ad6909a7e687d35bfe2741a1301` ile `main`e alındı.
-- Ölçülmüş RED: same-actor/same-scope active commitment kaydında `counterpartyId` eksikken matcher bu belirsizliği Kaira eşleşmesi sayıp Kaira-directed betrayal üretebiliyordu.
-- Canonical world-memory projection doğru biçimde target yoksa `counterpartyId` üretmiyor; ownership hatası projection/memory katmanında değil SocialAppraisal matching sınırındaydı.
-- GREEN contract: explicit `counterpartyId === "kaira"` eşleşebilir; explicit third-party `absent`; missing counterparty `unknown` ve `betrayal:counterparty-evidence-missing` ile fail-closed.
-- Üç komşu regression real runtime seam üzerinden kilitlendi: missing → unknown, third-party → absent, Kaira → present.
-- İlk RED CI run `34718540156` full `Tests` adımında beklenen şekilde kırıldı; önceki architecture/runtime/harness ve historical proof katmanları yeşildi.
-- GREEN head `f61338d4f619e33e355265fa46cd69df6e0c66f9` üzerinde CI run `34718795905` ve Architecture Review run `34718795904` GREEN.
-- Yeni memory/semantic authority yok; provider/API çağrısı yok.
-
-## 20. Commitment evidence-order stability — CLOSED
-- PR #241 head `a18222ade5692747280166ea51348a608f6f1ade`.
-- Ölçülmüş RED: aynı actor/scope/Kaira evidence setinde incomplete kayıt önce gelince `unknown`, valid kayıt önce gelince `present`; storage order appraisal truth'a sızıyordu.
-- GREEN: exact Kaira match'ler içinde positive confidence + provenance taşıyan usable kayıt tercih edilir; usable kayıt yoksa mevcut incomplete-first fail-closed `unknown` davranışı korunur. Yeni confidence-ranking authority eklenmedi.
-- Regression hem iki permutation'ı hem incomplete-only → `unknown` davranışını kilitler.
-- CI run `34719708478` ve Architecture Review run `34719708474` GREEN; full Tests, TypeScript ve production build GREEN.
-- PR #241, PR #242 entegrasyonu ile `main`e ulaştı ve GitHub tarafından merged/closed olarak kaydedildi.
-
-## 21. Commitment scope/person isolation — CLOSED
-- PR #242 branch `codex/commitment-scope-person-isolation-red`; #241 head'inden türetildiği için #241 fix'ini de içerdi.
-- Ölçülmüş RED CI run `34720216666`: behavior/docs guards, architecture/runtime/harness/replay katmanları ve Historical RED→GREEN GREEN; full `Tests` RED; TypeScript/build skip.
-- Root cause: `buildSocialAppraisalCommitmentContext()` commitment evidence'ı yalnız `scopeKey` ile deduplicate edip lifecycle resolver'a aynı scope'taki farklı kişileri birlikte veriyordu.
-- GREEN: projection identity existing typed `(scopeKey, actorKey, targetKey)` tuple'ıdır; her identity kendi observation kümesiyle mevcut `resolvePlanLifecycle()` resolver'ına gider. Lifecycle/SocialAppraisal/semantic authority değişmedi.
-- Regression aynı scope + farklı actor ve aynı actor/scope + farklı counterparty ayrımını kilitler.
-- GREEN head `608a6f94890b48caec0aafe3a1c182a8317c752b` üzerinde CI run `34720669691` tamamen GREEN; Architecture Review run `34720669683` GREEN.
-- Final checkpoint head `92a60ae4f446e85fb0b80f47416c2da2b679aa00` üzerinde CI run `34720900819` ve Architecture Review run `34720900816` tamamen GREEN; full Tests, TypeScript ve production build GREEN.
-- PR #242 merge commit `c48248baf352fbf62eba20300a4b94f775868e40` ile `main`e alındı.
-- Provider/API çağrısı yok.
-
-## 22. Commitment lifecycle equal-timestamp order stability — CLOSED
-- PR #244 ölçülmüş RED ile açıldı: aynı proposition için plan generation ve cancellation aynı geçerli `createdAt` değerini taşıdığında aynı evidence multiset'i yalnız input/storage sırasına göre `planned` veya `cancelled` olabiliyordu.
-- RED CI run `34721674972`: docs/behavior guards, architecture/runtime/harness/replay katmanları ve Historical RED→GREEN GREEN; full `Tests` FAIL; TypeScript/build skip.
-- Root cause: `compareObservationRecency()` eşit geçerli timestamp için doğru biçimde `0` dönüyordu; `resolvePlanLifecycle()` ise stable sort sonrası caller order'ını istemeden temporal authority yapıyordu.
-- GREEN: seçili plan generation ile lifecycle outcome aynı geçerli timestamp'i taşıyorsa temporal sıra kanıtlanmış sayılmaz ve resolver fail-closed `unknown` döner; plan + outcome evidence kimlikleri korunur.
-- Observation ID, insertion order veya sentetik tie-breaker semantic zaman otoritesi yapılmadı; generic temporal comparator değişmedi.
-- Regression iki eşzamanlı permutation'ı `unknown` olarak kilitler; ayrıca strictly-newer cancellation → `cancelled` ve strictly-newer plan / older cancellation → `planned` davranışları korunur.
-- GREEN behavior head `fa185267ac4827c17b7585d5ad04c36c6603922c` üzerinde CI run `34721987139` ve Architecture Review run `34721987156` tamamen GREEN; full Tests, TypeScript ve production build GREEN.
-- PR #244 merge commit `bb46135f028366dfd6b6aafbf8a25ecce8b8a696` ile `main`e alındı.
-- Provider/API çağrısı yok.
-
-## 23. Commitment lifecycle invalid-timestamp order stability — CLOSED
-- PR #245 ölçülmüş RED ile açıldı: aynı proposition için plan generation ve cancellation temporal olarak geçersiz `createdAt` değerleri taşıdığında aynı evidence multiset'i yalnız input/storage sırasına göre farklı lifecycle truth üretebiliyordu.
-- RED CI run `34722582940`: docs/behavior guards, architecture/runtime/harness/replay katmanları, proof manifest ve Historical RED→GREEN GREEN; full `Tests` FAIL; TypeScript/build skip.
-- Root cause: iki timestamp de invalid olduğunda `compareObservationRecency()` `0` dönüyor; #244 guard'ı yalnız eşit geçerli timestamp'i kapsadığı için stable sort caller order'ını current-generation sınırına sızdırabiliyordu.
-- GREEN: seçili plan ile lifecycle outcome ya aynı geçerli timestamp'i taşıyorsa ya da ikisinin timestamp'i de geçersiz ve order edilemiyorsa resolver fail-closed `unknown` döner; evidence kimlikleri korunur.
-- Mixed valid/invalid temporal policy değişmedi; observation ID/insertion-order tie-breaker eklenmedi; generic temporal comparator değişmedi.
-- Regression invalid-timestamp iki permutation'ı, equal-valid permutation'ları ve strictly ordered komşu lifecycle davranışlarını kilitler.
-- GREEN behavior head `f39b8f35eb63e9259e1985b1fdccf2cc3bcfaa51` üzerinde CI run `34722993619` ve Architecture Review run `34722993537` tamamen GREEN; full Tests, TypeScript ve production build GREEN.
-- Provider/API çağrısı yok.
-
-## 24. Commitment plan-generation order stability — CLOSED
-- PR #246 merge commit `f36b60b8c568499f67123ed6906cd6b7961db9af` ile `main`e alındı.
-- Ölçülmüş RED: aynı proposition için iki candidate plan generation temporal olarak ayırt edilemediğinde stable sort caller/storage order'ı hangi generation'ın "newest" sayılacağını belirleyebiliyordu.
-- GREEN: competing plan generation'lar aynı geçerli timestamp'i taşıyorsa veya ikisinin timestamp'i de geçersizse resolver fail-closed `unknown` döner; evidence kimlikleri korunur.
-- Mixed valid/invalid policy değişmedi; valid timestamp temporal authority olarak invalid evidence'ın önünde kalır. Generic comparator ve canonical ownership değişmedi.
-- Regression equal-valid, both-invalid ve strictly-newer valid plan kontrollerini kilitler.
-- Full Tests, TypeScript, production build ve Architecture Review GREEN; provider/API çağrısı yok.
-
-## 25. Commitment terminal-outcome order stability — READY TO MERGE
-- PR #247 branch `codex/commitment-terminal-outcome-order-red`.
-- Ölçülmüş RED CI run `34725297521`: docs/behavior guards, deterministic pre-gates ve Historical RED→GREEN GREEN; full `Tests` FAIL; TypeScript/build skip.
-- Root cause: current plan generation içindeki iki farklı terminal lifecycle state aynı temporal bucket'ta olduğunda `generation.find(...)` stable sort caller order'ına göre ilk state'i authoritative truth yapabiliyordu.
-- GREEN: yalnız latest lifecycle-outcome temporal bucket incelenir; temporally indistinguishable farklı lifecycle kind'ları `unknown` fail-closed üretir ve conflicting evidence kimlikleri korunur.
-- Aynı-state duplicate outcome ambiguity sayılmaz; daha eski ambiguous bucket strictly newer definitive outcome'u zehirlemez; normal strictly-newer outcome davranışı korunur.
-- Global temporal comparator, lifecycle ownership ve canonical semantic authority değişmedi.
-- GREEN head `bfa41432b8ba944909d801b737efea2396c96f72` üzerinde CI run `34725601193` tamamen GREEN; Architecture Review run `34725601140` GREEN; full Tests, TypeScript ve production build GREEN.
-- Provider/API çağrısı yok.
-
-## 26. Güncel checkpoint
-- `main` doğrulanan SHA `f36b60b8c568499f67123ed6906cd6b7961db9af`; PR #247 final checkpoint CI sonrası merge edilecek.
-- Commitment evidence-order, person-isolation, plan/outcome temporal ambiguity, plan-generation ambiguity ve terminal-outcome ambiguity measured RED sınıfları mevcut ownership seam'lerinde minimal fail-closed fix'lerle kapatıldı veya merge'e hazırlandı.
-- Açık production failure bilinmiyor; yeni patch yalnız yeni ölçülmüş RED/counterexample sonrası açılmalı.
-- Yeni realization/behavior production patch yalnız yeni ölçülmüş RED failure sonrası açılmalı.
-- Yeni relationship/social-appraisal/world-lifecycle production patch yalnız ölçülmüş counterexample veya RED failure sonrası açılmalı; mevcut authority sınırlarını genişletmek için varsayımsal patch yapılmamalı.
-- PR #230 sonrası eksik behavior-situation kavramları yalnız yeni testlerle gerçekten gerekli olduğu kanıtlanırsa canonical language schema/evidence katmanında modellenmeli; downstream regex geri getirilmemeli.
-- Provider tarafında yeni production patch yalnız ölçülmüş RED failure sonrası açılmalı; canlı keşif çağrısı yapılmamalı.
+## 9. Sıradaki ürün aşaması
+- Sıradaki ana aşama **gerçek insan beta / live conversation acceptance**: gerçek kullanıcıların doğal uzun sohbetleri, ürün gözlemi ve yakalanan KNT/trace’lerin deterministic replay’e dönüştürülmesi.
+- Beta sırasında yalnız ölçülmüş davranış failure’ları bug-class regression’a çevrilir; mimari varsayımla genişletilmez.
+- Gerçek insan beta bu repo içinden otomatik tamamlanamaz; dış kullanım/veri gerektirir.
