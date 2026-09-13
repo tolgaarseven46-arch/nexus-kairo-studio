@@ -40,7 +40,7 @@
 - PR #251: trust/warmth aynı tutulurken yalnız history/maturity farkının aynı mild direct injury’yi farklı damp ettiği tek-değişken A/B proof GREEN.
 - PR #252: gerçek `saveKdmInteraction()` → `loadKdmState()` normalization/hydration round-trip sonrası aynı maturity-bearing state aynı reducer davranışını üretir; GREEN.
 
-## 6. Commitment / betrayal lifecycle + appraisal — CLOSED FOR KNOWN FAILURES
+## 6. Commitment / betrayal lifecycle + appraisal — ACTIVE: PR #258
 - PR #237: commitment/betrayal typed appraisal boundary.
 - PR #239: unresolved counterparty isolation; missing counterparty fail-closed `unknown`.
 - PR #241/#242: evidence-order stability + person/scope/counterparty lifecycle isolation.
@@ -49,7 +49,12 @@
 - PR #247: conflicting terminal-outcome temporal bucket caller/storage order’dan bağımsız; ambiguity → `unknown`.
 - PR #248: canonical lifecycle `unknown` SocialAppraisal’da `absent`a düşmez; betrayal uncertainty korunur.
 - PR #250: `betrayal: unknown` downstream application seviyesinde relational/affective mutation, confidence escalation veya material effect üretmez.
-- Bu alanda bilinen açık production failure yok.
+- 13 Eylül authority audit’i yeni bir temsil boşluğu kanıtladı: mevcut `SemanticAttribution` controllability / communicationConsent / externalCause taşımıyordu ve SocialAppraisal commitment projection current `state` ile prior state/lifecycle outcome’u ayırmıyordu.
+- Characterization RED branch `codex/lifecycle-socialappraisal-mapping-contract`, RED commit `3d7949059071de07a5ca120510ff1e7e596e6ee4`, Fast CI run `34762500294`: 8 lifecycle mapping senaryosunun 5’i RED, 3’ü mevcut davranışla GREEN.
+- PR #258 aynı mevcut semantic authority’yi typed alanlarla genişletir; yeni authority, downstream raw-text reparse, regex veya phrase heuristic eklemez. Missing/legacy attribution evidence `unknown` fail-closed normalize edilir.
+- Commitment projection `state / previousState / lifecycleOutcome` olarak ayrılır: postponed aktif obligation’ı korur; failed/cancelled terminal outcome prior active state’i silmez; unknown lifecycle fail-closed kalır.
+- GREEN head `f95b377d8f74f16020e55920a6bfa4c6643c9b51`, Fast CI run `34763424188`: lifecycle mapping contract 8/8 GREEN, toplam 59/59 test ve `tsc --noEmit` GREEN.
+- PR #258 full CI / Architecture Review kapanmadan bu extension CLOSED sayılmaz.
 
 ## 7. Automated pre-beta system acceptance — CLOSED
 - PR #253 merge commit `f27f9bd0142cd618b952b012b7856059849e078a`.
@@ -64,14 +69,14 @@
 - PR #254 automated pre-beta checkpoint closure/docs sync olarak merge edildi.
 
 ## 8. Güncel teknik durum
-- Açık production failure bilinmiyor.
-- Otomatik pre-beta deterministic architecture/system acceptance kapsamında bilinen açık implementation işi yok.
+- PR #258’de measured lifecycle→SocialAppraisal representation gap’i kapanıyor; merge edilene kadar commitment/betrayal lifecycle alanı açık implementation işi sayılır.
+- Bunun dışındaki otomatik pre-beta deterministic architecture/system acceptance kapsamında bilinen açık implementation işi yok.
 - Yeni relationship/social-appraisal/world-lifecycle/behavior/realization/provider production patch yalnız yeni ölçülmüş RED/counterexample sonrası açılmalı.
 - Eksik behavior-situation kavramı ancak test ile gerçekten gerekli olduğu kanıtlanırsa canonical language schema/evidence katmanında modellenmeli; downstream regex/classifier geri getirilmemeli.
 - Provider live parity / maliyetli gerçek-provider keşfi ayrı acceptance sınıfıdır ve deterministic mimari proof yerine geçmez.
 
 ## 9. Live beta / real-human acceptance — ACTIVE PHASE
-- Sıradaki ana aşama gerçek insan beta / live conversation acceptance'tır.
+- Sıradaki ana aşama gerçek insan beta / live conversation acceptance'tır; PR #258 gate’leri kapanmadan yeni lifecycle/appraisal davranışı merge edilmiş kabul edilmez.
 - `docs/beta/live-beta-protocol.md` beta giriş kriterlerini, minimum session/turn evidence'ını, failure class/severity modelini, deterministic RED promotion zincirini ve exit criteria'yı tanımlar.
 - `.github/ISSUE_TEMPLATE/live-beta-failure.md` her gerçek beta failure'ı için standart capture/replay handoff formatıdır.
 - Bir beta gözlemi production bug sayılmaz; önce exact failing window + runtime evidence + owning seam + deterministic replay/counterexample gerekir.
