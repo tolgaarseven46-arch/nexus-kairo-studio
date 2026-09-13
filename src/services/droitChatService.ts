@@ -24,7 +24,7 @@ import { projectSemanticEvent } from "./semanticInterpretationProjection";
 import { projectCanonicalBehaviorSituations } from "./behaviorSituationProjection";
 import { saveTestSessionLayerAudit } from "./testSessionLayerAuditService";
 import { auth } from "../lib/firebase";
-import { requestCanonicalLanguageUnderstanding, type ClientLanguageUnderstandingResult } from "./clientLanguageUnderstanding";
+import { requestCanonicalLanguageUnderstanding, type ClientLanguageUnderstandingResult, type TextInteractionContext } from "./clientLanguageUnderstanding";
 import { resolveKairaInstanceContext, type KairaInstanceType } from "./kairaInstanceContext";
 import { normalizeFineTuneProfile } from "./fineTuneProfileNormalizer";
 import { acquireKairaChatRequestIdentity, buildKairaChatRetryFingerprint, completeKairaChatRequestIdentity } from "./kairaChatRetryIdentity";
@@ -57,6 +57,7 @@ export interface SendKairoChatOptions {
   sessionId?: string;
   kairaInstanceId?: string;
   kairaInstanceType?: KairaInstanceType;
+  messageContext?: TextInteractionContext;
 }
 
 export interface KairoChatResponse {
@@ -187,7 +188,7 @@ function projectTemperamentForBehavior(
 }
 
 export const droitChatService = {
-  async sendMessage({ userMessage, personality, dynamicState, history = [], characterInfo = { name: "KAIRO", roleTitle: "Sunucu Yöneticisi", raceName: "Sentetik Droit" }, provider = "openrouter", userId: explicitUserId, userName = "Kullanıcı", suppressRecentMemory = false, sessionId, kairaInstanceId, kairaInstanceType }: SendKairoChatOptions): Promise<KairoChatResponse> {
+  async sendMessage({ userMessage, personality, dynamicState, history = [], characterInfo = { name: "KAIRO", roleTitle: "Sunucu Yöneticisi", raceName: "Sentetik Droit" }, provider = "openrouter", userId: explicitUserId, userName = "Kullanıcı", suppressRecentMemory = false, sessionId, kairaInstanceId, kairaInstanceType, messageContext }: SendKairoChatOptions): Promise<KairoChatResponse> {
     const totalStart = performance.now();
     const userId = resolveConversationUserId(explicitUserId);
     const kairaInstance = resolveKairaInstanceContext({ instanceId: kairaInstanceId, instanceType: kairaInstanceType });
@@ -208,6 +209,7 @@ export const droitChatService = {
         userName,
         characterName: characterInfo.name || "KAIRO",
         provider,
+        interactionContext: messageContext,
         recentMessages: history.slice(-8).map((m) => ({
           role: m.sender === "droit" ? ("assistant" as const) : ("user" as const),
           content: m.text,
