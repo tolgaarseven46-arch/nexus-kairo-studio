@@ -44,6 +44,14 @@ export interface KairoTimingMetrics {
   totalMs: number;
 }
 
+export interface TextEpisodeFragment {
+  text: string;
+}
+
+export interface TextEpisodeInput {
+  fragments: TextEpisodeFragment[];
+}
+
 export interface SendKairoChatOptions {
   userMessage: string;
   personality: DroitPersonalityTraits;
@@ -58,6 +66,7 @@ export interface SendKairoChatOptions {
   kairaInstanceId?: string;
   kairaInstanceType?: KairaInstanceType;
   messageContext?: TextInteractionContext;
+  textEpisode?: TextEpisodeInput;
 }
 
 export interface KairoChatResponse {
@@ -187,16 +196,26 @@ function projectTemperamentForBehavior(
   return { ...previewState, anger: clamp100(previewState.anger + delta.anger), stress: clamp100(previewState.stress + delta.stress), happiness: clamp100(previewState.happiness + delta.happiness), calmness: clamp100(previewState.calmness + delta.calmness), confidence: clamp100(previewState.confidence + delta.confidence), surprise: clamp100(previewState.surprise + delta.surprise) };
 }
 
+function assembleTextEpisode(userMessage: string, textEpisode?: TextEpisodeInput): string {
+  const episodeText = textEpisode?.fragments
+    .map((fragment) => fragment.text.trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+  return episodeText || userMessage;
+}
+
 export const droitChatService = {
-  async sendMessage({ userMessage, personality, dynamicState, history = [], characterInfo = { name: "KAIRO", roleTitle: "Sunucu Yöneticisi", raceName: "Sentetik Droit" }, provider = "openrouter", userId: explicitUserId, userName = "Kullanıcı", suppressRecentMemory = false, sessionId, kairaInstanceId, kairaInstanceType, messageContext }: SendKairoChatOptions): Promise<KairoChatResponse> {
+  async sendMessage({ userMessage, personality, dynamicState, history = [], characterInfo = { name: "KAIRO", roleTitle: "Sunucu Yöneticisi", raceName: "Sentetik Droit" }, provider = "openrouter", userId: explicitUserId, userName = "Kullanıcı", suppressRecentMemory = false, sessionId, kairaInstanceId, kairaInstanceType, messageContext, textEpisode }: SendKairoChatOptions): Promise<KairoChatResponse> {
     const totalStart = performance.now();
+    const episodeText = assembleTextEpisode(userMessage, textEpisode);
     const userId = resolveConversationUserId(explicitUserId);
     const kairaInstance = resolveKairaInstanceContext({ instanceId: kairaInstanceId, instanceType: kairaInstanceType });
     const resolvedSessionId = sessionId?.trim() || freshSessionId(userId, kairaInstance.instanceId);
     const retryFingerprint = buildKairaChatRetryFingerprint({
       userId,
       kairaInstanceId: kairaInstance.instanceId,
-      userMessage,
+      userMessage: episodeText,
       dynamicState,
     });
     const requestId = acquireKairaChatRequestIdentity(retryFingerprint);
@@ -205,7 +224,7 @@ export const droitChatService = {
     let languageUnderstanding: ClientLanguageUnderstandingResult;
     try {
       languageUnderstanding = await requestCanonicalLanguageUnderstanding({
-        message: userMessage,
+        message: episodeText,
         userName,
         characterName: characterInfo.name || "KAIRO",
         provider,
@@ -216,7 +235,7 @@ export const droitChatService = {
         })),
       });
     } catch (error) {
-      const interpretation = interpretationFromRegexFloor(userMessage);
+      const interpretation = interpretationFromRegexFloor(episodeText);
       languageUnderstanding = {
         interpretation,
         event: projectSemanticEvent(interpretation),
@@ -236,12 +255,12 @@ export const droitChatService = {
     const valueRuntime = applyValues(motivationRuntime.personality, fineTune, behaviorSituations.values);
     const preferenceRuntime = applyPreferences(valueRuntime.personality, fineTune, behaviorSituations.preferences);
     const socialRuntime = applySocialOrientation(preferenceRuntime.personality, fineTune, behaviorSituations.social, temperamentAdjustedState);
-    const boundaryRuntime = applyBoundaries(socialRuntime.personality, fineTune, userMessage, temperamentAdjustedState, semanticEvent);
+    const boundaryRuntime = applyBoundaries(socialRuntime.personality, fineTune, episodeText, temperamentAdjustedState, semanticEvent);
     const expressionRuntime = applyExpressionStyle(boundaryRuntime.personality, fineTune, behaviorSituations.expression, temperamentAdjustedState);
     const integrationRuntime = integrateBehaviorLayers({
       personality: expressionRuntime.personality,
       dynamicState: temperamentAdjustedState,
-      userMessage,
+      userMessage: episodeText,
       semanticEvent,
       personalityTendency: personalityRuntime.response,
       motivation: motivationRuntime.response,
@@ -263,7 +282,7 @@ export const droitChatService = {
       .reverse()
       .find((message) => message.sender === "droit" && message.activityPermissionRequestId)
       ?.activityPermissionRequestId;
-    const payload = { sessionId: resolvedSessionId, requestId, userId, userName, userMessage, semanticInterpretation: languageUnderstanding.interpretation, semanticEvent, character: characterInfo, personality, responsePersonality: runtimePersonality, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorPolicy, dynamicState, affectBaseline, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName, semanticInterpretation: m.semanticInterpretation, semanticSource: m.semanticSource })), activityPermissionRequestId, provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
+    const payload = { sessionId: resolvedSessionId, requestId, userId, userName, userMessage: episodeText, semanticInterpretation: languageUnderstanding.interpretation, semanticEvent, character: characterInfo, personality, responsePersonality: runtimePersonality, personalityTendency: personalityRuntime.response, motivation: motivationRuntime.response, values: valueRuntime.response, preferences: preferenceRuntime.response, socialOrientation: socialRuntime.response, boundaries: boundaryRuntime.response, expressionStyle: expressionRuntime.response, behaviorPolicy, dynamicState, affectBaseline, history: history.slice(-24).map((m) => ({ sender: m.sender, text: m.text, participantId: m.participantId, participantName: m.participantName, replyToParticipantId: m.replyToParticipantId, replyToParticipantName: m.replyToParticipantName, semanticInterpretation: m.semanticInterpretation, semanticSource: m.semanticSource })), activityPermissionRequestId, provider, suppressRecentMemory, kairaInstanceId: kairaInstance.instanceId, kairaInstanceType: kairaInstance.instanceType };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), KAIRA_CHAT_CLIENT_TIMEOUT_MS);
     try {
