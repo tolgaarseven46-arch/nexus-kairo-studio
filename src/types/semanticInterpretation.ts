@@ -46,6 +46,31 @@ export type SemanticControllability = "high" | "low" | "unknown";
 export type SemanticCommunicationConsent = "present" | "absent" | "unknown";
 export type SemanticExternalCause = "present" | "absent" | "unknown";
 
+/** Utterance status of one proposition; distinct from world-event execution modality. */
+export type SemanticModality =
+  | "assertion"
+  | "question"
+  | "hypothetical"
+  | "wish"
+  | "prediction";
+
+/**
+ * One bounded semantic proposition carried by the canonical interpretation.
+ * This is evidence representation, not a second semantic authority and not a
+ * persistence decision. Downstream integrity gates decide what may persist.
+ */
+export interface SemanticProposition {
+  id: string;
+  content: string;
+  actorId?: string;
+  experiencerId?: string;
+  addresseeId?: string;
+  temporalAnchor?: string;
+  modality: SemanticModality;
+  confidence: number;
+  provenance: string[];
+}
+
 /**
  * Canonical current-turn attribution evidence. This describes only what the
  * current utterance explicitly supports; it does not decide betrayal/unfairness.
@@ -269,6 +294,8 @@ export interface SemanticInterpretation {
   stopRequest: boolean;
 
   discourseFacets: SemanticDiscourseFacets;
+  /** Bounded proposition evidence; optional for legacy/fallback producers. */
+  propositions?: SemanticProposition[];
   /** Structured world-memory semantics; optional for legacy/fallback producers. */
   worldMemory?: SemanticWorldMemorySemantics;
   /** Typed current-turn attribution; optional for legacy producers/snapshots. */
