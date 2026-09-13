@@ -1,6 +1,6 @@
 # KAIRO PROJECT STATE
 
-> Bu dosya projenin **aktif çalışma checkpoint'idir**. Yeni sohbet başladığında önce GitHub'daki gerçek `main`, açık PR/issue/CI ve bu dosya doğrulanır; eski sohbetten varsayım yapılmaz. Ayrıntılı tarih Git geçmişi, `AI_CHANGELOG.md` ve `docs/adr/**` içindedir.
+> Bu dosya projenin **aktif çalışma checkpoint'idir**. Yeni sohbet başladığında önce GitHub'daki gerçek `main`, açık PR/issue/CI ve bu dosya doğrulanır; eski sohbetten varsayım yapılmaz. Bu dosyadaki eski commit SHA'ları tarihsel kanıttır; güncel `main` SHA her zaman GitHub'dan yeniden doğrulanır. Ayrıntılı tarih Git geçmişi, `AI_CHANGELOG.md` ve `docs/adr/**` içindedir.
 
 ## 1. Değişmez mimari kurallar
 - `SemanticInterpretation@2` current-turn sınıflandırmasının tek canonical semantik otoritesidir.
@@ -61,17 +61,35 @@
 - CI run `34759029702`: docs-guard, behavior-guard, architecture contracts, autonomous runtime contracts, beta runtime regression, Phase-0 harness/report, beta conversation/KNT replay, proof manifest, Historical RED→GREEN, full Tests, TypeScript ve production build GREEN.
 - Architecture Review run `34759029689` GREEN.
 - Ölçülen production RED çıkmadı; runtime patch yapılmadı.
+- PR #254 automated pre-beta checkpoint closure/docs sync olarak merge edildi.
 
-## 8. Güncel checkpoint
-- Doğrulanmış `main`: `f27f9bd0142cd618b952b012b7856059849e078a` (#253 sonrası).
-- PR #250–#253 zinciri CLOSED.
+## 8. Güncel teknik durum
 - Açık production failure bilinmiyor.
-- Otomatik pre-beta deterministic architecture/system acceptance kapsamında şu an bilinen açık iş yok.
+- Otomatik pre-beta deterministic architecture/system acceptance kapsamında bilinen açık implementation işi yok.
 - Yeni relationship/social-appraisal/world-lifecycle/behavior/realization/provider production patch yalnız yeni ölçülmüş RED/counterexample sonrası açılmalı.
 - Eksik behavior-situation kavramı ancak test ile gerçekten gerekli olduğu kanıtlanırsa canonical language schema/evidence katmanında modellenmeli; downstream regex/classifier geri getirilmemeli.
 - Provider live parity / maliyetli gerçek-provider keşfi ayrı acceptance sınıfıdır ve deterministic mimari proof yerine geçmez.
 
-## 9. Sıradaki ürün aşaması
-- Sıradaki ana aşama **gerçek insan beta / live conversation acceptance**: gerçek kullanıcıların doğal uzun sohbetleri, ürün gözlemi ve yakalanan KNT/trace’lerin deterministic replay’e dönüştürülmesi.
-- Beta sırasında yalnız ölçülmüş davranış failure’ları bug-class regression’a çevrilir; mimari varsayımla genişletilmez.
-- Gerçek insan beta bu repo içinden otomatik tamamlanamaz; dış kullanım/veri gerektirir.
+## 9. Live beta / real-human acceptance — ACTIVE PHASE
+- Sıradaki ana aşama gerçek insan beta / live conversation acceptance'tır.
+- `docs/beta/live-beta-protocol.md` beta giriş kriterlerini, minimum session/turn evidence'ını, failure class/severity modelini, deterministic RED promotion zincirini ve exit criteria'yı tanımlar.
+- `.github/ISSUE_TEMPLATE/live-beta-failure.md` her gerçek beta failure'ı için standart capture/replay handoff formatıdır.
+- Bir beta gözlemi production bug sayılmaz; önce exact failing window + runtime evidence + owning seam + deterministic replay/counterexample gerekir.
+- Trace'te bulunmayan canonical evidence raw text'ten sonradan yeniden türetilmez; `missing` olarak tutulur.
+- `UNKNOWN` failure class'tan production patch yapılmaz.
+- S0 cross-user contamination/data/privacy failure beta'yı durdurur; S1 canonical truth/relationship/memory/hard-permission failure deterministic reproduction sonrası geniş beta öncesi kapatılır.
+
+## 10. Beta acceptance hedefleri
+- En az iki gerçek kullanıcıyla bağımsız history/memory ilişkileri test edilmeli.
+- Fresh vs mature relationship farkı gerçek kullanımda gözlenmeli.
+- Positive history → mild conflict ve repeated negative → repair akışları denenmeli.
+- Third-party referanslar Kaira-user ilişkisini yanlış mutate etmemeli.
+- Restart/hydration sonrası state parity gerçek kullanımda gözlenmeli.
+- En az bir gerçek sohbet 100+ turn boyunca manuel state reset olmadan yürütülmeli; yalnız final snapshot değil per-turn relationship/affect/memory/decision evrimi incelenmeli.
+- Aynı/benzer input farklı user history'lerinde gerektiğinde farklı sonuç üretmeli fakat kullanıcı state'leri birbirine sızmamalı.
+- Beta completion için unresolved S0/S1 kalmamalı; düzeltilen S1/S2 davranış failure'larının deterministic regression/replay'i olmalı.
+
+## 11. Çalışma kuralı
+- Beta başlamadan varsayımsal behavior patch üretme.
+- Gerçek kullanıcı failure'ı geldiğinde zincir: capture → ownership → minimal deterministic RED/replay → owning-seam fix → neighboring regressions → full CI → merge.
+- Test Lab'deki statik/simüle cevaplar gerçek live-beta kanıtı sayılmaz; beta evidence gerçek runtime conversation path'ten gelmelidir.
