@@ -65,12 +65,14 @@ function semanticWithModality(modality: SemanticModality) {
 }
 
 function durableProfileWrites() {
-  return firestore.setDoc.mock.calls.filter(([ref]) =>
-    typeof ref === 'object'
-    && ref !== null
-    && 'path' in ref
-    && String((ref as { path: string }).path).startsWith('kairoMemory/'),
-  );
+  const calls = firestore.setDoc.mock.calls as unknown as unknown[][];
+  return calls.filter((call) => {
+    const ref = call[0];
+    return typeof ref === 'object'
+      && ref !== null
+      && 'path' in ref
+      && String((ref as { path: string }).path).startsWith('kairoMemory/');
+  });
 }
 
 describe('persistence integrity gate characterization', () => {
