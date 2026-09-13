@@ -163,6 +163,13 @@ function normalizeAttribution(value: unknown): SemanticAttribution | undefined {
     ? v.commitmentViolation
     : "unknown";
   const deception = v.deception === "present" || v.deception === "absent" ? v.deception : "unknown";
+  const controllability = v.controllability === "high" || v.controllability === "low" ? v.controllability : "unknown";
+  const communicationConsent = v.communicationConsent === "present" || v.communicationConsent === "absent"
+    ? v.communicationConsent
+    : "unknown";
+  const externalCause = v.externalCause === "present" || v.externalCause === "absent"
+    ? v.externalCause
+    : "unknown";
   const actorId = canonicalMemoryKey(v.actorId);
   const scopeKey = canonicalMemoryKey(v.scopeKey);
   const provenance = Array.isArray(v.provenance)
@@ -174,6 +181,9 @@ function normalizeAttribution(value: unknown): SemanticAttribution | undefined {
     intentionality,
     commitmentViolation,
     deception,
+    controllability,
+    communicationConsent,
+    externalCause,
     confidence: clamp01(v.confidence),
     provenance,
   };
