@@ -39,6 +39,13 @@ const schemaExample: SemanticInterpretation = {
     stopQuestions: false,
     stopTalking: false,
   },
+  propositions: [{
+    id: "p1",
+    content: "mesajdaki tek bir önerme",
+    modality: "assertion",
+    confidence: 0.8,
+    provenance: ["current_turn"],
+  }],
   worldMemory: { claims: [], query: null },
   uncertainty: { overall: 0.25, intent: 0.2, target: 0.3, severity: 0.25 },
   evidence: [{ source: "llm", provider: "semantic-parser", cues: [], confidence: 0.75 }],
@@ -62,6 +69,16 @@ Bir mesaj birden fazla social act taşıyabilir. Primary intent tek ana içerik 
 
 TARGET:
 kaira | third_party | self | event | unknown. Emin değilsen unknown.
+
+PROPOSITIONS — bounded utterance semantics:
+- propositions, BU mesajdaki ayrı anlam önermelerini koruyan en fazla 15 elemanlı listedir; tam graph üretme.
+- Her proposition: {id, content, actorId?, experiencerId?, addresseeId?, temporalAnchor?, modality, confidence, provenance}.
+- modality yalnız assertion | question | hypothetical | wish | prediction olabilir.
+- Bir mesajda gerçek bildirim, soru, dilek ve tahmin birlikteyse bunları tek primaryIntent altında ezme; ayrı proposition olarak koru.
+- question/hypothetical/wish/prediction içeriğini assertion veya persistent fact gibi yeniden yazma.
+- actor/experiencer/addressee/temporalAnchor yalnız metin veya güvenilir referans bağlamı destekliyorsa doldur; uydurma.
+- provenance için current_turn kullan; bağlam yalnız referans çözümünde gerçekten etkiliyse kısa ek provenance etiketi eklenebilir.
+- proposition listesi evidence temsilidir; ilişki/appraisal/persistence kararı vermez.
 
 SEVERITY VECTOR — her alan bağımsız 0..1:
 - disrespect: 0=hakaret/aşağılama yok; .2=hafif kaba/teasing; .4=belirgin saygısızlık ama ağır saldırı değil; .7=doğrudan ciddi hakaret; .9+=çok ağır, açık ve hedefi net aşağılayıcı saldırı.
@@ -106,7 +123,7 @@ selfMemoryQuery = null veya {surface, scope:self_fact|autobiographical_memory|an
 
 WORLD MEMORY SEMANTICS:
 worldMemory = {claims, query}. Bu alan yalnız persistent dış-dünya/kişi bilgisinin typed fact kimliğini taşır; cevap/policy değildir.
-- claims: kullanıcının BU mesajda açıkça verdiği attribute-value gerçekleri. Her claim {subjectId, attributeKey, value, confidence}.
+- claims: kullanıcının BU mesajda açıkça ASSERT ETTİĞİ attribute-value gerçekleri. Soru, hypothetical, wish veya prediction içeriğinden claim üretme. Her claim {subjectId, attributeKey, value, confidence}.
 - query: geçmişten istenen belirli attribute için {subjectId, attributeKey, confidence}; attribute belli değilse null.
 - subjectId bağlam boyunca stabil canonical kimlik olmalı. Kullanıcının romantik partneri için current_user.partner; Kaira için kaira; adı açık kişiler için person:<normalize_ad>.
 - attributeKey kısa İngilizce snake_case kavram anahtarıdır: eye_color, hair_color, age, origin, favorite_feature gibi. Aynı kavram claim ve query'de AYNI key'i kullanmalı.
@@ -174,32 +191,15 @@ function enforceProviderFieldInvariants(
   context?: LanguageUnderstandingContext,
 ): SemanticInterpretation {
   const hasPriorAssistantTurn = context?.recentMessages?.some((item) => item.role === "assistant") ?? false;
-  const repairAllowed =
-    hasPriorAssistantTurn &&
-    interpretation.discourseFacets.discourseAct === "confusion_or_challenge";
-  const repairSignal = repairAllowed
-    ? interpretation.discourseFacets.repairSignal
-    : "none";
+  const repairAllowed = hasPriorAssistantTurn && interpretation.discourseFacets.discourseAct === "confusion_or_challenge";
+  const repairSignal = repairAllowed ? interpretation.discourseFacets.repairSignal : "none";
   const stopTalking = interpretation.discourseFacets.stopTalking;
   const stopQuestions = interpretation.discourseFacets.stopQuestions;
-  const secondarySocialActs = stopTalking
-    ? interpretation.secondarySocialActs
-    : interpretation.secondarySocialActs.filter((act) => act !== "stop_request");
-  const primaryIntent = interpretation.discourseFacets.socialRoutine === "how_are_you"
-    ? "greeting"
-    : interpretation.primaryIntent;
-
+  const secondarySocialActs = stopTalking ? interpretation.secondarySocialActs : interpretation.secondarySocialActs.filter((act) => act !== "stop_request");
+  const primaryIntent = interpretation.discourseFacets.socialRoutine === "how_are_you" ? "greeting" : interpretation.primaryIntent;
   return {
-    ...interpretation,
-    primaryIntent,
-    secondarySocialActs,
-    stopRequest: stopTalking,
-    discourseFacets: {
-      ...interpretation.discourseFacets,
-      repairSignal,
-      stopQuestions,
-      stopTalking,
-    },
+    ...interpretation, primaryIntent, secondarySocialActs, stopRequest: stopTalking,
+    discourseFacets: { ...interpretation.discourseFacets, repairSignal, stopQuestions, stopTalking },
   };
 }
 
@@ -207,18 +207,12 @@ function isShortContextAdjudicationCandidate(message: string, context?: Language
   const token = message.trim();
   return Boolean(context?.recentMessages?.length) && /^[\p{L}\p{N}]{2,3}$/u.test(token);
 }
-
-function hasRecentContext(context?: LanguageUnderstandingContext): boolean {
-  return Boolean(context?.recentMessages?.length);
-}
+function hasRecentContext(context?: LanguageUnderstandingContext): boolean { return Boolean(context?.recentMessages?.length); }
 
 function isSemanticallyOpaqueWithoutContext(interpretation: SemanticInterpretation): boolean {
   const severityPeak = Math.max(
-    interpretation.severity.disrespect,
-    interpretation.severity.coercion,
-    interpretation.severity.manipulation,
-    interpretation.severity.privacy,
-    interpretation.severity.aggression,
+    interpretation.severity.disrespect, interpretation.severity.coercion, interpretation.severity.manipulation,
+    interpretation.severity.privacy, interpretation.severity.aggression,
   );
   const facets = interpretation.discourseFacets;
   return interpretation.primaryIntent === "other"
@@ -248,18 +242,12 @@ function isSemanticallyOpaqueWithoutContext(interpretation: SemanticInterpretati
     && interpretation.uncertainty.intent >= 0.7;
 }
 
-function contextInventsLexicalMeaning(
-  baseline: SemanticInterpretation,
-  contextual: SemanticInterpretation,
-): boolean {
+function contextInventsLexicalMeaning(baseline: SemanticInterpretation, contextual: SemanticInterpretation): boolean {
   const baselineFacets = baseline.discourseFacets;
   const contextualFacets = contextual.discourseFacets;
   const contextualSeverityPeak = Math.max(
-    contextual.severity.disrespect,
-    contextual.severity.coercion,
-    contextual.severity.manipulation,
-    contextual.severity.privacy,
-    contextual.severity.aggression,
+    contextual.severity.disrespect, contextual.severity.coercion, contextual.severity.manipulation,
+    contextual.severity.privacy, contextual.severity.aggression,
   );
   return contextual.primaryIntent !== baseline.primaryIntent
     || contextual.secondarySocialActs.length > 0
@@ -284,19 +272,10 @@ function contextInventsLexicalMeaning(
     || contextualFacets.stopTalking !== baselineFacets.stopTalking;
 }
 
-function preserveOnlyContextualReferent(
-  baseline: SemanticInterpretation,
-  contextual: SemanticInterpretation,
-): SemanticInterpretation {
+function preserveOnlyContextualReferent(baseline: SemanticInterpretation, contextual: SemanticInterpretation): SemanticInterpretation {
   if (contextual.target === "unknown" || contextual.target === baseline.target) return baseline;
-  return {
-    ...baseline,
-    target: contextual.target,
-    uncertainty: {
-      ...baseline.uncertainty,
-      target: Math.min(baseline.uncertainty.target, contextual.uncertainty.target),
-    },
-  };
+  return { ...baseline, target: contextual.target,
+    uncertainty: { ...baseline.uncertainty, target: Math.min(baseline.uncertainty.target, contextual.uncertainty.target) } };
 }
 
 function fieldValue(interpretation: SemanticInterpretation, field: SemanticGroundingField): unknown {
@@ -316,55 +295,35 @@ function fieldValue(interpretation: SemanticInterpretation, field: SemanticGroun
 }
 
 const GROUNDING_FIELDS: SemanticGroundingField[] = [
-  "primaryIntent", "secondarySocialActs", "target", "valence", "severity",
-  "affection", "support", "compliment", "emotionalLoad", "apology", "repairAttempt",
-  "stopRequest", "socialRoutine", "discourseAct", "repairSignal", "adviceRequested",
-  "knowledgeQuery", "selfMemoryQuery", "worldMemory", "relationalAct", "stopQuestions", "stopTalking",
+  "primaryIntent", "secondarySocialActs", "target", "valence", "severity", "affection", "support", "compliment",
+  "emotionalLoad", "apology", "repairAttempt", "stopRequest", "socialRoutine", "discourseAct", "repairSignal",
+  "adviceRequested", "knowledgeQuery", "selfMemoryQuery", "worldMemory", "relationalAct", "stopQuestions", "stopTalking",
 ];
-
-function sameSemanticValue(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
-function collectContextInfluencedFields(
-  baseline: SemanticInterpretation,
-  contextual: SemanticInterpretation,
-): SemanticGroundingField[] {
+function sameSemanticValue(a: unknown, b: unknown): boolean { return JSON.stringify(a) === JSON.stringify(b); }
+function collectContextInfluencedFields(baseline: SemanticInterpretation, contextual: SemanticInterpretation): SemanticGroundingField[] {
   return GROUNDING_FIELDS.filter((field) => !sameSemanticValue(fieldValue(baseline, field), fieldValue(contextual, field)));
 }
-
 function withGrounding(
   interpretation: SemanticInterpretation,
   contextInfluencedFields: SemanticGroundingField[],
   rejectedContextFields: SemanticGroundingField[],
 ): SemanticInterpretation {
-  return {
-    ...interpretation,
-    grounding: {
-      adjudicatedAgainstContextFree: true,
-      contextInfluencedFields,
-      rejectedContextFields,
-    },
-  };
+  return { ...interpretation, grounding: { adjudicatedAgainstContextFree: true, contextInfluencedFields, rejectedContextFields } };
 }
-
 function shouldAdjudicateContextGrounding(
   message: string,
   context: LanguageUnderstandingContext | undefined,
   contextual: SemanticInterpretation,
 ): boolean {
   if (!hasRecentContext(context)) return false;
-  return isShortContextAdjudicationCandidate(message, context)
-    || contextual.discourseFacets.socialRoutine !== "none";
+  return isShortContextAdjudicationCandidate(message, context) || contextual.discourseFacets.socialRoutine !== "none";
 }
-
 function reconcileContextGrounding(
   message: string,
   contextFree: SemanticInterpretation,
   contextual: SemanticInterpretation,
 ): SemanticInterpretation {
   const influenced = collectContextInfluencedFields(contextFree, contextual);
-
   if (
     isShortContextAdjudicationCandidate(message, { recentMessages: [{ role: "user", content: "context" }] })
     && isSemanticallyOpaqueWithoutContext(contextFree)
@@ -374,13 +333,8 @@ function reconcileContextGrounding(
     const rejected = influenced.filter((field) => field !== "target");
     return withGrounding(result, influenced, rejected);
   }
-
-  const contextFreeRoutineIsGrounded =
-    contextFree.uncertainty.overall <= 0.35
-    && contextFree.uncertainty.intent <= 0.35;
-  const routineDrift =
-    contextual.discourseFacets.socialRoutine !== contextFree.discourseFacets.socialRoutine;
-
+  const contextFreeRoutineIsGrounded = contextFree.uncertainty.overall <= 0.35 && contextFree.uncertainty.intent <= 0.35;
+  const routineDrift = contextual.discourseFacets.socialRoutine !== contextFree.discourseFacets.socialRoutine;
   if (routineDrift && contextFreeRoutineIsGrounded) {
     const rejected: SemanticGroundingField[] = ["socialRoutine"];
     const primaryIntentDrift = contextual.primaryIntent !== contextFree.primaryIntent;
@@ -388,13 +342,9 @@ function reconcileContextGrounding(
     return withGrounding({
       ...contextual,
       ...(primaryIntentDrift ? { primaryIntent: contextFree.primaryIntent } : {}),
-      discourseFacets: {
-        ...contextual.discourseFacets,
-        socialRoutine: contextFree.discourseFacets.socialRoutine,
-      },
+      discourseFacets: { ...contextual.discourseFacets, socialRoutine: contextFree.discourseFacets.socialRoutine },
     }, influenced, rejected);
   }
-
   return withGrounding(contextual, influenced, []);
 }
 
@@ -411,10 +361,7 @@ export function createLlmSemanticUnderstandingProvider(options: LlmSemanticProvi
     if (parsed.schemaVersion !== SEMANTIC_INTERPRETATION_SCHEMA_VERSION || !isSemanticInterpretation(parsed)) {
       throw new Error("LLM semantic parser incomplete/invalid SemanticInterpretation@2 returned.");
     }
-    const normalized = enforceProviderFieldInvariants(
-      normalizeSemanticInterpretation(parsed, message),
-      context,
-    );
+    const normalized = enforceProviderFieldInvariants(normalizeSemanticInterpretation(parsed, message), context);
     normalized.evidence = normalized.evidence.length
       ? normalized.evidence.map((e) => ({ ...e, source: "llm", provider: e.provider ?? options.name ?? "llm_semantic_parser_v2" }))
       : [{ source: "llm", provider: options.name ?? "llm_semantic_parser_v2", cues: [], confidence: Math.max(0, 1 - normalized.uncertainty.overall) }];
