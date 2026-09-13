@@ -1,8 +1,4 @@
-import type {
-  SocialAppraisalCommitmentContext,
-  SocialAppraisalCommitmentLifecycleOutcome,
-  SocialAppraisalCommitmentState,
-} from "../types/socialAppraisal";
+import type { SocialAppraisalCommitmentContext } from "../types/socialAppraisal";
 import { resolvePlanLifecycle } from "./worldEventLifecycle";
 import type { WorldEventObservation } from "./worldModelEventStore";
 
