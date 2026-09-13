@@ -55,6 +55,20 @@ export function assessCommitmentBetrayal(
     return unknown("betrayal:attribution-scope-or-actor-missing");
   }
 
+  const activeCommitment = activeMatchingCommitment(semantic, commitments);
+  if (!activeCommitment) {
+    const unresolvedLifecycleMatch = commitments.some((commitment) =>
+      commitment.kind === "commitment" &&
+      commitment.state === "unknown" &&
+      commitment.actorId === attribution.actorId &&
+      commitment.scopeKey === attribution.scopeKey &&
+      commitment.counterpartyId === "kaira",
+    );
+    if (unresolvedLifecycleMatch) {
+      return unknown("betrayal:prior-commitment-lifecycle-unknown");
+    }
+  }
+
   const anyActiveCommitment = commitments.some((commitment) => commitment.state === "active");
   if (!anyActiveCommitment) return absent("betrayal:no-active-prior-commitment");
 
@@ -70,7 +84,7 @@ export function assessCommitmentBetrayal(
   );
   if (sameScopeCommitments.length === 0) return absent("betrayal:scope-mismatch");
 
-  const commitment = activeMatchingCommitment(semantic, commitments);
+  const commitment = activeCommitment;
   if (!commitment) {
     const unresolvedCounterparty = sameScopeCommitments.some(
       (candidate) => !candidate.counterpartyId,
