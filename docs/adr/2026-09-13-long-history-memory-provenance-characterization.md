@@ -1,13 +1,13 @@
 # Long-history persistent-memory evidence preserves provenance
 
 Date: 2026-09-13
-Status: Characterization RED
+Status: Accepted / GREEN
 
 ## Context
 
 ADR-0024 already owns the bounded persistent-memory retrieval policy: normal dialogue uses the small recent window and canonical `grounded_recall` may scan a deeper bounded window. Historical semantic replay separately establishes that a persisted `SemanticInterpretation@2` snapshot, when available, remains the semantic authority instead of reparsing historical raw text.
 
-The current persistence boundary accepts `semanticInterpretation` in `saveKdmInteraction`, but the trace record does not persist it. `loadRecentKdmMemory` also drops the Firestore document id and exposes no semantic snapshot on `KdmMemoryItem`. By the time a validated long-history memory is rendered into `memoryContext`, the evidence has therefore been flattened to user/reply text plus scope/confidence without stable source identity or canonical semantic provenance.
+The persistence boundary already accepted `semanticInterpretation` in `saveKdmInteraction`, but the trace record did not persist it. `loadRecentKdmMemory` also dropped the Firestore document id and exposed no semantic snapshot on `KdmMemoryItem`. By the time a validated long-history memory was rendered into `memoryContext`, the evidence had therefore been flattened to user/reply text plus scope/confidence without stable source identity or canonical semantic provenance.
 
 ## Characterization invariant
 
@@ -24,6 +24,8 @@ Persistent conversation-memory evidence that can influence a later response must
 - No raw-text classifier, regex recall patch, embedding system, vector store, or new retrieval algorithm is introduced by this characterization.
 - Provenance is evidence metadata. It must survive persistence/loading before any later prompt rendering or response grounding can rely on it safely.
 
-## RED requirement
+## Resolution
 
-The characterization remains RED until the persistence record stores the supplied canonical semantic interpretation and the retrieval contract returns both a stable persisted source id and the stored semantic snapshot.
+The persistence trace now stores the supplied canonical `semanticInterpretation`. `KdmMemoryItem` now exposes a stable persisted `sourceId` plus the stored `SemanticInterpretation`, and `loadRecentKdmMemory` carries both values across the Firestore load boundary.
+
+The characterization test moved RED → GREEN with all existing architecture, autonomous runtime, beta regression, historical proof, unit-test, TypeScript, and production-build gates passing. Existing retrieval and semantic authority boundaries remain unchanged.
