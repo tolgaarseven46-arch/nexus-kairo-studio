@@ -1,10 +1,10 @@
 # ADR 0023 — System long-horizon multi-user acceptance
 
-Status: Proposed
+Status: Accepted
 
 ## Context
 
-The relationship, memory, affect, persistence, SpeechIdentity/BehaviorContract and final-delivery boundaries have each been proven in narrower deterministic tests. The remaining pre-beta question is whether those boundaries continue to compose across a longer, multi-user history without cross-user state contamination or permission leakage.
+The relationship, memory, affect, persistence, SpeechIdentity/BehaviorContract and final-delivery boundaries had each been proven in narrower deterministic tests. The remaining pre-beta question was whether those boundaries continue to compose across a longer, multi-user history without cross-user state contamination or permission leakage.
 
 ## Decision
 
@@ -19,10 +19,14 @@ Add a provider-free system acceptance that:
 - requires forbidden advice to remain forbidden and persisted replies to remain non-empty;
 - makes no provider/API call and adds no new semantic, relationship, memory, or response authority.
 
-## Falsification policy
+## Result
 
-This change is characterization/acceptance only. Production behavior must not be changed unless this deterministic test exposes a measured RED. Any RED must be fixed only in the existing owning seam and then re-run through full CI.
+PR #253 merged as `f27f9bd0142cd618b952b012b7856059849e078a`.
+
+CI run `34759029702` was fully GREEN, including architecture/runtime gates, deterministic harness/replay, Historical RED→GREEN, full Tests, TypeScript and production build. Architecture Review run `34759029689` was GREEN.
+
+No production RED was measured, so no runtime behavior patch was required.
 
 ## Consequences
 
-A GREEN result closes the automated long-horizon/multi-user pre-beta acceptance class covered here. It does not replace real human beta sessions; those remain an external product acceptance activity.
+The automated long-horizon/multi-user pre-beta acceptance class covered here is closed. This does not replace real human beta sessions; those remain an external product acceptance activity. Any future production change in these seams still requires a new measured RED/counterexample.
