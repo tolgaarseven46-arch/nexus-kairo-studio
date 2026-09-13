@@ -27,6 +27,13 @@ export interface SocialAppraisalAutobiographicalContext {
 }
 
 export type SocialAppraisalCommitmentState = "active" | "fulfilled" | "cancelled" | "failed" | "unknown";
+export type SocialAppraisalCommitmentLifecycleOutcome =
+  | "none"
+  | "postponed"
+  | "fulfilled"
+  | "cancelled"
+  | "failed"
+  | "unknown";
 
 /**
  * Bounded projection of an existing canonical world-event commitment generation.
@@ -36,7 +43,12 @@ export type SocialAppraisalCommitmentState = "active" | "fulfilled" | "cancelled
  */
 export interface SocialAppraisalCommitmentContext {
   kind: "commitment";
+  /** Current commitment status after applying canonical lifecycle evidence. */
   state: SocialAppraisalCommitmentState;
+  /** Status immediately before the lifecycle outcome; optional for legacy projections. */
+  previousState?: SocialAppraisalCommitmentState;
+  /** Canonical lifecycle outcome, separated from current/prior status. */
+  lifecycleOutcome?: SocialAppraisalCommitmentLifecycleOutcome;
   actorId: string;
   counterpartyId?: string;
   scopeKey: string;

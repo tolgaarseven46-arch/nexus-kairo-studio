@@ -42,6 +42,9 @@ export type InterpretationEvidenceSource = "llm" | "regex" | "reconciled";
 export type SemanticIntentionality = "intentional" | "unintentional" | "unknown";
 export type SemanticCommitmentViolation = "present" | "absent" | "unknown";
 export type SemanticDeception = "present" | "absent" | "unknown";
+export type SemanticControllability = "high" | "low" | "unknown";
+export type SemanticCommunicationConsent = "present" | "absent" | "unknown";
+export type SemanticExternalCause = "present" | "absent" | "unknown";
 
 /**
  * Canonical current-turn attribution evidence. This describes only what the
@@ -55,6 +58,12 @@ export interface SemanticAttribution {
   intentionality: SemanticIntentionality;
   commitmentViolation: SemanticCommitmentViolation;
   deception: SemanticDeception;
+  /** Whether the actor could materially control/prevent the current outcome. */
+  controllability: SemanticControllability;
+  /** Whether the counterparty communicated/agreed to the lifecycle change. */
+  communicationConsent: SemanticCommunicationConsent;
+  /** Whether an external cause/excuse materially explains the outcome. */
+  externalCause: SemanticExternalCause;
   confidence: number;
   /** Provider/reconciliation evidence labels; never raw-history reparsing. */
   provenance: string[];

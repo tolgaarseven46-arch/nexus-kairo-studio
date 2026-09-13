@@ -31,10 +31,14 @@ If and only if the CURRENT utterance explicitly supports attribution relevant to
   "intentionality": "intentional" | "unintentional" | "unknown",
   "commitmentViolation": "present" | "absent" | "unknown",
   "deception": "present" | "absent" | "unknown",
+  "controllability": "high" | "low" | "unknown",
+  "communicationConsent": "present" | "absent" | "unknown",
+  "externalCause": "present" | "absent" | "unknown",
   "confidence": 0..1,
   "provenance": [short current-utterance evidence labels]
 }
-Do NOT infer betrayal or unfairness here. Do NOT use relationship history to manufacture intentionality.
+These attribution fields describe CURRENT-turn semantic evidence only. Use "unknown" whenever evidence is insufficient.
+Do NOT infer betrayal or unfairness here. Do NOT use relationship history to manufacture intentionality, controllability, consent, or external cause.
 Do NOT invent actorId or scopeKey; the canonical runtime grounds those from the already-built world event proposition.
 If evidence is insufficient, omit attribution or use unknown values. This extension is compatible with SemanticInterpretation@2.`;
 

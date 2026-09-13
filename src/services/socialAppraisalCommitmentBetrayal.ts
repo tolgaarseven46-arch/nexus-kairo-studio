@@ -1,6 +1,7 @@
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import type {
   SocialAppraisalCommitmentContext,
+  SocialAppraisalCommitmentLifecycleOutcome,
   SocialAppraisalEvidenceAssessment,
   SocialAppraisalResult,
 } from "../types/socialAppraisal";
@@ -19,7 +20,24 @@ const unknown = (reason: string): SocialAppraisalEvidenceAssessment => ({
   reasons: [reason],
 });
 
-function activeMatchingCommitment(
+function wasActive(commitment: Readonly<SocialAppraisalCommitmentContext>): boolean {
+  return commitment.state === "active" || commitment.previousState === "active";
+}
+
+function lifecycleOutcome(
+  commitment: Readonly<SocialAppraisalCommitmentContext>,
+): SocialAppraisalCommitmentLifecycleOutcome {
+  if (commitment.lifecycleOutcome) return commitment.lifecycleOutcome;
+  switch (commitment.state) {
+    case "fulfilled": return "fulfilled";
+    case "cancelled": return "cancelled";
+    case "failed": return "failed";
+    case "unknown": return "unknown";
+    default: return "none";
+  }
+}
+
+function matchingPriorCommitment(
   semantic: Readonly<SemanticInterpretation>,
   commitments: readonly Readonly<SocialAppraisalCommitmentContext>[],
 ): Readonly<SocialAppraisalCommitmentContext> | undefined {
@@ -28,7 +46,7 @@ function activeMatchingCommitment(
 
   const matches = commitments.filter((commitment) =>
     commitment.kind === "commitment" &&
-    commitment.state === "active" &&
+    wasActive(commitment) &&
     commitment.actorId === attribution.actorId &&
     commitment.scopeKey === attribution.scopeKey &&
     commitment.counterpartyId === "kaira",
@@ -37,6 +55,57 @@ function activeMatchingCommitment(
   return matches.find(
     (commitment) => commitment.confidence > 0 && commitment.provenance.length > 0,
   ) ?? matches[0];
+}
+
+function assessMatchedLifecycle(
+  semantic: Readonly<SemanticInterpretation>,
+  commitment: Readonly<SocialAppraisalCommitmentContext>,
+): SocialAppraisalEvidenceAssessment | undefined {
+  const attribution = semantic.attribution;
+  if (!attribution) return unknown("betrayal:attribution-missing");
+
+  const outcome = lifecycleOutcome(commitment);
+  const controllability = attribution.controllability ?? "unknown";
+  const communicationConsent = attribution.communicationConsent ?? "unknown";
+  const externalCause = attribution.externalCause ?? "unknown";
+
+  if (outcome === "postponed") {
+    return absent("betrayal:postponed-commitment-remains-active");
+  }
+  if (outcome === "fulfilled") {
+    return absent("betrayal:commitment-fulfilled");
+  }
+  if (outcome === "unknown") {
+    return unknown("betrayal:prior-commitment-lifecycle-unknown");
+  }
+  if (outcome === "failed") {
+    if (externalCause === "present") return absent("betrayal:failed-external-cause");
+    if (attribution.intentionality === "unintentional") return absent("betrayal:failed-unintentional");
+    if (controllability === "low") return absent("betrayal:failed-low-controllability");
+    if (
+      attribution.intentionality === "unknown" ||
+      controllability === "unknown" ||
+      externalCause === "unknown"
+    ) {
+      return unknown("betrayal:failed-accountability-evidence-unknown");
+    }
+    if (attribution.intentionality === "intentional" && controllability === "high" && externalCause === "absent") {
+      return undefined;
+    }
+    return absent("betrayal:failed-accountability-not-established");
+  }
+  if (outcome === "cancelled") {
+    if (communicationConsent === "present") return absent("betrayal:cancelled-with-consent");
+    if (attribution.intentionality === "unintentional") return absent("betrayal:cancelled-unintentional");
+    if (communicationConsent === "unknown" || attribution.intentionality === "unknown") {
+      return unknown("betrayal:cancellation-accountability-evidence-unknown");
+    }
+    if (communicationConsent === "absent" && attribution.intentionality === "intentional") {
+      return undefined;
+    }
+    return absent("betrayal:cancellation-not-unilateral");
+  }
+  return undefined;
 }
 
 export function assessCommitmentBetrayal(
@@ -55,36 +124,35 @@ export function assessCommitmentBetrayal(
     return unknown("betrayal:attribution-scope-or-actor-missing");
   }
 
-  const activeCommitment = activeMatchingCommitment(semantic, commitments);
-  if (!activeCommitment) {
-    const unresolvedLifecycleMatch = commitments.some((commitment) =>
-      commitment.kind === "commitment" &&
-      commitment.state === "unknown" &&
-      commitment.actorId === attribution.actorId &&
-      commitment.scopeKey === attribution.scopeKey &&
-      commitment.counterpartyId === "kaira",
+  const commitment = matchingPriorCommitment(semantic, commitments);
+  if (!commitment) {
+    const unresolvedLifecycleMatch = commitments.some((candidate) =>
+      candidate.kind === "commitment" &&
+      (candidate.state === "unknown" || candidate.lifecycleOutcome === "unknown") &&
+      candidate.actorId === attribution.actorId &&
+      candidate.scopeKey === attribution.scopeKey &&
+      candidate.counterpartyId === "kaira",
     );
     if (unresolvedLifecycleMatch) {
       return unknown("betrayal:prior-commitment-lifecycle-unknown");
     }
   }
 
-  const anyActiveCommitment = commitments.some((commitment) => commitment.state === "active");
-  if (!anyActiveCommitment) return absent("betrayal:no-active-prior-commitment");
+  const anyPriorActiveCommitment = commitments.some(wasActive);
+  if (!anyPriorActiveCommitment) return absent("betrayal:no-active-prior-commitment");
 
-  const sameActor = commitments.some((commitment) =>
-    commitment.state === "active" && commitment.actorId === attribution.actorId,
+  const sameActor = commitments.some((candidate) =>
+    wasActive(candidate) && candidate.actorId === attribution.actorId,
   );
   if (!sameActor) return absent("betrayal:party-mismatch");
 
-  const sameScopeCommitments = commitments.filter((commitment) =>
-    commitment.state === "active" &&
-    commitment.actorId === attribution.actorId &&
-    commitment.scopeKey === attribution.scopeKey,
+  const sameScopeCommitments = commitments.filter((candidate) =>
+    wasActive(candidate) &&
+    candidate.actorId === attribution.actorId &&
+    candidate.scopeKey === attribution.scopeKey,
   );
   if (sameScopeCommitments.length === 0) return absent("betrayal:scope-mismatch");
 
-  const commitment = activeCommitment;
   if (!commitment) {
     const unresolvedCounterparty = sameScopeCommitments.some(
       (candidate) => !candidate.counterpartyId,
@@ -94,6 +162,9 @@ export function assessCommitmentBetrayal(
     }
     return absent("betrayal:counterparty-mismatch");
   }
+
+  const lifecycleAssessment = assessMatchedLifecycle(semantic, commitment);
+  if (lifecycleAssessment) return lifecycleAssessment;
 
   if (attribution.intentionality === "unknown" || attribution.provenance.length === 0) {
     return unknown("betrayal:intentionality-evidence-missing");
