@@ -1,18 +1,35 @@
-import type { SocialAppraisalCommitmentContext } from "../types/socialAppraisal";
+import type {
+  SocialAppraisalCommitmentContext,
+  SocialAppraisalCommitmentLifecycleOutcome,
+  SocialAppraisalCommitmentState,
+} from "../types/socialAppraisal";
 import { resolvePlanLifecycle } from "./worldEventLifecycle";
 import type { WorldEventObservation } from "./worldModelEventStore";
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 
-function lifecycleState(
+type CommitmentLifecycleProjection = Pick<
+  SocialAppraisalCommitmentContext,
+  "state" | "previousState" | "lifecycleOutcome"
+>;
+
+function lifecycleProjection(
   state: ReturnType<typeof resolvePlanLifecycle>["state"],
-): SocialAppraisalCommitmentContext["state"] {
+): CommitmentLifecycleProjection {
   switch (state) {
-    case "planned": return "active";
-    case "executed": return "fulfilled";
-    case "cancelled": return "cancelled";
-    case "failed": return "failed";
-    default: return "unknown";
+    case "planned":
+      return { state: "active", lifecycleOutcome: "none" };
+    case "postponed":
+      return { state: "active", previousState: "active", lifecycleOutcome: "postponed" };
+    case "executed":
+      return { state: "fulfilled", previousState: "active", lifecycleOutcome: "fulfilled" };
+    case "cancelled":
+      return { state: "cancelled", previousState: "active", lifecycleOutcome: "cancelled" };
+    case "failed":
+      return { state: "failed", previousState: "active", lifecycleOutcome: "failed" };
+    default:
+      // Lifecycle ambiguity must not erase the last established active obligation.
+      return { state: "active", previousState: "active", lifecycleOutcome: "unknown" };
   }
 }
 
@@ -77,10 +94,11 @@ export function buildSocialAppraisalCommitmentContext(
       ...(generation.id ? [`world_event:${generation.id}`] : []),
       ...lifecycle.evidenceObservationIds.map((id) => `world_event:${id}`),
     ].filter((value, index, all) => all.indexOf(value) === index);
+    const projection = lifecycleProjection(lifecycle.state);
 
     return [{
       kind: "commitment" as const,
-      state: lifecycleState(lifecycle.state),
+      ...projection,
       actorId: identity.actorId,
       ...(identity.counterpartyId ? { counterpartyId: identity.counterpartyId } : {}),
       scopeKey: identity.scopeKey,
