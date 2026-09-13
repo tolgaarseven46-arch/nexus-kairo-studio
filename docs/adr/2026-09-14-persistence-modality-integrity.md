@@ -1,11 +1,11 @@
 # Persistence modality integrity gate
 
 Date: 2026-09-14
-Status: GREEN candidate
+Status: Accepted / GREEN
 
 ## Context
 
-Durable profile persistence still contains legacy raw-text candidate extraction for names, preferences, goals, and facts. Canonical `SemanticInterpretation@2` now carries typed proposition modality (`assertion`, `question`, `hypothetical`, `wish`, `prediction`). Without an integrity gate, a non-assertive utterance can match a legacy memory regex and be written as durable user truth.
+Durable profile persistence still contains legacy raw-text candidate extraction for names, preferences, goals, and facts. Canonical `SemanticInterpretation@2` carries typed proposition modality (`assertion`, `question`, `hypothetical`, `wish`, `prediction`). Without an integrity gate, a non-assertive utterance can match a legacy memory regex and be written as durable user truth.
 
 ## Decision
 
@@ -22,4 +22,8 @@ If proposition evidence is absent, legacy compatibility behavior remains unchang
 
 ## Characterization
 
-The deterministic characterization covers `question`, `hypothetical`, `wish`, and `prediction` turns whose raw text would otherwise match the durable goal regex. None may produce a `kairoMemory` profile write.
+The deterministic characterization covers `question`, `hypothetical`, `wish`, and `prediction` turns whose raw text would otherwise match the durable goal regex. None produces a `kairoMemory` profile write.
+
+## Verification
+
+Head `7968dc2a508d8a8a17b0985f62d747b8ba54bed3` passed Architecture Review classify, docs-guard, behavior-guard, architecture contracts, autonomous runtime contracts, beta runtime regression, Phase-0 harness/report, beta conversation acceptance/KNT replay, bug-class proof manifest, Historical RED→GREEN, full Tests, TypeScript, and production build.
