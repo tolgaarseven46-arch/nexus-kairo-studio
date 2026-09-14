@@ -2,7 +2,7 @@ import path from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
 const SEEDED_COMPLEX_LONG_SESSION =
-  "src/services/kairaSeededComplexConversationLongSessionRegression.test.ts";
+  "**/kairaSeededComplexConversationLongSessionRegression.test.ts";
 const explicitSeededComplexRun = process.argv.some((arg) =>
   arg.includes("kairaSeededComplexConversationLongSessionRegression.test.ts"),
 );
