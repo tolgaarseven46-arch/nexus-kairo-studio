@@ -1,12 +1,12 @@
 # Compound interaction characterization
 
-Status: Measured RED → minimal fix under verification
+Status: Accepted / GREEN
 
 ## Context
 
 PR #262-#266 closed five neighboring text-first architecture gaps independently: bounded semantic propositions/modality, persistence integrity gating, fragmented-message episode boundary, typed reply/mention context, and long-history provenance.
 
-Those mechanisms have not yet been proven in compound interactions where multiple mechanisms are active in the same turn. Claude review identified this as the highest-value missing evidence before treating the text architecture as beta-ready.
+Those mechanisms had not yet been proven in compound interactions where multiple mechanisms are active in the same turn. Claude review identified this as the highest-value missing evidence before treating the text architecture as beta-ready.
 
 ## First measured question
 
@@ -39,9 +39,24 @@ Neighboring coverage additionally proves:
 - legacy semantic interpretations without propositions remain compatible;
 - mixed proposition evidence containing an assertion is not incorrectly suppressed.
 
-## Verification state
+## GREEN evidence
 
-The minimal fix is now in CI. This ADR must not be marked GREEN until the full gate, TypeScript, and production build pass on the fixed head.
+Fix/test head `227d861e18f3a34bcd48c1f076c87a6145e8910f`, CI run `34858776042`:
+- docs-guard GREEN;
+- behavior-guard GREEN;
+- Architecture Review GREEN on the same fix sequence;
+- architecture contracts GREEN;
+- autonomous runtime contracts GREEN;
+- beta runtime regression GREEN;
+- Phase-0 deterministic harness/report GREEN;
+- beta conversation acceptance/KNT replay GREEN;
+- bug-class proof manifest GREEN;
+- Historical RED → GREEN proof GREEN;
+- full Tests GREEN;
+- TypeScript GREEN;
+- production build GREEN.
+
+The final documentation-only head must still satisfy repository governance before merge.
 
 ## Follow-up compound families
 
