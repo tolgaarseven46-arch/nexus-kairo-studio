@@ -113,6 +113,15 @@ export function assessCommitmentBetrayal(
   commitments: readonly Readonly<SocialAppraisalCommitmentContext>[] = [],
 ): SocialAppraisalEvidenceAssessment {
   const attribution = semantic.attribution;
+  const propositions = semantic.propositions ?? [];
+
+  // Canonical proposition modality is an integrity boundary for appraisal as well
+  // as persistence. If current-turn proposition evidence exists but none of it is
+  // assertive, typed violation attribution must not be flattened into a real-world
+  // betrayal event. Legacy interpretations without propositions remain compatible.
+  if (propositions.length > 0 && !propositions.some((proposition) => proposition.modality === "assertion")) {
+    return unknown("betrayal:current-violation-non-assertive");
+  }
 
   if (attribution?.commitmentViolation === "absent") {
     return absent("betrayal:no-current-violation");
