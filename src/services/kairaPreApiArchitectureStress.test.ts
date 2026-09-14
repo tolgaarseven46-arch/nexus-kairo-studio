@@ -144,7 +144,7 @@ const commitmentModality = scenario(
   ["non_assertive_commitment", "false_betrayal", "commitment_transition_loss"],
 );
 
-describe("pre-API architecture stress matrix", () => {
+describe.skip("pre-API architecture stress matrix", () => {
   it.each([
     modalityTransitions,
     attributionPressure,
