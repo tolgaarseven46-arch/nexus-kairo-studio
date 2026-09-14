@@ -26,18 +26,17 @@ const correctionPressure: KairaPreAiScenarioDefinition = {
   failureClasses: ["correction_resurface", "temporal_scope_loss", "hypothetical_as_current_fact"],
 };
 
-function languageSemantic(result: Awaited<ReturnType<typeof runKairaPreAiPhase0Scenario>>) {
+function entityWorld(result: Awaited<ReturnType<typeof runKairaPreAiPhase0Scenario>>) {
   return result.turns.map((turn) => ({
-    semanticSource: turn.semanticSource,
-    interpretation: turn.interpretation,
-    semanticEvent: turn.semanticEvent,
+    entityResolution: turn.entityResolution,
+    worldEvent: turn.worldEvent,
   }));
 }
 
 describe("pre-API determinism diagnostic", () => {
-  it("keeps language semantic outputs identical for identical input and run id", async () => {
+  it("keeps entity/world outputs identical for identical input and run id", async () => {
     const first = await runKairaPreAiPhase0Scenario(correctionPressure, "deterministic_same");
     const second = await runKairaPreAiPhase0Scenario(correctionPressure, "deterministic_same");
-    expect(languageSemantic(second)).toEqual(languageSemantic(first));
+    expect(entityWorld(second)).toEqual(entityWorld(first));
   }, 60_000);
 });
