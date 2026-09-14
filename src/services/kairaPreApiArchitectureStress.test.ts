@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   runKairaPreAiPhase0Scenario,
   type KairaPreAiScenarioDefinition,
@@ -81,6 +81,16 @@ function propositionModalities(result: KairaPreAiScenarioResult) {
   );
 }
 
+async function withFixedClock<T>(run: () => Promise<T>): Promise<T> {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-14T12:00:00.000Z"));
+  try {
+    return await run();
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 const modalityTransitions = scenario(
   "stress_modality_transitions",
   "Wish/question/hypothetical/prediction transitions into asserted truth and correction",
@@ -153,7 +163,7 @@ describe("pre-API architecture stress matrix", () => {
   ])("runs the complete deterministic pre-provider journey: $scenarioId", async (definition) => {
     const result = await runKairaPreAiPhase0Scenario(definition, "stress001");
     assertCoreJourney(result);
-    expect(Array.isArray(result.turns.flatMap((turn) => turn.audit.invariantViolations))).toBe(true);
+    expect(result.turns.flatMap((turn) => turn.audit.invariantViolations)).toEqual([]);
   }, 60_000);
 
   it("characterizes proposition modality as unavailable on the deterministic regex floor", async () => {
@@ -166,13 +176,15 @@ describe("pre-API architecture stress matrix", () => {
     expect(modalities).toEqual(Array.from({ length: result.turns.length }, () => []));
   }, 60_000);
 
-  it.skip("is deterministic for identical input and seed", async () => {
-    const first = await runKairaPreAiPhase0Scenario(correctionPressure, "deterministic_same");
-    const second = await runKairaPreAiPhase0Scenario(correctionPressure, "deterministic_same");
-    expect(normalizedJourney(second)).toEqual(normalizedJourney(first));
+  it("is deterministic for identical input and seed", async () => {
+    await withFixedClock(async () => {
+      const first = await runKairaPreAiPhase0Scenario(correctionPressure, "deterministic_same");
+      const second = await runKairaPreAiPhase0Scenario(correctionPressure, "deterministic_same");
+      expect(normalizedJourney(second)).toEqual(normalizedJourney(first));
+    });
   }, 60_000);
 
-  it.skip("keeps five 100-turn user sessions isolated and reaches the final provider boundary on every turn", async () => {
+  it("keeps five 100-turn user sessions isolated and reaches the final provider boundary on every turn", async () => {
     const users = ["alpha", "bravo", "charlie", "delta", "echo"];
     const results: KairaPreAiScenarioResult[] = [];
 
@@ -212,7 +224,7 @@ describe("pre-API architecture stress matrix", () => {
     }
   }, 180_000);
 
-  it.skip("replays a 100-turn long session byte-for-byte at the pre-provider observable boundary", async () => {
+  it("replays a 100-turn long session byte-for-byte at the pre-provider observable boundary", async () => {
     const messages = Array.from({ length: 100 }, (_, index) => {
       const turn = index + 1;
       if (turn % 20 === 0) return `Hayır, ${turn - 1}. turdaki şeyi düzeltiyorum: yeni değer ${turn}.`;
@@ -227,8 +239,10 @@ describe("pre-API architecture stress matrix", () => {
       ["non_deterministic_pipeline", "history_order_drift"],
     );
 
-    const first = await runKairaPreAiPhase0Scenario(definition, "replay001");
-    const second = await runKairaPreAiPhase0Scenario(definition, "replay001");
-    expect(normalizedJourney(second)).toEqual(normalizedJourney(first));
+    await withFixedClock(async () => {
+      const first = await runKairaPreAiPhase0Scenario(definition, "replay001");
+      const second = await runKairaPreAiPhase0Scenario(definition, "replay001");
+      expect(normalizedJourney(second)).toEqual(normalizedJourney(first));
+    });
   }, 180_000);
 });
