@@ -1,5 +1,11 @@
 import path from "path";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
+
+const SEEDED_COMPLEX_LONG_SESSION =
+  "src/services/kairaSeededComplexConversationLongSessionRegression.test.ts";
+const explicitSeededComplexRun = process.argv.some((arg) =>
+  arg.includes("kairaSeededComplexConversationLongSessionRegression.test.ts"),
+);
 
 export default defineConfig({
   resolve: {
@@ -8,8 +14,11 @@ export default defineConfig({
     },
   },
   test: {
-    // Keep CI memory bounded when long-session regression files run together.
-    // Local development keeps Vitest's default worker count.
-    maxWorkers: process.env.CI ? 1 : undefined,
+    // This heavy long-session acceptance already runs in the dedicated beta
+    // acceptance gate. Avoid running it a second time during full-suite
+    // auto-discovery, while preserving explicit/dedicated execution.
+    exclude: explicitSeededComplexRun
+      ? configDefaults.exclude
+      : [...configDefaults.exclude, SEEDED_COMPLEX_LONG_SESSION],
   },
 });
