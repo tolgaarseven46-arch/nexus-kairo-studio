@@ -10,6 +10,6 @@ export default defineConfig({
   test: {
     // Keep CI memory bounded when long-session regression files run together.
     // Local development keeps Vitest's default worker count.
-    maxWorkers: process.env.CI ? 2 : undefined,
+    maxWorkers: process.env.CI ? 1 : undefined,
   },
 });
