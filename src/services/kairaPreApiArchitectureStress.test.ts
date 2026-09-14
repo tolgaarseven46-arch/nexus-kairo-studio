@@ -156,7 +156,7 @@ describe("pre-API architecture stress matrix", () => {
     expect(Array.isArray(result.turns.flatMap((turn) => turn.audit.invariantViolations))).toBe(true);
   }, 60_000);
 
-  it.skip("characterizes proposition modality as unavailable on the deterministic regex floor", async () => {
+  it("characterizes proposition modality as unavailable on the deterministic regex floor", async () => {
     const result = await runKairaPreAiPhase0Scenario(modalityTransitions, "modality001");
     const modalities = propositionModalities(result);
 
