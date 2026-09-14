@@ -144,7 +144,7 @@ const commitmentModality = scenario(
   ["non_assertive_commitment", "false_betrayal", "commitment_transition_loss"],
 );
 
-describe.skip("pre-API architecture stress matrix", () => {
+describe("pre-API architecture stress matrix", () => {
   it.each([
     modalityTransitions,
     attributionPressure,
@@ -172,7 +172,7 @@ describe.skip("pre-API architecture stress matrix", () => {
     expect(normalizedJourney(second)).toEqual(normalizedJourney(first));
   }, 60_000);
 
-  it("keeps five 100-turn user sessions isolated and reaches the final provider boundary on every turn", async () => {
+  it.skip("keeps five 100-turn user sessions isolated and reaches the final provider boundary on every turn", async () => {
     const users = ["alpha", "bravo", "charlie", "delta", "echo"];
     const results: KairaPreAiScenarioResult[] = [];
 
@@ -212,7 +212,7 @@ describe.skip("pre-API architecture stress matrix", () => {
     }
   }, 180_000);
 
-  it("replays a 100-turn long session byte-for-byte at the pre-provider observable boundary", async () => {
+  it.skip("replays a 100-turn long session byte-for-byte at the pre-provider observable boundary", async () => {
     const messages = Array.from({ length: 100 }, (_, index) => {
       const turn = index + 1;
       if (turn % 20 === 0) return `Hayır, ${turn - 1}. turdaki şeyi düzeltiyorum: yeni değer ${turn}.`;
