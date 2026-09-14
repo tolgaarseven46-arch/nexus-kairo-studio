@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DroitDynamicState, ReasoningTrace } from "../types/nexus";
 import { analyzeKdmInteraction } from "./kdmConsistencyEngine";
 import { buildBehaviorContract } from "./behaviorContract";
@@ -6,37 +6,37 @@ import { computeKairoSpeechIdentity } from "./kairoSpeechIdentity";
 import { resolveKairaFinalDelivery } from "./kairaFinalDeliveryGate";
 import { NEUTRAL_DROIT_PERSONALITY } from "./droitPersonalityNormalizer";
 
-const firestoreMemory = vi.hoisted(() => ({
+const firestoreMemory = {
   states: new Map<string, DroitDynamicState>(),
-}));
+};
 
-vi.mock("../lib/firebase", () => ({ db: {} }));
-vi.mock("firebase/firestore", () => ({
-  doc: (...parts: unknown[]) => ({ kind: "doc", parts }),
-  collection: (...parts: unknown[]) => ({ kind: "collection", parts }),
-  query: (...parts: unknown[]) => ({ kind: "query", parts }),
-  orderBy: (...parts: unknown[]) => ({ kind: "orderBy", parts }),
-  limit: (value: number) => ({ kind: "limit", value }),
-  where: (...parts: unknown[]) => ({ kind: "where", parts }),
-  setDoc: vi.fn(async (ref: { parts?: unknown[] }, value: { dynamicState?: DroitDynamicState }) => {
-    const key = String(ref.parts?.[ref.parts.length - 1] ?? "unknown");
-    if (value.dynamicState) {
-      firestoreMemory.states.set(key, JSON.parse(JSON.stringify(value.dynamicState)) as DroitDynamicState);
-    }
-  }),
-  addDoc: vi.fn(async () => ({ id: "trace" })),
-  getDoc: vi.fn(async (ref: { parts?: unknown[] }) => {
-    const key = String(ref.parts?.[ref.parts.length - 1] ?? "unknown");
-    return {
-      exists: () => firestoreMemory.states.has(key),
-      data: () => ({ dynamicState: firestoreMemory.states.get(key) }),
-    };
-  }),
-  getDocs: vi.fn(async () => ({ empty: true, docs: [] })),
-  deleteDoc: vi.fn(async () => undefined),
-}));
-
-import { loadKdmState, saveKdmInteraction } from "./kdmPersistenceService";
+function installPersistenceMocks(): void {
+  vi.doMock("../lib/firebase", () => ({ db: {} }));
+  vi.doMock("firebase/firestore", () => ({
+    doc: (...parts: unknown[]) => ({ kind: "doc", parts }),
+    collection: (...parts: unknown[]) => ({ kind: "collection", parts }),
+    query: (...parts: unknown[]) => ({ kind: "query", parts }),
+    orderBy: (...parts: unknown[]) => ({ kind: "orderBy", parts }),
+    limit: (value: number) => ({ kind: "limit", value }),
+    where: (...parts: unknown[]) => ({ kind: "where", parts }),
+    setDoc: vi.fn(async (ref: { parts?: unknown[] }, value: { dynamicState?: DroitDynamicState }) => {
+      const key = String(ref.parts?.[ref.parts.length - 1] ?? "unknown");
+      if (value.dynamicState) {
+        firestoreMemory.states.set(key, JSON.parse(JSON.stringify(value.dynamicState)) as DroitDynamicState);
+      }
+    }),
+    addDoc: vi.fn(async () => ({ id: "trace" })),
+    getDoc: vi.fn(async (ref: { parts?: unknown[] }) => {
+      const key = String(ref.parts?.[ref.parts.length - 1] ?? "unknown");
+      return {
+        exists: () => firestoreMemory.states.has(key),
+        data: () => ({ dynamicState: firestoreMemory.states.get(key) }),
+      };
+    }),
+    getDocs: vi.fn(async () => ({ empty: true, docs: [] })),
+    deleteDoc: vi.fn(async () => undefined),
+  }));
+}
 
 const USER_A = "seeded-complex-user-a";
 const USER_B = "seeded-complex-user-b";
@@ -205,6 +205,12 @@ function persistenceTrace(state: DroitDynamicState): ReasoningTrace {
 
 describe("Kaira seeded complex conversation long-session regression", () => {
   beforeEach(() => firestoreMemory.states.clear());
+  afterEach(() => {
+    vi.doUnmock("firebase/firestore");
+    vi.doUnmock("../lib/firebase");
+    vi.resetModules();
+    firestoreMemory.states.clear();
+  });
 
   it("replays 160 mixed turns deterministically while keeping two user histories independent", () => {
     const firstA = runSeededConversation(0x4b414952, "supportive");
@@ -237,6 +243,8 @@ describe("Kaira seeded complex conversation long-session regression", () => {
   }, 120_000);
 
   it("survives save/load restart without cross-user contamination", async () => {
+    installPersistenceMocks();
+    const { loadKdmState, saveKdmInteraction } = await import("./kdmPersistenceService");
     const a = runSeededConversation(0x4b414952, "supportive");
     const b = runSeededConversation(0x4e455855, "volatile");
 
