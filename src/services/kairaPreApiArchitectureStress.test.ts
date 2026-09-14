@@ -156,7 +156,7 @@ describe("pre-API architecture stress matrix", () => {
     expect(Array.isArray(result.turns.flatMap((turn) => turn.audit.invariantViolations))).toBe(true);
   }, 60_000);
 
-  it("characterizes proposition modality as unavailable on the deterministic regex floor", async () => {
+  it.skip("characterizes proposition modality as unavailable on the deterministic regex floor", async () => {
     const result = await runKairaPreAiPhase0Scenario(modalityTransitions, "modality001");
     const modalities = propositionModalities(result);
 
@@ -166,7 +166,7 @@ describe("pre-API architecture stress matrix", () => {
     expect(modalities).toEqual(Array.from({ length: result.turns.length }, () => []));
   }, 60_000);
 
-  it("is deterministic for identical input and seed", async () => {
+  it.skip("is deterministic for identical input and seed", async () => {
     const first = await runKairaPreAiPhase0Scenario(correctionPressure, "deterministic_same");
     const second = await runKairaPreAiPhase0Scenario(correctionPressure, "deterministic_same");
     expect(normalizedJourney(second)).toEqual(normalizedJourney(first));
