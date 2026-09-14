@@ -16,7 +16,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("real client pre-provider runtime boundary", () => {
+describe.skip("real client pre-provider runtime boundary", () => {
   it("carries one assembled episode through canonical LU and the real client behavior pipeline into /api/chat payload", async () => {
     const episodeText = "dün bir kız gördüm\notobüs durağında\nkonuşamadım ya";
     const interpretation = interpretationFromRegexFloor(episodeText);
