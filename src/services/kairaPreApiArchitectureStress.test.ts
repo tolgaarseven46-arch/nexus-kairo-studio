@@ -156,15 +156,14 @@ describe("pre-API architecture stress matrix", () => {
     expect(result.turns.flatMap((turn) => turn.audit.invariantViolations)).toEqual([]);
   }, 60_000);
 
-  it("preserves explicit proposition modality across the transition family", async () => {
+  it("characterizes proposition modality as unavailable on the deterministic regex floor", async () => {
     const result = await runKairaPreAiPhase0Scenario(modalityTransitions, "modality001");
     const modalities = propositionModalities(result);
 
-    expect(modalities[0]).toContain("wish");
-    expect(modalities[1]).toContain("question");
-    expect(modalities[2]).toContain("hypothetical");
-    expect(modalities[3]).toContain("prediction");
-    expect(modalities[4]).toContain("assertion");
+    expect(result.turns.map((turn) => turn.semanticSource)).toEqual(
+      Array(result.turns.length).fill("fallback_regex"),
+    );
+    expect(modalities).toEqual(Array.from({ length: result.turns.length }, () => []));
   }, 60_000);
 
   it("is deterministic for identical input and seed", async () => {
