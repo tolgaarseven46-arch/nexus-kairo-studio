@@ -46,6 +46,7 @@ export interface KairoTimingMetrics {
 
 export interface TextEpisodeFragment {
   text: string;
+  interactionContext?: TextInteractionContext;
 }
 
 export interface TextEpisodeInput {
@@ -196,19 +197,57 @@ function projectTemperamentForBehavior(
   return { ...previewState, anger: clamp100(previewState.anger + delta.anger), stress: clamp100(previewState.stress + delta.stress), happiness: clamp100(previewState.happiness + delta.happiness), calmness: clamp100(previewState.calmness + delta.calmness), confidence: clamp100(previewState.confidence + delta.confidence), surprise: clamp100(previewState.surprise + delta.surprise) };
 }
 
-function assembleTextEpisode(userMessage: string, textEpisode?: TextEpisodeInput): string {
-  const episodeText = textEpisode?.fragments
-    .map((fragment) => fragment.text.trim())
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-  return episodeText || userMessage;
+function interactionContextFingerprint(context?: TextInteractionContext): string {
+  const reply = context?.replyTo
+    ? `${context.replyTo.messageId}:${context.replyTo.authorId}`
+    : "";
+  const mentions = [...(context?.mentions ?? [])]
+    .map((mention) => mention.entityId)
+    .sort()
+    .join(",");
+  return `${reply}|${mentions}`;
+}
+
+function assembleTextEpisode(
+  userMessage: string,
+  textEpisode?: TextEpisodeInput,
+  interactionContext?: TextInteractionContext,
+): { text: string; interactionContext?: TextInteractionContext } {
+  const fragments = (textEpisode?.fragments ?? [])
+    .map((fragment) => ({ ...fragment, text: fragment.text.trim() }))
+    .filter((fragment) => Boolean(fragment.text));
+  if (fragments.length === 0) {
+    return { text: userMessage, interactionContext };
+  }
+
+  const fingerprints = new Set(
+    fragments.map((fragment) => interactionContextFingerprint(fragment.interactionContext)),
+  );
+  if (fingerprints.size > 1) {
+    throw new Error("Text episode interaction context changed; split at transport boundary");
+  }
+
+  const fragmentContext = fragments[0]?.interactionContext;
+  if (
+    fragmentContext &&
+    interactionContext &&
+    interactionContextFingerprint(fragmentContext) !== interactionContextFingerprint(interactionContext)
+  ) {
+    throw new Error("Text episode interaction context conflicts with message context");
+  }
+
+  return {
+    text: fragments.map((fragment) => fragment.text).join("\n"),
+    interactionContext: fragmentContext ?? interactionContext,
+  };
 }
 
 export const droitChatService = {
   async sendMessage({ userMessage, personality, dynamicState, history = [], characterInfo = { name: "KAIRO", roleTitle: "Sunucu Yöneticisi", raceName: "Sentetik Droit" }, provider = "openrouter", userId: explicitUserId, userName = "Kullanıcı", suppressRecentMemory = false, sessionId, kairaInstanceId, kairaInstanceType, messageContext, textEpisode }: SendKairoChatOptions): Promise<KairoChatResponse> {
     const totalStart = performance.now();
-    const episodeText = assembleTextEpisode(userMessage, textEpisode);
+    const assembledEpisode = assembleTextEpisode(userMessage, textEpisode, messageContext);
+    const episodeText = assembledEpisode.text;
+    const episodeInteractionContext = assembledEpisode.interactionContext;
     const userId = resolveConversationUserId(explicitUserId);
     const kairaInstance = resolveKairaInstanceContext({ instanceId: kairaInstanceId, instanceType: kairaInstanceType });
     const resolvedSessionId = sessionId?.trim() || freshSessionId(userId, kairaInstance.instanceId);
@@ -228,7 +267,7 @@ export const droitChatService = {
         userName,
         characterName: characterInfo.name || "KAIRO",
         provider,
-        interactionContext: messageContext,
+        interactionContext: episodeInteractionContext,
         recentMessages: history.slice(-8).map((m) => ({
           role: m.sender === "droit" ? ("assistant" as const) : ("user" as const),
           content: m.text,

@@ -45,7 +45,7 @@ describe("reply and mention metadata boundary", () => {
       /requestCanonicalLanguageUnderstanding\([\s\S]*interactionContext\??\s*:\s*TextInteractionContext/u,
     );
     expect(chatServiceSource).toMatch(
-      /requestCanonicalLanguageUnderstanding\(\{[\s\S]{0,800}?interactionContext\s*:\s*(?:options\.)?messageContext/u,
+      /requestCanonicalLanguageUnderstanding\(\{[\s\S]{0,800}?interactionContext\s*:\s*(?:episodeInteractionContext|(?:options\.)?messageContext)/u,
     );
   });
 
