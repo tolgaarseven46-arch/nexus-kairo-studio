@@ -38,7 +38,7 @@ Katman modeli:
 - R Multi-Party Attention / Engagement
 - S Prompt Assembly / Realization Authority
 
-`R` gerçek eşzamanlı multi-party engagement kararı mevcut tek-aktif-konuşmacı runtime için future/out-of-scope olabilir; participant attribution ve user-local isolation mevcut pre-AI invariants içinde kalır.
+`R` gerçek eşzamanlı multi-party engagement kararı mevcut tek-aktif-konuşmacı runtime için **FUTURE / OUT-OF-SCOPE**'tur; participant attribution ve user-local isolation mevcut pre-AI invariants içinde kalır.
 
 ## 3. Foundation — CLOSED for measured pre-AI scope
 Aşağıdaki foundation aileleri deterministic/contract/integration kanıtlarıyla kurulmuştur; ayrıntılı PR/commit geçmişi Git ve `AI_CHANGELOG.md` içindedir:
@@ -57,21 +57,36 @@ Aşağıdaki foundation aileleri deterministic/contract/integration kanıtlarıy
 - controlled spontaneity persisted semantic history consumption,
 - Phase-0 deterministic pre-AI harness + beta/KNT/seeded acceptance gates.
 
-## 4. Final pre-AI authority closure — ACTIVE CHECKPOINT
-Final closure work is tracked by the latest GitHub PR/CI, not by a hard-coded "current main" line in this document.
+## 4. Final pre-AI architecture — FROZEN
+A–S pre-AI architecture is frozen at the architectural layer level.
 
-Measured closure findings:
-- **T3 / Dialogue Board:** current production block is explicitly observational and states it does not grant question/advice/humor/speculation/social-move/style permissions; DialogueDecision + KairaResponsePlan own those decisions.
-- **T6 / historical grounding:** characterization proved historical uncertainty could be reconstructed from raw wording even when persisted canonical semantics disagreed. Closure requires persisted semantic uncertainty to be authoritative; missing historical semantic snapshot fails closed.
-- **T2 / SpeechIdentity:** two reaction-mode phrases duplicated relationship WHAT/WHETHER decisions. Closure keeps only distance/rhythm/softening HOW and leaves reopening/forgiveness/repair-completion to ResponsePlan.
-- **T5 / provider-output repair:** realization-stage retry is bounded; a repaired candidate must pass the same grounding/attribution/dialogue/ResponsePlan/affect/world validators before adoption. It cannot bypass the validator chain.
-- **R / true multi-party engagement:** future/out-of-scope unless product runtime is expanded beyond the current active-speaker model.
-- **S / final prompt assembly:** serializer owns ordering/assembly only. Upstream layer ownership remains authoritative; prompt blocks may not silently manufacture new permissions or certainty.
+Final decisions:
+- **T3 / Dialogue Board:** CLOSED — observational only; no question/advice/humor/speculation/social-move/style permission grant.
+- **T6 / historical grounding:** CLOSED — persisted canonical semantic history owns historical uncertainty; raw text cannot recreate shadow semantics; missing snapshot fails closed.
+- **T2 / SpeechIdentity:** CLOSED — HOW only; reopening/forgiveness/repair-completion remain ResponsePlan/BehaviorContract decisions.
+- **T5 / provider-output repair:** CLOSED as bounded realization mechanism — repaired output must pass the same grounding/attribution/dialogue/ResponsePlan/affect/world validators before adoption.
+- **R / true simultaneous multi-party engagement:** FUTURE / OUT-OF-SCOPE under current single-active-speaker runtime.
+- **S / prompt assembly + socialStyle:** CLOSED — assembly/default-style guidance may narrow realization but cannot grant new WHAT/WHETHER permission or semantic certainty.
+- **Q / governance:** CLOSED — volatile GitHub truth is queried from GitHub; this file is not a SHA/PR/CI mirror.
 
-Current closure ADR:
+Freeze ADR:
+- `docs/adr/2026-09-15-pre-ai-architecture-freeze.md`
+
+Authority-closure ADR:
 - `docs/adr/2026-09-15-pre-ai-final-authority-closure.md`
 
-## 5. Test truth / proof levels
+## 5. Frozen finite composition stress suite
+Architecture closure uses six finite cross-layer composition classes rather than an unbounded sentence catalog:
+1. attribution × uncertainty × historical memory,
+2. repair × relationship × HOW,
+3. fragmented discourse × commitment lifecycle,
+4. concurrency × persistence × user isolation,
+5. ambiguity × fail-closed × state mutation,
+6. provider-boundary authority collision.
+
+These classes are backed by existing characterization/contract/integration/acceptance/historical-replay gates in CI. They prove failure containment and authority composition; they do not claim universal natural-language understanding.
+
+## 6. Test truth / proof levels
 Test results must be described by what they really exercise:
 1. unit proof,
 2. contract proof,
@@ -86,15 +101,15 @@ A green harness may not be described as full production-path proof when it inten
 
 The frozen Phase-0 baseline remains 21 scenarios / 423 turns and stops at `FINAL_PROVIDER_PROMPT_BUILT_NO_PROVIDER_CALL`.
 
-## 6. Grey-zone policy
+## 7. Grey-zone policy
 - Semantic meaning may remain `unknown`, `ambiguous`, `low-confidence`, or unresolved when evidence is insufficient.
 - Uncertainty may damp or block state mutation rather than forcing a guessed interpretation.
 - Downstream layers cannot increase semantic certainty without an explicitly owned resolution contract.
 - Authority, state ownership, user scope, persistence owner and concurrency lease are not grey zones; ambiguity there fails closed.
 - A weird conversation that stays inside these invariants is a bounded product-quality issue, not automatically a reason to reopen architecture.
 
-## 7. Architecture reopening rule
-After final pre-AI closure, **general architecture audit does not automatically reopen the system**.
+## 8. Architecture reopening rule
+After pre-AI freeze, **general architecture audit does not automatically reopen the system**.
 
 New architecture work requires at least one of:
 1. a measured invariant violation with reproducible evidence,
@@ -107,24 +122,24 @@ Otherwise:
 - future modalities/features stay in backlog/out-of-scope,
 - no ad-hoc downstream regex/phrase patch is added.
 
-## 8. Definition of Done — pre-AI architecture
-Pre-AI architecture can be frozen when:
-- A–S layer set and owners are explicit,
-- canonical authority collisions are absent,
-- state scopes/owners are deterministic,
+## 9. Frozen Definition of Done — pre-AI architecture
+The pre-AI Definition of Done is satisfied when the freeze ADR is on `main` and its CI remains green:
+- A–S layer set and owners explicit,
+- canonical authority collisions absent,
+- state scopes/owners deterministic,
 - historical semantic consumers do not create shadow truth,
-- grey-zone/fail-closed policy is explicit,
-- production seams have honestly classified proof coverage,
-- measured closure blockers are GREEN under targeted + neighboring + full CI,
-- persistence/hydration/concurrency isolation gates remain GREEN,
+- grey-zone/fail-closed policy explicit,
+- production seams honestly classify proof coverage,
+- measured closure blockers GREEN under targeted + neighboring + full CI,
+- persistence/hydration/concurrency isolation gates GREEN,
 - prompt assembly cannot silently expand WHAT/WHETHER authority,
-- observability can identify owning seam/failure class,
-- governance docs do not claim volatile GitHub state and therefore cannot silently drift from branch/CI reality.
+- observability identifies owning seam/failure class,
+- governance docs do not claim volatile GitHub state.
 
-## 9. Next handoff rule
+## 10. Next handoff rule
 Before any next action:
 1. query GitHub for actual `main`, PRs and CI,
-2. read the latest closure ADR(s),
-3. do not reopen already-closed architecture from old chat memory,
-4. finish any active closure PR through test → CI → merge → main-CI,
-5. only after pre-AI freeze decision move to model-in-the-loop / answer-quality validation.
+2. read the freeze/closure ADRs,
+3. do not reopen frozen pre-AI architecture from old chat memory or generic audit concerns,
+4. reopen architecture only under the frozen reopening rule,
+5. otherwise move to **model-in-the-loop / answer-quality validation** and treat ordinary response-quality misses as product-quality work unless they reveal a measured frozen invariant violation.
