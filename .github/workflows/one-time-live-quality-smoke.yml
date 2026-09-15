@@ -8,9 +8,9 @@ on:
 jobs:
   live-quality-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - name: Run bounded Gemini Flash Lite live-quality matrix
+      - name: Run hard Gemini Flash Lite live-quality matrix
         run: |
           python - <<'PY'
           import json, time, urllib.request, urllib.error
@@ -25,21 +25,30 @@ jobs:
               raise SystemExit(f"wrong live model route: {runtime}")
 
           scenarios = [
-              ("third_party_uncertainty", [
-                  "Mert bugün bana 'salak mısın sen' dedi, ben de cevap vermedim",
-                  "sence Mert bana kızgın mı yoksa sadece sinirli miydi",
-                  "neyse bunu kapatalım",
+              ("direct_conflict_repair", [
+                  "saçmalıyorsun şu an",
+                  "salak mısın ya",
+                  "neyse kusura bakma sinirlendim",
+                  "barıştık mı",
               ]),
-              ("commitment_correction", [
-                  "yarın işten istifa edeceğim, kararımı verdim",
-                  "yok vazgeçtim, yarın istifa etmiyorum",
-                  "peki yarın ne yapacağım",
+              ("nested_third_party_quote", [
+                  "Ali bana Mert'in benim hakkımda 'Tolga tam aptal' dediğini söyledi",
+                  "bunu Ali söyledi diye Mert'in gerçekten dediğinden emin olabilir miyiz",
+                  "Mert'e kızmalı mıyım sence",
+                  "boşver şimdilik bir şey yapmayacağım",
               ]),
-              ("fragmented_social_story", [
-                  "bugün durakta bir kız gördüm",
-                  "çok hoşuma gitti ama konuşamadım",
-                  "yarın aynı saatte tekrar gideceğim galiba",
-                  "sence gidip konuşmalı mıyım",
+              ("uncertain_plan_then_cancel", [
+                  "galiba yarın müdürle konuşup istifa edeceğim",
+                  "aslında emin değilim",
+                  "yok karar verdim, istifa etmeyeceğim",
+                  "yarın istifa edecek miyim",
+              ]),
+              ("topic_close_and_return", [
+                  "bugün iş yerinde tatsız bir şey oldu",
+                  "şimdilik anlatmak istemiyorum kapatalım",
+                  "bu arada Fenerbahçe hakkında konuşalım",
+                  "az önceki iş mevzusuna geri dönelim",
+                  "müdür herkesin içinde bana bağırdı",
               ]),
           ]
 
@@ -60,8 +69,9 @@ jobs:
                   return exc.code, parsed
 
           failures = []
+          accepted_turns = 0
           for scenario_index, (name, messages) in enumerate(scenarios, 1):
-              user_id = f"flash_lite_quality_{name}_20260915_b"
+              user_id = f"flash_lite_hard_{name}_20260915"
               session_id = f"session_{user_id}_{int(time.time())}"
               history = []
               print(f"=== SCENARIO {scenario_index}: {name} ===")
@@ -73,7 +83,7 @@ jobs:
                       "history": history,
                       "provider": "openrouter",
                       "sessionId": session_id,
-                      "requestId": f"flash_lite_{name}_{int(time.time())}_{turn_index}",
+                      "requestId": f"flash_lite_hard_{name}_{int(time.time())}_{turn_index}",
                       "suppressRecentMemory": True,
                   }
                   status, result = post(payload)
@@ -102,6 +112,7 @@ jobs:
                       failures.append({"scenario": name, "turn": turn_index, "message": message, "status": status, "error": "empty_reply"})
                       break
 
+                  accepted_turns += 1
                   history.append({
                       "sender": "user",
                       "text": message,
@@ -111,6 +122,6 @@ jobs:
                   history.append({"sender": "kaira", "text": reply})
 
           print("=== MATRIX SUMMARY ===")
-          print(json.dumps({"failures": failures, "failureCount": len(failures)}, ensure_ascii=False, indent=2))
-          print("LIVE_GEMINI_FLASH_LITE_MATRIX_COMPLETE")
+          print(json.dumps({"acceptedTurns": accepted_turns, "failures": failures, "failureCount": len(failures)}, ensure_ascii=False, indent=2))
+          print("LIVE_GEMINI_FLASH_LITE_HARD_MATRIX_COMPLETE")
           PY
