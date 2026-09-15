@@ -1,38 +1,46 @@
 import { describe, expect, it } from "vitest";
 import {
-  auditKairaFinalProviderPrompt,
-  type KairaPreAiAuditInput,
-} from "./kairaPreAiAudit";
-import type { KairaPromptAuthorityBlock } from "./kairaFinalProviderPrompt";
+  auditKairaPromptAuthorityBlocks,
+  classifyKairaFinalProviderPromptParts,
+  type KairaPromptAuthorityBlock,
+} from "./kairaPromptAuthority";
+import type { KairaFinalProviderPromptParts } from "./kairaFinalProviderPrompt";
 
-function baseInput(promptBlocks: KairaPromptAuthorityBlock[]): KairaPreAiAuditInput {
+const violationCodes = (blocks: KairaPromptAuthorityBlock[]) =>
+  auditKairaPromptAuthorityBlocks(blocks)
+    .filter((finding) => finding.severity === "violation")
+    .map((finding) => finding.code);
+
+function emptyParts(overrides: Partial<KairaFinalProviderPromptParts> = {}): KairaFinalProviderPromptParts {
   return {
-    scenarioId: "AUTH1",
-    branchTrackType: "regression",
-    userId: "preai_AUTH1_run001",
-    sessionId: "preai_session_AUTH1_run001",
-    expectedUserIdPrefix: "preai_",
-    expectedSessionIdPrefix: "preai_session_",
-    systemPrompt: promptBlocks.map((block) => block.content).join("\n"),
-    messages: [{ role: "user", content: "tamam" }],
-    responsePlan: {
-      allowQuestion: false,
-      allowAffection: false,
-      allowAdvice: false,
-      requiredContent: [],
-      hardReasons: ["question_forbidden"],
-      maxWords: 12,
-      maxSentences: 1,
-    },
-    promptBlocks,
+    runtimeIdentityInstruction: "",
+    speechIdentityInstruction: "",
+    languageStyleMemoryInstruction: "",
+    dyadicLanguageAlignmentInstruction: "",
+    socialStyle: "",
+    groundingInstruction: "",
+    activeParticipantInstruction: "",
+    entityGroundingInstruction: "",
+    worldEventInstruction: "",
+    worldEventMemoryInstruction: "",
+    worldStateAppraisalInstruction: "",
+    worldReasoningPolicyInstruction: "",
+    epistemicInstruction: "",
+    selfMemoryInstruction: "",
+    dialogueInstruction: "",
+    discourseInstruction: "",
+    dialogueDecisionInstruction: "",
+    responsePlanInstruction: "",
+    canonicalObservationalContext: "",
+    sessionWorkingMemory: "",
+    memoryContext: "",
+    tone: "",
+    ...overrides,
   };
 }
 
-const violationCodes = (blocks: KairaPromptAuthorityBlock[]) =>
-  auditKairaFinalProviderPrompt(baseInput(blocks)).invariantViolations.map((item) => item.code);
-
 describe("typed prompt authority classification", () => {
-  it("RED: catches a #260-family question directive hidden in an observational block", () => {
+  it("catches a #260-family question directive hidden in an observational block", () => {
     expect(violationCodes([
       {
         id: "synthetic_observational_violation",
@@ -42,7 +50,7 @@ describe("typed prompt authority classification", () => {
     ])).toContain("prompt_block_authority_violation");
   });
 
-  it("RED: catches a T3-family move selection directive hidden in an observational block", () => {
+  it("catches a T3-family move selection directive hidden in an observational block", () => {
     expect(violationCodes([
       {
         id: "synthetic_t3_violation",
@@ -80,5 +88,31 @@ describe("typed prompt authority classification", () => {
         content: "allowQuestion=yasak; maxSentences=1; soru sorma.",
       },
     ])).not.toContain("prompt_block_authority_violation");
+  });
+
+  it("classifies current production parts without rewriting their prompt bytes", () => {
+    const blocks = classifyKairaFinalProviderPromptParts(emptyParts({
+      speechIdentityInstruction: "Kısa ve gündelik yaz.",
+      dialogueInstruction: "KARMAŞIK DİYALOG TAHTASI",
+      responsePlanInstruction: "allowQuestion=yasak",
+    }));
+    expect(blocks.find((block) => block.id === "speechIdentityInstruction")?.authorityClass).toBe("how_style");
+    expect(blocks.find((block) => block.id === "dialogueInstruction")?.authorityClass).toBe("mixed_unresolved");
+    expect(blocks.find((block) => block.id === "responsePlanInstruction")?.authorityClass).toBe("social_behavior_authority");
+  });
+
+  it("reports mixed production blocks as warnings rather than silently blessing them", () => {
+    const findings = auditKairaPromptAuthorityBlocks([
+      {
+        id: "dialogueInstruction",
+        authorityClass: "mixed_unresolved",
+        content: "En doğal tek sosyal hareketi seç.",
+      },
+    ]);
+    expect(findings).toContainEqual(expect.objectContaining({
+      code: "prompt_block_authority_unresolved",
+      severity: "warning",
+      blockId: "dialogueInstruction",
+    }));
   });
 });
