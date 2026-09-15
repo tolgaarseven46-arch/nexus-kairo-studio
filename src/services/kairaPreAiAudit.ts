@@ -217,7 +217,13 @@ function defaultCoverage(input: KairaPreAiAuditInput): KairaPreAiDetectorCoverag
 function realizerInstructionSurface(systemPrompt: string) {
   return systemPrompt
     .split("\n")
-    .filter((line) => !/^\s*DEBUG_ONLY\b/iu.test(line))
+    .filter((line) => {
+      if (/^\s*DEBUG_ONLY\b/iu.test(line)) return false;
+      if (/GÖZLEMSEL\s*[—-]\s*KARAR DEĞİL/iu.test(line)) return false;
+      if (/^\s*-\s*Bu turdaki tek ana hareket:/iu.test(line)) return false;
+      if (/^\s*[A-Za-z_][\w.]*\s*=/u.test(line)) return false;
+      return true;
+    })
     .join("\n");
 }
 
@@ -259,8 +265,9 @@ export function auditKairaFinalProviderPrompt(input: KairaPreAiAuditInput): Kair
   }
 
   // General C-family detector: every realizer-facing question authorization is
-  // checked against the effective hard permission. DEBUG_ONLY metadata is kept
-  // for diagnostics but deliberately excluded from the instruction surface.
+  // checked against the effective hard permission. Explicitly observational
+  // and structured machine-readable metadata remain auditable in the prompt
+  // snapshot but are excluded from the natural-language instruction surface.
   const realizerSurface = realizerInstructionSurface(input.systemPrompt);
   if (!input.responsePlan.allowQuestion && /(?:soru sor\b|sorabilirsin|clarify|netleştir)/iu.test(realizerSurface)) {
     const explicitOverride = /clarification-question-authorized-by-obligation|obligation-owned clarification/iu.test(realizerSurface);
