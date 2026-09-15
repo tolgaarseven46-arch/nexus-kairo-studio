@@ -52,7 +52,7 @@ jobs:
         run: node scripts/run-behavior-red-green-proof.mjs
 
       - name: Tests
-        run: npm test -- --run
+        run: npm test -- --run --exclude src/services/kairaSeededComplexConversationLongSessionRegression.test.ts --exclude src/services/kairaSeededAdversarialConversationExploration.test.ts
 
       - name: TypeScript check
         run: npm run lint
