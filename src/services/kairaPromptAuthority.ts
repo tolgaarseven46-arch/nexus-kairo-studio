@@ -39,7 +39,7 @@ const FINAL_PROMPT_PART_AUTHORITY = {
   worldReasoningPolicyInstruction: "epistemic_authority",
   epistemicInstruction: "epistemic_authority",
   selfMemoryInstruction: "epistemic_authority",
-  dialogueInstruction: "mixed_unresolved",
+  dialogueInstruction: "observational_evidence",
   discourseInstruction: "observational_evidence",
   dialogueDecisionInstruction: "observational_evidence",
   responsePlanInstruction: "social_behavior_authority",
