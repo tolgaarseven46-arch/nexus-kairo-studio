@@ -1,7 +1,7 @@
 import type { DroitDynamicState } from '../types/nexus';
 import type { ConversationTurn } from './kairoConversationGrounding';
 import type { KairaResponsePlan } from './kairaResponsePlan';
-import { interpretSemanticEvent } from './semanticEventEngine';
+import { projectSemanticEvent } from './semanticInterpretationProjection';
 
 export type KairaSpontaneityMode = 'none' | 'recent_topic_nudge';
 
@@ -60,7 +60,8 @@ function safeTopicCandidate(history: ConversationTurn[]): ConversationTurn | und
       const text = String(turn.text || '').trim();
       if (text.length < 8 || text.includes('?')) return false;
       if (topicWasRecentlyEchoed(text, recentKairaReplies)) return false;
-      const event = interpretSemanticEvent(text);
+      if (!turn.semanticInterpretation) return false;
+      const event = projectSemanticEvent(turn.semanticInterpretation);
       return (
         event.intent === 'general_chat' ||
         event.intent === 'banter' ||
