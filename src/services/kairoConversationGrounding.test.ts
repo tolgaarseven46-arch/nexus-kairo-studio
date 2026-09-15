@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { SemanticInterpretation } from "../types/semanticInterpretation";
 import {
   buildActiveParticipantInstruction,
   buildKairoGroundingInstruction,
@@ -8,8 +9,66 @@ import {
   sanitizeKairoChatHistory,
 } from "./kairoConversationGrounding";
 
+function semanticSnapshot(raw: string, uncertaintyOverall: number): SemanticInterpretation {
+  return {
+    schemaVersion: "semantic-interpretation@2",
+    raw,
+    normalized: raw.toLocaleLowerCase("tr-TR"),
+    primaryIntent: "smalltalk",
+    secondarySocialActs: [],
+    target: "unknown",
+    valence: "neutral",
+    severity: {
+      disrespect: 0,
+      coercion: 0,
+      manipulation: 0,
+      privacy: 0,
+      aggression: 0,
+    },
+    jokingConfidence: 0,
+    sincerityConfidence: 1,
+    affection: 0,
+    support: 0,
+    compliment: 0,
+    emotionalLoad: 0,
+    apology: false,
+    repairAttempt: false,
+    stopRequest: false,
+    discourseFacets: {
+      socialRoutine: "none",
+      discourseAct: "none",
+      repairSignal: "none",
+      adviceRequested: false,
+      knowledgeQuery: null,
+      selfMemoryQuery: null,
+      relationalAct: "none",
+      relationalIntensity: 0,
+      stopQuestions: false,
+      stopTalking: false,
+    },
+    uncertainty: {
+      overall: uncertaintyOverall,
+      intent: uncertaintyOverall,
+      target: 0,
+      severity: 0,
+    },
+    evidence: [
+      {
+        source: "reconciled",
+        cues: ["grounding_fixture"],
+        confidence: 1,
+      },
+    ],
+  };
+}
+
+const uncertainHistoryText = "Mert yarın istifa etmeyi düşünüyorum dedi.";
 const history = [
-  { sender: "user", text: "Mert yarın istifa etmeyi düşünüyorum dedi." },
+  {
+    sender: "user",
+    text: uncertainHistoryText,
+    semanticInterpretation: semanticSnapshot(uncertainHistoryText, 0.8),
+  },
   { sender: "droit", text: "O iş ciddiymiş." },
 ];
 
@@ -58,10 +117,10 @@ describe("Kaira conversation grounding", () => {
     ).toEqual([]);
   });
 
-  it("places uncertain evidence in the model instruction", () => {
+  it("places persisted uncertain evidence in the model instruction", () => {
     expect(
       buildKairoGroundingInstruction(history, "Mert ne yapacaktı?"),
-    ).toContain("Mert yarın istifa etmeyi düşünüyorum dedi.");
+    ).toContain(uncertainHistoryText);
   });
 
   it("removes a failed assistant turn together with its user message", () => {

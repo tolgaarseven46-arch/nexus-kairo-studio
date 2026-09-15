@@ -1,102 +1,130 @@
 # KAIRO PROJECT STATE
 
-> Bu dosya projenin **aktif çalışma checkpoint'idir**. Yeni sohbet başladığında önce GitHub'daki gerçek `main`, açık PR/issue/CI ve bu dosya doğrulanır; eski sohbetten varsayım yapılmaz. Bu dosyadaki eski commit SHA'ları tarihsel kanıttır; güncel `main` SHA her zaman GitHub'dan yeniden doğrulanır. Ayrıntılı tarih Git geçmişi, `AI_CHANGELOG.md` ve `docs/adr/**` içindedir.
+> Bu dosya projenin **aktif çalışma checkpoint'idir**; GitHub gerçekliğinin kopyası değildir. Yeni sohbet/çalışma başladığında önce repository'nin gerçek `main` SHA'sı, açık PR/issue'lar ve CI durumu GitHub'dan doğrulanır. Bu dosyada "güncel main SHA", "açık PR yok" veya benzeri hızla bayatlayan iddialar tutulmaz. Tarihsel ayrıntı Git geçmişi, `AI_CHANGELOG.md` ve `docs/adr/**` içindedir.
 
 ## 1. Değişmez mimari kurallar
 - `SemanticInterpretation@2` current-turn sınıflandırmasının tek canonical semantik otoritesidir.
-- Morphology / syntax / discourse katmanları typed evidence üretir; semantic truth canonical L6 gateway'de oluşur.
-- Downstream raw-text reparse veya ikinci semantic authority yok.
+- Morphology / syntax / discourse katmanları typed evidence üretir; downstream katmanlar raw text'ten ikinci semantic truth üretmez.
+- Historical consumer, persisted canonical semantic snapshot mevcutsa onu kullanır; geçmiş raw text yeni semantic authority olamaz.
 - `RelationshipReducer`, social appraisal, memory, dialogue decision, behavior/response ve persistence ownership sınırları korunur.
-- SpeechIdentity yalnız HOW; BehaviorContract WHAT/WHETHER authority’sidir.
+- SpeechIdentity yalnız **HOW**; BehaviorContract / KairaResponsePlan **WHAT/WHETHER** authority'sidir.
+- Prompt assembly yeni semantic/behavior authority değildir; upstream typed/owned blokları provider sınırında serialize eder.
+- Meaning/content `unknown | ambiguous | low-confidence` kalabilir; state ownership / lease / scope / canonical authority belirsiz bırakılamaz.
 - Provider/API seçimi canonical semantic truth veya deterministic architecture proof değildir.
 - Yeni regex/classifier/phrase patch yalnız ölçülmüş failure class ile gerekçelendirilir.
-- Yeni production patch yalnız deterministic counterexample / measured RED sonrası açılır.
+- Production patch zinciri: deterministic characterization RED → owning-seam minimal fix → neighboring regression → full CI.
 
-## 2. Foundation — CLOSED
-- Language/canonical foundation: PR #192–#196; frozen Phase-0 baseline 21 senaryo / 423 tur korunuyor.
-- Relationship/memory/persistence foundation: PR #199, #202–#205.
-- State mutation concurrency/ownership: PR #206, #207, #210, #211; lease ownership loss fail-closed.
-- Counterfactual/discourse authority: PR #209, #213.
-- Provider/canonical boundary: PR #214, #215; canonical authority provider-neutral.
+## 2. Pre-AI sistem sınırı
+Bu checkpoint'in kapsamı kullanıcı mesajının girişinden **final provider prompt boundary**'ye kadardır. Model cevabının kalitesi, prompt wording tuning'i, temperature/model seçimi ve provider-output estetik değerlendirmesi bu kapanışın dışında tutulur.
 
-## 3. Core adversarial + emotion-state validation — CLOSED
-- PR #219–#222: long-horizon, relationship edge combinations, discourse collision, temporal robustness, uncertainty damping, persistence corruption/version mismatch, spontaneous conversation probes.
-- PR #224: affect baseline / Phase 5A.
-- PR #225: relationship-derived reaction-mode matrix / Phase 5B; SpeechIdentity HOW vs BehaviorContract WHAT/WHETHER separation.
-- Phase 5C: affect × reactionMode cross-axis boundedness/isolation proof.
-- Known deterministic gates, TypeScript, build and Architecture Review are GREEN.
+Katman modeli:
+- A Input / Evidence
+- B Entity / Attribution
+- C Discourse / Episode
+- D Canonical Semantic
+- E Temporal / Lifecycle
+- F Relationship
+- G Memory
+- H Social Appraisal
+- I Commitment / Norm
+- J State Ownership
+- K Concurrency
+- L Persistence / Hydration
+- M Decision / Behavior
+- N Speech Identity
+- O Controlled Spontaneity / Historical Recall
+- P Observability / Trace
+- Q Architecture Governance
+- R Multi-Party Attention / Engagement
+- S Prompt Assembly / Realization Authority
 
-## 4. Runtime/response/provider safety — CLOSED FOR KNOWN FAILURES
-- PR #217/#218: measured advice-leak regressions closed.
-- PR #228: live transport timeout policy closed.
-- PR #230: canonical behavior-situation projection; downstream raw-text semantic reparse removed from production behavior path.
-- PR #231: generation başına shared outbound provider attempt budget max 2.
-- PR #233: final-delivery empty reply fail-closed; accepted turn boş reply persist edemez.
-- PR #235: canonical semantic event production reachability closed.
-- Provider/API live keşif testleri maliyet nedeniyle deterministic acceptance’tan ayrıdır.
+`R` gerçek eşzamanlı multi-party engagement kararı mevcut tek-aktif-konuşmacı runtime için future/out-of-scope olabilir; participant attribution ve user-local isolation mevcut pre-AI invariants içinde kalır.
 
-## 5. Relationship maturity / severe harm — CLOSED
-- PR #236: mature/high-trust relationship severe coercion/privacy injury floor; severe harm maturity attenuation ile tamamen eriyemez.
-- PR #251: trust/warmth aynı tutulurken yalnız history/maturity farkının aynı mild direct injury’yi farklı damp ettiği tek-değişken A/B proof GREEN.
-- PR #252: gerçek `saveKdmInteraction()` → `loadKdmState()` normalization/hydration round-trip sonrası aynı maturity-bearing state aynı reducer davranışını üretir; GREEN.
+## 3. Foundation — CLOSED for measured pre-AI scope
+Aşağıdaki foundation aileleri deterministic/contract/integration kanıtlarıyla kurulmuştur; ayrıntılı PR/commit geçmişi Git ve `AI_CHANGELOG.md` içindedir:
+- canonical semantic authority + provider-neutral boundary,
+- relationship / memory / persistence foundation,
+- state mutation ownership + concurrency / idempotency / lease fail-closed,
+- discourse / counterfactual / temporal authority,
+- world/self/relationship separation,
+- social appraisal + commitment/betrayal lifecycle,
+- affect baseline + qualitative reaction mode,
+- BehaviorContract / KairaResponsePlan final WHAT/WHETHER authority,
+- SpeechIdentity HOW boundary,
+- final-delivery/provider-attempt/timeout safety,
+- persistence/hydration parity and corruption/version mismatch handling,
+- multi-user deterministic isolation,
+- controlled spontaneity persisted semantic history consumption,
+- Phase-0 deterministic pre-AI harness + beta/KNT/seeded acceptance gates.
 
-## 6. Commitment / betrayal lifecycle + appraisal — CLOSED
-- PR #237: commitment/betrayal typed appraisal boundary.
-- PR #239: unresolved counterparty isolation; missing counterparty fail-closed `unknown`.
-- PR #241/#242: evidence-order stability + person/scope/counterparty lifecycle isolation.
-- PR #244/#245: equal/invalid timestamp lifecycle ambiguity fail-closed.
-- PR #246: plan-generation temporal ambiguity fail-closed.
-- PR #247: conflicting terminal-outcome temporal bucket caller/storage order’dan bağımsız; ambiguity → `unknown`.
-- PR #248: canonical lifecycle `unknown` SocialAppraisal’da `absent`a düşmez; betrayal uncertainty korunur.
-- PR #250: `betrayal: unknown` downstream application seviyesinde relational/affective mutation, confidence escalation veya material effect üretmez.
-- 13 Eylül authority audit’i `SemanticAttribution` içinde controllability / communicationConsent / externalCause temsil boşluğunu ve commitment projection’da current state ile prior state/lifecycle outcome ayrımı ihtiyacını kanıtladı.
-- Characterization RED commit `3d7949059071de07a5ca120510ff1e7e596e6ee4`, Fast CI run `34762500294`: 8 lifecycle mapping senaryosunun 5’i RED, 3’ü mevcut davranışla GREEN.
-- PR #258 aynı mevcut semantic authority’yi typed alanlarla genişletti; yeni authority, downstream raw-text reparse, regex veya phrase heuristic eklenmedi. Missing/legacy attribution evidence `unknown` fail-closed normalize edilir.
-- Commitment projection `state / previousState / lifecycleOutcome` olarak ayrıldı: postponed aktif obligation’ı korur; failed/cancelled terminal outcome prior active state’i silmez; ambiguous/unknown lifecycle current state `unknown` olurken `previousState: active` korunur.
-- İlk full-suite kırılımında iki regression runtime’ın ambiguous lifecycle’ı `active` projekte ettiğini kanıtladı; minimal fix commit `a4e41cd00250b10ddf9ce592f3757de2655da77b` ile current state `unknown`, prior state `active` korunacak şekilde düzeltildi.
-- Final CI run `34772256739`: docs-guard, behavior-guard, architecture contracts, autonomous runtime contracts, beta runtime regression, Phase-0 harness/report, beta conversation/KNT replay, proof manifest, Historical RED→GREEN, full Tests, TypeScript ve production build GREEN.
-- Architecture Review run `34772256580` GREEN; insan `/arch-approve` gerekmiyor.
-- PR #258 squash merge commit `3f419870c3bfe8d45745f6cb850b5f05a6d9d287` ile `main`e merge edildi.
+## 4. Final pre-AI authority closure — ACTIVE CHECKPOINT
+Final closure work is tracked by the latest GitHub PR/CI, not by a hard-coded "current main" line in this document.
 
-## 7. Automated pre-beta system acceptance — CLOSED
-- PR #253 merge commit `f27f9bd0142cd618b952b012b7856059849e078a`.
-- Provider-free deterministic acceptance toplam 120 relationship turn çalıştırır: iki kullanıcı × 60 turn.
-- Supportive ve mixed history aynı canonical `RelationshipReducer` altında farklı ilişki geçmişi üretir; aynı final mild direct negative probe history-dependent relational output verir.
-- Bir kullanıcının progression’ı diğer kullanıcının state’ini mutate etmez.
-- İki ayrı user ID gerçek `saveKdmInteraction()` / `loadKdmState()` normalization path’inden geçer; yalnız Firestore transport in-memory mock’tur; cross-user persistence contamination yoktur.
-- Long-horizon state SpeechIdentity → BehaviorContract → final-delivery zincirine girer; HOW/WHAT authority ayrımı ve forbidden advice korunur; accepted final reply non-empty kalır.
-- CI run `34759029702` tamamen GREEN; Architecture Review run `34759029689` GREEN.
-- Ölçülen production RED çıkmadı; runtime patch yapılmadı.
-- PR #254 automated pre-beta checkpoint closure/docs sync olarak merge edildi.
+Measured closure findings:
+- **T3 / Dialogue Board:** current production block is explicitly observational and states it does not grant question/advice/humor/speculation/social-move/style permissions; DialogueDecision + KairaResponsePlan own those decisions.
+- **T6 / historical grounding:** characterization proved historical uncertainty could be reconstructed from raw wording even when persisted canonical semantics disagreed. Closure requires persisted semantic uncertainty to be authoritative; missing historical semantic snapshot fails closed.
+- **T2 / SpeechIdentity:** two reaction-mode phrases duplicated relationship WHAT/WHETHER decisions. Closure keeps only distance/rhythm/softening HOW and leaves reopening/forgiveness/repair-completion to ResponsePlan.
+- **T5 / provider-output repair:** realization-stage retry is bounded; a repaired candidate must pass the same grounding/attribution/dialogue/ResponsePlan/affect/world validators before adoption. It cannot bypass the validator chain.
+- **R / true multi-party engagement:** future/out-of-scope unless product runtime is expanded beyond the current active-speaker model.
+- **S / final prompt assembly:** serializer owns ordering/assembly only. Upstream layer ownership remains authoritative; prompt blocks may not silently manufacture new permissions or certainty.
 
-## 8. Güncel teknik durum
-- Güncel doğrulanmış `main`: `3f419870c3bfe8d45745f6cb850b5f05a6d9d287` (PR #258 merge).
-- Açık PR yok; açık issue yok.
-- Otomatik pre-beta deterministic architecture/system acceptance kapsamında bilinen açık implementation işi yok.
-- Yeni relationship/social-appraisal/world-lifecycle/behavior/realization/provider production patch yalnız yeni ölçülmüş RED/counterexample sonrası açılmalı.
-- Eksik behavior-situation kavramı ancak test ile gerçekten gerekli olduğu kanıtlanırsa canonical language schema/evidence katmanında modellenmeli; downstream regex/classifier geri getirilmemeli.
-- Provider live parity / maliyetli gerçek-provider keşfi ayrı acceptance sınıfıdır ve deterministic mimari proof yerine geçmez.
+Current closure ADR:
+- `docs/adr/2026-09-15-pre-ai-final-authority-closure.md`
 
-## 9. Live beta / real-human acceptance — ACTIVE PHASE
-- Sıradaki ana aşama gerçek insan beta / live conversation acceptance'tır. PR #258 merge edildiği için lifecycle/appraisal gate artık beta girişini bloklamıyor.
-- `docs/beta/live-beta-protocol.md` beta giriş kriterlerini, minimum session/turn evidence'ını, failure class/severity modelini, deterministic RED promotion zincirini ve exit criteria'yı tanımlar.
-- `.github/ISSUE_TEMPLATE/live-beta-failure.md` her gerçek beta failure'ı için standart capture/replay handoff formatıdır.
-- Bir beta gözlemi production bug sayılmaz; önce exact failing window + runtime evidence + owning seam + deterministic replay/counterexample gerekir.
-- Trace'te bulunmayan canonical evidence raw text'ten sonradan yeniden türetilmez; `missing` olarak tutulur.
-- `UNKNOWN` failure class'tan production patch yapılmaz.
-- S0 cross-user contamination/data/privacy failure beta'yı durdurur; S1 canonical truth/relationship/memory/hard-permission failure deterministic reproduction sonrası geniş beta öncesi kapatılır.
+## 5. Test truth / proof levels
+Test results must be described by what they really exercise:
+1. unit proof,
+2. contract proof,
+3. characterization proof,
+4. shared-production-function proof,
+5. production-context integration proof,
+6. deterministic pre-AI end-to-end proof,
+7. persistence/hydration/concurrency proof,
+8. adversarial / long-horizon / historical replay proof.
 
-## 10. Beta acceptance hedefleri
-- En az iki gerçek kullanıcıyla bağımsız history/memory ilişkileri test edilmeli.
-- Fresh vs mature relationship farkı gerçek kullanımda gözlenmeli.
-- Positive history → mild conflict ve repeated negative → repair akışları denenmeli.
-- Third-party referanslar Kaira-user ilişkisini yanlış mutate etmemeli.
-- Restart/hydration sonrası state parity gerçek kullanımda gözlenmeli.
-- En az bir gerçek sohbet 100+ turn boyunca manuel state reset olmadan yürütülmeli; yalnız final snapshot değil per-turn relationship/affect/memory/decision evrimi incelenmeli.
-- Aynı/benzer input farklı user history'lerinde gerektiğinde farklı sonuç üretmeli fakat kullanıcı state'leri birbirine sızmamalı.
-- Beta completion için unresolved S0/S1 kalmamalı; düzeltilen S1/S2 davranış failure'larının deterministic regression/replay'i olmalı.
+A green harness may not be described as full production-path proof when it intentionally substitutes deterministic ingress, omits persistent hydration, or stops before provider execution.
 
-## 11. Çalışma kuralı
-- Beta başlamadan varsayımsal behavior patch üretme.
-- Gerçek kullanıcı failure'ı geldiğinde zincir: capture → ownership → minimal deterministic RED/replay → owning-seam fix → neighboring regressions → full CI → merge.
-- Test Lab'deki statik/simüle cevaplar gerçek live-beta kanıtı sayılmaz; beta evidence gerçek runtime conversation path'ten gelmelidir.
+The frozen Phase-0 baseline remains 21 scenarios / 423 turns and stops at `FINAL_PROVIDER_PROMPT_BUILT_NO_PROVIDER_CALL`.
+
+## 6. Grey-zone policy
+- Semantic meaning may remain `unknown`, `ambiguous`, `low-confidence`, or unresolved when evidence is insufficient.
+- Uncertainty may damp or block state mutation rather than forcing a guessed interpretation.
+- Downstream layers cannot increase semantic certainty without an explicitly owned resolution contract.
+- Authority, state ownership, user scope, persistence owner and concurrency lease are not grey zones; ambiguity there fails closed.
+- A weird conversation that stays inside these invariants is a bounded product-quality issue, not automatically a reason to reopen architecture.
+
+## 7. Architecture reopening rule
+After final pre-AI closure, **general architecture audit does not automatically reopen the system**.
+
+New architecture work requires at least one of:
+1. a measured invariant violation with reproducible evidence,
+2. a frozen reopening-condition hit (authority collision, ownership leak, cross-user contamination, persistence divergence, production/test-path mismatch that invalidates a claimed proof),
+3. an explicit new product requirement that expands the frozen system boundary.
+
+Otherwise:
+- new sentence/conversation examples map to an existing failure class,
+- non-critical ambiguity remains a typed grey zone,
+- future modalities/features stay in backlog/out-of-scope,
+- no ad-hoc downstream regex/phrase patch is added.
+
+## 8. Definition of Done — pre-AI architecture
+Pre-AI architecture can be frozen when:
+- A–S layer set and owners are explicit,
+- canonical authority collisions are absent,
+- state scopes/owners are deterministic,
+- historical semantic consumers do not create shadow truth,
+- grey-zone/fail-closed policy is explicit,
+- production seams have honestly classified proof coverage,
+- measured closure blockers are GREEN under targeted + neighboring + full CI,
+- persistence/hydration/concurrency isolation gates remain GREEN,
+- prompt assembly cannot silently expand WHAT/WHETHER authority,
+- observability can identify owning seam/failure class,
+- governance docs do not claim volatile GitHub state and therefore cannot silently drift from branch/CI reality.
+
+## 9. Next handoff rule
+Before any next action:
+1. query GitHub for actual `main`, PRs and CI,
+2. read the latest closure ADR(s),
+3. do not reopen already-closed architecture from old chat memory,
+4. finish any active closure PR through test → CI → merge → main-CI,
+5. only after pre-AI freeze decision move to model-in-the-loop / answer-quality validation.

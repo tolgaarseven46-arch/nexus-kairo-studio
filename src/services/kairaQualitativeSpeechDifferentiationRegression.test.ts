@@ -58,14 +58,16 @@ describe('qualitative reaction speech differentiation', () => {
     expect(withdrawnSpeech.instructions.join(' ')).toContain('Nitel tepki withdrawn');
   });
 
-  it('uses controlled softening for repairing instead of hurt/firm carry-over', () => {
+  it('uses controlled HOW-only softening for repairing instead of hurt/firm carry-over', () => {
     const damaged = analyzeKdmInteraction('sen salaksın', NEUTRAL_DROIT_PERSONALITY, base('damaged'));
     const repair = analyzeKdmInteraction('özür dilerim', NEUTRAL_DROIT_PERSONALITY, damaged.nextDynamicState);
     expect(repair.nextDynamicState.reactionMode).toBe('repairing');
 
     const speech = computeKairoSpeechIdentity(NEUTRAL_DROIT_PERSONALITY, repair.nextDynamicState, repair.trace);
+    const instructions = speech.instructions.join(' ');
     expect(speech.register).toBe('balanced');
-    expect(speech.instructions.join(' ')).toContain('Nitel tepki repairing');
-    expect(speech.instructions.join(' ')).toContain('tamamen düzelmiş ilan etme');
+    expect(instructions).toContain('Nitel tepki repairing');
+    expect(instructions).toContain('kontrollü, ölçülü bir yumuşama');
+    expect(instructions).not.toContain('tamamen düzelmiş ilan etme');
   });
 });
