@@ -42,6 +42,15 @@ Do NOT infer betrayal or unfairness here. Do NOT use relationship history to man
 Do NOT invent actorId or scopeKey; the canonical runtime grounds those from the already-built world event proposition.
 If evidence is insufficient, omit attribution or use unknown values. This extension is compatible with SemanticInterpretation@2.`;
 
+const SUBJECT_AND_REPORTED_SPEECH_EXTENSION = `
+CANONICAL SUBJECT / REPORTED-SPEECH EXTENSION (fail-closed):
+- Kullanıcının birinci şahıs öznesi (ben, benim, yaptım/yapacağım gibi user-owned first-person eylem veya fact) için canonical subjectId/actorId current_user kullan.
+- Kaira için kaira yalnız current utterance Kaira'yı açıkça özne yaptığında kullanılabilir. Kullanıcının kendi planını, kararını, durumunu veya eylemini kaira subjectId ile ASLA yazma.
+- Adı açık üçüncü kişiler person:<normalize_ad> kimliğini kullanır.
+- NESTED REPORTED SPEECH: Kullanıcı yalnızca bir kişinin başka bir kişinin sözünü aktardığını bildiriyorsa (örn. "Ali bana Mert'in X dediğini söyledi"), gömülü X içeriğini doğrudan doğrulanmış durable fact gibi worldMemory claim ÜRETME. Rapor zincirini propositions/evidence içinde current-turn report olarak koru ve belirsizliği koru.
+- Yalnız current utterance özne/attribute/value ilişkisini doğrudan destekliyorsa worldMemory claim üret. İkinci-el/nested hearsay için direct provenance yoksa fail-closed kal.
+- Reported speech target/insult gibi utterance-level semantics korunabilir; bu kural yalnız durable world-memory fact promotion'ını sınırlar.`;
+
 function groundCanonicalAttribution(result: LanguageUnderstandingResult): LanguageUnderstandingResult {
   const attribution = result.interpretation.attribution;
   if (!attribution) return result;
@@ -78,7 +87,7 @@ export async function resolveServerLanguageUnderstanding(
     name: CANONICAL_SEMANTIC_PROVIDER,
     generate: ({ system, prompt, temperature }) =>
       input.generateText(
-        `${system}\n\n${ATTRIBUTION_SCHEMA_EXTENSION}`,
+        `${system}\n\n${ATTRIBUTION_SCHEMA_EXTENSION}\n\n${SUBJECT_AND_REPORTED_SPEECH_EXTENSION}`,
         [{ role: "user", content: prompt }],
         temperature,
         input.preferredProvider,
