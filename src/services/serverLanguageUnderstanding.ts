@@ -1,9 +1,11 @@
 import {
+  groundSemanticEventForAppraisal,
   understandTurkishMessage,
   type LanguageUnderstandingContext,
   type LanguageUnderstandingResult,
 } from "./languageUnderstandingService";
 import { createLlmSemanticUnderstandingProvider } from "./llmSemanticUnderstandingProvider";
+import { projectSemanticEvent } from "./semanticInterpretationProjection";
 import { createConfiguredZemberekMorphologyProvider } from "./zemberekMorphologyProvider";
 
 export interface ServerSemanticGenerateText {
@@ -49,7 +51,8 @@ CANONICAL SUBJECT / REPORTED-SPEECH EXTENSION (fail-closed):
 - Adı açık üçüncü kişiler person:<normalize_ad> kimliğini kullanır.
 - NESTED REPORTED SPEECH: Kullanıcı yalnızca bir kişinin başka bir kişinin sözünü aktardığını bildiriyorsa (örn. "Ali bana Mert'in X dediğini söyledi"), gömülü X içeriğini doğrudan doğrulanmış durable fact gibi worldMemory claim ÜRETME. Rapor zincirini propositions/evidence içinde current-turn report olarak koru ve belirsizliği koru.
 - Yalnız current utterance özne/attribute/value ilişkisini doğrudan destekliyorsa worldMemory claim üret. İkinci-el/nested hearsay için direct provenance yoksa fail-closed kal.
-- Reported speech target/insult gibi utterance-level semantics korunabilir; bu kural yalnız durable world-memory fact promotion'ını sınırlar.`;
+- Reported speech target/insult gibi utterance-level semantics korunabilir; bu kural yalnız durable world-memory fact promotion'ını sınırlar.
+- Düz bir reported-speech bildirimi recall_request değildir. recall_request yalnız kullanıcı gerçekten geçmiş bilgiyi geri çağırmayı istediğinde kullanılabilir.`;
 
 function groundCanonicalAttribution(result: LanguageUnderstandingResult): LanguageUnderstandingResult {
   const attribution = result.interpretation.attribution;
@@ -72,6 +75,64 @@ function groundCanonicalAttribution(result: LanguageUnderstandingResult): Langua
         ])).slice(-8),
       },
     },
+  };
+}
+
+export function reconcileServerCanonicalSemantics(
+  message: string,
+  result: LanguageUnderstandingResult,
+): LanguageUnderstandingResult {
+  const interpretation = result.interpretation;
+  const existingClaims = interpretation.worldMemory?.claims ?? [];
+  const claims = existingClaims.map((claim) =>
+    claim.subjectId === "self" ? { ...claim, subjectId: "current_user" } : claim,
+  );
+  const normalizedSelfSubject = claims.some((claim, index) => claim.subjectId !== existingClaims[index]?.subjectId);
+
+  const recallGrounded =
+    interpretation.primaryIntent === "question" ||
+    interpretation.propositions?.some((proposition) => proposition.modality === "question") ||
+    interpretation.worldMemory?.query != null ||
+    interpretation.discourseFacets.selfMemoryQuery != null;
+  const removeUngroundedRecall =
+    interpretation.discourseFacets.discourseAct === "recall_request" && !recallGrounded;
+
+  if (!normalizedSelfSubject && !removeUngroundedRecall) return result;
+
+  const cues = [
+    ...(normalizedSelfSubject ? ["world_memory_self_alias_to_current_user"] : []),
+    ...(removeUngroundedRecall ? ["recall_request_requires_retrieval_evidence"] : []),
+  ];
+  const reconciledInterpretation = {
+    ...interpretation,
+    ...(interpretation.worldMemory
+      ? { worldMemory: { ...interpretation.worldMemory, claims } }
+      : {}),
+    discourseFacets: {
+      ...interpretation.discourseFacets,
+      ...(removeUngroundedRecall ? { discourseAct: "none" as const } : {}),
+    },
+    evidence: [
+      ...interpretation.evidence,
+      {
+        source: "reconciled" as const,
+        provider: "server_canonical_semantic_bridge",
+        cues,
+        confidence: 1,
+      },
+    ].slice(-8),
+  };
+  const projected = projectSemanticEvent(reconciledInterpretation);
+  const grounded = groundSemanticEventForAppraisal(message, projected, result.entityResolution);
+
+  return {
+    ...result,
+    interpretation: reconciledInterpretation,
+    event: {
+      ...grounded.event,
+      semanticUncertainty: reconciledInterpretation.uncertainty.overall,
+    },
+    worldEvent: grounded.worldEvent,
   };
 }
 
@@ -100,7 +161,8 @@ export async function resolveServerLanguageUnderstanding(
     semanticProvider,
     context: input.context,
   });
-  const result = groundCanonicalAttribution(rawResult);
+  const reconciledResult = reconcileServerCanonicalSemantics(input.message, rawResult);
+  const result = groundCanonicalAttribution(reconciledResult);
 
   if (result.semanticSource !== "semantic_provider") return result;
   return {
