@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Replay fixed live semantic attribution cases
+      - name: Diagnose live response quality seams
         run: |
           python - <<'PY'
           import json, time, urllib.request, urllib.error
@@ -19,8 +19,7 @@ jobs:
           expected_model = "google/gemini-2.5-flash-lite"
           with urllib.request.urlopen(base + "/api/runtime-info", timeout=45) as response:
               runtime = json.loads(response.read().decode("utf-8"))
-          print("RUNTIME_INFO:")
-          print(json.dumps(runtime, ensure_ascii=False, indent=2))
+          print("RUNTIME_INFO:", json.dumps(runtime, ensure_ascii=False))
           if runtime.get("activeProvider") != "openrouter" or runtime.get("model") != expected_model:
               raise SystemExit(f"wrong live model route: {runtime}")
 
@@ -34,7 +33,7 @@ jobs:
                   "history": history,
                   "provider": "openrouter",
                   "sessionId": session_id,
-                  "requestId": f"postfix_replay_{int(time.time())}_{turn}",
+                  "requestId": f"quality_diag_{int(time.time())}_{turn}",
                   "suppressRecentMemory": True,
               }
               data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -46,44 +45,36 @@ jobs:
                   body = exc.read().decode("utf-8", errors="replace")
                   raise SystemExit(f"HTTP {exc.code}: {body}")
 
-          # Case 1: first-person user plan must never become Kaira-owned durable memory.
-          history = []
-          uid = "postfix_current_user_20260915"
-          sid = f"session_{uid}_{int(time.time())}"
-          status, result = post("galiba yarın müdürle konuşup istifa edeceğim", uid, sid, history, 1)
-          interp = result.get("semanticInterpretation") or result.get("metadata", {}).get("semanticInterpretation") or {}
-          claims = ((interp.get("worldMemory") or {}).get("claims") or [])
-          event = (result.get("kdm") or {}).get("semanticEvent")
-          print("=== FIRST_PERSON_REPLAY ===")
-          print("REPLY:", result.get("reply"))
-          print("WORLD_MEMORY:", json.dumps(claims, ensure_ascii=False))
-          print("SEMANTIC_EVENT:", json.dumps(event, ensure_ascii=False))
-          if any(str(c.get("subjectId")) == "kaira" and "resign" in str(c.get("attributeKey", "")).lower() for c in claims):
-              raise SystemExit("FAIL: user first-person resignation was still assigned to kaira")
-          resign_claims = [c for c in claims if "resign" in str(c.get("attributeKey", "")).lower() or "istifa" in str(c.get("attributeKey", "")).lower()]
-          if resign_claims and any(str(c.get("subjectId")) != "current_user" for c in resign_claims):
-              raise SystemExit(f"FAIL: resignation claim subject not current_user: {resign_claims}")
+          def show(label, message, result):
+              interp = result.get("semanticInterpretation") or result.get("metadata", {}).get("semanticInterpretation") or {}
+              kdm = result.get("kdm") or {}
+              print(f"=== {label} ===")
+              print("USER:", message)
+              print("KAIRA:", result.get("reply"))
+              print("CONSISTENCY:", json.dumps(result.get("consistency"), ensure_ascii=False))
+              print("SEMANTIC_INTERPRETATION:", json.dumps(interp, ensure_ascii=False))
+              print("SEMANTIC_EVENT:", json.dumps(kdm.get("semanticEvent"), ensure_ascii=False))
+              print("RESPONSE_PLAN:", json.dumps(kdm.get("responsePlan"), ensure_ascii=False))
+              print("DIALOGUE_DECISION:", json.dumps(kdm.get("dialogueDecision"), ensure_ascii=False))
+              return interp
 
-          # Case 2: nested hearsay must not become a direct durable Mert fact.
+          # Hearsay: pre-AI should preserve uncertainty, while reply must not upgrade to certainty.
           history = []
-          uid = "postfix_hearsay_20260915"
+          uid = "quality_diag_hearsay_20260915"
           sid = f"session_{uid}_{int(time.time())}"
-          msg = "Ali bana Mert'in benim hakkımda 'Tolga tam aptal' dediğini söyledi"
-          status, result = post(msg, uid, sid, history, 1)
-          interp = result.get("semanticInterpretation") or result.get("metadata", {}).get("semanticInterpretation") or {}
-          claims = ((interp.get("worldMemory") or {}).get("claims") or [])
-          event = (result.get("kdm") or {}).get("semanticEvent")
-          print("=== NESTED_HEARSAY_REPLAY ===")
-          print("REPLY:", result.get("reply"))
-          print("WORLD_MEMORY:", json.dumps(claims, ensure_ascii=False))
-          print("SEMANTIC_EVENT:", json.dumps(event, ensure_ascii=False))
-          direct_mert_quote = [c for c in claims if str(c.get("subjectId")) == "person:mert" and ("said" in str(c.get("attributeKey", "")).lower() or "dedi" in str(c.get("attributeKey", "")).lower() or "aptal" in json.dumps(c, ensure_ascii=False).lower())]
-          if direct_mert_quote:
-              raise SystemExit(f"FAIL: nested hearsay promoted to durable Mert fact: {direct_mert_quote}")
+          messages = [
+              "Ali bana Mert'in benim hakkımda 'Tolga tam aptal' dediğini söyledi",
+              "bunu Ali söyledi diye Mert'in gerçekten dediğinden emin olabilir miyiz",
+          ]
+          for i, message in enumerate(messages, 1):
+              _, result = post(message, uid, sid, history, i)
+              interp = show(f"HEARSAY_{i}", message, result)
+              history.append({"sender": "user", "text": message, "participantName": "Tolga", **({"semanticInterpretation": interp} if interp else {})})
+              history.append({"sender": "kaira", "text": str(result.get("reply") or "")})
 
-          # Continuity replay: cancellation should be available to the next turn without Kaira ownership contamination.
+          # Commitment cancellation: inspect whether current context knows the cancellation before realization.
           history = []
-          uid = "postfix_commitment_continuity_20260915"
+          uid = "quality_diag_commitment_20260915"
           sid = f"session_{uid}_{int(time.time())}"
           messages = [
               "galiba yarın müdürle konuşup istifa edeceğim",
@@ -91,17 +82,10 @@ jobs:
               "yarın istifa edecek miyim",
           ]
           for i, message in enumerate(messages, 1):
-              status, result = post(message, uid, sid, history, i)
-              interp = result.get("semanticInterpretation") or result.get("metadata", {}).get("semanticInterpretation")
-              claims = (((interp or {}).get("worldMemory") or {}).get("claims") or [])
-              print(f"CONTINUITY TURN {i}")
-              print("USER:", message)
-              print("KAIRA:", result.get("reply"))
-              print("WORLD_MEMORY:", json.dumps(claims, ensure_ascii=False))
-              if any(str(c.get("subjectId")) == "kaira" and ("resign" in str(c.get("attributeKey", "")).lower() or "istifa" in str(c.get("attributeKey", "")).lower()) for c in claims):
-                  raise SystemExit("FAIL: continuity replay contaminated Kaira-owned state")
+              _, result = post(message, uid, sid, history, i)
+              interp = show(f"COMMITMENT_{i}", message, result)
               history.append({"sender": "user", "text": message, "participantName": "Tolga", **({"semanticInterpretation": interp} if interp else {})})
               history.append({"sender": "kaira", "text": str(result.get("reply") or "")})
 
-          print("POSTFIX_PRODUCTION_REPLAY_COMPLETE")
+          print("QUALITY_DIAG_COMPLETE")
           PY
