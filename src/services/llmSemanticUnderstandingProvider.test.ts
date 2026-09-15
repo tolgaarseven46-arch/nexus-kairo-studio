@@ -169,4 +169,30 @@ describe("llm semantic understanding provider", () => {
       provenance: ["current_user_report", "reported_by:person:ali"],
     });
   });
+
+  it("does not let a kaira memory subject override a typed current_user proposition actor", async () => {
+    const provider = createLlmSemanticUnderstandingProvider({
+      generate: async () => JSON.stringify({
+        ...base,
+        normalized: "yarın istifa edeceğim",
+        propositions: [{
+          id: "p1",
+          content: "current user will resign tomorrow",
+          actorId: "current_user",
+          temporalAnchor: "tomorrow",
+          modality: "prediction",
+          confidence: 0.8,
+          provenance: ["current_turn"],
+        }],
+        worldMemory: {
+          claims: [{ subjectId: "kaira", attributeKey: "will_resign_tomorrow", value: true, confidence: 0.8 }],
+          query: null,
+        },
+      }),
+    });
+
+    const interpretation = await provider.interpret({ message: "yarın istifa edeceğim" });
+
+    expect(interpretation.worldMemory?.claims[0]?.subjectId).toBe("current_user");
+  });
 });
