@@ -22,4 +22,17 @@ describe("server language-understanding provider boundary contracts", () => {
     expect(bridge).toContain('evidence.source === "llm"');
     expect(bridge).toContain("provider: CANONICAL_SEMANTIC_PROVIDER");
   });
+
+  it("freezes current_user as the canonical first-person subject and never aliases it to kaira", () => {
+    expect(bridge).toContain("Kullanıcının birinci şahıs");
+    expect(bridge).toContain("current_user");
+    expect(bridge).toContain("Kaira için kaira yalnız");
+  });
+
+  it("keeps nested reported speech out of durable world-memory facts when direct provenance is unavailable", () => {
+    expect(bridge).toContain("NESTED REPORTED SPEECH");
+    expect(bridge).toContain("worldMemory claim ÜRETME");
+    expect(bridge).toContain("propositions/evidence");
+    expect(bridge).toContain("belirsizliği koru");
+  });
 });
