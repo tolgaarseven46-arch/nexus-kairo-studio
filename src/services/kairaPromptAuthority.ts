@@ -50,7 +50,7 @@ const FINAL_PROMPT_PART_AUTHORITY = {
 } satisfies Record<keyof KairaFinalProviderPromptParts, KairaPromptAuthorityClass>;
 
 const SOCIAL_MOVE_SELECTION_RE =
-  /(?:en\s+doğal\s+tek\s+sosyal\s+hareketi\s+seç|sosyal\s+hareket(?:i|ini)\s+seç|(?:tepki|soru|görüş|şaka)[^\n]{0,80}(?:tepki|soru|görüş|şaka))/iu;
+  /(?:en\s+doğal\s+tek\s+sosyal\s+hareketi\s+seç(?=$|[\s:.,;!?])|sosyal\s+hareket(?:i|ini)\s+seç(?=$|[\s:.,;!?])|(?:tepki|soru|görüş|şaka)[^\n]{0,80}(?:tepki|soru|görüş|şaka))/iu;
 
 const NON_SOCIAL_BEHAVIOR_CLASSES = new Set<KairaPromptAuthorityClass>([
   "epistemic_authority",
