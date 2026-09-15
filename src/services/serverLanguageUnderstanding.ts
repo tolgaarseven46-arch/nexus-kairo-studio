@@ -91,7 +91,7 @@ export function reconcileServerCanonicalSemantics(
 
   const recallGrounded =
     interpretation.primaryIntent === "question" ||
-    interpretation.propositions.some((proposition) => proposition.modality === "question") ||
+    interpretation.propositions?.some((proposition) => proposition.modality === "question") ||
     interpretation.worldMemory?.query != null ||
     interpretation.discourseFacets.selfMemoryQuery != null;
   const removeUngroundedRecall =
