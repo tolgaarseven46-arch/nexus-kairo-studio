@@ -5,6 +5,7 @@ import { normalizeDroitPersonality } from "./droitPersonalityNormalizer";
 import { projectSemanticEventToDialogueAnalysis } from "./kairaDialogueTurnProjection";
 import { deriveDiscourseState, buildDiscourseObservationalInstruction } from "./discourseStateReducer";
 import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
+import { buildDialogueBoardInstruction } from "./kairoDialogueChaosEngine";
 import { computeKairoSpeechIdentity, speechIdentityPrompt } from "./kairoSpeechIdentity";
 import { buildKairaResponsePlan } from "./kairaResponsePlan";
 import {
@@ -78,15 +79,11 @@ const DEFAULT_STATE: DroitDynamicState = {
   lastStatus: "Sakin ve kontrollü",
 };
 
-function initialDynamicStateFrom(
-  seed?: Partial<DroitDynamicState>,
-): DroitDynamicState {
+function initialDynamicStateFrom(seed?: Partial<DroitDynamicState>): DroitDynamicState {
   return {
     ...DEFAULT_STATE,
     ...seed,
-    ...(seed?.relationship
-      ? { relationship: { ...seed.relationship } }
-      : {}),
+    ...(seed?.relationship ? { relationship: { ...seed.relationship } } : {}),
   };
 }
 
@@ -113,9 +110,7 @@ function promptFactProvenance(event: any) {
   }));
 }
 
-function buildSessionWorkingMemory(
-  history: Array<{ sender: string; text: string }>,
-) {
+function buildSessionWorkingMemory(history: Array<{ sender: string; text: string }>) {
   if (!history.length) {
     return "PHASE-0 SESSION HISTORY:\nSTATUS=empty\nNo prior generated assistant turns exist; only actual user turns are authoritative.";
   }
@@ -133,6 +128,7 @@ function buildCoreFinalProviderPrompt(input: {
   speech: any;
   discourse: any;
   dialogueDecision: any;
+  dialogueInstruction: string;
   trace: any;
   dynamicState: DroitDynamicState;
   interpretation: SemanticInterpretation;
@@ -140,7 +136,6 @@ function buildCoreFinalProviderPrompt(input: {
   worldEvent: any;
   selfMemoryInstruction: string;
   sessionWorkingMemory: string;
-  userMessage: string;
 }) {
   const relationship = input.trace.relationship;
   const observational = buildCanonicalObservationalContext({
@@ -168,7 +163,7 @@ function buildCoreFinalProviderPrompt(input: {
     worldReasoningPolicyInstruction: "",
     epistemicInstruction: "",
     selfMemoryInstruction: input.selfMemoryInstruction,
-    dialogueInstruction: `CURRENT USER TURN: ${input.userMessage}`,
+    dialogueInstruction: input.dialogueInstruction,
     discourseInstruction: buildDiscourseObservationalInstruction(input.discourse),
     dialogueDecisionInstruction: buildCanonicalDialogueMoveContext(
       input.dialogueDecision.move,
@@ -216,6 +211,12 @@ export async function runKairaPreAiPhase0Scenario(
     });
     const before = dynamicState;
     const dialogueAnalysis = projectSemanticEventToDialogueAnalysis(language.event);
+    const dialogueInstruction = buildDialogueBoardInstruction(
+      history as any,
+      userMessage,
+      "Mert",
+      dialogueAnalysis,
+    );
     const discourse = deriveDiscourseState(history, { message: userMessage, event: language.event });
     const dialogueDecision = planDialogueResponse(
       history as any,
@@ -252,6 +253,7 @@ export async function runKairaPreAiPhase0Scenario(
       speech,
       discourse,
       dialogueDecision,
+      dialogueInstruction,
       trace: kdm.trace,
       dynamicState,
       interpretation: language.interpretation,
@@ -259,7 +261,6 @@ export async function runKairaPreAiPhase0Scenario(
       worldEvent: language.worldEvent,
       selfMemoryInstruction: selfAuthority?.instruction || selfMemoryRuntime.instruction,
       sessionWorkingMemory: buildSessionWorkingMemory(history),
-      userMessage,
     });
     const audit = auditKairaFinalProviderPrompt({
       scenarioId: scenario.scenarioId,
@@ -332,7 +333,8 @@ export async function runKairaPreAiPhase0Scenario(
       "history_fidelity=user_turns_only_until_generation_phase",
       "prompt_assembly=shared_production_final_provider_serializer",
       "prompt_serializer_byte_parity=proven_shared_function",
-      "prompt_context_fidelity=deterministic_phase0_subset_not_full_production_runtime",
+      "dialogue_board_surface=shared_production_projection",
+      "prompt_context_fidelity=deterministic_phase0_subset_with_production_dialogue_board",
       "detector_snapshots=typed_runtime_outputs_only",
       "a_cluster_authority_facets=typed_runtime_or_explicit_unavailable",
       "session_provenance=actual_phase0_user_turn_history",
