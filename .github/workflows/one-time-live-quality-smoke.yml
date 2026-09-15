@@ -53,11 +53,15 @@ jobs:
                       return response.status, json.loads(response.read().decode("utf-8"))
               except urllib.error.HTTPError as exc:
                   body = exc.read().decode("utf-8", errors="replace")
-                  print(f"HTTP_ERROR {exc.code}: {body}")
-                  raise
+                  try:
+                      parsed = json.loads(body)
+                  except Exception:
+                      parsed = {"error": body}
+                  return exc.code, parsed
 
+          failures = []
           for scenario_index, (name, messages) in enumerate(scenarios, 1):
-              user_id = f"flash_lite_quality_{name}_20260915"
+              user_id = f"flash_lite_quality_{name}_20260915_b"
               session_id = f"session_{user_id}_{int(time.time())}"
               history = []
               print(f"=== SCENARIO {scenario_index}: {name} ===")
@@ -74,21 +78,39 @@ jobs:
                   }
                   status, result = post(payload)
                   reply = str(result.get("reply") or "").strip()
-                  plan = result.get("kdm", {}).get("responsePlan")
-                  semantic = result.get("kdm", {}).get("semanticEvent")
                   print(f"TURN {turn_index}")
                   print(f"USER: {message}")
+                  print(f"HTTP_STATUS: {status}")
+                  if status != 200:
+                      error_text = str(result.get("error") or result)
+                      print(f"DELIVERY_REJECTED: {error_text}")
+                      print("---")
+                      failures.append({"scenario": name, "turn": turn_index, "message": message, "status": status, "error": error_text})
+                      break
+
+                  plan = result.get("kdm", {}).get("responsePlan")
+                  semantic_event = result.get("kdm", {}).get("semanticEvent")
+                  semantic_interpretation = result.get("semanticInterpretation") or result.get("metadata", {}).get("semanticInterpretation")
                   print(f"TRANSPORT_PROVIDER: {result.get('providerUsed')}")
                   print(f"MODEL_ROUTE: {expected_model}")
                   print(f"KAIRA: {reply}")
                   print(f"CONSISTENCY_ACCEPTED: {result.get('consistency', {}).get('accepted')}")
                   print(f"RESPONSE_PLAN: {json.dumps(plan, ensure_ascii=False)}")
-                  print(f"SEMANTIC_EVENT: {json.dumps(semantic, ensure_ascii=False)}")
+                  print(f"SEMANTIC_EVENT: {json.dumps(semantic_event, ensure_ascii=False)}")
                   print("---")
-                  if status != 200 or not reply:
-                      raise SystemExit(f"{name} turn {turn_index} failed: status={status}, reply={reply!r}")
-                  history.append({"sender": "user", "text": message, "participantName": "Tolga"})
+                  if not reply:
+                      failures.append({"scenario": name, "turn": turn_index, "message": message, "status": status, "error": "empty_reply"})
+                      break
+
+                  history.append({
+                      "sender": "user",
+                      "text": message,
+                      "participantName": "Tolga",
+                      **({"semanticInterpretation": semantic_interpretation} if semantic_interpretation else {}),
+                  })
                   history.append({"sender": "kaira", "text": reply})
 
+          print("=== MATRIX SUMMARY ===")
+          print(json.dumps({"failures": failures, "failureCount": len(failures)}, ensure_ascii=False, indent=2))
           print("LIVE_GEMINI_FLASH_LITE_MATRIX_COMPLETE")
           PY
