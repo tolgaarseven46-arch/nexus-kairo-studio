@@ -81,10 +81,10 @@ describe("Kaira complex dialogue engine", () => {
     expect(instruction).toContain("maaş");
     expect(instruction).toContain("maça");
     expect(instruction).toContain("Mert: [correction");
-    expect(instruction).toContain("Birden fazla konu dalı açık kalabilir");
     expect(instruction).toContain(
-      "Her ayrıntıya cevap vermek zorunda değilsin",
+      "Birden fazla konu dalının aynı anda açık olması mümkündür",
     );
+    expect(instruction).toContain("sosyal hareket seçmez");
   });
 
   it("keeps the claim source separate from the person doing the action", () => {

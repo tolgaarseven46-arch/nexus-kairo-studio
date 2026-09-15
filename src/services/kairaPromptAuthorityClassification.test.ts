@@ -97,7 +97,7 @@ describe("typed prompt authority classification", () => {
       responsePlanInstruction: "allowQuestion=yasak",
     }));
     expect(blocks.find((block) => block.id === "speechIdentityInstruction")?.authorityClass).toBe("how_style");
-    expect(blocks.find((block) => block.id === "dialogueInstruction")?.authorityClass).toBe("mixed_unresolved");
+    expect(blocks.find((block) => block.id === "dialogueInstruction")?.authorityClass).toBe("observational_evidence");
     expect(blocks.find((block) => block.id === "responsePlanInstruction")?.authorityClass).toBe("social_behavior_authority");
   });
 
