@@ -45,6 +45,9 @@ jobs:
       - name: Beta conversation acceptance + captured KNT replay
         run: node scripts/run-beta-conversation-acceptance.mjs
 
+      - name: Seeded complex conversation acceptance
+        run: npx vitest run src/services/kairaSeededComplexConversationLongSessionRegression.test.ts
+
       - name: Validate behavior bug-class proof manifest
         run: node scripts/validate-behavior-regression-proof.mjs
 
