@@ -1,76 +1,124 @@
 # Kaira Phase 0 — Authority Graph
 
-This is the gate diagram for Phase 1. It distinguishes canonical truth, evidence, state, policy compression, final behavior authority, HOW, assembly and verification.
+This is the gate diagram for Phase 1. It distinguishes canonical truth, evidence, state, epistemic/world authority, final social-behavior authority, HOW, assembly and verification.
 
 ```mermaid
 flowchart LR
-  RAW[Raw Input] --> SG[Semantic Gateway\nCANONICAL TRUTH]
+  RAW[Raw Input] --> SG[Semantic Gateway]
   SG --> SEM[SemanticInterpretation@2\nCANONICAL SEMANTIC AUTHORITY]
 
-  SEM --> EVID[Entity / World / Discourse / Memory Evidence\nEVIDENCE / GROUNDING]
-  EVID --> APP[Social / World Appraisal\nDERIVED EVIDENCE]
-  SEM --> APP
+  SEM --> ENT[Entity Resolution\nIDENTITY/TARGET GROUNDING]
+  SEM --> WORLD[Canonical World Event\nEVENT TRUTH]
+  SEM --> DISC[Discourse State\nOBSERVATIONAL]
+  SEM --> SELF[Self-Memory Query]
+  SEM --> KNOW[Knowledge Query]
 
-  APP --> KDM[KDM\nSTATE TRANSITION OWNER]
+  WORLD --> WM[World Retrieval\nEVIDENCE]
+  WM --> WAPP[World State Appraisal\nWORLD EVIDENCE POSTURE]
+  WAPP --> WRP[World Reasoning Policy\nEPISTEMIC/WORLD AUTHORITY]
+  KNOW --> EPI[Epistemic Gate\nKNOWLEDGE AUTHORITY]
+  SELF --> SM[Autobiographical Recall\nSELF-EPISTEMIC AUTHORITY/EVIDENCE]
+
+  SEM --> KDM[KDM\nSTATE TRANSITION OWNER]
+  WORLD --> KDM
+  SM --> KDM
   KDM --> REL[Relationship State\nSOCIAL STATE]
   KDM --> DYN[Dynamic State\nAFFECT STATE]
 
-  REL --> BC[BehaviorContract\nPOLICY COMPRESSION]
+  SEM --> DD[DialogueDecision\nDIALOGUE OBLIGATION / MOVE]
+  DISC --> DD
+
+  REL --> BC[BehaviorContract\nSTATE/POLICY ELIGIBILITY]
   DYN --> BC
   SEM --> BC
+  BC --> HC[HardConstraints\nDEONTIC GATE]
 
-  SEM --> DD[DialogueDecision\nDIALOGUE OBLIGATION / MOVE]
-  EVID --> DD
-
-  BC --> RP[KairaResponsePlan\nSINGLE WHAT / WHETHER AUTHORITY]
+  HC --> RP[KairaResponsePlan\nSINGLE SOCIAL WHAT/WHETHER AUTHORITY]
   DD --> RP
 
-  REL --> HOW[Speech Identity\nHOW ONLY]
+  REL --> HOW[Speech Identity\nINTENDED HOW — MIXED TODAY]
   DYN --> HOW
 
-  RP --> REAL[Realization Paths]
-  HOW --> REAL
-  EVID --> REAL
+  RP --> VAR[Bounded Expression Variation\nINTENDED SUBORDINATE — MIXED TODAY]
+  HOW --> VAR
 
-  REAL --> LOCAL[Local Reply\nTBD realization authority]
-  REAL --> PROMPT[Prompt Blocks\nTBD typed authority metadata]
-  PROMPT --> SER[Final Prompt Serializer\nASSEMBLY ONLY]
+  ENT --> PB[Prompt Blocks]
+  WORLD --> PB
+  DISC --> PB
+  WRP --> PB
+  EPI --> PB
+  SM --> PB
+  RP --> PB
+  HOW --> PB
+  VAR --> PB
+
+  PB --> MIX[CURRENT MIXED PROMPT SURFACES\nDialogue Board / socialStyle / HOW directives]
+  MIX --> SER[Final Prompt Serializer\nASSEMBLY ONLY]
   SER --> MODEL[Provider]
-  MODEL --> REPAIR[Repair / Fallback\nTBD realization authority]
+
+  RP --> LOCAL[Local Language Engine\nREALIZATION-ONLY conceptually]
+  LOCAL --> GUARD[Canonical Guards / Delivery]
+  MODEL --> REPAIR[Repair Realization\nUNTYPED EXTENSION TODAY]
+  REPAIR --> GUARD
+  MODEL --> DF[Deterministic Fallback if needed\nPLAN-PRESERVING expected]
+  DF --> GUARD
 
   RP --> AUDIT[Pre/Post Audits\nVERIFICATION ONLY]
-  PROMPT --> AUDIT
+  PB --> AUDIT
   LOCAL --> AUDIT
   REPAIR --> AUDIT
-
+  DF --> AUDIT
   AUDIT --> KNT[KNT\nOBSERVABILITY ONLY]
 ```
 
 ## Frozen authority rules
-1. `SemanticInterpretation@2` owns canonical message meaning.
+1. `SemanticInterpretation@2` owns canonical current-message meaning.
 2. Entity/world/discourse/memory layers may add grounding/evidence but may not manufacture a competing semantic truth downstream.
-3. KDM owns dynamic/relationship state transition, not raw semantic reinterpretation.
-4. `BehaviorContract` compresses policy/state into permissions; it is not the final realizer instruction surface.
-5. `DialogueDecision` owns dialogue obligation/move selection, subject to realizability by final permissions.
-6. `KairaResponsePlan` is the intended single WHAT/WHETHER behavior authority.
-7. Speech identity is HOW-only and may not widen permissions.
-8. Final prompt serializer owns assembly only.
-9. Audit and KNT are non-authoritative.
+3. World/epistemic authorities may constrain factual certainty without becoming social-behavior authorities.
+4. KDM owns dynamic/relationship state transition, not raw semantic reinterpretation.
+5. `BehaviorContract` owns state/policy eligibility; `HardConstraints` converts this into hard deontic gates.
+6. `DialogueDecision` owns dialogue obligation/move selection.
+7. `KairaResponsePlan` owns the final social WHAT/WHETHER decision for the turn.
+8. Speech/language style may control HOW only and may not widen or reverse ResponsePlan permissions.
+9. Final prompt serializer owns assembly only.
+10. Audit and KNT are non-authoritative.
 
-## Phase 0 unresolved boundaries
-These require ownership audit before Phase 1 implementation:
-- `BehaviorContract.forgivenessGranted` vs `KairaResponsePlan.allowForgiveness`: owner vs projection must be explicit.
-- Controlled Spontaneity: must be classified as HOW-only or plan-owned projection; it may not silently become a second WHAT authority.
-- Local language reply: must be proven to realize the canonical plan, not decide around it.
-- Repair prompt: must repair realization errors without reopening forbidden decisions.
-- Deterministic fallback: must be a plan-preserving fallback, not an independent behavior planner.
-- Prompt blocks: current string-only shape cannot mechanically express authority classes; this is a confirmed structural gap for Phase 1.
+## Resolved Phase 0 ownership questions
+
+### Forgiveness
+Resolved as staged refinement rather than duplicate ownership:
+
+```text
+Relationship/KDM
+ -> BehaviorContract.forgivenessGranted
+ -> HardConstraints.forgivenessAllowed
+ -> PlanResolver
+ -> ResponsePlan.allowForgiveness
+```
+
+### Local language path
+Conceptually realization-only: it consumes shared SemanticEvent, DialogueDecision and ResponsePlan and is guarded before delivery. Phase 1 still needs a mechanical no-widening contract.
+
+### Activity-permission UI
+Resolved non-bypass: structured activity permission prompt is returned separately; reply composer returns the canonical reply text unchanged.
+
+## Confirmed authority problems entering mandatory red-team
+1. Controlled Spontaneity reparses prior raw text with `interpretSemanticEvent` while selecting a topic nudge.
+2. SpeechIdentity contains relationship-behavior constraints despite HOW-only labeling.
+3. Production Dialogue Board tells the realizer to choose social moves and ask clarification.
+4. `server.ts` socialStyle mixes HOW with behavior policy.
+5. Repair instruction is appended after final prompt assembly without typed authority classification.
+6. Conversation grounding reparses raw history/message for uncertainty/judgment policy.
+7. Prompt parts are string-only; authority classes are not mechanically expressible.
 
 ## Phase 1 prerequisite
-No Phase 1 code change starts until every `TBD` above is resolved as one of:
-- canonical authority,
+Phase 1 may begin only after architecture red-team reviews the confirmed trigger set and Phase 0 freezes each mixed surface as one of:
+- canonical/domain authority,
 - projection,
 - evidence,
 - HOW,
+- realization,
 - assembly,
 - verification.
+
+No Phase 1 implementation may introduce a new authority class not present on this graph without reopening the Phase 0 authority decision.
