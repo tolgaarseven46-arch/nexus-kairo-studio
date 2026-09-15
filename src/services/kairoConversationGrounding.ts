@@ -1,4 +1,6 @@
 import type { SemanticInterpretation } from "../types/semanticInterpretation";
+import { isSemanticInterpretation } from "./semanticInterpretationSchema";
+
 export interface ConversationTurn {
   sender?: string;
   text?: string;
@@ -96,18 +98,6 @@ const JUDGMENT_REQUEST_RE =
 const UNSOLICITED_VERDICT_RE =
   /(?:%\s*\d+[^.!?\n]{0,30}haklı(?![\p{L}])|(?<![\p{L}])(?:aşırı\s+)?haklı(?:ydın|sın|ydı|ydılar|dır)?(?![\p{L}])(?!\s+(?:dedin|dedi|demiş|diye))|(?<![\p{L}])haksız(?:dın|sın|dı|dır)?(?![\p{L}])(?!\s+(?:dedin|dedi|demiş|diye)))/iu;
 
-function userEvidence(
-  history: ConversationTurn[],
-  userMessage: string,
-): string[] {
-  return [
-    ...history
-      .filter((turn) => turn?.sender === "user")
-      .map((turn) => String(turn.text || "")),
-    userMessage,
-  ].filter(Boolean);
-}
-
 function meaningfulTokens(text: string): string[] {
   const stop = new Set([
     "bu",
@@ -132,17 +122,29 @@ function meaningfulTokens(text: string): string[] {
     .filter((token) => token.length >= 3 && !stop.has(token));
 }
 
-function relevantUncertainEvidence(
+function historicalUncertainEvidence(
   history: ConversationTurn[],
   userMessage: string,
 ): string[] {
   const queryTokens = meaningfulTokens(userMessage);
-  return userEvidence(history, userMessage).filter((text) => {
-    if (!UNCERTAINTY_RE.test(text)) return false;
-    if (text === userMessage) return true;
-    const evidenceTokens = meaningfulTokens(text);
-    return queryTokens.some((token) => evidenceTokens.includes(token));
-  });
+  return history
+    .filter((turn) => turn?.sender === "user")
+    .flatMap((turn) => {
+      if (!isSemanticInterpretation(turn.semanticInterpretation)) return [];
+      if ((turn.semanticInterpretation.uncertainty?.overall ?? 0) <= 0) return [];
+      const text = String(turn.text || "");
+      const evidenceTokens = meaningfulTokens(text);
+      return queryTokens.some((token) => evidenceTokens.includes(token)) ? [text] : [];
+    });
+}
+
+function relevantUncertainEvidence(
+  history: ConversationTurn[],
+  userMessage: string,
+): string[] {
+  const historical = historicalUncertainEvidence(history, userMessage);
+  const current = UNCERTAINTY_RE.test(userMessage) ? [userMessage] : [];
+  return [...historical, ...current];
 }
 
 export function buildKairoGroundingInstruction(
