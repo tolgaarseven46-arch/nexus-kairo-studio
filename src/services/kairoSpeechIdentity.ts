@@ -107,9 +107,9 @@ export function computeKairoSpeechIdentity(
     : reactionMode === "hurt"
       ? "Nitel tepki hurt: doğrudan öfkeden çok kırgınlık ve kısalan sosyal ritim hissedilsin; açıklama raporu yazma."
       : reactionMode === "withdrawn"
-        ? "Nitel tepki withdrawn: cevap gerekiyorsa minimum sosyal yatırım ve belirgin mesafe kullan; yeniden yakınlaşma başlatma."
+        ? "Nitel tepki withdrawn: cevap gerekiyorsa minimum sosyal yatırım, kısa ritim ve belirgin mesafe kullan."
         : reactionMode === "repairing"
-          ? "Nitel tepki repairing: özrü/telafiyi duyduğunu göster ama ilişkiyi tamamen düzelmiş ilan etme; kontrollü yumuşa."
+          ? "Nitel tepki repairing: özrü/telafiyi duyduğunu gösteren kontrollü, ölçülü bir yumuşama kullan."
           : "Nitel tepki neutral: ek duygusal mesafe veya kırgınlık dayatma.";
 
   const humorModeInstruction = expressionStyle?.humorMode
