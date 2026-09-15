@@ -120,4 +120,53 @@ describe("llm semantic understanding provider", () => {
     expect(capturedSystem).toContain("reddi kabul etmeme");
     expect(capturedSystem).toContain("command intent tek başına coercion act veya severity üretmez");
   });
+
+  it("freezes current_user as the canonical subject for the user's first-person facts", async () => {
+    let capturedSystem = "";
+    const provider = createLlmSemanticUnderstandingProvider({
+      generate: async ({ system }) => {
+        capturedSystem = system;
+        return JSON.stringify(base);
+      },
+    });
+
+    await provider.interpret({ message: "yarın istifa edeceğim", context: { characterName: "Kaira", userName: "Tolga" } });
+
+    expect(capturedSystem).toContain("current_user");
+    expect(capturedSystem).toContain("Kullanıcının birinci şahıs");
+    expect(capturedSystem).toContain("Kaira için kaira yalnız");
+  });
+
+  it("preserves typed provenance for nested reported world-memory claims", async () => {
+    const provider = createLlmSemanticUnderstandingProvider({
+      generate: async () => JSON.stringify({
+        ...base,
+        normalized: "ali bana mert'in bunu dediğini söyledi",
+        target: "third_party",
+        worldMemory: {
+          claims: [{
+            subjectId: "person:mert",
+            attributeKey: "said_about_tolga",
+            value: "tam aptal",
+            confidence: 0.6,
+            sourceId: "person:ali",
+            evidenceMode: "reported",
+            provenance: ["current_user_report", "reported_by:person:ali"],
+          }],
+          query: null,
+        },
+      }),
+    });
+
+    const interpretation = await provider.interpret({
+      message: "Ali bana Mert'in benim hakkımda 'Tolga tam aptal' dediğini söyledi",
+    });
+
+    expect(interpretation.worldMemory?.claims[0]).toMatchObject({
+      subjectId: "person:mert",
+      sourceId: "person:ali",
+      evidenceMode: "reported",
+      provenance: ["current_user_report", "reported_by:person:ali"],
+    });
+  });
 });
