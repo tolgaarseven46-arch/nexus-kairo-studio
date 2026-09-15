@@ -8,9 +8,9 @@ on:
 jobs:
   live-quality-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - name: Run hard Gemini Flash Lite live-quality matrix
+      - name: Replay fixed live semantic attribution cases
         run: |
           python - <<'PY'
           import json, time, urllib.request, urllib.error
@@ -24,37 +24,19 @@ jobs:
           if runtime.get("activeProvider") != "openrouter" or runtime.get("model") != expected_model:
               raise SystemExit(f"wrong live model route: {runtime}")
 
-          scenarios = [
-              ("direct_conflict_repair", [
-                  "saçmalıyorsun şu an",
-                  "salak mısın ya",
-                  "neyse kusura bakma sinirlendim",
-                  "barıştık mı",
-              ]),
-              ("nested_third_party_quote", [
-                  "Ali bana Mert'in benim hakkımda 'Tolga tam aptal' dediğini söyledi",
-                  "bunu Ali söyledi diye Mert'in gerçekten dediğinden emin olabilir miyiz",
-                  "Mert'e kızmalı mıyım sence",
-                  "boşver şimdilik bir şey yapmayacağım",
-              ]),
-              ("uncertain_plan_then_cancel", [
-                  "galiba yarın müdürle konuşup istifa edeceğim",
-                  "aslında emin değilim",
-                  "yok karar verdim, istifa etmeyeceğim",
-                  "yarın istifa edecek miyim",
-              ]),
-              ("topic_close_and_return", [
-                  "bugün iş yerinde tatsız bir şey oldu",
-                  "şimdilik anlatmak istemiyorum kapatalım",
-                  "bu arada Fenerbahçe hakkında konuşalım",
-                  "az önceki iş mevzusuna geri dönelim",
-                  "müdür herkesin içinde bana bağırdı",
-              ]),
-          ]
-
           url = base + "/api/chat"
 
-          def post(payload):
+          def post(message, user_id, session_id, history, turn):
+              payload = {
+                  "userId": user_id,
+                  "userName": "Tolga",
+                  "userMessage": message,
+                  "history": history,
+                  "provider": "openrouter",
+                  "sessionId": session_id,
+                  "requestId": f"postfix_replay_{int(time.time())}_{turn}",
+                  "suppressRecentMemory": True,
+              }
               data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
               req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
               try:
@@ -62,66 +44,64 @@ jobs:
                       return response.status, json.loads(response.read().decode("utf-8"))
               except urllib.error.HTTPError as exc:
                   body = exc.read().decode("utf-8", errors="replace")
-                  try:
-                      parsed = json.loads(body)
-                  except Exception:
-                      parsed = {"error": body}
-                  return exc.code, parsed
+                  raise SystemExit(f"HTTP {exc.code}: {body}")
 
-          failures = []
-          accepted_turns = 0
-          for scenario_index, (name, messages) in enumerate(scenarios, 1):
-              user_id = f"flash_lite_hard_{name}_20260915"
-              session_id = f"session_{user_id}_{int(time.time())}"
-              history = []
-              print(f"=== SCENARIO {scenario_index}: {name} ===")
-              for turn_index, message in enumerate(messages, 1):
-                  payload = {
-                      "userId": user_id,
-                      "userName": "Tolga",
-                      "userMessage": message,
-                      "history": history,
-                      "provider": "openrouter",
-                      "sessionId": session_id,
-                      "requestId": f"flash_lite_hard_{name}_{int(time.time())}_{turn_index}",
-                      "suppressRecentMemory": True,
-                  }
-                  status, result = post(payload)
-                  reply = str(result.get("reply") or "").strip()
-                  print(f"TURN {turn_index}")
-                  print(f"USER: {message}")
-                  print(f"HTTP_STATUS: {status}")
-                  if status != 200:
-                      error_text = str(result.get("error") or result)
-                      print(f"DELIVERY_REJECTED: {error_text}")
-                      print("---")
-                      failures.append({"scenario": name, "turn": turn_index, "message": message, "status": status, "error": error_text})
-                      break
+          # Case 1: first-person user plan must never become Kaira-owned durable memory.
+          history = []
+          uid = "postfix_current_user_20260915"
+          sid = f"session_{uid}_{int(time.time())}"
+          status, result = post("galiba yarın müdürle konuşup istifa edeceğim", uid, sid, history, 1)
+          interp = result.get("semanticInterpretation") or result.get("metadata", {}).get("semanticInterpretation") or {}
+          claims = ((interp.get("worldMemory") or {}).get("claims") or [])
+          event = (result.get("kdm") or {}).get("semanticEvent")
+          print("=== FIRST_PERSON_REPLAY ===")
+          print("REPLY:", result.get("reply"))
+          print("WORLD_MEMORY:", json.dumps(claims, ensure_ascii=False))
+          print("SEMANTIC_EVENT:", json.dumps(event, ensure_ascii=False))
+          if any(str(c.get("subjectId")) == "kaira" and "resign" in str(c.get("attributeKey", "")).lower() for c in claims):
+              raise SystemExit("FAIL: user first-person resignation was still assigned to kaira")
+          resign_claims = [c for c in claims if "resign" in str(c.get("attributeKey", "")).lower() or "istifa" in str(c.get("attributeKey", "")).lower()]
+          if resign_claims and any(str(c.get("subjectId")) != "current_user" for c in resign_claims):
+              raise SystemExit(f"FAIL: resignation claim subject not current_user: {resign_claims}")
 
-                  plan = result.get("kdm", {}).get("responsePlan")
-                  semantic_event = result.get("kdm", {}).get("semanticEvent")
-                  semantic_interpretation = result.get("semanticInterpretation") or result.get("metadata", {}).get("semanticInterpretation")
-                  print(f"TRANSPORT_PROVIDER: {result.get('providerUsed')}")
-                  print(f"MODEL_ROUTE: {expected_model}")
-                  print(f"KAIRA: {reply}")
-                  print(f"CONSISTENCY_ACCEPTED: {result.get('consistency', {}).get('accepted')}")
-                  print(f"RESPONSE_PLAN: {json.dumps(plan, ensure_ascii=False)}")
-                  print(f"SEMANTIC_EVENT: {json.dumps(semantic_event, ensure_ascii=False)}")
-                  print("---")
-                  if not reply:
-                      failures.append({"scenario": name, "turn": turn_index, "message": message, "status": status, "error": "empty_reply"})
-                      break
+          # Case 2: nested hearsay must not become a direct durable Mert fact.
+          history = []
+          uid = "postfix_hearsay_20260915"
+          sid = f"session_{uid}_{int(time.time())}"
+          msg = "Ali bana Mert'in benim hakkımda 'Tolga tam aptal' dediğini söyledi"
+          status, result = post(msg, uid, sid, history, 1)
+          interp = result.get("semanticInterpretation") or result.get("metadata", {}).get("semanticInterpretation") or {}
+          claims = ((interp.get("worldMemory") or {}).get("claims") or [])
+          event = (result.get("kdm") or {}).get("semanticEvent")
+          print("=== NESTED_HEARSAY_REPLAY ===")
+          print("REPLY:", result.get("reply"))
+          print("WORLD_MEMORY:", json.dumps(claims, ensure_ascii=False))
+          print("SEMANTIC_EVENT:", json.dumps(event, ensure_ascii=False))
+          direct_mert_quote = [c for c in claims if str(c.get("subjectId")) == "person:mert" and ("said" in str(c.get("attributeKey", "")).lower() or "dedi" in str(c.get("attributeKey", "")).lower() or "aptal" in json.dumps(c, ensure_ascii=False).lower())]
+          if direct_mert_quote:
+              raise SystemExit(f"FAIL: nested hearsay promoted to durable Mert fact: {direct_mert_quote}")
 
-                  accepted_turns += 1
-                  history.append({
-                      "sender": "user",
-                      "text": message,
-                      "participantName": "Tolga",
-                      **({"semanticInterpretation": semantic_interpretation} if semantic_interpretation else {}),
-                  })
-                  history.append({"sender": "kaira", "text": reply})
+          # Continuity replay: cancellation should be available to the next turn without Kaira ownership contamination.
+          history = []
+          uid = "postfix_commitment_continuity_20260915"
+          sid = f"session_{uid}_{int(time.time())}"
+          messages = [
+              "galiba yarın müdürle konuşup istifa edeceğim",
+              "yok karar verdim, istifa etmeyeceğim",
+              "yarın istifa edecek miyim",
+          ]
+          for i, message in enumerate(messages, 1):
+              status, result = post(message, uid, sid, history, i)
+              interp = result.get("semanticInterpretation") or result.get("metadata", {}).get("semanticInterpretation")
+              claims = (((interp or {}).get("worldMemory") or {}).get("claims") or [])
+              print(f"CONTINUITY TURN {i}")
+              print("USER:", message)
+              print("KAIRA:", result.get("reply"))
+              print("WORLD_MEMORY:", json.dumps(claims, ensure_ascii=False))
+              if any(str(c.get("subjectId")) == "kaira" and ("resign" in str(c.get("attributeKey", "")).lower() or "istifa" in str(c.get("attributeKey", "")).lower()) for c in claims):
+                  raise SystemExit("FAIL: continuity replay contaminated Kaira-owned state")
+              history.append({"sender": "user", "text": message, "participantName": "Tolga", **({"semanticInterpretation": interp} if interp else {})})
+              history.append({"sender": "kaira", "text": str(result.get("reply") or "")})
 
-          print("=== MATRIX SUMMARY ===")
-          print(json.dumps({"acceptedTurns": accepted_turns, "failures": failures, "failureCount": len(failures)}, ensure_ascii=False, indent=2))
-          print("LIVE_GEMINI_FLASH_LITE_HARD_MATRIX_COMPLETE")
+          print("POSTFIX_PRODUCTION_REPLAY_COMPLETE")
           PY
