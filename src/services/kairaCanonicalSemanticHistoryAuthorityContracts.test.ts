@@ -31,6 +31,7 @@ describe("canonical historical semantic authority", () => {
 
   it("structurally forbids historical reparse and wires v2 snapshot transport + persistence", () => {
     const discourse = readFileSync("src/services/discourseStateReducer.ts", "utf8");
+    const spontaneity = readFileSync("src/services/kairaControlledSpontaneity.ts", "utf8");
     const chat = readFileSync("src/services/droitChatService.ts", "utf8");
     const persistence = readFileSync("src/services/kdmPersistenceService.ts", "utf8");
     const server = readFileSync("server.ts", "utf8");
@@ -38,6 +39,8 @@ describe("canonical historical semantic authority", () => {
 
     expect(discourse).not.toContain("interpretSemanticEvent(text)");
     expect(discourse).toContain("projectSemanticEvent(raw.semanticInterpretation)");
+    expect(spontaneity).not.toContain("interpretSemanticEvent");
+    expect(spontaneity).toContain("projectSemanticEvent(turn.semanticInterpretation)");
     expect(chat).toContain("semanticInterpretation: m.semanticInterpretation");
     expect(persistence).toContain("semanticInterpretation: turn.metadata?.semanticInterpretation");
     expect(server).toContain("semanticInterpretation: canonicalSemantic.interpretation");

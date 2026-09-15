@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { SemanticInterpretation, SemanticPrimaryIntent } from '../types/semanticInterpretation';
 import { decideKairaControlledSpontaneity } from './kairaControlledSpontaneity';
 
 const plan = (relationshipLevel: 'new' | 'familiar' | 'close' = 'close', overrides: any = {}) => ({
@@ -24,10 +25,68 @@ const state = (reactionMode = 'neutral') => ({
   relationship: { warmth: 80, trust: 80, conflictScore: 0, hurtScore: 0, familiarityDays: 40, interactionCount: 60 },
 }) as any;
 
+const semanticSnapshot = (
+  raw: string,
+  primaryIntent: SemanticPrimaryIntent = 'smalltalk',
+): SemanticInterpretation => ({
+  schemaVersion: 'semantic-interpretation@2',
+  raw,
+  normalized: raw.toLocaleLowerCase('tr-TR'),
+  primaryIntent,
+  secondarySocialActs: [],
+  target: 'unknown',
+  valence: 'neutral',
+  severity: {
+    disrespect: 0,
+    coercion: 0,
+    manipulation: 0,
+    privacy: 0,
+    aggression: 0,
+  },
+  jokingConfidence: 0,
+  sincerityConfidence: 1,
+  affection: 0,
+  support: 0,
+  compliment: 0,
+  emotionalLoad: 0,
+  apology: false,
+  repairAttempt: false,
+  stopRequest: false,
+  discourseFacets: {
+    socialRoutine: 'none',
+    discourseAct: 'none',
+    repairSignal: 'none',
+    adviceRequested: false,
+    knowledgeQuery: null,
+    selfMemoryQuery: null,
+    relationalAct: 'none',
+    relationalIntensity: 0,
+    stopQuestions: false,
+    stopTalking: false,
+  },
+  uncertainty: {
+    overall: 0,
+    intent: 0,
+    target: 0,
+    severity: 0,
+  },
+  evidence: [{ source: 'reconciled', cues: ['test_fixture'], confidence: 1 }],
+});
+
 const baseHistory: any[] = [
-  { sender: 'user', text: 'masayı çalışma odasına taşıdım sonunda', participantName: 'Tolga' },
+  {
+    sender: 'user',
+    text: 'masayı çalışma odasına taşıdım sonunda',
+    participantName: 'Tolga',
+    semanticInterpretation: semanticSnapshot('masayı çalışma odasına taşıdım sonunda'),
+  },
   { sender: 'droit', text: 'iyi olmuş ya', participantName: 'Kaira' },
-  { sender: 'user', text: 'bilgisayar kurulumu sonunda tamamlandı', participantName: 'Tolga' },
+  {
+    sender: 'user',
+    text: 'bilgisayar kurulumu sonunda tamamlandı',
+    participantName: 'Tolga',
+    semanticInterpretation: semanticSnapshot('bilgisayar kurulumu sonunda tamamlandı'),
+  },
 ];
 
 function selectedCount(level: 'new' | 'familiar' | 'close'): number {
@@ -51,8 +110,18 @@ describe('controlled spontaneity quality characterization', () => {
 
   it('does not immediately reuse a topic already echoed in recent Kaira replies', () => {
     const history: any[] = [
-      { sender: 'user', text: 'masayı çalışma odasına taşıdım sonunda', participantName: 'Tolga' },
-      { sender: 'user', text: 'bilgisayar kurulumu sonunda tamamlandı', participantName: 'Tolga' },
+      {
+        sender: 'user',
+        text: 'masayı çalışma odasına taşıdım sonunda',
+        participantName: 'Tolga',
+        semanticInterpretation: semanticSnapshot('masayı çalışma odasına taşıdım sonunda'),
+      },
+      {
+        sender: 'user',
+        text: 'bilgisayar kurulumu sonunda tamamlandı',
+        participantName: 'Tolga',
+        semanticInterpretation: semanticSnapshot('bilgisayar kurulumu sonunda tamamlandı'),
+      },
       { sender: 'droit', text: 'bilgisayar kurulumu tamamlandı iyi olmuş', participantName: 'Kaira' },
     ];
 
