@@ -500,7 +500,7 @@ export function buildDiscourseObservationalInstruction(state: DiscourseState): s
         ? "birden fazla açık kullanıcı-olay konusu"
         : "birden fazla açık konuşma konusu";
   lines.push(
-    `- Kullanıcının dönüş yapabileceği ${ambiguityLabel} var. Hangisini kastettiğini UYDURMA; gerekiyorsa kısa netleştirme iste.`,
+    `- Kullanıcının dönüş yapabileceği ${ambiguityLabel} var. Hangi konunun kastedildiği gözlemsel olarak belirsiz; bu yalnızca belirsizlik kanıtıdır ve davranış kararı içermez.`,
   );
 }
   if (state.selfRepeat) {
