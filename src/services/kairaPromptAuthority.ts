@@ -24,6 +24,31 @@ export interface KairaPromptAuthorityFinding {
   reason: string;
 }
 
+const FINAL_PROMPT_PART_AUTHORITY = {
+  runtimeIdentityInstruction: "identity_grounding",
+  speechIdentityInstruction: "how_style",
+  languageStyleMemoryInstruction: "how_style",
+  dyadicLanguageAlignmentInstruction: "how_style",
+  socialStyle: "mixed_unresolved",
+  groundingInstruction: "mixed_unresolved",
+  activeParticipantInstruction: "identity_grounding",
+  entityGroundingInstruction: "identity_grounding",
+  worldEventInstruction: "observational_evidence",
+  worldEventMemoryInstruction: "epistemic_authority",
+  worldStateAppraisalInstruction: "epistemic_authority",
+  worldReasoningPolicyInstruction: "epistemic_authority",
+  epistemicInstruction: "epistemic_authority",
+  selfMemoryInstruction: "epistemic_authority",
+  dialogueInstruction: "mixed_unresolved",
+  discourseInstruction: "observational_evidence",
+  dialogueDecisionInstruction: "observational_evidence",
+  responsePlanInstruction: "social_behavior_authority",
+  canonicalObservationalContext: "observational_evidence",
+  sessionWorkingMemory: "observational_evidence",
+  memoryContext: "observational_evidence",
+  tone: "how_style",
+} satisfies Record<keyof KairaFinalProviderPromptParts, KairaPromptAuthorityClass>;
+
 const SOCIAL_MOVE_SELECTION_RE =
   /(?:en\s+doğal\s+tek\s+sosyal\s+hareketi\s+seç|sosyal\s+hareket(?:i|ini)\s+seç|(?:tepki|soru|görüş|şaka)[^\n]{0,80}(?:tepki|soru|görüş|şaka))/iu;
 
@@ -116,32 +141,16 @@ export function auditKairaPromptAuthorityBlocks(
 /**
  * Typed inventory of the current production prompt parts. `mixed_unresolved`
  * is diagnostic metadata, not an excuse to move/clean content in this PR.
+ * The exhaustive `Record<keyof ...>` above makes any newly added serializer
+ * field fail TypeScript until an authority class is explicitly assigned.
  */
 export function classifyKairaFinalProviderPromptParts(
   parts: KairaFinalProviderPromptParts,
 ): KairaPromptAuthorityBlock[] {
-  return [
-    { id: "runtimeIdentityInstruction", authorityClass: "identity_grounding", content: parts.runtimeIdentityInstruction },
-    { id: "speechIdentityInstruction", authorityClass: "how_style", content: parts.speechIdentityInstruction },
-    { id: "languageStyleMemoryInstruction", authorityClass: "how_style", content: parts.languageStyleMemoryInstruction },
-    { id: "dyadicLanguageAlignmentInstruction", authorityClass: "how_style", content: parts.dyadicLanguageAlignmentInstruction },
-    { id: "socialStyle", authorityClass: "mixed_unresolved", content: parts.socialStyle },
-    { id: "groundingInstruction", authorityClass: "mixed_unresolved", content: parts.groundingInstruction },
-    { id: "activeParticipantInstruction", authorityClass: "identity_grounding", content: parts.activeParticipantInstruction },
-    { id: "entityGroundingInstruction", authorityClass: "identity_grounding", content: parts.entityGroundingInstruction },
-    { id: "worldEventInstruction", authorityClass: "observational_evidence", content: parts.worldEventInstruction },
-    { id: "worldEventMemoryInstruction", authorityClass: "epistemic_authority", content: parts.worldEventMemoryInstruction },
-    { id: "worldStateAppraisalInstruction", authorityClass: "epistemic_authority", content: parts.worldStateAppraisalInstruction },
-    { id: "worldReasoningPolicyInstruction", authorityClass: "epistemic_authority", content: parts.worldReasoningPolicyInstruction },
-    { id: "epistemicInstruction", authorityClass: "epistemic_authority", content: parts.epistemicInstruction },
-    { id: "selfMemoryInstruction", authorityClass: "epistemic_authority", content: parts.selfMemoryInstruction },
-    { id: "dialogueInstruction", authorityClass: "mixed_unresolved", content: parts.dialogueInstruction },
-    { id: "discourseInstruction", authorityClass: "observational_evidence", content: parts.discourseInstruction },
-    { id: "dialogueDecisionInstruction", authorityClass: "observational_evidence", content: parts.dialogueDecisionInstruction },
-    { id: "responsePlanInstruction", authorityClass: "social_behavior_authority", content: parts.responsePlanInstruction },
-    { id: "canonicalObservationalContext", authorityClass: "observational_evidence", content: parts.canonicalObservationalContext },
-    { id: "sessionWorkingMemory", authorityClass: "observational_evidence", content: parts.sessionWorkingMemory },
-    { id: "memoryContext", authorityClass: "observational_evidence", content: parts.memoryContext },
-    { id: "tone", authorityClass: "how_style", content: parts.tone },
-  ];
+  return (Object.keys(FINAL_PROMPT_PART_AUTHORITY) as Array<keyof KairaFinalProviderPromptParts>)
+    .map((id) => ({
+      id,
+      authorityClass: FINAL_PROMPT_PART_AUTHORITY[id],
+      content: parts[id],
+    }));
 }
