@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { SemanticInterpretation, SemanticPrimaryIntent } from '../types/semanticInterpretation';
 import {
   decideKairaControlledSpontaneity,
   kairaControlledSpontaneityInstruction,
@@ -35,10 +36,70 @@ const state = (reactionMode = 'neutral') => ({
   },
 }) as any;
 
+const semanticSnapshot = (
+  raw: string,
+  primaryIntent: SemanticPrimaryIntent,
+  overrides: Partial<SemanticInterpretation> = {},
+): SemanticInterpretation => ({
+  schemaVersion: 'semantic-interpretation@2',
+  raw,
+  normalized: raw.toLocaleLowerCase('tr-TR'),
+  primaryIntent,
+  secondarySocialActs: [],
+  target: 'unknown',
+  valence: 'neutral',
+  severity: {
+    disrespect: 0,
+    coercion: 0,
+    manipulation: 0,
+    privacy: 0,
+    aggression: 0,
+  },
+  jokingConfidence: 0,
+  sincerityConfidence: 1,
+  affection: 0,
+  support: 0,
+  compliment: 0,
+  emotionalLoad: 0,
+  apology: false,
+  repairAttempt: false,
+  stopRequest: false,
+  discourseFacets: {
+    socialRoutine: 'none',
+    discourseAct: 'none',
+    repairSignal: 'none',
+    adviceRequested: false,
+    knowledgeQuery: null,
+    selfMemoryQuery: null,
+    relationalAct: 'none',
+    relationalIntensity: 0,
+    stopQuestions: false,
+    stopTalking: false,
+  },
+  uncertainty: {
+    overall: 0,
+    intent: 0,
+    target: 0,
+    severity: 0,
+  },
+  evidence: [{ source: 'reconciled', cues: ['test_fixture'], confidence: 1 }],
+  ...overrides,
+});
+
 const history: any[] = [
-  { sender: 'user', text: 'dün bilgisayarı toparladım sonunda', participantName: 'Tolga' },
+  {
+    sender: 'user',
+    text: 'dün bilgisayarı toparladım sonunda',
+    participantName: 'Tolga',
+    semanticInterpretation: semanticSnapshot('dün bilgisayarı toparladım sonunda', 'smalltalk'),
+  },
   { sender: 'droit', text: 'iyi olmuş ya', participantName: 'Kaira' },
-  { sender: 'user', text: 'bugün de biraz iş güç işte', participantName: 'Tolga' },
+  {
+    sender: 'user',
+    text: 'bugün de biraz iş güç işte',
+    participantName: 'Tolga',
+    semanticInterpretation: semanticSnapshot('bugün de biraz iş güç işte', 'smalltalk'),
+  },
 ];
 
 describe('controlled spontaneity safety gates', () => {
@@ -100,9 +161,35 @@ describe('controlled spontaneity safety gates', () => {
 
   it('refuses sensitive/unsupported prior turns as spontaneous topic sources', () => {
     const unsafeHistory: any[] = [
-      { sender: 'user', text: 'salak mısın ya', participantName: 'Tolga' },
-      { sender: 'user', text: 'moralim çok bozuk bugün', participantName: 'Tolga' },
-      { sender: 'user', text: 'özür dilerim', participantName: 'Tolga' },
+      {
+        sender: 'user',
+        text: 'salak mısın ya',
+        participantName: 'Tolga',
+        semanticInterpretation: semanticSnapshot('salak mısın ya', 'insult', {
+          severity: {
+            disrespect: 0.9,
+            coercion: 0,
+            manipulation: 0,
+            privacy: 0,
+            aggression: 0.6,
+          },
+        }),
+      },
+      {
+        sender: 'user',
+        text: 'moralim çok bozuk bugün',
+        participantName: 'Tolga',
+        semanticInterpretation: semanticSnapshot('moralim çok bozuk bugün', 'emotional_share', {
+          valence: 'negative',
+          emotionalLoad: 0.8,
+        }),
+      },
+      {
+        sender: 'user',
+        text: 'özür dilerim',
+        participantName: 'Tolga',
+        semanticInterpretation: semanticSnapshot('özür dilerim', 'apology', { apology: true }),
+      },
     ];
     const decision = decideKairaControlledSpontaneity(
       { responsePlan: plan(), dynamicState: state(), history: unsafeHistory },
