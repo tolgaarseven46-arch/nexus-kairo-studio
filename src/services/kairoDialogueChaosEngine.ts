@@ -54,41 +54,10 @@ export function isConfusionOrChallenge(text: string): boolean {
 }
 
 const TOPIC_STOP_WORDS = new Set([
-  "ama",
-  "artık",
-  "ben",
-  "beni",
-  "benim",
-  "bir",
-  "bize",
-  "bizim",
-  "bugün",
-  "bunu",
-  "dedi",
-  "dedim",
-  "değil",
-  "diye",
-  "evet",
-  "falan",
-  "gibi",
-  "hayır",
-  "için",
-  "kanka",
-  "lan",
-  "mı",
-  "mi",
-  "mu",
-  "mü",
-  "nasıl",
-  "neyse",
-  "olan",
-  "onu",
-  "öyle",
-  "sana",
-  "sen",
-  "şey",
-  "yarın",
-  "yok",
+  "ama", "artık", "ben", "beni", "benim", "bir", "bize", "bizim", "bugün", "bunu",
+  "dedi", "dedim", "değil", "diye", "evet", "falan", "gibi", "hayır", "için", "kanka",
+  "lan", "mı", "mi", "mu", "mü", "nasıl", "neyse", "olan", "onu", "öyle", "sana",
+  "sen", "şey", "yarın", "yok",
 ]);
 
 function topicTokens(text: string): string[] {
@@ -134,28 +103,13 @@ export function analyzeDialogueTurn(text: string): DialogueTurnAnalysis {
   if (absurd) factConfidence = 0.12;
   if (noise) factConfidence = 0.05;
 
-  const memoryScope: DialogueMemoryScope =
-    noise || absurd ? "session" : durable ? "durable_candidate" : "episodic";
-
-  return {
-    acts: Array.from(new Set(acts)),
-    factConfidence,
-    memoryScope,
-    isLikelyAbsurd: absurd,
-    topicTokens: topicTokens(raw),
-  };
+  const memoryScope: DialogueMemoryScope = noise || absurd ? "session" : durable ? "durable_candidate" : "episodic";
+  return { acts: Array.from(new Set(acts)), factConfidence, memoryScope, isLikelyAbsurd: absurd, topicTokens: topicTokens(raw) };
 }
 
-/**
- * Historical replay authority: if a persisted SemanticInterpretation@2 snapshot
- * exists, project it deterministically instead of reparsing raw historical text.
- * Raw analysis remains only as compatibility for genuinely pre-snapshot turns.
- */
 export function analyzeHistoricalDialogueTurn(turn: ConversationTurn): DialogueTurnAnalysis {
   if (isSemanticInterpretation(turn.semanticInterpretation)) {
-    return projectSemanticEventToDialogueAnalysis(
-      projectSemanticEvent(turn.semanticInterpretation),
-    );
+    return projectSemanticEventToDialogueAnalysis(projectSemanticEvent(turn.semanticInterpretation));
   }
   return analyzeDialogueTurn(String(turn.text || ""));
 }
@@ -163,19 +117,11 @@ export function analyzeHistoricalDialogueTurn(turn: ConversationTurn): DialogueT
 function participantInText(text: string, participant: string): boolean {
   const normalizedText = text.toLocaleLowerCase("tr-TR");
   const normalizedParticipant = participant.toLocaleLowerCase("tr-TR");
-  return new RegExp(
-    `(?<![\\p{L}])${normalizedParticipant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}])`,
-    "iu",
-  ).test(normalizedText);
+  return new RegExp(`(?<![\\p{L}])${normalizedParticipant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}])`, "iu").test(normalizedText);
 }
 
 function explicitPersonNames(text: string): string[] {
-  return Array.from(
-    new Set(
-      (text.match(/(?<![\p{L}])[A-ZÇĞİÖŞÜ][a-zçğıöşü]{1,31}(?![\p{L}])/gu) ?? [])
-        .filter((name) => !["Kaira", "Kairo"].includes(name)),
-    ),
-  );
+  return Array.from(new Set((text.match(/(?<![\p{L}])[A-ZÇĞİÖŞÜ][a-zçğıöşü]{1,31}(?![\p{L}])/gu) ?? []).filter((name) => !["Kaira", "Kairo"].includes(name))));
 }
 
 function claimId(turnIndex: number, source: string, subject: string, ordinal: number): string {
@@ -183,68 +129,36 @@ function claimId(turnIndex: number, source: string, subject: string, ordinal: nu
   return `claim-${turnIndex}-${clean(source)}-${clean(subject)}-${ordinal}`;
 }
 
-export function buildDialogueClaimLedger(
-  history: ConversationTurn[],
-  userMessage: string,
-  userName: string,
-  currentAnalysis?: DialogueTurnAnalysis,
-): DialogueClaim[] {
+export function buildDialogueClaimLedger(history: ConversationTurn[], userMessage: string, userName: string, currentAnalysis?: DialogueTurnAnalysis): DialogueClaim[] {
   const userTurns: Array<{ speaker: string; text: string; analysis?: DialogueTurnAnalysis }> = history
     .filter((turn) => turn.sender === "user")
-    .map((turn) => ({
-      speaker: turn.participantName || "Kullanıcı",
-      text: String(turn.text || ""),
-      analysis: analyzeHistoricalDialogueTurn(turn),
-    }));
+    .map((turn) => ({ speaker: turn.participantName || "Kullanıcı", text: String(turn.text || ""), analysis: analyzeHistoricalDialogueTurn(turn) }));
   const turns = [...userTurns, { speaker: userName, text: userMessage, analysis: currentAnalysis }];
-  const knownPeople = new Set(
-    [...userTurns.map((turn) => turn.speaker), userName].filter((name) => name !== "Kullanıcı"),
-  );
+  const knownPeople = new Set([...userTurns.map((turn) => turn.speaker), userName].filter((name) => name !== "Kullanıcı"));
   for (const turn of turns) for (const name of explicitPersonNames(turn.text)) knownPeople.add(name);
   const claims: Claim[] = [];
 
   for (const [turnIndex, turn] of turns.entries()) {
     const analysis = turn.analysis ?? analyzeDialogueTurn(turn.text);
     const isCorrection = analysis.acts.includes("correction");
-
     if (isCorrection) {
       const explicitSelfDenial = /\b(?:o\s+)?ben değildim\b/iu.test(turn.text);
-      const opposed = [...effectivelySupportedClaims(claims)]
-        .reverse()
-        .find((claim) => explicitSelfDenial ? claim.subject === turn.speaker : true);
+      const opposed = [...effectivelySupportedClaims(claims)].reverse().find((claim) => explicitSelfDenial ? claim.subject === turn.speaker : true);
       if (opposed) {
-        claims.push({
-          id: claimId(turnIndex, turn.speaker, opposed.subject, claims.length),
-          source: turn.speaker,
-          subject: opposed.subject,
-          proposition: opposed.proposition,
-          confidence: analysis.factConfidence,
-          status: "denial",
-          opposesClaimId: opposed.id,
-        });
+        claims.push({ id: claimId(turnIndex, turn.speaker, opposed.subject, claims.length), source: turn.speaker, subject: opposed.subject, proposition: opposed.proposition, confidence: analysis.factConfidence, status: "denial", opposesClaimId: opposed.id });
       }
     }
-
     if (analysis.acts.includes("question") || analysis.acts.includes("noise")) continue;
-
     for (const subject of knownPeople) {
       if (!participantInText(turn.text, subject)) continue;
       if (isCorrection && subject === turn.speaker && /\b(?:o\s+)?ben değildim\b/iu.test(turn.text)) continue;
       claims.push({
-        id: claimId(turnIndex, turn.speaker, subject, claims.length),
-        source: turn.speaker,
-        subject,
-        proposition: turn.text,
+        id: claimId(turnIndex, turn.speaker, subject, claims.length), source: turn.speaker, subject, proposition: turn.text,
         confidence: analysis.factConfidence,
-        status: analysis.isLikelyAbsurd
-          ? "absurd"
-          : analysis.acts.includes("uncertain")
-            ? "uncertain"
-            : "asserted",
+        status: analysis.isLikelyAbsurd ? "absurd" : analysis.acts.includes("uncertain") ? "uncertain" : "asserted",
       });
     }
   }
-
   return claims.slice(-12);
 }
 
@@ -254,70 +168,25 @@ const ACTION_TOPICS = [
   { id: "maç", pattern: /\b(maç|maça)/i },
 ] as const;
 
-export function findDialogueAttributionIssues(
-  reply: string,
-  history: ConversationTurn[],
-  userMessage: string,
-  userName: string,
-  currentAnalysis?: DialogueTurnAnalysis,
-): string[] {
+export function findDialogueAttributionIssues(reply: string, history: ConversationTurn[], userMessage: string, userName: string, currentAnalysis?: DialogueTurnAnalysis): string[] {
   const ledger = buildDialogueClaimLedger(history, userMessage, userName, currentAnalysis);
-  const participants = Array.from(
-    new Set([
-      ...history.map((turn) => turn.participantName).filter(Boolean),
-      userName,
-    ]),
-  ) as string[];
-  const target = participants.find((name) =>
-    participantInText(userMessage, name),
-  );
+  const participants = Array.from(new Set([...history.map((turn) => turn.participantName).filter(Boolean), userName])) as string[];
+  const target = participants.find((name) => participantInText(userMessage, name));
   if (!target) return [];
-
   const issues: string[] = [];
   const clauses = reply.split(/[.!?;\n]+/).filter(Boolean);
   for (const topic of ACTION_TOPICS) {
-    const targetTopicClauses = clauses.filter(
-      (clause) =>
-        participantInText(clause, target) && topic.pattern.test(clause),
-    );
+    const targetTopicClauses = clauses.filter((clause) => participantInText(clause, target) && topic.pattern.test(clause));
     if (!targetTopicClauses.length) continue;
-    const targetHasTopic = ledger.some(
-      (claim) =>
-        claim.subject === target &&
-        effectivelySupportedClaims(ledger).includes(claim) &&
-        topic.pattern.test(claim.proposition),
-    );
-    const otherHasTopic = ledger.some(
-      (claim) =>
-        claim.subject !== target &&
-        effectivelySupportedClaims(ledger).includes(claim) &&
-        topic.pattern.test(claim.proposition),
-    );
-    const targetDeniedTopic = ledger.some(
-      (claim) =>
-        claim.subject === target &&
-        claim.status === "denial" &&
-        topic.pattern.test(claim.proposition),
-    );
-    const revivesDeniedTopic =
-      targetDeniedTopic &&
-      targetTopicClauses.some(
-        (clause) =>
-          !/\b(dedi|dedin|demiş|iddia|reddetti|yalanladı|yok|değil)\b/i.test(
-            clause,
-          ),
-      );
+    const targetHasTopic = ledger.some((claim) => claim.subject === target && effectivelySupportedClaims(ledger).includes(claim) && topic.pattern.test(claim.proposition));
+    const otherHasTopic = ledger.some((claim) => claim.subject !== target && effectivelySupportedClaims(ledger).includes(claim) && topic.pattern.test(claim.proposition));
+    const targetDeniedTopic = ledger.some((claim) => claim.subject === target && claim.status === "denial" && topic.pattern.test(claim.proposition));
+    const revivesDeniedTopic = targetDeniedTopic && targetTopicClauses.some((clause) => !/\b(dedi|dedin|demiş|iddia|reddetti|yalanladı|yok|değil)\b/i.test(clause));
     if (revivesDeniedTopic) {
-      issues.push(
-        `${target} tarafından reddedilen ${topic.id} iddiası yeni tahmin gibi yeniden üretildi`,
-      );
+      issues.push(`${target} tarafından reddedilen ${topic.id} iddiası yeni tahmin gibi yeniden üretildi`);
       continue;
     }
-    if (!targetHasTopic && otherHasTopic) {
-      issues.push(
-        `${topic.id} konusu ${target} yerine başka bir kişiye ait kaynaktan yanlış aktarıldı`,
-      );
-    }
+    if (!targetHasTopic && otherHasTopic) issues.push(`${topic.id} konusu ${target} yerine başka bir kişiye ait kaynaktan yanlış aktarıldı`);
   }
   return issues;
 }
@@ -331,45 +200,23 @@ export function buildDialogueBoardInstruction(
   const recentUserTurns = history
     .filter((turn) => turn.sender === "user")
     .slice(-6)
-    .map((turn) => ({
-      speaker: turn.participantName || "Kullanıcı",
-      text: String(turn.text || ""),
-      analysis: analyzeHistoricalDialogueTurn(turn),
-    }));
-  const current = {
-    speaker: userName,
-    text: userMessage,
-    analysis: currentAnalysis ?? analyzeDialogueTurn(userMessage),
-  };
+    .map((turn) => ({ speaker: turn.participantName || "Kullanıcı", text: String(turn.text || ""), analysis: analyzeHistoricalDialogueTurn(turn) }));
+  const current = { speaker: userName, text: userMessage, analysis: currentAnalysis ?? analyzeDialogueTurn(userMessage) };
   const turns = [...recentUserTurns, current];
   const claimLedger = buildDialogueClaimLedger(history, userMessage, userName, current.analysis);
-  const topics = Array.from(
-    new Set(turns.flatMap((turn) => turn.analysis.topicTokens)),
-  ).slice(-8);
-  const signals = turns
-    .slice(-5)
-    .map(
-      (turn) =>
-        `- ${turn.speaker}: [${turn.analysis.acts.join(", ")}; güven=${turn.analysis.factConfidence.toFixed(2)}; hafıza=${turn.analysis.memoryScope}] ${turn.text}`,
-    )
-    .join("\n");
-  const claims = claimLedger
-    .map(
-      (claim) =>
-        `- id=${claim.id}; kaynak=${claim.source}; özne=${claim.subject}; durum=${claim.status}; karşı-iddia=${claim.opposesClaimId || "yok"}; güven=${claim.confidence.toFixed(2)}; önerme="${claim.proposition}"`,
-    )
-    .join("\n");
+  const topics = Array.from(new Set(turns.flatMap((turn) => turn.analysis.topicTokens))).slice(-8);
+  const signals = turns.slice(-5).map((turn) => `- ${turn.speaker}: [${turn.analysis.acts.join(", ")}; güven=${turn.analysis.factConfidence.toFixed(2)}; hafıza=${turn.analysis.memoryScope}] ${turn.text}`).join("\n");
+  const claims = claimLedger.map((claim) => `- id=${claim.id}; kaynak=${claim.source}; özne=${claim.subject}; durum=${claim.status}; karşı-iddia=${claim.opposesClaimId || "yok"}; güven=${claim.confidence.toFixed(2)}; önerme="${claim.proposition}"`).join("\n");
 
-  return `KARMAŞIK DİYALOG TAHTASI:
+  return `KARMAŞIK DİYALOG TAHTASI (GÖZLEMSEL — KARAR DEĞİL):
 - Açık konu işaretleri: ${topics.length ? topics.join(", ") : "belirgin konu yok"}
 - Son sosyal sinyaller:\n${signals || "- kayıt yok"}
 - Kaynaklı iddia defteri:\n${claims || "- açık iddia yok"}
-KURALLAR:
-- Sohbetin tek ve düzgün bir konu izlemesi gerekmez. Birden fazla konu dalı açık kalabilir.
-- Düzeltmeyi, şakayı, aktarılan sözü ve belirsiz ifadeyi kesin gerçek gibi birleştirme.
-- İddia defterinde kaynak yalnızca sözü söyleyendir; eylemi yapan kişi "özne"dir. Kaynak ile özneyi ASLA birbirine çevirme. "denial" karşı-iddiasının bastırdığı önerme geçerli plan değildir; eski iddia geçmişten silinmez.
-- Geçmişi hatırlama sorusunda özneye ait etkin iddia kalmadıysa "net bilgi yok" de. Reddedilmiş veya desteksiz bir planı mizah, tahmin ya da "büyük ihtimalle" kalıbıyla yeniden UYDURMA.
-- "session" işaretli absürt/gürültülü mesajları kalıcı gerçek sayma; akış içinde şakaya katılabilirsin.
-- Her ayrıntıya cevap vermek zorunda değilsin. En doğal tek sosyal hareketi seç: tepki, soru, görüş, şaka, düzeltme veya kısa sessiz kabul.
-- Karışıklık önemsizse akışı bozma. Ancak yanlış anlamak kişi, plan veya önemli olay bilgisini değiştirecekse kısa bir netleştirme sor.`;
+GÖZLEMSEL SEMANTİK:
+- Birden fazla konu dalının aynı anda açık olması mümkündür; bu yalnız discourse evidence bilgisidir.
+- correction, banter, reported/uncertain ve memory-scope etiketleri kanıt niteliğini tarif eder; sosyal hareket seçmez.
+- İddia defterinde kaynak sözü söyleyen, özne ise iddianın/eylemin ait olduğu kişidir.
+- denial durumu önceki önerme için etkin karşı-kanıt bulunduğunu gösterir; önceki kayıt geçmişten silinmiş sayılmaz.
+- session kapsamı kalıcı gerçeklik kanıtı değildir; absurd/noise işaretleri de yalnız kanıt kalitesini tarif eder.
+- Bu blok soru, tavsiye, şaka, spekülasyon, sosyal hareket, uzunluk veya stil izni vermez. Bu kararların sahibi DialogueDecision ve KairaResponsePlan'dır.`;
 }
