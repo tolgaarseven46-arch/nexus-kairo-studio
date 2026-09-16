@@ -143,3 +143,13 @@ Before any next action:
 3. do not reopen frozen pre-AI architecture from old chat memory or generic audit concerns,
 4. reopen architecture only under the frozen reopening rule,
 5. otherwise move to **model-in-the-loop / answer-quality validation** and treat ordinary response-quality misses as product-quality work unless they reveal a measured frozen invariant violation.
+
+## 11. Model-in-the-loop recovery checkpoint
+A live provider response exposed the measured failure class `response_plan_unsupported_generated_claim`.
+
+Current decision:
+- generated-claim provenance remains authoritative and must continue rejecting unsupported claims,
+- this failure does **not** reopen the frozen pre-AI architecture,
+- containment belongs to the existing `kairaRecoveryPolicy` seam,
+- recovery may remove the unsupported claim and emit only a bounded ResponsePlan-conformant fallback; it must not reinterpret user semantics or grant new WHAT/WHETHER permission,
+- characterization evidence must remain RED-before-fix and the fix must pass the same canonical constraint boundary plus full CI.
