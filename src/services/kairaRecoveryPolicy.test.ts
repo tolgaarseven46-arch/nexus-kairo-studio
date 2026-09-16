@@ -78,6 +78,20 @@ describe("kairaRecoveryPolicy", () => {
     expect(fallback).not.toMatch(/bebeğim|aşkım|tatlım|sevgilim/iu);
   });
 
+  it("recovers a rejected unsupported generated claim without weakening provenance validation", () => {
+    const issues = ["response_plan_unsupported_generated_claim"];
+    expect(classifyKairaRecoveryViolations(issues)).toContain(
+      "unsupported_generated_claim",
+    );
+    expect(buildKairaRecoveryInstruction(issues)).toContain(
+      "desteklenmeyen iddiayı çıkar",
+    );
+
+    const fallback = buildKairaRecoveryFallback(basePlan, issues);
+    expect(fallback).toBe("heh, baya net söyledin");
+    expect(findKairaResponsePlanIssues(fallback!, basePlan)).toEqual([]);
+  });
+
   it("does not invent a recovery path for unrelated issues", () => {
     expect(buildKairaRecoveryInstruction(["response_plan_word_budget_exceeded"])).toBeNull();
     expect(buildKairaRecoveryFallback(basePlan, ["response_plan_word_budget_exceeded"])).toBeNull();
