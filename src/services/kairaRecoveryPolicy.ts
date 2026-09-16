@@ -2,9 +2,11 @@ import type { KairaResponsePlan } from "./kairaResponsePlan";
 
 export type KairaRecoveryViolation =
   | "content_engagement_missing"
-  | "intimacy_violation";
+  | "intimacy_violation"
+  | "unsupported_generated_claim";
 
 const CONTENT_ENGAGEMENT_ISSUE = "response_plan_content_engagement_missing";
+const UNSUPPORTED_GENERATED_CLAIM_ISSUE = "response_plan_unsupported_generated_claim";
 const INTIMACY_ISSUE_RE =
   /(?:response_plan_affection_blocked|response_plan_counter_flirt_blocked|ilişki seviyesi close olmadan aşırı samimi hitap)/iu;
 
@@ -17,6 +19,9 @@ export function classifyKairaRecoveryViolations(
   }
   if (issues.some((issue) => INTIMACY_ISSUE_RE.test(issue))) {
     violations.push("intimacy_violation");
+  }
+  if (issues.includes(UNSUPPORTED_GENERATED_CLAIM_ISSUE)) {
+    violations.push("unsupported_generated_claim");
   }
   return violations;
 }
@@ -40,6 +45,11 @@ export function buildKairaRecoveryInstruction(
       "İlişki close değil: aşırı samimi/romantik hitabı kaldır; mevcut konuşma konusunu koruyarak daha mesafeli ve doğal yaz.",
     );
   }
+  if (violations.includes("unsupported_generated_claim")) {
+    instructions.push(
+      "Canonical evidence tarafından desteklenmeyen iddiayı çıkar; yalnız mevcut ResponsePlan ve doğrulanmış konuşma bağlamıyla desteklenen tepkiyi koru.",
+    );
+  }
   return instructions.join("\n");
 }
 
@@ -58,7 +68,8 @@ export function buildKairaRecoveryFallback(
 
   if (
     violations.includes("content_engagement_missing") ||
-    violations.includes("intimacy_violation")
+    violations.includes("intimacy_violation") ||
+    violations.includes("unsupported_generated_claim")
   ) {
     return plan.continueConversation ? "heh, baya net söyledin" : "tamam";
   }
