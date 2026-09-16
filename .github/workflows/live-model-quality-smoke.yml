@@ -1,0 +1,36 @@
+name: Live Model Quality Smoke
+
+on:
+  push:
+    branches:
+      - codex/model-in-loop-live-smoke
+  workflow_dispatch:
+
+jobs:
+  live-quality-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+
+      - name: Run live model-in-the-loop smoke
+        env:
+          KAIRA_LIVE_BASE_URL: https://nexus-kairo-studio.onrender.com
+          KAIRA_LIVE_PROVIDER: gemini
+          KAIRA_LIVE_REPORT: artifacts/kaira-live-model-quality-smoke.json
+        run: |
+          mkdir -p artifacts
+          node scripts/run-live-model-quality-smoke.mjs
+
+      - name: Print failure classification summary
+        if: always()
+        run: |
+          if [ -f artifacts/kaira-live-model-quality-smoke.json ]; then
+            node -e "const r=require('./artifacts/kaira-live-model-quality-smoke.json'); console.log(JSON.stringify({scenarioCount:r.scenarioCount,passedScenarioCount:r.passedScenarioCount,failedScenarioCount:r.failedScenarioCount,failureClasses:r.failureClasses},null,2))"
+          fi
