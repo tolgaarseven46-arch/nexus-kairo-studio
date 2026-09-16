@@ -1,6 +1,5 @@
 import type { Express, Request, Response } from "express";
 import { authorizeKairaInternalWorker } from "./kairaInternalWorkerAuth";
-import { registerPrivatRoomDmIntegrationRoute } from "./privatRoomDmIntegrationRoute";
 import {
   loadActiveKairaActivityCatalog,
   publishKairaActivityCatalogAtomic,
@@ -31,8 +30,6 @@ function instanceType(value: unknown): KairaInstanceContext["instanceType"] | nu
 
 /** Trusted provisioning/admin surface. It never accepts client-authored timestamps. */
 export function registerKairaActivityProvisioningRoute(app: Express) {
-  registerPrivatRoomDmIntegrationRoute(app);
-
   app.get("/internal/kaira/activity-catalog", async (req: Request, res: Response) => {
     if (!authorize(req, res)) return;
     const kairaInstanceId = String(req.query?.kairaInstanceId || "").trim();
