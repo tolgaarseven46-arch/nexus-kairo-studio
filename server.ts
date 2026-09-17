@@ -119,6 +119,7 @@ import {
 } from "./src/services/kairaEpistemicResponsePolicy";
 import { registerKairaProposalRecoveryWorkerRoute } from "./src/services/kairaProposalRecoveryWorkerRoute";
 import { registerKairaActivityProvisioningRoute } from "./src/services/kairaActivityProvisioningRoute";
+import { registerPrivatRoomDmIntegrationRoute } from "./src/services/privatRoomDmIntegrationRoute";
 import type {
   DroitDynamicState,
 } from "./src/types/nexus";
@@ -128,6 +129,7 @@ const app = express(),
 app.use(express.json());
 registerKairaProposalRecoveryWorkerRoute(app);
 registerKairaActivityProvisioningRoute(app);
+registerPrivatRoomDmIntegrationRoute(app);
 let aiClient: GoogleGenAI | null = null;
 const now = () => performance.now(),
   memoryCache = new Map<
