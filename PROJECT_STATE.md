@@ -644,3 +644,24 @@ v6 scheduling:
 - strict relationship and TestRun continuity persistence remain response-blocking for first-encounter fast replies.
 
 No replay, serialization, semantic, or persistence authority is weakened; only independent I/O is overlapped.
+
+
+## 38. First-encounter lease-held deferred continuity v7 (2026-09-18)
+
+v6 production probe:
+- semantic/provider GREEN: `well_being_reply`, `local_language`, `aiMs=0`
+- client latency: `5641ms`
+- server latency: `5444ms` (444ms above the internal 5s gate)
+- `memoryMs=1391`
+- `criticalPersistenceMs=1908`
+
+The remaining visible wait is the durability barrier itself. v7 changes the barrier shape without allowing a later turn to observe stale state:
+- first-encounter fast replies preallocate a canonical `turnId`;
+- the response is sent with that exact id before Firestore relationship/TestSession continuity commits finish;
+- the distributed state-mutation lease and idempotency ownership remain held after response;
+- relationship state and TestSession turn/session continuity are persisted immediately after response;
+- only after those strict writes succeed is the distributed idempotency claim completed and the state lease released;
+- therefore a subsequent request for the same state owner cannot enter the mutable turn pipeline before prior continuity is durable;
+- telemetry/autonomous observation remains non-causal and runs after continuity.
+
+Failure caveat: a process crash in the short post-response/pre-persistence window can lose the just-returned turn. The lease-held design removes stale-next-turn execution during normal operation but is not equivalent to pre-response crash durability. This tradeoff is explicit and bounded to the first-encounter trivial social fast path.
