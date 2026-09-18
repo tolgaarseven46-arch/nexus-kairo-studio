@@ -174,3 +174,29 @@ Initial contract proof:
 
 Next seam after contract closure:
 - characterize where `PlatformActionIntent` belongs in the existing canonical decision output before any runtime wiring.
+
+
+## 13. Social-platform product freeze → Slice A measurement-first checkpoint
+
+The Kaira × PrivatRoom product/scenario design was reviewed through v0.4 with Tolga + Claude.
+No freeze-blocker remains at product level.
+
+Delivery is now measurement-first:
+- prior action-decision PR #283 is intentionally parked/closed and must not be merged before Slice A/B gates,
+- Slice A owns TestRun provenance, Fresh/Continuation/Replay isolation, replay hard sandbox and proof quality,
+- Slice B owns multi-user Conversation Graph/context fixtures,
+- Slice C owns first user-facing behavior (adaptive address, trial UI authority, first-server rule draft).
+
+Hard product/test invariants:
+- exact build/prompt/policy/feature/environment provenance,
+- replay allowlist/default-deny and zero real side effects,
+- namespaced test memory/relationship/KNT,
+- cross-server zero-leak,
+- demographic/tone-only data structurally excluded from decision/capability input,
+- independent Claude red-team and Tolga product review,
+- no promotion without CI + replay + live TestRun review.
+
+Current implementation slice:
+**Slice A1 — TestRun provenance v1 + replay sandbox policy.**
+
+Authority/behavior expansion is intentionally paused until Slice A measurement infrastructure is proven.
