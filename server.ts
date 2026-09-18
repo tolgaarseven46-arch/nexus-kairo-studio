@@ -745,7 +745,13 @@ app.post("/api/chat", async (req, res) => {
       }
       return res.json(payload);
     };
-    const activityPermissionResolution = kairaPolicy.autonomousActivityPlanning
+    let firstEncounterTrivialSocial = false;
+    const shouldResolveActivityPermissionReply =
+      kairaPolicy.autonomousActivityPlanning &&
+      (conversationPhase !== "first_encounter" ||
+        (typeof incomingActivityPermissionRequestId === "string" &&
+          incomingActivityPermissionRequestId.trim().length > 0));
+    const activityPermissionResolution = shouldResolveActivityPermissionReply
       ? await resolveKairaActivityPermissionChatReply({
           ownerUserId: userId,
           kairaInstanceId: kairaInstance.instanceId,
@@ -760,7 +766,7 @@ app.post("/api/chat", async (req, res) => {
       : ({ status: "none" } as const);
     let activityPermissionPrompt: KairaActivityPermissionChatPrompt | null = null;
     const attachActivityPermission = async (baseReply: string) => {
-      if (!kairaPolicy.autonomousActivityPlanning) return baseReply;
+      if (!kairaPolicy.autonomousActivityPlanning || firstEncounterTrivialSocial) return baseReply;
       activityPermissionPrompt = await presentKairaActivityPermissionChatPrompt({
         ownerUserId: userId,
         kairaInstanceId: kairaInstance.instanceId,
@@ -816,6 +822,18 @@ app.post("/api/chat", async (req, res) => {
       event: languageUnderstanding.event,
       source: languageUnderstanding.semanticSource,
     };
+    firstEncounterTrivialSocial =
+      conversationPhase === "first_encounter" &&
+      [
+        "greeting",
+        "how_are_you",
+        "well_being_reply",
+        "what_doing",
+        "thanks",
+        "agreement",
+        "goodbye",
+        "good_night",
+      ].includes(String(canonicalSemantic.event.socialRoutine ?? "none"));
     const retrievedWorldEvents = kairaPolicy.persistentWorldModel && shouldRetrieveWorldEvents(canonicalSemantic.interpretation)
       ? rankWorldEventObservations(
           userMessage,
@@ -866,10 +884,15 @@ app.post("/api/chat", async (req, res) => {
         }
       : null;
     const epistemicInstruction = buildKairaEpistemicInstruction(epistemicAccess);
-    const socialAppraisalMemoryRuntime = await loadSocialAppraisalAutobiographicalRuntime({
-      instance: kairaInstance,
-      userId: String(userId),
-    });
+    const socialAppraisalMemoryRuntime = firstEncounterTrivialSocial
+      ? {
+          status: "skipped_first_encounter_trivial" as const,
+          memory: undefined,
+        }
+      : await loadSocialAppraisalAutobiographicalRuntime({
+          instance: kairaInstance,
+          userId: String(userId),
+        });
     const selfMemoryRuntime = await resolveKairaAutobiographicalRecallRuntime({
       instance: kairaInstance,
       query: canonicalSemantic.event.selfMemoryQuery,
