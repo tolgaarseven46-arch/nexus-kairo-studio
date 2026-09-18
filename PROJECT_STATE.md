@@ -385,3 +385,12 @@ The exact independent red-team request and response schema are frozen at:
 - `docs/reviews/slice-b-w2-independent-red-team-request.md`
 
 This makes W2 externally reviewable without ambiguity. It does not itself satisfy W2.
+
+
+## 27. Slice B W5 fixture preparation
+Twenty deterministic Slice B fixture contracts are prepared but inactive at:
+- `docs/tests/slice-b-w5-fixture-spec.md`
+
+They define expected invariants for cold/warm/experienced-owner, explicit reply/mention, unresolved refs, duplicate/conflicting ids, ordering, namespace isolation, unanswered-turn evidence, suppression receipts, escalation refs, semantic non-invention, replay and Droit self-events.
+
+No characterization RED has been run. W5 remains blocked by W2 independent review + W3 freeze.
