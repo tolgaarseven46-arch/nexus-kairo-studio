@@ -25,6 +25,6 @@ describe("first-encounter combined coordination v8", () => {
     expect(coordinator).toContain("claimFirstEncounterCoordination");
     expect(coordinator).toContain("registerPreclaimedStateMutation");
     expect(coordinator).toContain("distributedOwners.set(normalizedKey");
-    expect(coordinator).toContain("stateMutationHandles.set(normalizedKey");
+    expect(coordinator).toContain("stateMutationHandles.set(requestKey");
   });
 });
