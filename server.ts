@@ -1167,6 +1167,9 @@ app.post("/api/chat", async (req, res) => {
       const firstEncounterTurnNumberHint = firstEncounterFastPersistence
         ? cleanHistory.filter((turn: any) => turn.sender === "user").length + 1
         : undefined;
+      const firstEncounterTurnId = firstEncounterFastPersistence
+        ? `turn_${String(requestId || randomUUID()).replace(/[^a-zA-Z0-9_-]/g, "_")}`
+        : undefined;
       const ownershipStart = now();
       await assertStateMutationOwnership();
       const ownershipMs = Math.round(now() - ownershipStart);
@@ -1182,7 +1185,7 @@ app.post("/api/chat", async (req, res) => {
             dynamicStateAfter: kdm.nextDynamicState,
           });
       const livedMemoryMs = Math.round(now() - livedMemoryStart);
-      let savedTurnId = "";
+      let savedTurnId = firstEncounterTurnId ?? "";
       const saveRelationshipState = () =>
         kairaPolicy.persistentRelationship
           ? saveKdmInteraction({
@@ -1203,6 +1206,7 @@ app.post("/api/chat", async (req, res) => {
         saveTestSessionTurn({
           strictPersistence: firstEncounterFastPersistence,
           turnNumberHint: firstEncounterTurnNumberHint,
+          turnIdHint: firstEncounterTurnId,
           sessionId,
           testRunId,
           testRunRecord,
@@ -1336,14 +1340,15 @@ app.post("/api/chat", async (req, res) => {
         });
 
       let criticalPersistenceMs = 0;
-      if (firstEncounterFastPersistence) {
+      const persistFirstEncounterContinuity = async () => {
         const criticalStart = now();
         await Promise.all([
           saveRelationshipState(),
           saveTurnContinuity(),
         ]);
         criticalPersistenceMs = Math.round(now() - criticalStart);
-      } else {
+      };
+      if (!firstEncounterFastPersistence) {
         await Promise.allSettled([
           saveRelationshipState(),
           saveMetricTelemetry(),
@@ -1403,7 +1408,7 @@ app.post("/api/chat", async (req, res) => {
       if (!consistency.accepted) {
         throw buildKairaFinalDeliveryRejectionError(finalDelivery);
       }
-      await sendChatPayload({
+      const responsePayload = {
         sessionId,
         testRunId,
         turnId: savedTurnId,
@@ -1438,20 +1443,37 @@ app.post("/api/chat", async (req, res) => {
         consistency,
         dialogue: dialogueAnalysis,
         timings,
-      });
+      };
       if (firstEncounterFastPersistence) {
+        sendFirstEncounterFastPayload(responsePayload);
         const backgroundStart = now();
-        await Promise.allSettled([
-          saveMetricTelemetry(),
-          saveKntTelemetry(),
-          saveAutonomousState(),
-        ]);
-        console.log("[First Encounter Background Persistence]", {
-          testRunId,
-          requestId,
-          backgroundPersistenceMs: Math.round(now() - backgroundStart),
-        });
+        try {
+          await persistFirstEncounterContinuity();
+          if (coordinationKey && ownsCoordinationClaim) {
+            await completeCoordinatedKairaChatRequest(coordinationKey, responsePayload);
+            ownsCoordinationClaim = false;
+          }
+          await Promise.allSettled([
+            saveMetricTelemetry(),
+            saveKntTelemetry(),
+            saveAutonomousState(),
+          ]);
+          console.log("[First Encounter Deferred Continuity]", {
+            testRunId,
+            requestId,
+            criticalPersistenceMs,
+            backgroundPersistenceMs: Math.round(now() - backgroundStart),
+          });
+        } catch (error) {
+          console.error("[First Encounter Deferred Continuity] failed:", error);
+          if (coordinationKey && ownsCoordinationClaim) {
+            await failCoordinatedKairaChatRequest(coordinationKey, error);
+            ownsCoordinationClaim = false;
+          }
+        }
+        return;
       }
+      await sendChatPayload(responsePayload);
       return;
       }
     }
