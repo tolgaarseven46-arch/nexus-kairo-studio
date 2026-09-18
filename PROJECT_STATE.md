@@ -601,3 +601,22 @@ v4 scheduling decisions:
 - non-trivial/default turns retain synchronous coordination completion behavior.
 
 No semantic, dialogue-decision, relationship, or replay authority is weakened. This is execution scheduling only.
+
+
+## 36. First-encounter TestSession persistence latency v5 (2026-09-18)
+
+v4 production evidence:
+- semantic/provider path GREEN: `well_being_reply`, `local_language`, `aiMs=0`
+- client wall time GREEN against the 7s gate: `5702ms`
+- strict internal server gate narrowly RED: `5468ms`
+- `ownershipMs=0`, `memoryMs=253`, `criticalPersistenceMs=1741`
+
+The remaining dominant critical-path cost is TestSession persistence performing a Firestore session `getDoc` immediately before its batch commit.
+
+v5 rule:
+- for first-encounter fast turns, the caller supplies a deterministic `turnNumberHint` derived from canonical request history;
+- `saveTestSessionTurn` skips the session pre-read when that hint is present;
+- the turn document and session summary are still committed atomically in the same strict Firestore batch before response;
+- default/non-fast callers retain the existing session pre-read and turn-count behavior.
+
+This removes one network round trip without weakening TestRun/session continuity.

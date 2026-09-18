@@ -110,6 +110,7 @@ export async function loadRecentKdmMemory(maxItems = 6, userId?: string): Promis
 export interface SaveTestSessionTurnPayload {
   sessionId: string;
   strictPersistence?: boolean;
+  turnNumberHint?: number;
   testRunId?: string;
   testRunRecord?: unknown;
   userId?: string;
@@ -247,16 +248,23 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
   const now = new Date().toISOString();
   const speaker = payload.speaker || payload.userName || 'Kullanıcı';
 
-  let turnNumber = 1;
+  let turnNumber =
+    typeof payload.turnNumberHint === 'number' &&
+    Number.isFinite(payload.turnNumberHint) &&
+    payload.turnNumberHint >= 1
+      ? Math.floor(payload.turnNumberHint)
+      : 1;
   let existingTestRunRecord: unknown = undefined;
-  try {
-    const existingSnap = await getDoc(doc(db, TEST_SESSIONS_COLLECTION, sessionId));
-    if (existingSnap.exists()) {
-      const existingData = existingSnap.data();
-      turnNumber = Number(existingData?.turnCount || 0) + 1;
-      existingTestRunRecord = existingData?.testRunRecord;
-    }
-  } catch {}
+  if (!payload.turnNumberHint) {
+    try {
+      const existingSnap = await getDoc(doc(db, TEST_SESSIONS_COLLECTION, sessionId));
+      if (existingSnap.exists()) {
+        const existingData = existingSnap.data();
+        turnNumber = Number(existingData?.turnCount || 0) + 1;
+        existingTestRunRecord = existingData?.testRunRecord;
+      }
+    } catch {}
+  }
 
   const turnRecord: TestSessionTurnRecord = {
     turnId,

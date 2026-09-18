@@ -1158,6 +1158,9 @@ app.post("/api/chat", async (req, res) => {
       const firstEncounterFastPersistence =
         conversationPhase === "first_encounter" &&
         firstEncounterFastReply.handled;
+      const firstEncounterTurnNumberHint = firstEncounterFastPersistence
+        ? cleanHistory.filter((turn: any) => turn.sender === "user").length + 1
+        : undefined;
       const ownershipStart = now();
       await assertStateMutationOwnership();
       const ownershipMs = Math.round(now() - ownershipStart);
@@ -1193,6 +1196,7 @@ app.post("/api/chat", async (req, res) => {
       const saveTurnContinuity = () =>
         saveTestSessionTurn({
           strictPersistence: firstEncounterFastPersistence,
+          turnNumberHint: firstEncounterTurnNumberHint,
           sessionId,
           testRunId,
           testRunRecord,
