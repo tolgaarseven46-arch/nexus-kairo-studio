@@ -10,11 +10,12 @@ describe("first-encounter critical-path latency v3", () => {
     expect(server).toContain("conversationPhase === \"first_encounter\"");
     expect(server).toContain("canonicalSemantic.event.socialRoutine");
 
-    expect(server).toContain("!firstEncounterTrivialSocial");
+    expect(server).toContain('conversationPhase !== "first_encounter"');
     expect(server).toContain("incomingActivityPermissionRequestId");
+    expect(server).toContain("|| firstEncounterTrivialSocial) return baseReply");
     expect(server).toContain("loadSocialAppraisalAutobiographicalRuntime");
     expect(server).toMatch(
-      /firstEncounterTrivialSocial[\s\S]{0,260}?memory:\s*undefined[\s\S]{0,420}?loadSocialAppraisalAutobiographicalRuntime/,
+      /const socialAppraisalMemoryRuntime = firstEncounterTrivialSocial[\s\S]{0,260}?memory:\s*undefined[\s\S]{0,420}?loadSocialAppraisalAutobiographicalRuntime/,
     );
   });
 
