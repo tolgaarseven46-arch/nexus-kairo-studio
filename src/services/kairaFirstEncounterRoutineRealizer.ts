@@ -13,6 +13,7 @@ export interface KairaFirstEncounterRoutineResult {
   intent?:
     | "greeting"
     | "how_are_you"
+    | "well_being_reply"
     | "what_doing"
     | "thanks"
     | "agreement"
