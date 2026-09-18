@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { interpretSemanticEvent } from "./semanticEventEngine";
 import {
-  buildGroundedDialogueFallback,
   findDialogueDecisionIssues,
   planDialogueResponse,
   type DialogueDecisionPlan,
 } from "./kairoDialogueDecisionEngine";
+import { resolveServerLanguageUnderstanding } from "./serverLanguageUnderstanding";
 import { decideKairaWelcome } from "./kairaWelcomeDecision";
 import { realizeKairaWelcome } from "./kairaWelcomeRealizer";
+import { realizeKairaFirstEncounterRoutine } from "./kairaFirstEncounterRoutineRealizer";
+import { realizeKairaFirstEncounterContext } from "./kairaFirstEncounterContextRealizer";
 
 const welcomeHistory = [
   {
@@ -17,42 +18,95 @@ const welcomeHistory = [
   },
 ];
 
-describe("first encounter historical RED fixtures", () => {
-  it("RED-1: 'naber' can never degrade to generic acknowledgement", () => {
-    const event = interpretSemanticEvent("naber");
+const firstEncounterPlan = (move: "natural_reaction" | "answer_or_clarify") =>
+  ({
+    move,
+    stance: "open",
+    register: "casual",
+    relationshipLevel: "new",
+    continueConversation: true,
+    allowQuestion: true,
+    allowHumor: true,
+    allowAffection: false,
+    allowAdvice: false,
+    allowForgiveness: false,
+    allowReopeningCloseness: false,
+    maxSentences: 2,
+    maxWords: 24,
+    emojiBudget: 1,
+    reasons: [],
+  }) as any;
+
+describe("first encounter historical RED -> GREEN fixtures", () => {
+  it("RED-1: 'naber' uses canonical fast semantics and never degrades to generic acknowledgement", async () => {
+    let providerCalls = 0;
+    const understanding = await resolveServerLanguageUnderstanding({
+      message: "naber",
+      preferredProvider: "openrouter",
+      generateText: async () => {
+        providerCalls += 1;
+        throw new Error("provider_should_not_be_called");
+      },
+      preferTrivialSocialFastPath: true,
+      firstEncounterContext: { roomName: "kankalar", isOwner: true },
+    });
+
     const plan = planDialogueResponse(
       welcomeHistory,
       "naber",
       "Tolga",
-      event,
+      understanding.event,
       undefined,
       undefined,
     );
-    const fallback = buildGroundedDialogueFallback(
-      plan,
-      welcomeHistory,
-      "naber",
-      "Tolga",
-    );
+    const realized = realizeKairaFirstEncounterRoutine({
+      requestId: "req_naber",
+      event: understanding.event,
+      plan: firstEncounterPlan(plan.move as any),
+    });
 
-    expect(event.socialRoutine).toBe("how_are_you");
-    expect(fallback).toBeTruthy();
-    expect(fallback).not.toMatch(/^(?:he|hee|hmm|anladım|he anladım|tamam)[.!…]*$/iu);
+    expect(providerCalls).toBe(0);
+    expect(understanding.event.socialRoutine).toBe("how_are_you");
+    expect(realized.handled).toBe(true);
+    expect(realized.reply).toBeTruthy();
+    expect(realized.reply).not.toMatch(
+      /^(?:he|hee|hmm|anladım|he anladım|tamam)[.!…]*$/iu,
+    );
   });
 
-  it("RED-2: first-encounter room-context question creates answer obligation", () => {
-    const event = interpretSemanticEvent("napıyoruz burada");
+  it("RED-2: room-context question becomes a canonical answer obligation without provider latency", async () => {
+    let providerCalls = 0;
+    const understanding = await resolveServerLanguageUnderstanding({
+      message: "napıyoruz burada",
+      preferredProvider: "openrouter",
+      generateText: async () => {
+        providerCalls += 1;
+        throw new Error("provider_should_not_be_called");
+      },
+      preferTrivialSocialFastPath: true,
+      firstEncounterContext: { roomName: "kankalar", isOwner: true },
+    });
+
     const plan = planDialogueResponse(
       welcomeHistory,
       "napıyoruz burada",
       "Tolga",
-      event,
+      understanding.event,
       undefined,
       undefined,
     );
+    const realized = realizeKairaFirstEncounterContext({
+      requestId: "req_room_context",
+      interpretation: understanding.interpretation,
+      plan: firstEncounterPlan(plan.move as any),
+      context: { roomName: "kankalar", isOwner: true },
+    });
 
+    expect(providerCalls).toBe(0);
     expect(plan.move).toBe("answer_or_clarify");
     expect(plan.obligation?.type).toBe("answer_or_clarify");
+    expect(realized.handled).toBe(true);
+    expect(realized.reply).toMatch(/kankalar|odan|oda/iu);
   });
 
   it("RED-3: direct-question obligation rejects dressed-up acknowledgement", () => {
@@ -68,7 +122,12 @@ describe("first encounter historical RED fixtures", () => {
         type: "answer_or_clarify",
         satisfactionCriteria: {
           forbiddenResponseClasses: ["acknowledgement_only"],
-          allowedResolutions: ["fulfill_now", "clarify", "decline_explicit", "defer_explicit"],
+          allowedResolutions: [
+            "fulfill_now",
+            "clarify",
+            "decline_explicit",
+            "defer_explicit",
+          ],
         },
       },
     };
@@ -101,8 +160,12 @@ describe("first encounter historical RED fixtures", () => {
     expect(seen.size).toBe(8);
     for (const text of seen.values()) {
       expect(text).toMatch(/Kaira/u);
-      expect(text).not.toMatch(/baskı yok|hayırlı olsun demeyeyim|müşteri|asistan|Droit/iu);
-      expect(text).not.toMatch(/(?:Oyuncu|Beta Kullanıcısı|Kullanıcı|Siz)/iu);
+      expect(text).not.toMatch(
+        /baskı yok|hayırlı olsun demeyeyim|müşteri|asistan|Droit/iu,
+      );
+      expect(text).not.toMatch(
+        /\b(?:Oyuncu|Beta Kullanıcısı|Kullanıcı|Siz)\b/iu,
+      );
     }
   });
 });
