@@ -20,6 +20,7 @@ export interface RuntimeTestRunInputV1 {
   testerUserId: string;
   privatRoomCommit: string;
   scenarioPackVersion?: string;
+  integrationContractVersion?: string;
   trialState?: TestRunProvenanceV1["trialState"];
   retryOf?: string;
   idempotencyChain?: string[];
@@ -104,7 +105,8 @@ export function buildRuntimeTestRunRecordV1(
     versions: {
       privatRoomCommit,
       kairaCommit,
-      integrationContractVersion: "privatroom-dm-v1",
+      integrationContractVersion:
+        input.integrationContractVersion?.trim() || "privatroom-dm-v1",
       systemPromptVersion:
         env.KAIRA_SYSTEM_PROMPT_VERSION?.trim() || "kaira-final-provider-v1",
       policyConfigVersion:
