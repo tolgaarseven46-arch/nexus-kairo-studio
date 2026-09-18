@@ -45,6 +45,13 @@ const POOLS = {
     "iyiyim, keyfim yerinde. sende?",
     "fena değilim 😄 sen nasılsın?",
   ],
+  well_being_reply: [
+    "iyi bari 😄",
+    "güzel, sevindim",
+    "mis gibi 😄",
+    "iyi iyi",
+    "oh tamamdır",
+  ],
   what_doing: [
     "şimdilik takılıyorum 😄 sen ne yapıyorsun?",
     "burdayım, ortama bakıyorum. sen?",
@@ -79,6 +86,7 @@ function fastRoutine(event: SemanticEvent): FastRoutine | null {
   switch (event.socialRoutine) {
     case "greeting":
     case "how_are_you":
+    case "well_being_reply":
     case "what_doing":
     case "thanks":
     case "agreement":
