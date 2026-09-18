@@ -164,7 +164,7 @@ describe("first encounter historical RED -> GREEN fixtures", () => {
         /baskı yok|hayırlı olsun demeyeyim|müşteri|asistan|Droit/iu,
       );
       expect(text).not.toMatch(
-        /\b(?:Oyuncu|Beta Kullanıcısı|Kullanıcı|Siz)\b/iu,
+        /\b(?:Oyuncu|Beta Kullanıcısı|Kullanıcı|Siz|Sen)\b/iu,
       );
     }
   });
