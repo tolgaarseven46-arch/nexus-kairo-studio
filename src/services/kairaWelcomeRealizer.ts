@@ -54,7 +54,7 @@ export function realizeKairaWelcome(
   const index = fnv1a(seed) % variants.length;
   const variantId = `${input.decision.introduceSelf ? "room_created" : "participant_joined"}_v${index + 1}`;
   const displayName = input.actorDisplayName.trim() || "arkadaşım";
-  const genericName = /^(?:beta kullanıcısı|oyuncu|siz|kullanıcı)$/iu.test(displayName);
+  const genericName = /^(?:beta kullanıcısı|oyuncu|siz|sen|kullanıcı)$/iu.test(displayName);
   const realized = variants[index](displayName);
   const text = genericName
     ? realized
