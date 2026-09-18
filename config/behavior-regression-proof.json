@@ -224,6 +224,20 @@
       "counterexamples": [
         "counterexample: unambiguous advice request preserves normal advice handling"
       ]
+    },
+    {
+      "id": "live-beta-test-session-read-auth",
+      "invariant": "Persisted live-beta TestRun transcripts must require the configured internal bearer token on generic TestSession read paths, while legacy Studio TestSession reads retain the existing compatibility contract.",
+      "redSha": "8de75dc71a32f8d4c31c83bcc45ccb4cbd972fb5",
+      "testFile": "src/services/testSessionReadAccessNeighborProofRegression.test.ts",
+      "reported": "reported: blocks the captured predictable live-beta acceptance TestRun read without internal auth",
+      "neighbors": [
+        "neighbor-1: blocks another room-scoped live-beta TestRun id",
+        "neighbor-2: rejects the wrong bearer token for a protected live-beta session"
+      ],
+      "counterexamples": [
+        "counterexample: preserves legacy Studio TestSession read compatibility"
+      ]
     }
   ]
 }
