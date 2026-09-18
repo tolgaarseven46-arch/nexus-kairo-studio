@@ -254,3 +254,110 @@ export const isPrivatRoomPlatformEventV1 = (
     isPlatformContextV1(candidate.context)
   );
 };
+
+
+export const isProposedPlatformAction = (
+  value: unknown,
+): value is ProposedPlatformAction => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<ProposedPlatformAction> & {
+    type?: string;
+    requestedCapability?: string;
+  };
+
+  const baseValid =
+    typeof candidate.actionId === 'string' &&
+    candidate.actionId.length > 0 &&
+    typeof candidate.type === 'string' &&
+    typeof candidate.serverId === 'string' &&
+    candidate.serverId.length > 0 &&
+    (candidate.roomId === undefined || typeof candidate.roomId === 'string') &&
+    typeof candidate.requestedCapability === 'string' &&
+    CAPABILITIES.has(candidate.requestedCapability as PlatformCapability) &&
+    Array.isArray(candidate.basedOnEventIds) &&
+    candidate.basedOnEventIds.every((id) => typeof id === 'string' && id.length > 0) &&
+    typeof candidate.confidence === 'number' &&
+    candidate.confidence >= 0 &&
+    candidate.confidence <= 1;
+
+  if (!baseValid || candidate.type !== candidate.requestedCapability) return false;
+
+  switch (candidate.type) {
+    case 'server.rules.propose': {
+      const action = candidate as Partial<ServerRulesProposeAction>;
+      return (
+        typeof action.rulesVersionBase === 'string' &&
+        action.rulesVersionBase.length > 0 &&
+        Array.isArray(action.rules) &&
+        action.rules.every(
+          (rule) =>
+            Boolean(rule) &&
+            typeof rule.ruleId === 'string' &&
+            rule.ruleId.length > 0 &&
+            typeof rule.text === 'string' &&
+            rule.text.trim().length > 0,
+        )
+      );
+    }
+    case 'member.warn': {
+      const action = candidate as Partial<MemberWarnAction>;
+      return (
+        typeof action.targetUserId === 'string' &&
+        action.targetUserId.length > 0 &&
+        typeof action.reason === 'string' &&
+        action.reason.trim().length > 0
+      );
+    }
+    case 'message.delete': {
+      const action = candidate as Partial<MessageDeleteAction>;
+      return (
+        typeof action.messageId === 'string' &&
+        action.messageId.length > 0 &&
+        typeof action.reason === 'string' &&
+        action.reason.trim().length > 0
+      );
+    }
+    case 'member.timeout': {
+      const action = candidate as Partial<MemberTimeoutAction>;
+      return (
+        typeof action.targetUserId === 'string' &&
+        action.targetUserId.length > 0 &&
+        typeof action.durationMs === 'number' &&
+        action.durationMs > 0 &&
+        typeof action.reason === 'string' &&
+        action.reason.trim().length > 0
+      );
+    }
+    case 'member.kick':
+    case 'member.ban': {
+      const action = candidate as Partial<MemberKickAction | MemberBanAction>;
+      return (
+        typeof action.targetUserId === 'string' &&
+        action.targetUserId.length > 0 &&
+        typeof action.reason === 'string' &&
+        action.reason.trim().length > 0
+      );
+    }
+    default:
+      return false;
+  }
+};
+
+export const isPlatformActionResultV1 = (
+  value: unknown,
+): value is PlatformActionResultV1 => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<PlatformActionResultV1>;
+  return (
+    candidate.contractVersion === PRIVATROOM_PLATFORM_CONTRACT_VERSION &&
+    typeof candidate.actionId === 'string' &&
+    candidate.actionId.length > 0 &&
+    (candidate.status === 'executed' ||
+      candidate.status === 'approval_required' ||
+      candidate.status === 'rejected' ||
+      candidate.status === 'failed') &&
+    (candidate.reason === undefined || typeof candidate.reason === 'string') &&
+    (candidate.executedAt === undefined || typeof candidate.executedAt === 'number') &&
+    (candidate.approvalId === undefined || typeof candidate.approvalId === 'string')
+  );
+};
