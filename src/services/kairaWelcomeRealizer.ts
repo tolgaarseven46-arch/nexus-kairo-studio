@@ -59,7 +59,7 @@ export function realizeKairaWelcome(
   const text = genericName
     ? realized
         .replace(
-          new RegExp("(^|\s)" + displayName + "(?=[,.!?\s]|$)", "giu"),
+          new RegExp("(^|\\s)" + displayName + "(?=[,.!?\\s]|$)", "giu"),
           "$1",
         )
         .replace(/^\s*[,.-]+\s*/u, "")
