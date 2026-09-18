@@ -798,9 +798,14 @@ app.post("/api/chat", async (req, res) => {
       });
     };
     const cleanHistory = sanitizeKairoChatHistory(history);
-    const persistedStatePromise = kairaPolicy.persistentRelationship
-      ? loadKdmState(stateUserId).catch(() => null)
-      : Promise.resolve(null);
+    const isFirstEncounterFirstUserTurn =
+      conversationPhase === "first_encounter" &&
+      cleanHistory.every((turn: any) => turn.sender !== "user");
+    const persistedStatePromise = isFirstEncounterFirstUserTurn
+      ? Promise.resolve(null)
+      : kairaPolicy.persistentRelationship
+        ? loadKdmState(stateUserId).catch(() => null)
+        : Promise.resolve(null);
     const semanticStart = now();
     const languageUnderstanding = await resolveServerLanguageUnderstanding({
       message: userMessage,
