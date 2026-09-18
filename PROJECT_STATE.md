@@ -576,3 +576,28 @@ v3 critical-path rule:
 - non-trivial/default turns retain the existing activity-permission and social-appraisal behavior.
 
 No new semantic or decision authority is introduced. The optimization is execution scheduling only.
+
+
+## 35. First-encounter Firestore round-trip latency v4 (2026-09-18)
+
+Live v3 production evidence remained latency-RED despite semantic/provider GREEN:
+- `providerUsed=local_language`
+- `socialRoutine=well_being_reply`
+- `aiMs=0`
+- `memoryMs=1385`
+- `ownershipMs=1453`
+- `criticalPersistenceMs=1733`
+- `serverTotalMs=7798`
+- client wall time `10872ms`
+
+The remaining delay is dominated by distributed coordination and persistence round trips rather than language generation.
+
+v4 scheduling decisions:
+- the state-mutation lease is already acquired authoritatively before the turn pipeline and renewed by its background lease timer;
+- immediately before mutation, the runtime now performs a local held/lost assertion instead of forcing an additional Firestore renewal transaction;
+- typed trivial first-encounter social turns still hydrate relationship state, but skip unrelated persistent dialogue-memory and language-memory hydration;
+- after strict relationship/TestRun continuity writes succeed, the user response may be sent before distributed replay bookkeeping finishes;
+- distributed idempotency completion and state-lease release still execute immediately after response as deferred bookkeeping;
+- non-trivial/default turns retain synchronous coordination completion behavior.
+
+No semantic, dialogue-decision, relationship, or replay authority is weakened. This is execution scheduling only.

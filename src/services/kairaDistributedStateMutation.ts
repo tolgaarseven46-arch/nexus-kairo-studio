@@ -13,6 +13,7 @@ export class KairaStateMutationOwnershipLostError extends Error {
 
 export interface KairaStateMutationLease {
   ownerToken: string;
+  assertHeld: () => Promise<void>;
   assertOwned: () => Promise<void>;
   release: () => Promise<void>;
 }
@@ -41,6 +42,7 @@ export function createDistributedStateMutationCoordinator(
       if (!normalizedKey) {
         return {
           ownerToken: '',
+          assertHeld: async () => undefined,
           assertOwned: async () => undefined,
           release: async () => undefined,
         };
@@ -57,8 +59,11 @@ export function createDistributedStateMutationCoordinator(
           const markOwnershipLost = () => {
             ownershipLost = true;
           };
-          const renewAuthoritatively = async () => {
+          const assertHeld = async () => {
             if (released || ownershipLost) throw new KairaStateMutationOwnershipLostError();
+          };
+          const renewAuthoritatively = async () => {
+            await assertHeld();
             const renewed = await backend.renew({
               key: normalizedKey,
               ownerToken: token,
@@ -91,6 +96,7 @@ export function createDistributedStateMutationCoordinator(
 
           return {
             ownerToken: token,
+            assertHeld,
             assertOwned: renewAuthoritatively,
             release: async () => {
               if (released) return;
