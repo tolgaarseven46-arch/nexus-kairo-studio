@@ -1116,18 +1116,24 @@ app.post("/api/chat", async (req, res) => {
         learnLanguageReply(stateUserId, reply);
       }
       const postStart = now();
-      await assertStateMutationOwnership();
-      const livedMemoryRuntime = await persistWorldEventAndMaybeConsolidateLivedMemory({
-        userId,
-        instance: kairaInstance,
-        sessionId,
-        speakerName: userName,
-        event: languageUnderstanding.worldEvent,
-        dynamicStateAfter: kdm.nextDynamicState,
-      });
       const firstEncounterFastPersistence =
         conversationPhase === "first_encounter" &&
         firstEncounterFastReply.handled;
+      const ownershipStart = now();
+      await assertStateMutationOwnership();
+      const ownershipMs = Math.round(now() - ownershipStart);
+      const livedMemoryStart = now();
+      const livedMemoryRuntime = firstEncounterFastPersistence
+        ? { status: "not_applicable" as const }
+        : await persistWorldEventAndMaybeConsolidateLivedMemory({
+            userId,
+            instance: kairaInstance,
+            sessionId,
+            speakerName: userName,
+            event: languageUnderstanding.worldEvent,
+            dynamicStateAfter: kdm.nextDynamicState,
+          });
+      const livedMemoryMs = Math.round(now() - livedMemoryStart);
       let savedTurnId = "";
       const saveRelationshipState = () =>
         kairaPolicy.persistentRelationship
@@ -1301,17 +1307,19 @@ app.post("/api/chat", async (req, res) => {
         : savedTurnId
           ? `chat_turn:${savedTurnId}`
           : "";
-      if (kairaPolicy.autonomousActivityPlanning && autonomousStateSourceId) {
-        await Promise.allSettled([
-          observeKairaActivityDynamicState({
-            ownerUserId: String(userId),
-            kairaInstanceId: kairaInstance.instanceId,
-            instanceType: kairaInstance.instanceType,
-            state: kdm.nextDynamicState,
-            observedAt: new Date().toISOString(),
-            sourceId: autonomousStateSourceId,
-          }),
-        ]);
+      const saveAutonomousState = () =>
+        kairaPolicy.autonomousActivityPlanning && autonomousStateSourceId
+          ? observeKairaActivityDynamicState({
+              ownerUserId: String(userId),
+              kairaInstanceId: kairaInstance.instanceId,
+              instanceType: kairaInstance.instanceType,
+              state: kdm.nextDynamicState,
+              observedAt: new Date().toISOString(),
+              sourceId: autonomousStateSourceId,
+            })
+          : Promise.resolve();
+      if (!firstEncounterFastPersistence) {
+        await Promise.allSettled([saveAutonomousState()]);
       }
       memoryCache.delete(memoryCacheKey(userId, kairaInstance.instanceId));
       const postProcessMs = Math.round(now() - postStart),
@@ -1332,6 +1340,9 @@ app.post("/api/chat", async (req, res) => {
           memoryMs,
           kdmMs,
           aiMs: 0,
+          ownershipMs,
+          livedMemoryMs,
+          criticalPersistenceMs,
           postProcessMs,
           serverTotalMs: timings.serverTotalMs,
           variantId:
@@ -1379,6 +1390,19 @@ app.post("/api/chat", async (req, res) => {
         dialogue: dialogueAnalysis,
         timings,
       });
+      if (firstEncounterFastPersistence) {
+        const backgroundStart = now();
+        await Promise.allSettled([
+          saveMetricTelemetry(),
+          saveKntTelemetry(),
+          saveAutonomousState(),
+        ]);
+        console.log("[First Encounter Background Persistence]", {
+          testRunId,
+          requestId,
+          backgroundPersistenceMs: Math.round(now() - backgroundStart),
+        });
+      }
       return;
       }
     }
