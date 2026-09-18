@@ -1,5 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { authorizeKairaInternalWorker } from "./kairaInternalWorkerAuth";
+import { buildRuntimeTestRunRecordV1 } from "./testRunRuntimeProvenance";
+import { resolveChatTestRunBinding } from "./testRunLiveBinding";
 
 const CONTRACT_VERSION = 1 as const;
 
@@ -73,19 +75,62 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
     }
 
     const event = req.body;
+
+    const incomingTestRunId = String(req.get("x-kaira-test-run-id") || "").trim();
+    const incomingTestMode = String(req.get("x-kaira-test-mode") || "").trim().toLowerCase();
+    const incomingEnvironmentId = String(req.get("x-kaira-environment-id") || "").trim();
+    const incomingPrivatRoomCommit = String(req.get("x-privatroom-git-commit") || "").trim();
+    const incomingScenarioPackVersion = String(
+      req.get("x-kaira-scenario-pack-version") || "",
+    ).trim();
+
+    let testRunRecord: ReturnType<typeof buildRuntimeTestRunRecordV1> | undefined;
+    if (incomingTestRunId) {
+      const conversationServerId = event.conversation.conversationId.replace(/^room:/, "");
+      testRunRecord = buildRuntimeTestRunRecordV1({
+        testRunId: incomingTestRunId,
+        environmentId:
+          incomingEnvironmentId === "test" ||
+          incomingEnvironmentId === "staging" ||
+          incomingEnvironmentId === "live-beta"
+            ? incomingEnvironmentId
+            : "live-beta",
+        mode: incomingTestMode === "continuation" ? "continuation" : "fresh",
+        serverId: conversationServerId,
+        kairaInstanceId: event.kairaInstanceId,
+        testerUserId: event.actor.userId,
+        privatRoomCommit: incomingPrivatRoomCommit,
+        scenarioPackVersion:
+          incomingScenarioPackVersion || "social-platform-v0.4",
+        trialState: "fresh",
+        sourceRunId:
+          incomingTestMode === "continuation"
+            ? String(req.get("x-kaira-source-run-id") || "").trim()
+            : undefined,
+      });
+    }
+
     if (!event.capabilities.includes("message.send")) {
       return res.json({
         contractVersion: CONTRACT_VERSION,
         sourceEventId: event.eventId,
         responseId: `no_reply_${safeId(event.eventId)}`,
+        testRunId: testRunRecord?.provenance.identity.testRunId,
         proposedActions: [],
         noReplyReason: "message_send_capability_not_granted",
       });
     }
 
+    const legacySessionId = `privatroom_${safeId(event.conversation.conversationId)}`;
+    const testRunBinding = resolveChatTestRunBinding({
+      legacySessionId,
+      record: testRunRecord,
+    });
+
     const corePayload = {
       requestId: `privatroom_${safeId(event.eventId)}`,
-      sessionId: `privatroom_${safeId(event.conversation.conversationId)}`,
+      sessionId: testRunBinding.sessionId,
+      testRunRecord: testRunBinding.record,
       userId: event.actor.userId,
       userName: event.actor.displayName,
       userMessage: event.message.text,
@@ -117,11 +162,14 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
       }
 
       const reply = String(data?.reply || "").trim();
+      const responseTestRunId =
+        typeof data?.testRunId === "string" ? data.testRunId : testRunBinding.testRunId;
       if (!reply) {
         return res.json({
           contractVersion: CONTRACT_VERSION,
           sourceEventId: event.eventId,
           responseId: `no_reply_${safeId(event.eventId)}`,
+          testRunId: testRunBinding.testRunId,
           proposedActions: [],
           noReplyReason: "kaira_core_returned_empty_reply",
         });
@@ -131,6 +179,7 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
         contractVersion: CONTRACT_VERSION,
         sourceEventId: event.eventId,
         responseId: `reply_${safeId(event.eventId)}`,
+        testRunId: responseTestRunId,
         proposedActions: [
           {
             type: "message.send",

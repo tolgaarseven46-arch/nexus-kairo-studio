@@ -49,7 +49,7 @@ function normalizeDynamicState(value: unknown): DroitDynamicState | null {
 export interface KdmPersistencePayload { dynamicState: DroitDynamicState; reasoningTrace: ReasoningTrace; lastUserMessage: string; reply: string; userId?: string; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; semanticInterpretation?: SemanticInterpretation; }
 export interface KdmMemoryItem { sourceId?: string; userMessage: string; reply: string; createdAt?: string; reasoningTrace?: ReasoningTrace; dynamicState?: DroitDynamicState; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; semanticInterpretation?: SemanticInterpretation; }
 export interface KairoUserMemory { userName?: string; preferences: string[]; facts: string[]; goals: string[]; notes: string[]; updatedAt: string; }
-export interface KntTracePayload { userId?: string; userMessage: string; reply: string; reasoningTrace: ReasoningTrace; dynamicState: DroitDynamicState; timings: Record<string, number>; providerUsed?: string; semanticInterpretation?: SemanticInterpretation; semanticEvent?: unknown; semanticSource?: string; languageStyleMemory?: unknown; controlledSpontaneity?: unknown; speechIdentity?: unknown; worldStateAppraisal?: unknown; worldReasoningPolicy?: unknown; worldMemoryGuard?: unknown; epistemicAccess?: unknown; selfMemoryRuntime?: unknown; livedMemoryRuntime?: unknown; responsePlan?: unknown; createdAt?: string; }
+export interface KntTracePayload { userId?: string; testRunId?: string; sessionId?: string; userMessage: string; reply: string; reasoningTrace: ReasoningTrace; dynamicState: DroitDynamicState; timings: Record<string, number>; providerUsed?: string; semanticInterpretation?: SemanticInterpretation; semanticEvent?: unknown; semanticSource?: string; languageStyleMemory?: unknown; controlledSpontaneity?: unknown; speechIdentity?: unknown; worldStateAppraisal?: unknown; worldReasoningPolicy?: unknown; worldMemoryGuard?: unknown; epistemicAccess?: unknown; selfMemoryRuntime?: unknown; livedMemoryRuntime?: unknown; responsePlan?: unknown; createdAt?: string; }
 const emptyUserMemory = (): KairoUserMemory => ({ preferences: [], facts: [], goals: [], notes: [], updatedAt: new Date().toISOString() });
 const uniqueRecent = (items: string[]) => [...new Set(items.map((item) => item.trim()).filter(Boolean))].slice(-20);
 function extractMemoryCandidates(userMessage: string, semanticInterpretation?: SemanticInterpretation | null): Partial<KairoUserMemory> { const text = userMessage.trim(); const result: Partial<KairoUserMemory> = {}; const propositions: SemanticProposition[] | undefined = semanticInterpretation?.propositions; if (propositions?.length && !propositions.some((proposition: SemanticProposition) => proposition.modality === 'assertion')) return result; const name = text.match(/(?:benim adım|adım|ismim)\s+([A-Za-zÇĞİÖŞÜçğıöşü0-9_-]{2,40})/i); if (name) result.userName = name[1]; const dyadicAffection = Boolean(semanticInterpretation && semanticInterpretation.target === 'kaira' && (semanticInterpretation.primaryIntent === 'affection' || semanticInterpretation.affection > 0 || semanticInterpretation.secondarySocialActs.includes('affection') || semanticInterpretation.discourseFacets.relationalAct === 'closeness_bid')); if (!dyadicAffection && (/(?:artık .*? sevmiyorum|artık .*? ilgilenmiyorum)/i.test(text) || /(?:seviyorum|sevdiğim|favorim|hoşuma gidiyor|ilgileniyorum|ilgimi çekiyor|daha çok .*? ilgileniyorum)/i.test(text))) result.preferences = [text]; if (/(?:istiyorum|hedefim|amacım|planım|üzerinde çalışıyorum|geliştiriyorum)/i.test(text)) result.goals = [text]; if (/(?:yaşım|yaşındayım|mesleğim|işim|şehirde yaşıyorum|yaşıyorum|çalışıyorum)/i.test(text)) result.facts = [text]; return result; }
@@ -74,6 +74,8 @@ export async function loadRecentKdmMemory(maxItems = 6, userId?: string): Promis
 
 export interface SaveTestSessionTurnPayload {
   sessionId: string;
+  testRunId?: string;
+  testRunRecord?: unknown;
   userId?: string;
   userName?: string;
   userMessage: string;
@@ -135,6 +137,8 @@ export interface SaveTestSessionTurnPayload {
     livedMemoryRuntime?: unknown;
     responsePlan?: unknown;
     activityPermission?: { requestId: string; activityId: string; activityLabel: string; text: string } | null;
+    testRunId?: string;
+    testRunRecord?: unknown;
   };
 }
 
@@ -204,10 +208,13 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
   const speaker = payload.speaker || payload.userName || 'Kullanıcı';
 
   let turnNumber = 1;
+  let existingTestRunRecord: unknown = undefined;
   try {
     const existingSnap = await getDoc(doc(db, TEST_SESSIONS_COLLECTION, sessionId));
     if (existingSnap.exists()) {
-      turnNumber = Number(existingSnap.data()?.turnCount || 0) + 1;
+      const existingData = existingSnap.data();
+      turnNumber = Number(existingData?.turnCount || 0) + 1;
+      existingTestRunRecord = existingData?.testRunRecord;
     }
   } catch {}
 
@@ -215,6 +222,7 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
     turnId,
     turnNumber,
     sessionId,
+    testRunId: payload.testRunId,
     timestamp: now,
     userMessage: payload.userMessage,
     assistantReply: payload.assistantReply,
@@ -260,6 +268,8 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
       livedMemoryRuntime: payload.metadata?.livedMemoryRuntime,
       responsePlan: payload.metadata?.responsePlan,
       activityPermission: payload.metadata?.activityPermission,
+      testRunId: payload.metadata?.testRunId || payload.testRunId,
+      testRunRecord: payload.metadata?.testRunRecord || payload.testRunRecord,
     },
   };
 
@@ -274,6 +284,8 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
     // Update parent session summary document
     const sessionUpdate: Partial<TestSessionSummary> & Record<string, any> = {
       sessionId,
+      testRunId: payload.testRunId,
+      testRunRecord: existingTestRunRecord || payload.testRunRecord,
       userId: userScope,
       userName: speaker,
       characterId: 'kairo',
@@ -317,6 +329,7 @@ export async function loadTestSession(sessionId: string): Promise<RestoredTestSe
           turnId: docSnap.id,
           turnNumber: Number(data.turnNumber || 0),
           sessionId,
+          testRunId: typeof data.testRunId === 'string' ? data.testRunId : undefined,
           timestamp: typeof data.timestamp === 'string' ? data.timestamp : new Date().toISOString(),
           userMessage: typeof data.userMessage === 'string' ? data.userMessage : '',
           assistantReply: typeof data.assistantReply === 'string' ? data.assistantReply : '',
@@ -342,6 +355,8 @@ export async function loadTestSession(sessionId: string): Promise<RestoredTestSe
       const lastTurn = turns[turns.length - 1];
       const sessionSummary: TestSessionSummary = {
         sessionId,
+        testRunId: typeof sessionData.testRunId === 'string' ? sessionData.testRunId : undefined,
+        testRunRecord: sessionData.testRunRecord,
         userId: sessionData.userId || 'anonymous',
         userName: sessionData.userName || 'Kullanıcı',
         characterId: sessionData.characterId || 'kairo',
