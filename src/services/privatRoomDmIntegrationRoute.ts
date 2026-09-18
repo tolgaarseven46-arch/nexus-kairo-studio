@@ -146,6 +146,7 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
       kairaInstanceId: event.kairaInstanceId,
       history: firstEncounter.history,
       conversationPhase: firstEncounter.active ? "first_encounter" : "default",
+      firstEncounterContext: firstEncounter.context,
       provider: process.env.PRIVATROOM_KAIRA_PROVIDER || "openrouter",
     };
 
