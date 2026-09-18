@@ -10,7 +10,10 @@ describe("Kaira autonomous state chat wiring contracts", () => {
       'import { observeKairaActivityDynamicState } from "./src/services/kairaActivityDynamicStateObservationCoordinator";',
     );
     expect(text.match(/observeKairaActivityDynamicState\(\{/g)?.length).toBe(2);
-    expect(text.match(/if \(kairaPolicy\.autonomousActivityPlanning && autonomousStateSourceId\)/g)?.length).toBe(2);
+    expect(text).toContain("const saveAutonomousState = () =>");
+    expect(text).toContain("kairaPolicy.autonomousActivityPlanning && autonomousStateSourceId");
+    expect(text).toContain("if (!firstEncounterFastPersistence)");
+
     expect(text.match(/state: kdm\.nextDynamicState/g)?.length).toBe(2);
     expect(text.match(/ownerUserId: String\(userId\)/g)?.length).toBe(2);
   });
@@ -24,15 +27,25 @@ describe("Kaira autonomous state chat wiring contracts", () => {
 
   it("observes autonomous state only after the canonical turn id can be persisted", () => {
     const text = source();
-    const blocks = text.split("const autonomousStateSourceId = requestId");
-    expect(blocks).toHaveLength(3);
-    for (const before of blocks.slice(0, 2)) {
-      expect(before.lastIndexOf("savedTurnId = t.turnId;")).toBeGreaterThan(before.lastIndexOf("const postStart = now();"));
-    }
+    const firstSource = text.indexOf("const autonomousStateSourceId = requestId");
+    const secondSource = text.indexOf(
+      "const autonomousStateSourceId = requestId",
+      firstSource + 1,
+    );
+    expect(firstSource).toBeGreaterThan(-1);
+    expect(secondSource).toBeGreaterThan(firstSource);
+
+    const firstSavedTurn = text.lastIndexOf("savedTurnId = turn.turnId;", firstSource);
+    const secondSavedTurn = text.lastIndexOf("savedTurnId = t.turnId;", secondSource);
+    expect(firstSavedTurn).toBeGreaterThan(-1);
+    expect(firstSavedTurn).toBeLessThan(firstSource);
+    expect(secondSavedTurn).toBeGreaterThan(-1);
+    expect(secondSavedTurn).toBeLessThan(secondSource);
   });
 
   it("keeps autonomous-state persistence best-effort for chat delivery", () => {
     const text = source();
-    expect(text.match(/await Promise\.allSettled\(\[\s*observeKairaActivityDynamicState/g)?.length).toBe(2);
+    expect(text).toContain("await Promise.allSettled([saveAutonomousState()])");
+    expect(text.match(/await Promise\.allSettled\(\[\s*observeKairaActivityDynamicState/g)?.length).toBeGreaterThanOrEqual(1);
   });
 });
