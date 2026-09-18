@@ -791,6 +791,9 @@ app.post("/api/chat", async (req, res) => {
       });
     };
     const cleanHistory = sanitizeKairoChatHistory(history);
+    const persistedStatePromise = kairaPolicy.persistentRelationship
+      ? loadKdmState(stateUserId).catch(() => null)
+      : Promise.resolve(null);
     const semanticStart = now();
     const languageUnderstanding = await resolveServerLanguageUnderstanding({
       message: userMessage,
@@ -929,7 +932,7 @@ app.post("/api/chat", async (req, res) => {
     );
     const memoryStart = now();
     const [persistedState, persistentMemory] = await Promise.all([
-      kairaPolicy.persistentRelationship ? loadKdmState(stateUserId).catch(() => null) : Promise.resolve(null),
+      persistedStatePromise,
       firstEncounterTrivialSocial
         ? Promise.resolve([])
         : suppressRecentMemory || !kairaPolicy.persistentUserMemory
