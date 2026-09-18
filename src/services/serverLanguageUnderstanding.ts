@@ -23,6 +23,11 @@ export interface ResolveServerLanguageUnderstandingInput {
   context?: LanguageUnderstandingContext;
   preferredProvider: string;
   generateText: ServerSemanticGenerateText;
+  preferTrivialSocialFastPath?: boolean;
+  firstEncounterContext?: {
+    roomName?: string;
+    isOwner?: boolean;
+  };
 }
 
 const CANONICAL_SEMANTIC_PROVIDER = "llm_semantic_runtime";
@@ -43,6 +48,90 @@ These attribution fields describe CURRENT-turn semantic evidence only. Use "unkn
 Do NOT infer betrayal or unfairness here. Do NOT use relationship history to manufacture intentionality, controllability, consent, or external cause.
 Do NOT invent actorId or scopeKey; the canonical runtime grounds those from the already-built world event proposition.
 If evidence is insufficient, omit attribution or use unknown values. This extension is compatible with SemanticInterpretation@2.`;
+
+
+const FAST_SOCIAL_ROUTINES = new Set([
+  "greeting",
+  "how_are_you",
+  "what_doing",
+  "thanks",
+  "agreement",
+  "goodbye",
+  "good_night",
+]);
+
+const FIRST_ENCOUNTER_ROOM_CONTEXT_RE =
+  /(?:^|\s)(?:napıyoruz|napicaz|napıcaz|ne\s+yapıyoruz|ne\s+yapacağız|burada\s+ne\s+yapıyoruz|burda\s+ne\s+yapıyoruz|burası\s+ne|bu\s+oda\s+ne\s+için|burada\s+ne\s+oluyor|burda\s+ne\s+oluyor)(?:\s|$|[?.!,])/iu;
+
+function isSafeTrivialSocialFastPath(result: LanguageUnderstandingResult): boolean {
+  const event = result.event;
+  return (
+    FAST_SOCIAL_ROUTINES.has(event.socialRoutine ?? "none") &&
+    !event.insult &&
+    !event.redLine &&
+    !event.apology &&
+    !event.repairAttempt &&
+    !event.stopTalking &&
+    !event.stopQuestions &&
+    event.coercion === 0 &&
+    event.manipulation === 0 &&
+    event.privacyViolation === 0 &&
+    !event.knowledgeQuery &&
+    (event.discourseAct ?? "none") === "none"
+  );
+}
+
+function reconcileFirstEncounterContextSemantics(
+  message: string,
+  result: LanguageUnderstandingResult,
+  context?: ResolveServerLanguageUnderstandingInput["firstEncounterContext"],
+): LanguageUnderstandingResult {
+  if (!context || !FIRST_ENCOUNTER_ROOM_CONTEXT_RE.test(message.toLocaleLowerCase("tr-TR").trim())) {
+    return result;
+  }
+
+  const interpretation = {
+    ...result.interpretation,
+    primaryIntent: "question" as const,
+    target: "event" as const,
+    discourseFacets: {
+      ...result.interpretation.discourseFacets,
+      socialRoutine: "none" as const,
+    },
+    uncertainty: {
+      ...result.interpretation.uncertainty,
+      intent: Math.min(result.interpretation.uncertainty.intent, 0.08),
+      target: Math.min(result.interpretation.uncertainty.target, 0.12),
+      overall: Math.min(result.interpretation.uncertainty.overall, 0.12),
+    },
+    evidence: [
+      ...result.interpretation.evidence,
+      {
+        source: "reconciled" as const,
+        provider: "kaira_first_encounter_context_semantics",
+        cues: ["first_encounter_room_context_question"],
+        confidence: 0.96,
+      },
+    ].slice(-8),
+  };
+
+  const projected = projectSemanticEvent(interpretation);
+  const grounded = groundSemanticEventForAppraisal(
+    message,
+    projected,
+    result.entityResolution,
+  );
+
+  return {
+    ...result,
+    interpretation,
+    event: {
+      ...grounded.event,
+      semanticUncertainty: interpretation.uncertainty.overall,
+    },
+    worldEvent: grounded.worldEvent,
+  };
+}
 
 const SUBJECT_AND_REPORTED_SPEECH_EXTENSION = `
 CANONICAL SUBJECT / REPORTED-SPEECH EXTENSION (fail-closed):
@@ -140,6 +229,26 @@ export function reconcileServerCanonicalSemantics(
 export async function resolveServerLanguageUnderstanding(
   input: ResolveServerLanguageUnderstandingInput,
 ): Promise<LanguageUnderstandingResult> {
+  if (
+    input.preferTrivialSocialFastPath &&
+    !input.incomingSemanticInterpretation
+  ) {
+    const fastFloor = await understandTurkishMessage(input.message, {
+      context: input.context,
+    });
+    if (isSafeTrivialSocialFastPath(fastFloor)) {
+      const reconciledFast = reconcileServerCanonicalSemantics(
+        input.message,
+        fastFloor,
+      );
+      return reconcileFirstEncounterContextSemantics(
+        input.message,
+        reconciledFast,
+        input.firstEncounterContext,
+      );
+    }
+  }
+
   const morphologyProvider = createConfiguredZemberekMorphologyProvider();
   const semanticProvider = createLlmSemanticUnderstandingProvider({
     // Canonical semantic evidence must not encode the requested transport/provider.
@@ -162,7 +271,12 @@ export async function resolveServerLanguageUnderstanding(
     context: input.context,
   });
   const reconciledResult = reconcileServerCanonicalSemantics(input.message, rawResult);
-  const result = groundCanonicalAttribution(reconciledResult);
+  const contextualResult = reconcileFirstEncounterContextSemantics(
+    input.message,
+    reconciledResult,
+    input.firstEncounterContext,
+  );
+  const result = groundCanonicalAttribution(contextualResult);
 
   if (result.semanticSource !== "semantic_provider") return result;
   return {
