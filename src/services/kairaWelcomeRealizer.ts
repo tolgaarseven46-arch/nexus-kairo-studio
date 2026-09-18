@@ -59,12 +59,12 @@ export function realizeKairaWelcome(
   const text = genericName
     ? realized
         .replace(
-          new RegExp("(^|\\s)" + displayName + "(?=[,.!?\\s]|$)", "giu"),
+          new RegExp("(^|\s)" + displayName + "(?=[,.!?\s]|$)", "giu"),
           "$1",
         )
-        .replace(/^\\s*[,.-]+\\s*/u, "")
-        .replace(/\\s+([,.!?])/gu, "$1")
-        .replace(/\\s{2,}/gu, " ")
+        .replace(/^\s*[,.-]+\s*/u, "")
+        .replace(/\s+([,.!?])/gu, "$1")
+        .replace(/\s{2,}/gu, " ")
         .trim()
     : realized;
 
