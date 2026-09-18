@@ -1125,57 +1125,29 @@ app.post("/api/chat", async (req, res) => {
         event: languageUnderstanding.worldEvent,
         dynamicStateAfter: kdm.nextDynamicState,
       });
+      const firstEncounterFastPersistence =
+        conversationPhase === "first_encounter" &&
+        firstEncounterFastReply.handled;
       let savedTurnId = "";
-      await Promise.allSettled([
-        kairaPolicy.persistentRelationship ? saveKdmInteraction({
-          userId: stateUserId,
-          dynamicState: kdm.nextDynamicState,
-          reasoningTrace: kdm.trace,
-          lastUserMessage: userMessage,
-          reply: userFacingReply,
-          memoryScope: kairaPolicy.persistentUserMemory ? dialogueAnalysis.memoryScope : "session",
-          dialogueAnalysis,
-          semanticInterpretation: canonicalSemantic.interpretation,
-        }) : Promise.resolve(),
-        recordKdmMetric({
-          userId: stateUserId,
-          score: consistency.score,
-          accepted: consistency.accepted,
-          repaired: false,
-          repairAttempts: 0,
-          issues: consistency.issues,
-        }),
-        saveKntTrace({
-          userId: stateUserId,
-          testRunId,
-          sessionId,
-          userMessage,
-          reply: finalDelivery.candidateReply,
-          reasoningTrace: kdm.trace,
-          dynamicState: kdm.nextDynamicState,
-          timings: {
-            memoryMs,
-            kdmMs,
-            aiMs: 0,
-            postProcessMs: 0,
-            serverTotalMs: 0,
-          },
-          providerUsed: "local_language",
-          semanticInterpretation: canonicalSemantic.interpretation,
-          semanticEvent: canonicalSemantic.event,
-          semanticSource: canonicalSemantic.source,
-          languageStyleMemory,
-          controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" },
-          speechIdentity: speech,
-          worldStateAppraisal,
-          worldReasoningPolicy,
-          worldMemoryGuard,
-          epistemicAccess,
-          selfMemoryRuntime,
-          livedMemoryRuntime,
-          responsePlan,
-        }),
+      const saveRelationshipState = () =>
+        kairaPolicy.persistentRelationship
+          ? saveKdmInteraction({
+              strictPersistence: firstEncounterFastPersistence,
+              userId: stateUserId,
+              dynamicState: kdm.nextDynamicState,
+              reasoningTrace: kdm.trace,
+              lastUserMessage: userMessage,
+              reply: userFacingReply,
+              memoryScope: kairaPolicy.persistentUserMemory
+                ? dialogueAnalysis.memoryScope
+                : "session",
+              dialogueAnalysis,
+              semanticInterpretation: canonicalSemantic.interpretation,
+            })
+          : Promise.resolve();
+      const saveTurnContinuity = () =>
         saveTestSessionTurn({
+          strictPersistence: firstEncounterFastPersistence,
           sessionId,
           testRunId,
           testRunRecord,
@@ -1216,15 +1188,28 @@ app.post("/api/chat", async (req, res) => {
           },
           metadata: {
             semanticInterpretation: canonicalSemantic.interpretation,
-        semanticEvent: canonicalSemantic.event,
+            semanticEvent: canonicalSemantic.event,
             semanticSource: canonicalSemantic.source,
             providerUsed: "local_language",
             languageStyleMemory,
-            controlledSpontaneity: { mode: "none", eligible: false, probability: 0, roll: 0, reason: "local_language_short_circuit" },
+            controlledSpontaneity: {
+              mode: "none",
+              eligible: false,
+              probability: 0,
+              roll: 0,
+              reason: "local_language_short_circuit",
+            },
             speechIdentity: speech,
             entityResolution: languageUnderstanding.entityResolution,
             worldEvent: languageUnderstanding.worldEvent,
-            retrievedWorldEvents: retrievedWorldEvents.map((item) => ({ id: item.observation.id, score: item.score, reasons: item.reasons, kind: item.observation.kind, status: item.observation.status, event: item.observation.event })),
+            retrievedWorldEvents: retrievedWorldEvents.map((item) => ({
+              id: item.observation.id,
+              score: item.score,
+              reasons: item.reasons,
+              kind: item.observation.kind,
+              status: item.observation.status,
+              event: item.observation.event,
+            })),
             worldStateAppraisal,
             worldReasoningPolicy,
             worldMemoryGuard,
@@ -1245,10 +1230,72 @@ app.post("/api/chat", async (req, res) => {
             testRunRecord,
             activityPermission: activityPermissionPrompt,
           },
-        }).then((t) => {
-          savedTurnId = t.turnId;
-        }),
-      ]);
+        }).then((turn) => {
+          savedTurnId = turn.turnId;
+        });
+      const saveMetricTelemetry = () =>
+        recordKdmMetric({
+          userId: stateUserId,
+          score: consistency.score,
+          accepted: consistency.accepted,
+          repaired: false,
+          repairAttempts: 0,
+          issues: consistency.issues,
+        });
+      const saveKntTelemetry = () =>
+        saveKntTrace({
+          userId: stateUserId,
+          testRunId,
+          sessionId,
+          userMessage,
+          reply: finalDelivery.candidateReply,
+          reasoningTrace: kdm.trace,
+          dynamicState: kdm.nextDynamicState,
+          timings: {
+            memoryMs,
+            kdmMs,
+            aiMs: 0,
+            postProcessMs: 0,
+            serverTotalMs: 0,
+          },
+          providerUsed: "local_language",
+          semanticInterpretation: canonicalSemantic.interpretation,
+          semanticEvent: canonicalSemantic.event,
+          semanticSource: canonicalSemantic.source,
+          languageStyleMemory,
+          controlledSpontaneity: {
+            mode: "none",
+            eligible: false,
+            probability: 0,
+            roll: 0,
+            reason: "local_language_short_circuit",
+          },
+          speechIdentity: speech,
+          worldStateAppraisal,
+          worldReasoningPolicy,
+          worldMemoryGuard,
+          epistemicAccess,
+          selfMemoryRuntime,
+          livedMemoryRuntime,
+          responsePlan,
+        });
+
+      let criticalPersistenceMs = 0;
+      if (firstEncounterFastPersistence) {
+        const criticalStart = now();
+        await Promise.all([
+          saveRelationshipState(),
+          saveTurnContinuity(),
+        ]);
+        criticalPersistenceMs = Math.round(now() - criticalStart);
+      } else {
+        await Promise.allSettled([
+          saveRelationshipState(),
+          saveMetricTelemetry(),
+          saveKntTelemetry(),
+          saveTurnContinuity(),
+        ]);
+      }
       const autonomousStateSourceId = requestId
         ? `chat_request:${requestId}`
         : savedTurnId
