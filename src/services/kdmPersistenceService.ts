@@ -318,10 +318,6 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
     const turnsRef = collection(sessionRef, TURNS_COLLECTION);
     const turnDocRef = doc(turnsRef, turnId);
 
-    // Save individual turn document without undefined properties
-    await setDoc(turnDocRef, stripUndefined(turnRecord));
-
-    // Update parent session summary document
     const sessionUpdate: Partial<TestSessionSummary> & Record<string, any> = {
       sessionId,
       testRunId: payload.testRunId,
@@ -338,7 +334,10 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
       active: true,
     };
 
-    await setDoc(sessionRef, stripUndefined(sessionUpdate), { merge: true });
+    const batch = writeBatch(db);
+    batch.set(turnDocRef, stripUndefined(turnRecord));
+    batch.set(sessionRef, stripUndefined(sessionUpdate), { merge: true });
+    await batch.commit();
 
     // Store active sessionId in localStorage for fast reload on client
     if (typeof window !== 'undefined' && window.localStorage) {
