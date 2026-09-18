@@ -11,6 +11,10 @@ import {
   KairaStateMutationOwnershipLostError,
 } from './kairaDistributedStateMutation';
 import { firestoreStateMutationBackend } from './kairaFirestoreStateMutation';
+import {
+  claimFirstEncounterCoordination,
+  FIRST_ENCOUNTER_STATE_LEASE_MS,
+} from './kairaFirestoreCombinedCoordination';
 
 const distributed = createDistributedChatIdempotency<any>(firestoreChatIdempotencyBackend);
 const stateMutations = createDistributedStateMutationCoordinator(firestoreStateMutationBackend);
@@ -52,6 +56,56 @@ async function acquireLocalStateMutation(key: string): Promise<StateMutationHand
   };
 }
 
+function registerPreclaimedStateMutation(requestKey: string, stateOwnerToken: string) {
+  const ownerKey = stateOwnerKey(requestKey);
+  let released = false;
+  let ownershipLost = false;
+  let renewing = false;
+  const assertHeld = async () => {
+    if (released || ownershipLost) throw new KairaStateMutationOwnershipLostError();
+  };
+  const renew = async () => {
+    await assertHeld();
+    const renewed = await firestoreStateMutationBackend.renew({
+      key: ownerKey,
+      ownerToken: stateOwnerToken,
+      now: Date.now(),
+      leaseMs: FIRST_ENCOUNTER_STATE_LEASE_MS,
+    });
+    if (!renewed) {
+      ownershipLost = true;
+      throw new KairaStateMutationOwnershipLostError();
+    }
+  };
+  const timer = setInterval(async () => {
+    if (released || ownershipLost || renewing) return;
+    renewing = true;
+    try {
+      await renew();
+    } catch (error) {
+      if (error instanceof KairaStateMutationOwnershipLostError) clearInterval(timer);
+      console.warn('[Kaira State Mutation] preclaimed lease renewal failed:', error);
+    } finally {
+      renewing = false;
+    }
+  }, Math.max(5_000, Math.floor(FIRST_ENCOUNTER_STATE_LEASE_MS / 3)));
+  (timer as any).unref?.();
+
+  stateMutationHandles.set(requestKey, {
+    assertHeld,
+    assertOwned: renew,
+    release: async () => {
+      if (released) return;
+      released = true;
+      clearInterval(timer);
+      await firestoreStateMutationBackend.release({
+        key: ownerKey,
+        ownerToken: stateOwnerToken,
+      });
+    },
+  });
+}
+
 async function acquireStateMutation(requestKey: string) {
   const ownerKey = stateOwnerKey(requestKey);
   try {
@@ -86,9 +140,28 @@ async function releaseStateMutation(requestKey: string) {
   }
 }
 
-export async function claimCoordinatedKairaChatRequest<T = unknown>(key: string): Promise<KairaChatRequestClaim<T>> {
+export async function claimCoordinatedKairaChatRequest<T = unknown>(
+  key: string,
+  options: { preferCombinedFirstEncounterCoordination?: boolean } = {},
+): Promise<KairaChatRequestClaim<T>> {
   const normalizedKey = key.trim();
   if (!normalizedKey) return { kind: 'owner' };
+
+  if (options.preferCombinedFirstEncounterCoordination) {
+    try {
+      const combined = await claimFirstEncounterCoordination<T>(normalizedKey);
+      if (combined.kind === 'owner') {
+        registerPreclaimedStateMutation(normalizedKey, combined.stateOwnerToken);
+        distributedOwners.set(normalizedKey, combined.idempotencyOwnerToken);
+        localFallbackKeys.delete(normalizedKey);
+        return { kind: 'owner' };
+      }
+      if (combined.kind === 'replay') return combined;
+      return await distributed.claim(normalizedKey) as KairaChatRequestClaim<T>;
+    } catch (error) {
+      console.warn('[Kaira Coordination] combined first-encounter claim unavailable; falling back:', error);
+    }
+  }
 
   const stateMutationPromise = acquireStateMutation(normalizedKey);
   const claimPromise = distributed.claim(normalizedKey);
