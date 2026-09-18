@@ -54,7 +54,19 @@ export function realizeKairaWelcome(
   const index = fnv1a(seed) % variants.length;
   const variantId = `${input.decision.introduceSelf ? "room_created" : "participant_joined"}_v${index + 1}`;
   const displayName = input.actorDisplayName.trim() || "arkadaşım";
-  const text = variants[index](displayName);
+  const genericName = /^(?:beta kullanıcısı|oyuncu|siz|kullanıcı)$/iu.test(displayName);
+  const realized = variants[index](displayName);
+  const text = genericName
+    ? realized
+        .replace(
+          new RegExp("(^|\\\\s)" + displayName + "(?=[,.!?\\\\s]|$)", "giu"),
+          "$1",
+        )
+        .replace(/^\\s*[,.-]+\\s*/u, "")
+        .replace(/\\s+([,.!?])/gu, "$1")
+        .replace(/\\s{2,}/gu, " ")
+        .trim()
+    : realized;
 
   for (const term of input.decision.prohibitedTerms) {
     if (text.toLocaleLowerCase("tr-TR").includes(term.toLocaleLowerCase("tr-TR"))) {
