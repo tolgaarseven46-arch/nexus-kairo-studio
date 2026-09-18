@@ -7,7 +7,7 @@ const serverSource = fs.readFileSync(path.resolve(process.cwd(), 'server.ts'), '
 describe('chat idempotency server integration contracts', () => {
   it('claims coordination identity before language understanding and KDM work', () => {
     const identityIndex = serverSource.indexOf('resolveKairaChatRequestCoordinationIdentity(');
-    const claimIndex = serverSource.indexOf('claimCoordinatedKairaChatRequest<any>(coordinationKey)', identityIndex);
+    const claimIndex = serverSource.indexOf('claimCoordinatedKairaChatRequest<any>(coordinationKey, {', identityIndex);
     const languageIndex = serverSource.indexOf('const languageUnderstanding = await resolveServerLanguageUnderstanding', claimIndex);
     const kdmIndex = serverSource.indexOf('analyzeKdmInteractionCanonicalTurn(', claimIndex);
 
