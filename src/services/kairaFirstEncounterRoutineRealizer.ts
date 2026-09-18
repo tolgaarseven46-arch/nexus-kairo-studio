@@ -106,7 +106,7 @@ export function realizeKairaFirstEncounterRoutine(
   const seed = `${input.requestId}:${routine}:${input.plan.move}:${input.plan.relationshipLevel}`;
   const pool = POOLS[routine];
   const index = fnv1a(seed) % pool.length;
-  let reply = pool[index];
+  let reply: string = pool[index];
 
   if (!input.plan.allowQuestion) {
     reply = reply
