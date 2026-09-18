@@ -5,7 +5,21 @@ vi.mock('../lib/firebase', () => ({ db: {} }));
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((...args: unknown[]) => ({ kind: 'collection', args })),
   doc: vi.fn((...args: unknown[]) => ({ kind: 'doc', args })),
-  getDoc: vi.fn(), getDocs: firestore.getDocs, setDoc: firestore.setDoc, addDoc: firestore.addDoc,
+  getDoc: vi.fn(), getDocs: firestore.getDocs, setDoc: firestore.setDoc,
+  writeBatch: vi.fn(() => {
+    const operations: Array<{ ref: unknown; data: Record<string, any>; options?: unknown }> = [];
+    return {
+      set: vi.fn((ref: unknown, data: Record<string, any>, options?: unknown) => {
+        operations.push({ ref, data, options });
+      }),
+      commit: vi.fn(async () => {
+        for (const operation of operations) {
+          await firestore.setDoc(operation.ref, operation.data, operation.options);
+        }
+      }),
+    };
+  }),
+  addDoc: firestore.addDoc,
   writeBatch: vi.fn(() => ({ set: (...args: unknown[]) => firestore.setDoc(...args), commit: vi.fn(async () => undefined) })),
   deleteDoc: vi.fn(), where: vi.fn(), limit: vi.fn((value: number) => ({ kind: 'limit', value })),
   orderBy: vi.fn((...args: unknown[]) => ({ kind: 'orderBy', args })), query: vi.fn((...args: unknown[]) => ({ kind: 'query', args })),
