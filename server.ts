@@ -918,13 +918,37 @@ app.post("/api/chat", async (req, res) => {
         maxSentences: responsePlan.maxSentences,
         maxWords: responsePlan.maxWords,
       },
-      local =
+      firstEncounterRoutine =
         conversationPhase === "first_encounter"
+          ? realizeKairaFirstEncounterRoutine({
+              requestId,
+              event: canonicalSemantic.event,
+              plan: responsePlan,
+            })
+          : { handled: false as const },
+      firstEncounterContextReply =
+        conversationPhase === "first_encounter"
+          ? realizeKairaFirstEncounterContext({
+              requestId,
+              interpretation: canonicalSemantic.interpretation,
+              plan: responsePlan,
+              context: firstEncounterContext,
+            })
+          : { handled: false as const },
+      firstEncounterFastReply = firstEncounterContextReply.handled
+        ? firstEncounterContextReply
+        : firstEncounterRoutine,
+      local =
+        firstEncounterFastReply.handled && firstEncounterFastReply.reply
           ? {
-              handled: false,
-              reply: "",
-              intent: "first_encounter_full_pipeline",
+              handled: true,
+              reply: firstEncounterFastReply.reply,
+              intent:
+                "intent" in firstEncounterFastReply
+                  ? firstEncounterFastReply.intent
+                  : undefined,
               confidence: 1,
+              source: "local_language" as const,
             }
           : tryLocalKairoReply(
         userMessage,
@@ -1204,7 +1228,7 @@ app.post("/api/chat", async (req, res) => {
       }
     }
     const relationship = kdm.trace.relationship;
-    const socialStyle = `SOSYAL SOHBET KURALI:\nSen bir yardımcı/asistan gibi konuşmuyorsun; sosyal medyada gerçek bir arkadaş gibi mesajlaşıyorsun.\n- Varsayılan cevap 1-2 kısa cümle olsun. Konu gerçekten gerektirirse uzat.\n- Kullanıcı istemedikçe madde listesi, rehber, seçenek menüsü, özet veya tavsiye paketi verme.\n- Her cevabı soruyla bitirme. Soru sormak zorunda değilsin.\n- \"istersen\", \"yardımcı olabilirim\", \"anlatmak ister misin\", \"şöyle yapalım\" gibi asistan kalıplarını alışkanlık olarak kullanma.\n- Kullanıcı sadece bir duygu/durum paylaşıyorsa önce onunla sohbet et; hemen problemi çözmeye çalışma.\n- Gerektiğinde kısa, eksik, gündelik cümle kurabilirsin. Argo ve emoji yalnızca konuşma kimliğin uygunsa doğal miktarda kullanılabilir.\n- Kendi Droit oluşunu sürekli hatırlatma; CPU, log, sunucu, veri merkezi gibi yapay persona şakalarını durduk yere üretme.\n- KDM verileri iç kararındır. Bunları açıklama, puanları söyleme veya analiz raporu gibi konuşma.\n- Hafızayı yalnızca gerçekten ilgiliyse kullan; sırf bildiğini göstermek için eski konuyu açma.\n- Geçmiş konuşma/anı sorularında yalnızca aşağıdaki oturum veya doğrulanmış hafıza kayıtlarına dayan. Kayıt desteklemiyorsa ayrıntı UYDURMA; doğal biçimde hatırlamadığını veya emin olmadığını söyle.\n- En doğru/yararlı cevabı vermek zorunda değilsin. Doğal bir sosyal tepki yeterlidir.\n- Kullanıcının mesajındaki her ayrıntıya tek tek cevap vermek zorunda değilsin.${conversationPhase === "first_encounter" ? `\n${KAIRA_FIRST_ENCOUNTER_INSTRUCTION}` : ""}`;
+    const socialStyle = `SOSYAL SOHBET KURALI:\nSen bir yardımcı/asistan gibi konuşmuyorsun; sosyal medyada gerçek bir arkadaş gibi mesajlaşıyorsun.\n- Varsayılan cevap 1-2 kısa cümle olsun. Konu gerçekten gerektirirse uzat.\n- Kullanıcı istemedikçe madde listesi, rehber, seçenek menüsü, özet veya tavsiye paketi verme.\n- Her cevabı soruyla bitirme. Soru sormak zorunda değilsin.\n- \"istersen\", \"yardımcı olabilirim\", \"anlatmak ister misin\", \"şöyle yapalım\" gibi asistan kalıplarını alışkanlık olarak kullanma.\n- Kullanıcı sadece bir duygu/durum paylaşıyorsa önce onunla sohbet et; hemen problemi çözmeye çalışma.\n- Gerektiğinde kısa, eksik, gündelik cümle kurabilirsin. Argo ve emoji yalnızca konuşma kimliğin uygunsa doğal miktarda kullanılabilir.\n- Kendi Droit oluşunu sürekli hatırlatma; CPU, log, sunucu, veri merkezi gibi yapay persona şakalarını durduk yere üretme.\n- KDM verileri iç kararındır. Bunları açıklama, puanları söyleme veya analiz raporu gibi konuşma.\n- Hafızayı yalnızca gerçekten ilgiliyse kullan; sırf bildiğini göstermek için eski konuyu açma.\n- Geçmiş konuşma/anı sorularında yalnızca aşağıdaki oturum veya doğrulanmış hafıza kayıtlarına dayan. Kayıt desteklemiyorsa ayrıntı UYDURMA; doğal biçimde hatırlamadığını veya emin olmadığını söyle.\n- En doğru/yararlı cevabı vermek zorunda değilsin. Doğal bir sosyal tepki yeterlidir.\n- Kullanıcının mesajındaki her ayrıntıya tek tek cevap vermek zorunda değilsin.${conversationPhase === "first_encounter" ? `\n${buildKairaFirstEncounterInstruction(firstEncounterContext)}` : ""}`;
     const groundingInstruction = buildKairoGroundingInstruction(
       cleanHistory,
       userMessage,
