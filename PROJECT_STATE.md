@@ -305,3 +305,14 @@ Current proof:
 - the read-only review route is internal-authenticated and does not change live chat behavior.
 
 This is the review seam needed for joint live-beta inspection after REC proof.
+
+
+## 21. Slice A W9 — internal live review evidence probe
+The final Slice A joint-review gate may use an ephemeral internal startup probe to read the already-persisted live TestRun through the same review-packet builder without weakening any external auth boundary.
+
+Constraints:
+- the probe is read-only and uses the existing persisted TestSession,
+- it logs only a sanitized review summary (canonical ids, exact build provenance, transcript/provider/timing and evidence-presence booleans),
+- it does not expose a public route or bypass the owner-authenticated PrivatRoom review proxy,
+- it must be removed after W9 evidence is captured,
+- W10 remains blocked until the captured packet is reviewed and the promotion gate is explicitly closed.
