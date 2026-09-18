@@ -15,6 +15,6 @@ describe("first-encounter parallel coordination latency v6", () => {
     expect(server).toContain("const persistedStatePromise =");
     expect(server).toContain("loadKdmState(stateUserId)");
     expect(server).toContain("const languageUnderstanding = await resolveServerLanguageUnderstanding");
-    expect(server).toContain("await persistedStatePromise");
+    expect(server).toMatch(/Promise\.all\(\[\s*persistedStatePromise,/);
   });
 });
