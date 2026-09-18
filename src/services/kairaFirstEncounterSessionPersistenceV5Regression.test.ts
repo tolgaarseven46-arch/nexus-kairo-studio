@@ -6,7 +6,7 @@ describe("first-encounter session persistence latency v5", () => {
     const persistence = await readFile(new URL("./kdmPersistenceService.ts", import.meta.url), "utf8");
     expect(persistence).toContain("turnNumberHint");
     expect(persistence).toContain("payload.turnNumberHint");
-    expect(persistence).toContain("if (payload.turnNumberHint");
+    expect(persistence).toContain("if (!payload.turnNumberHint)");
   });
 
   it("derives the first-encounter fast turn number from canonical request history", async () => {
