@@ -111,6 +111,7 @@ export interface SaveTestSessionTurnPayload {
   sessionId: string;
   strictPersistence?: boolean;
   turnNumberHint?: number;
+  turnIdHint?: string;
   testRunId?: string;
   testRunRecord?: unknown;
   userId?: string;
@@ -244,7 +245,10 @@ function stripUndefined<T>(val: T): T {
 export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): Promise<TestSessionTurnRecord> {
   const userScope = scope(payload.userId);
   const sessionId = payload.sessionId || `session_${userScope}`;
-  const turnId = `turn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const turnId =
+    typeof payload.turnIdHint === 'string' && payload.turnIdHint.trim()
+      ? payload.turnIdHint.trim()
+      : `turn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const now = new Date().toISOString();
   const speaker = payload.speaker || payload.userName || 'Kullanıcı';
 

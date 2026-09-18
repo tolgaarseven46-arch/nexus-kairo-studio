@@ -71,7 +71,7 @@ describe("first-encounter continuity + latency v2", () => {
     expect(decision.socialRoutine).toBe("well_being_reply");
   });
 
-  it("keeps critical continuity before response but telemetry after response", async () => {
+  it("keeps causal continuity lease-held after response and telemetry non-blocking", async () => {
     const fs = await import("node:fs/promises");
     const server = await fs.readFile(new URL("../../server.ts", import.meta.url), "utf8");
     const persistence = await fs.readFile(
@@ -84,14 +84,15 @@ describe("first-encounter continuity + latency v2", () => {
     expect(server).toContain("criticalPersistenceMs");
 
     const localStart = server.indexOf("const firstEncounterFastPersistence");
-    const send = server.indexOf("await sendChatPayload({", localStart);
-    const background = server.indexOf(
-      'console.log("[First Encounter Background Persistence]"',
-      send,
-    );
+    const send = server.indexOf("sendFirstEncounterFastPayload(responsePayload)", localStart);
+    const persist = server.indexOf("await persistFirstEncounterContinuity()", send);
+    const complete = server.indexOf("await completeCoordinatedKairaChatRequest(coordinationKey, responsePayload)", persist);
+    const background = server.indexOf('console.log("[First Encounter Deferred Continuity]"', complete);
     expect(localStart).toBeGreaterThan(-1);
     expect(send).toBeGreaterThan(localStart);
-    expect(background).toBeGreaterThan(send);
+    expect(persist).toBeGreaterThan(send);
+    expect(complete).toBeGreaterThan(persist);
+    expect(background).toBeGreaterThan(complete);
 
     expect(persistence).toContain("writeBatch");
     expect(persistence).toContain("batch.set(turnDocRef");

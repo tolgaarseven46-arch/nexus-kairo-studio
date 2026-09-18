@@ -23,10 +23,11 @@ describe('chat idempotency server integration contracts', () => {
     expect(serverSource).toContain('if (outcome.ok === true) return res.json(outcome.payload);');
   });
 
-  it('completes both local and AI final responses through one payload gate', () => {
-    const occurrences = serverSource.match(/sendChatPayload\(\{/g) ?? [];
-    expect(occurrences).toHaveLength(2);
-    expect(serverSource).toContain('completeCoordinatedKairaChatRequest(coordinationKey, payload)');
+  it('completes AI responses through the standard gate and fast local responses after lease-held continuity', () => {
+    expect(serverSource).toContain('await sendChatPayload(responsePayload)');
+    expect(serverSource).toContain('sendFirstEncounterFastPayload(responsePayload)');
+    expect(serverSource).toContain('await persistFirstEncounterContinuity()');
+    expect(serverSource).toContain('await completeCoordinatedKairaChatRequest(coordinationKey, responsePayload)');
   });
 
   it('releases an owned coordination claim when the request fails', () => {
