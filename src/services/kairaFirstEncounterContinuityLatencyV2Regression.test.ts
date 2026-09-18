@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { resolveServerLanguageUnderstanding } from "./serverLanguageUnderstanding";
+import { deriveDiscourseState } from "./discourseStateReducer";
+import { planDialogueResponse } from "./kairoDialogueDecisionEngine";
+import { projectSemanticEventToDialogueAnalysis } from "./kairaDialogueTurnProjection";
 
 describe("first-encounter continuity + latency v2", () => {
   it("canonicalizes 'iyilik' as a contextual well-being reply without provider", async () => {
@@ -32,6 +35,40 @@ describe("first-encounter continuity + latency v2", () => {
         evidence.cues.includes("first_encounter_well_being_reply"),
       ),
     ).toBe(true);
+  });
+
+  it("keeps contextual well-being reply under canonical social-routine decision authority", async () => {
+    const history = [{ sender: "droit", text: "gayet iyiyim, sen nasılsın?" }];
+    const result = await resolveServerLanguageUnderstanding({
+      message: "iyilik",
+      context: {
+        userName: "Sen",
+        characterName: "Kaira",
+        recentMessages: [{ role: "assistant", content: history[0].text }],
+      },
+      preferredProvider: "openrouter",
+      preferTrivialSocialFastPath: true,
+      firstEncounterContext: { roomName: "deneme", isOwner: true },
+      generateText: async () => { throw new Error("provider must not be called"); },
+    });
+    const analysis = projectSemanticEventToDialogueAnalysis(result.event);
+    const discourse = deriveDiscourseState(history, {
+      message: "iyilik",
+      event: result.event,
+    });
+    const decision = planDialogueResponse(
+      history,
+      "iyilik",
+      "Sen",
+      result.event,
+      analysis,
+      discourse,
+    );
+
+    expect(discourse.previousTurnDependency).toBeTruthy();
+    expect(result.event.socialRoutine).toBe("well_being_reply");
+    expect(decision.move).toBe("complete_social_routine");
+    expect(decision.socialRoutine).toBe("well_being_reply");
   });
 
   it("keeps critical continuity before response but telemetry after response", async () => {
