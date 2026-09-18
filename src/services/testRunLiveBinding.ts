@@ -40,3 +40,27 @@ export function resolveChatTestRunBinding(input: {
     record,
   };
 }
+
+
+export interface TestRunCaptureProof {
+  testRunId: string;
+  sessionId: string;
+  turnId?: string;
+  persisted: boolean;
+}
+
+export function buildTestRunCaptureProof(input: {
+  testRunId?: string;
+  sessionId: string;
+  turnId?: string;
+}): TestRunCaptureProof | undefined {
+  const testRunId = String(input.testRunId || "").trim();
+  if (!testRunId) return undefined;
+  const turnId = String(input.turnId || "").trim();
+  return {
+    testRunId,
+    sessionId: input.sessionId,
+    turnId: turnId || undefined,
+    persisted: Boolean(turnId),
+  };
+}
