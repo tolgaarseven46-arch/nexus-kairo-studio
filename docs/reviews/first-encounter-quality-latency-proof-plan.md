@@ -168,12 +168,12 @@ Generic labels may exist internally only.
 
 | Proof | Required | Status |
 |---|---|---|
-| historical RED fixtures reproduce current failures | yes | pending |
-| architecture authority tests | yes | pending |
-| semantic engagement tests | yes | pending |
-| identity/generic-label tests | yes | pending |
-| latency budget tests | yes | pending |
-| full Kaira CI | yes | pending |
+| historical RED fixtures reproduce current failures | yes | complete — CI run 35333356648 reproduced 4/4 live failures |
+| architecture authority tests | yes | in progress — Architecture Review passing on repair branch |
+| semantic engagement tests | yes | implemented — direct-question dressed acknowledgement rejection + room-context typed evidence |
+| identity/generic-label tests | yes | implemented in historical RED→GREEN fixtures |
+| latency budget tests | yes | implemented — canonical fast path + 2.5s semantic / 3.5s generation budgets; live timing pending |
+| full Kaira CI | yes | running |
 | live TestRun room.created provenance | yes | pending |
 | live TestRun first 3 turns coherent | yes | pending |
 | live server timing within target/fallback budget | yes | pending |
