@@ -34,7 +34,6 @@ describe("TestRun review packet regression", () => {
             providerUsed: "openrouter",
             timings: { totalMs: 420 },
             responsePlan: { continueConversation: true },
-            semanticInterpretation: { primaryIntent: "greeting" },
           },
           retrievedMemories: [],
         },
