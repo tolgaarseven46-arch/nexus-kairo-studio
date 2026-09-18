@@ -405,3 +405,17 @@ The external W2 review can now be validated structurally before it is accepted:
 The gate requires an explicitly independent reviewer, complete finding fields, all seven verdicts, zero remaining blockers and an explicit safe-to-enter-W3 verdict.
 
 This governance tooling does not satisfy W2 by itself and does not authorize W5.
+
+
+## 29. Slice B W2 → W3 transition planner
+A deterministic transition planner now converts a validated independent W2 review into:
+- unresolved blocker IDs,
+- minimum repair + required-test work,
+- the seven-item W3 freeze checklist,
+- an explicit `canFreezeW3` result.
+
+Files:
+- `src/services/sliceBW2ToW3TransitionPlanner.ts`
+- `src/services/sliceBW2ToW3TransitionPlanner.test.ts`
+
+This still does not satisfy W2 by itself; it only prevents manual ambiguity once the external review arrives.
