@@ -8,7 +8,8 @@ describe('server chat request coordination wiring', () => {
     expect(serverSource).toContain('resolveKairaChatRequestCoordinationIdentity(');
     expect(serverSource).toContain('incomingRequestId,\n      randomUUID,');
     expect(serverSource).toContain('requestIdentity.coordinationRequestId');
-    expect(serverSource).toContain('claimCoordinatedKairaChatRequest<any>(coordinationKey)');
+    expect(serverSource).toContain('claimCoordinatedKairaChatRequest<any>(coordinationKey, {');
+    expect(serverSource).toContain('preferCombinedFirstEncounterCoordination,');
   });
 
   it('does not gate state-owner coordination on the presence of an external requestId', () => {
