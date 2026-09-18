@@ -121,6 +121,7 @@ import { registerKairaProposalRecoveryWorkerRoute } from "./src/services/kairaPr
 import { registerKairaActivityProvisioningRoute } from "./src/services/kairaActivityProvisioningRoute";
 import { registerPrivatRoomDmIntegrationRoute } from "./src/services/privatRoomDmIntegrationRoute";
 import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
+import { registerTestRunReviewRoute } from "./src/services/testRunReviewRoute";
 import {
   buildTestRunCaptureProof,
   resolveChatTestRunBinding,
@@ -136,6 +137,7 @@ registerKairaProposalRecoveryWorkerRoute(app);
 registerKairaActivityProvisioningRoute(app);
 registerPrivatRoomDmIntegrationRoute(app);
 registerTestRunProvenanceRoute(app);
+registerTestRunReviewRoute(app);
 let aiClient: GoogleGenAI | null = null;
 const now = () => performance.now(),
   memoryCache = new Map<
