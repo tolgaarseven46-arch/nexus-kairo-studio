@@ -245,3 +245,20 @@ Current proof seam:
 - realization may vary wording while the frozen decision object remains equal.
 
 This is additive proof infrastructure only; the live provider call split is not wired yet.
+
+
+## 17. Slice A5 — runtime provenance population seam
+A runtime-internal TestRun provenance route now builds a complete TestRun record from exact deploy/build facts.
+
+Current proof:
+- Kaira deploy SHA is sourced from `RENDER_GIT_COMMIT` (or explicit `KAIRA_GIT_COMMIT` fallback),
+- PrivatRoom deploy SHA must be supplied as an exact SHA and invalid/missing values fail closed,
+- prompt/policy/model/feature/scenario/environment provenance is populated into the same record,
+- Fresh and Continuation state bindings are created through the same validated factory,
+- continuation requires an explicit source run,
+- the internal route does not change live Kaira reply behavior; it is an observability/provenance seam.
+
+Next Slice A work:
+- carry TestRun context from PrivatRoom beta room automatically,
+- persist/retrieve the populated TestRun record under an isolated test namespace,
+- connect turn-level KNT/session evidence to the TestRun id.
