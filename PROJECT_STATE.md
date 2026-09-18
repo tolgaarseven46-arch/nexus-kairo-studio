@@ -316,3 +316,5 @@ Constraints:
 - it does not expose a public route or bypass the owner-authenticated PrivatRoom review proxy,
 - it must be removed after W9 evidence is captured,
 - W10 remains blocked until the captured packet is reviewed and the promotion gate is explicitly closed.
+
+- W9 startup evidence probe retries persisted TestSession reads after process startup so infrastructure initialization order cannot create a false negative.
