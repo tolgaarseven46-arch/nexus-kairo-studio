@@ -1114,6 +1114,14 @@ app.post("/api/chat", async (req, res) => {
         sessionId,
         testRunId,
         turnId: savedTurnId,
+        testCapture: testRunId
+          ? {
+              testRunId,
+              sessionId,
+              turnId: savedTurnId || undefined,
+              persisted: Boolean(savedTurnId),
+            }
+          : undefined,
         requestId: requestId || undefined,
         kairaInstanceId: kairaInstance.instanceId,
         kairaInstanceType: kairaInstance.instanceType,
@@ -1615,6 +1623,14 @@ app.post("/api/chat", async (req, res) => {
       sessionId,
       testRunId,
       turnId: savedTurnId,
+      testCapture: testRunId
+        ? {
+            testRunId,
+            sessionId,
+            turnId: savedTurnId || undefined,
+            persisted: Boolean(savedTurnId),
+          }
+        : undefined,
       requestId: requestId || undefined,
       kairaInstanceId: kairaInstance.instanceId,
       kairaInstanceType: kairaInstance.instanceType,
