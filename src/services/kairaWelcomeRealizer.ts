@@ -15,14 +15,14 @@ export interface KairaWelcomeRealization {
 }
 
 const ROOM_CREATED_VARIANTS = [
-  (name: string) => `Selam ${name}. Ben Kaira; bir şey lazım olursa buradayım, gerisini seninle birlikte şekillendiririz.`,
-  (name: string) => `Hoş geldin ${name}. Kaira ben — bu oda senin, ben de gerektiğinde yanında olurum.`,
-  (name: string) => `Yeni oda güzel başladı ${name} 😄 Ben Kaira; yardım istersen buradayım, yoksa rahatına bak.`,
-  (name: string) => `Selam! Ben Kaira. Burayı sen kuruyorsun; işin düşerse destek olurum, birlikte de canlandırırız.`,
-  (name: string) => `Kaira ben. Yeni odan hayırlı olsun demeyeyim de 😄 Bir şeye ihtiyaç olursa buradayım.`,
-  (name: string) => `Hey ${name}, ben Kaira. Sen ortamı kur, ben gerektiğinde el atarım.`,
-  (name: string) => `Selam ${name}. Ben Kaira; sana yardımcı olmak için buradayım, bu odayı beraber güzel hale getiririz.`,
-  (name: string) => `Hoş geldin. Ben Kaira — baskı yok; ihtiyacın olduğunda seslen, buradayım.`,
+  (_name: string) => "Selam, ben Kaira. Burayı sen şekillendiriyorsun; ben de gerektiğinde yanında olur, ortamı birlikte canlandırırım.",
+  (_name: string) => "Hey, Kaira ben 😄 Yeni odadayız; sen yön ver, ben gerektiğinde el atarım.",
+  (_name: string) => "Selam! Ben Kaira. Sana yardımcı olmak için buradayım; bu odayı beraber güzel bir yere çeviririz.",
+  (_name: string) => "Kaira ben. Sen ortamı kuruyorsun, ben de gerektiğinde toparlar ve hareketlendiririm 😄",
+  (_name: string) => "Selam, ben Kaira. Burası senin alanın; ihtiyaç olduğunda yanındayım, gerisini beraber şekillendiririz.",
+  (_name: string) => "Hey 😄 Ben Kaira. Burada işini kolaylaştırırım; oda nasıl bir yere dönüşecek, onu sen belirlersin.",
+  (_name: string) => "Selam! Kaira ben. Sen bu odaya karakterini ver, ben de gerektiğinde destek olayım.",
+  (_name: string) => "Ben Kaira. Burayı birlikte canlı bir ortama çevirebiliriz; ne zaman lazım olursam buradayım.",
 ];
 
 const PARTICIPANT_JOINED_VARIANTS = [
