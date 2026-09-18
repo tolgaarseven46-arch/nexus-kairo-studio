@@ -426,3 +426,18 @@ A single-copy external reviewer prompt is prepared at:
 - `docs/reviews/slice-b-w2-one-shot-external-prompt.md`
 
 It requires JSON output matching the already-merged W2 intake validator, so an external review can be processed immediately into blocker repairs and the W3 transition plan.
+
+
+## 31. Canonical PrivatRoom welcome migration
+PrivatRoom welcome behavior is moving off the temporary platform-owned `kaira_welcome_pool`.
+
+Authority boundary:
+- PrivatRoom owns factual lifecycle events: `room.created` / `participant.joined`.
+- Kaira owns WHETHER/HOW-TO-WELCOME decision in `kairaWelcomeDecision.ts`.
+- Kaira realization owns wording/variant selection in `kairaWelcomeRealizer.ts`.
+- Conversation Graph remains observational and owns no welcome decision.
+- Cold-start welcome reads no relationship memory.
+- Internal architecture terms are prohibited at realization.
+- `realizationVariantSeed` + `realizationVariantId` are persisted in TestRun metadata for deterministic replay/review.
+
+The temporary PrivatRoom local welcome pool is migration-only and must be removed from live production once the lifecycle gateway is deployed.
