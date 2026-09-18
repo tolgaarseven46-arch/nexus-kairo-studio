@@ -121,6 +121,7 @@ import { registerKairaProposalRecoveryWorkerRoute } from "./src/services/kairaPr
 import { registerKairaActivityProvisioningRoute } from "./src/services/kairaActivityProvisioningRoute";
 import { registerPrivatRoomDmIntegrationRoute } from "./src/services/privatRoomDmIntegrationRoute";
 import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
+import { resolveChatTestRunBinding } from "./src/services/testRunLiveBinding";
 import type {
   DroitDynamicState,
 } from "./src/types/nexus";
@@ -603,6 +604,7 @@ app.post("/api/chat", async (req, res) => {
       behaviorPolicy: incomingBehaviorPolicy,
       affectBaseline: incomingAffectBaseline,
       sessionId: incomingSessionId,
+      testRunRecord: incomingTestRunRecord,
       kairaInstanceId: incomingKairaInstanceId,
       kairaInstanceType: incomingKairaInstanceType,
       requestId: incomingRequestId,
@@ -617,7 +619,16 @@ app.post("/api/chat", async (req, res) => {
     const kairaPolicy = instancePolicy(kairaInstance.instanceType);
     const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, "_");
     const stateUserId = stateOwnerScope(userId, kairaInstance.instanceId);
-    const sessionId = incomingSessionId?.trim() || `session_${stateUserId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+    const legacySessionId =
+      incomingSessionId?.trim() ||
+      `session_${stateUserId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+    const testRunBinding = resolveChatTestRunBinding({
+      legacySessionId,
+      record: incomingTestRunRecord,
+    });
+    const sessionId = testRunBinding.sessionId;
+    const testRunId = testRunBinding.testRunId;
+    const testRunRecord = testRunBinding.record;
     const requestIdentity = resolveKairaChatRequestCoordinationIdentity(
       incomingRequestId,
       randomUUID,
@@ -976,6 +987,8 @@ app.post("/api/chat", async (req, res) => {
         }),
         saveKntTrace({
           userId: stateUserId,
+          testRunId,
+          sessionId,
           userMessage,
           reply: finalDelivery.candidateReply,
           reasoningTrace: kdm.trace,
@@ -1004,6 +1017,8 @@ app.post("/api/chat", async (req, res) => {
         }),
         saveTestSessionTurn({
           sessionId,
+          testRunId,
+          testRunRecord,
           userId: stateUserId,
           userName,
           userMessage,
@@ -1058,6 +1073,8 @@ app.post("/api/chat", async (req, res) => {
             livedMemoryRuntime,
             responsePlan,
             timings: { memoryMs, kdmMs, aiMs: 0 },
+            testRunId,
+            testRunRecord,
             activityPermission: activityPermissionPrompt,
           },
         }).then((t) => {
@@ -1095,6 +1112,7 @@ app.post("/api/chat", async (req, res) => {
       }
       await sendChatPayload({
         sessionId,
+        testRunId,
         turnId: savedTurnId,
         requestId: requestId || undefined,
         kairaInstanceId: kairaInstance.instanceId,
@@ -1556,6 +1574,8 @@ app.post("/api/chat", async (req, res) => {
           livedMemoryRuntime,
           responsePlan,
           timings: { memoryMs, kdmMs, aiMs },
+          testRunId,
+          testRunRecord,
           activityPermission: activityPermissionPrompt,
         },
       }).then((t) => {
@@ -1593,6 +1613,7 @@ app.post("/api/chat", async (req, res) => {
     }
     await sendChatPayload({
       sessionId,
+      testRunId,
       turnId: savedTurnId,
       requestId: requestId || undefined,
       kairaInstanceId: kairaInstance.instanceId,
