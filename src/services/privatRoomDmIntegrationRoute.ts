@@ -164,12 +164,17 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
       const reply = String(data?.reply || "").trim();
       const responseTestRunId =
         typeof data?.testRunId === "string" ? data.testRunId : testRunBinding.testRunId;
+      const testCapture =
+        data?.testCapture && typeof data.testCapture === "object"
+          ? data.testCapture
+          : undefined;
       if (!reply) {
         return res.json({
           contractVersion: CONTRACT_VERSION,
           sourceEventId: event.eventId,
           responseId: `no_reply_${safeId(event.eventId)}`,
           testRunId: testRunBinding.testRunId,
+          testCapture,
           proposedActions: [],
           noReplyReason: "kaira_core_returned_empty_reply",
         });
@@ -180,6 +185,7 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
         sourceEventId: event.eventId,
         responseId: `reply_${safeId(event.eventId)}`,
         testRunId: responseTestRunId,
+        testCapture,
         proposedActions: [
           {
             type: "message.send",
