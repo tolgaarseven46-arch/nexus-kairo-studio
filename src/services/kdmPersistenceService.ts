@@ -106,6 +106,7 @@ export async function loadRecentKdmMemory(maxItems = 6, userId?: string): Promis
 
 export interface SaveTestSessionTurnPayload {
   sessionId: string;
+  strictPersistence?: boolean;
   testRunId?: string;
   testRunRecord?: unknown;
   userId?: string;
@@ -345,6 +346,7 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
     }
   } catch (err) {
     console.warn('[TestSessionPersistence] saveTestSessionTurn failed:', err);
+    if (payload.strictPersistence) throw err;
   }
 
   return turnRecord;
