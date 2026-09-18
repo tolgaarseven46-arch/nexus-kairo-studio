@@ -90,17 +90,24 @@ export async function claimCoordinatedKairaChatRequest<T = unknown>(key: string)
   const normalizedKey = key.trim();
   if (!normalizedKey) return { kind: 'owner' };
 
-  await acquireStateMutation(normalizedKey);
+  const stateMutationPromise = acquireStateMutation(normalizedKey);
+  const claimPromise = distributed.claim(normalizedKey);
   try {
-    const claim = await distributed.claim(normalizedKey);
+    const claim = await claimPromise;
     if (claim.kind === 'owner') {
+      await stateMutationPromise;
       distributedOwners.set(normalizedKey, claim.ownerToken);
       localFallbackKeys.delete(normalizedKey);
       return { kind: 'owner' };
     }
-    await releaseStateMutation(normalizedKey);
+    void stateMutationPromise
+      .then(() => releaseStateMutation(normalizedKey))
+      .catch((error) => {
+        console.warn('[Kaira State Mutation] deferred non-owner release failed:', error);
+      });
     return claim as KairaChatRequestClaim<T>;
   } catch (error) {
+    await stateMutationPromise;
     console.warn('[Kaira Idempotency] distributed claim unavailable; using process-local fallback:', error);
     localFallbackKeys.add(normalizedKey);
     const claim = claimKairaChatRequest<T>(normalizedKey);

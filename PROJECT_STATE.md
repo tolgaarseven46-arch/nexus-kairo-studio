@@ -620,3 +620,27 @@ v5 rule:
 - default/non-fast callers retain the existing session pre-read and turn-count behavior.
 
 This removes one network round trip without weakening TestRun/session continuity.
+
+
+## 37. First-encounter parallel coordination latency v6 (2026-09-18)
+
+v5 production probe remained latency-RED under Firestore variance:
+- `providerUsed=local_language`
+- `socialRoutine=well_being_reply`
+- `aiMs=0`
+- `memoryMs=1503`
+- `ownershipMs=0`
+- `criticalPersistenceMs=1899`
+- `serverTotalMs=8301`
+- client wall time `8527ms`
+
+The measured blocks leave ~4.68s before/around semantic+state preparation. Code inspection shows two independent distributed Firestore operations were serialized at request start: state-mutation lease acquisition followed by distributed idempotency claim.
+
+v6 scheduling:
+- begin state-mutation lease acquisition and distributed idempotency claim concurrently;
+- an owner claim still waits for state-mutation ownership before entering the mutable turn pipeline;
+- replay/wait claims no longer wait for a state lease that they do not need; any concurrently-started lease acquisition is released asynchronously;
+- relationship-state hydration starts immediately after coordination ownership and overlaps semantic interpretation;
+- strict relationship and TestRun continuity persistence remain response-blocking for first-encounter fast replies.
+
+No replay, serialization, semantic, or persistence authority is weakened; only independent I/O is overlapped.
