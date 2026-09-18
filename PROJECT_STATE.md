@@ -378,3 +378,10 @@ While W2 independent red-team remains open, a non-authoritative W3 freeze draft 
 
 This does not close W2 or W3 and does not authorize W5/implementation.
 The draft defines the candidate graph shape, fixture semantics and 20 characterization targets so W2 findings can be applied mechanically rather than restarting design.
+
+
+## 26. Slice B W2 reviewer handoff ready
+The exact independent red-team request and response schema are frozen at:
+- `docs/reviews/slice-b-w2-independent-red-team-request.md`
+
+This makes W2 externally reviewable without ambiguity. It does not itself satisfy W2.
