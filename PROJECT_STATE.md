@@ -174,3 +174,26 @@ Initial contract proof:
 
 Next seam after contract closure:
 - characterize where `PlatformActionIntent` belongs in the existing canonical decision output before any runtime wiring.
+
+
+## 13. Platform action decision seam — sibling authority, capability-after-decision
+Claude red-team on the merged Phase-1 platform contract resolved the next runtime seam without reopening the frozen Kaira core.
+
+Decision:
+- `DialogueDecisionPlan` may signal that a user action request exists, but it does not own platform action selection,
+- `KairaResponsePlan` remains the user-facing speech WHAT/WHETHER authority and does not own platform side effects,
+- platform action WHAT/WHETHER is a sibling authority fed by the same canonical evidence set,
+- actor-specific capability grants are explicitly excluded from `PlatformActionDecisionInput`; grants enter only after decision at feasibility,
+- platform action intent and concrete proposal remain separate abstractions,
+- moderation uses a generic severity/evidence intent plus a centralized policy mapping instead of one decision branch per warn/timeout/kick/ban,
+- action realization is typed and feasibility-gated; it cannot change intent identity, raise confidence, or expand scope,
+- Kaira may claim an action completed only after a matching `PlatformActionResultV1(status=executed)` receipt,
+- execution results will later re-enter Kaira through the normal observed-world event path rather than direct relationship/appraisal mutation.
+
+Current additive proof files:
+- `src/services/platformActionDecision.ts`
+- `src/services/platformActionRealizer.ts`
+- `src/services/platformActionClaimGuard.ts`
+- `src/services/platformActionDecisionContracts.test.ts`
+
+No live `/api/chat` action wiring is enabled in this phase.
