@@ -59,4 +59,16 @@ describe("Slice A W9 startup review probe regression", () => {
       ],
     });
   });
+  it("does not mutate the captured review packet", () => {
+    const packet = {
+      testRunId: "TR_X",
+      sessionId: "TR_X",
+      turnCount: 0,
+      provenance: undefined,
+      turns: [],
+    } as any;
+    const before = JSON.stringify(packet);
+    summarizeSliceAW9ReviewPacket(packet);
+    expect(JSON.stringify(packet)).toBe(before);
+  });
 });
