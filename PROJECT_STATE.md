@@ -318,3 +318,25 @@ Constraints:
 - W10 remains blocked until the captured packet is reviewed and the promotion gate is explicitly closed.
 
 - W9 startup evidence probe retries persisted TestSession reads after process startup so infrastructure initialization order cannot create a false negative.
+
+
+## 22. Slice A W9/W10 — live review accepted and measurement slice promoted
+W9 live review evidence was captured from Render for TestRun `TR_live_beta_slice-a-acceptance-35310419905`.
+
+Verified review packet:
+- canonical `testRunId == sessionId == TR_live_beta_slice-a-acceptance-35310419905`,
+- turnCount = 1,
+- Kaira provenance commit = `8de75dc71a32f8d4c31c83bcc45ccb4cbd972fb5`,
+- PrivatRoom provenance commit = `033fadf62d175811f2071fd6782c982b65094e9f`,
+- transcript = user `selam kairo` → assistant `merhaba`,
+- provider = `local_language`,
+- semantic, reasoning, response-plan, state, relationship and consistency evidence are present,
+- retrieved-memory count = 0 for this greeting turn,
+- no cross-server leak, false execution claim or replay sandbox leak was observed in the accepted Slice A evidence chain.
+
+The ephemeral startup reader was removed after evidence capture; no external auth boundary was weakened.
+
+W10 decision:
+- Slice A measurement/isolation infrastructure is promoted/accepted.
+- The W0–W10 workflow remains authoritative for later slices.
+- Slice B may begin; Slice C behavior remains gated behind its own W0–W10 evidence chain.
