@@ -121,7 +121,10 @@ import { registerKairaProposalRecoveryWorkerRoute } from "./src/services/kairaPr
 import { registerKairaActivityProvisioningRoute } from "./src/services/kairaActivityProvisioningRoute";
 import { registerPrivatRoomDmIntegrationRoute } from "./src/services/privatRoomDmIntegrationRoute";
 import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
-import { resolveChatTestRunBinding } from "./src/services/testRunLiveBinding";
+import {
+  buildTestRunCaptureProof,
+  resolveChatTestRunBinding,
+} from "./src/services/testRunLiveBinding";
 import type {
   DroitDynamicState,
 } from "./src/types/nexus";
@@ -1114,14 +1117,11 @@ app.post("/api/chat", async (req, res) => {
         sessionId,
         testRunId,
         turnId: savedTurnId,
-        testCapture: testRunId
-          ? {
-              testRunId,
-              sessionId,
-              turnId: savedTurnId || undefined,
-              persisted: Boolean(savedTurnId),
-            }
-          : undefined,
+        testCapture: buildTestRunCaptureProof({
+          testRunId,
+          sessionId,
+          turnId: savedTurnId,
+        }),
         requestId: requestId || undefined,
         kairaInstanceId: kairaInstance.instanceId,
         kairaInstanceType: kairaInstance.instanceType,
@@ -1623,14 +1623,11 @@ app.post("/api/chat", async (req, res) => {
       sessionId,
       testRunId,
       turnId: savedTurnId,
-      testCapture: testRunId
-        ? {
-            testRunId,
-            sessionId,
-            turnId: savedTurnId || undefined,
-            persisted: Boolean(savedTurnId),
-          }
-        : undefined,
+      testCapture: buildTestRunCaptureProof({
+        testRunId,
+        sessionId,
+        turnId: savedTurnId,
+      }),
       requestId: requestId || undefined,
       kairaInstanceId: kairaInstance.instanceId,
       kairaInstanceType: kairaInstance.instanceType,
