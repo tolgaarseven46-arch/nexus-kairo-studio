@@ -53,6 +53,7 @@ If evidence is insufficient, omit attribution or use unknown values. This extens
 const FAST_SOCIAL_ROUTINES = new Set([
   "greeting",
   "how_are_you",
+  "well_being_reply",
   "what_doing",
   "thanks",
   "agreement",
@@ -62,6 +63,66 @@ const FAST_SOCIAL_ROUTINES = new Set([
 
 const FIRST_ENCOUNTER_ROOM_CONTEXT_RE =
   /(?:^|\s)(?:napıyoruz|napicaz|napıcaz|ne\s+yapıyoruz|ne\s+yapacağız|burada\s+ne\s+yapıyoruz|burda\s+ne\s+yapıyoruz|burası\s+ne|bu\s+oda\s+ne\s+için|burada\s+ne\s+oluyor|burda\s+ne\s+oluyor)(?:\s|$|[?.!,])/iu;
+
+const FIRST_ENCOUNTER_WELL_BEING_REPLY_RE =
+  /^(?:iyi(?:yim|dir|lik)?|gayet\s+iyi(?:yim)?|çok\s+iyi(?:yim)?|fena\s+değil|idare|şükür|şükürler\s+olsun)(?:\s+(?:ya|işte|valla))?[.!?…]*$/iu;
+const PREVIOUS_WELL_BEING_PROMPT_RE =
+  /(?:sen\s+nasılsın|sende\s+(?:durumlar\s+nasıl|ne\s+var\s+ne\s+yok)|senden\s+naber|sen\s+naber)\??$/iu;
+
+function reconcileFirstEncounterWellBeingReply(
+  message: string,
+  result: LanguageUnderstandingResult,
+  context?: LanguageUnderstandingContext,
+): LanguageUnderstandingResult {
+  if (!FIRST_ENCOUNTER_WELL_BEING_REPLY_RE.test(message.trim())) return result;
+  const previousAssistant = [...(context?.recentMessages || [])]
+    .reverse()
+    .find((item) => item.role === "assistant");
+  if (!previousAssistant || !PREVIOUS_WELL_BEING_PROMPT_RE.test(previousAssistant.content.trim())) {
+    return result;
+  }
+
+  const interpretation = {
+    ...result.interpretation,
+    primaryIntent: "smalltalk" as const,
+    valence: "positive" as const,
+    discourseFacets: {
+      ...result.interpretation.discourseFacets,
+      socialRoutine: "well_being_reply" as const,
+    },
+    uncertainty: {
+      ...result.interpretation.uncertainty,
+      intent: Math.min(result.interpretation.uncertainty.intent, 0.05),
+      overall: Math.min(result.interpretation.uncertainty.overall, 0.08),
+    },
+    evidence: [
+      ...result.interpretation.evidence,
+      {
+        source: "reconciled" as const,
+        provider: "kaira_first_encounter_context_semantics",
+        cues: ["first_encounter_well_being_reply"],
+        confidence: 0.97,
+      },
+    ].slice(-8),
+  };
+
+  const projected = projectSemanticEvent(interpretation);
+  const grounded = groundSemanticEventForAppraisal(
+    message,
+    projected,
+    result.entityResolution,
+  );
+
+  return {
+    ...result,
+    interpretation,
+    event: {
+      ...grounded.event,
+      semanticUncertainty: interpretation.uncertainty.overall,
+    },
+    worldEvent: grounded.worldEvent,
+  };
+}
 
 function isSafeTrivialSocialFastPath(result: LanguageUnderstandingResult): boolean {
   const event = result.event;
@@ -248,10 +309,15 @@ export async function resolveServerLanguageUnderstanding(
       input.message,
       fastFloor,
     );
-    const contextualFast = reconcileFirstEncounterContextSemantics(
+    const contextualRoomFast = reconcileFirstEncounterContextSemantics(
       input.message,
       reconciledFast,
       input.firstEncounterContext,
+    );
+    const contextualFast = reconcileFirstEncounterWellBeingReply(
+      input.message,
+      contextualRoomFast,
+      input.context,
     );
     if (
       isSafeTrivialSocialFastPath(contextualFast) ||
@@ -283,10 +349,15 @@ export async function resolveServerLanguageUnderstanding(
     context: input.context,
   });
   const reconciledResult = reconcileServerCanonicalSemantics(input.message, rawResult);
-  const contextualResult = reconcileFirstEncounterContextSemantics(
+  const contextualRoomResult = reconcileFirstEncounterContextSemantics(
     input.message,
     reconciledResult,
     input.firstEncounterContext,
+  );
+  const contextualResult = reconcileFirstEncounterWellBeingReply(
+    input.message,
+    contextualRoomResult,
+    input.context,
   );
   const result = groundCanonicalAttribution(contextualResult);
 
