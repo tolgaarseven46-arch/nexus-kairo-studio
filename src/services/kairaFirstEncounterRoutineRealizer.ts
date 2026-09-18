@@ -13,6 +13,7 @@ export interface KairaFirstEncounterRoutineResult {
   intent?:
     | "greeting"
     | "how_are_you"
+    | "well_being_reply"
     | "what_doing"
     | "thanks"
     | "agreement"
@@ -44,6 +45,13 @@ const POOLS = {
     "iyi sayılır 😄 sende durumlar nasıl?",
     "iyiyim, keyfim yerinde. sende?",
     "fena değilim 😄 sen nasılsın?",
+  ],
+  well_being_reply: [
+    "iyi bari 😄",
+    "güzel, sevindim",
+    "mis gibi 😄",
+    "iyi iyi",
+    "oh tamamdır",
   ],
   what_doing: [
     "şimdilik takılıyorum 😄 sen ne yapıyorsun?",
@@ -79,6 +87,7 @@ function fastRoutine(event: SemanticEvent): FastRoutine | null {
   switch (event.socialRoutine) {
     case "greeting":
     case "how_are_you":
+    case "well_being_reply":
     case "what_doing":
     case "thanks":
     case "agreement":

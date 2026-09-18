@@ -22,8 +22,42 @@ function installPersistenceMocks(): void {
     setDoc: vi.fn(async (ref: { parts?: unknown[] }, value: { dynamicState?: DroitDynamicState }) => {
       const key = String(ref.parts?.[ref.parts.length - 1] ?? "unknown");
       if (value.dynamicState) {
-        firestoreMemory.states.set(key, JSON.parse(JSON.stringify(value.dynamicState)) as DroitDynamicState);
+        firestoreMemory.states.set(
+          key,
+          JSON.parse(JSON.stringify(value.dynamicState)) as DroitDynamicState,
+        );
       }
+    }),
+    writeBatch: vi.fn(() => {
+      const operations: Array<{
+        ref: { parts?: unknown[] };
+        value: { dynamicState?: DroitDynamicState };
+      }> = [];
+      return {
+        set: vi.fn(
+          (
+            ref: { parts?: unknown[] },
+            value: { dynamicState?: DroitDynamicState },
+          ) => {
+            operations.push({ ref, value });
+          },
+        ),
+        commit: vi.fn(async () => {
+          for (const operation of operations) {
+            const key = String(
+              operation.ref.parts?.[operation.ref.parts.length - 1] ?? "unknown",
+            );
+            if (operation.value.dynamicState) {
+              firestoreMemory.states.set(
+                key,
+                JSON.parse(
+                  JSON.stringify(operation.value.dynamicState),
+                ) as DroitDynamicState,
+              );
+            }
+          }
+        }),
+      };
     }),
     addDoc: vi.fn(async () => ({ id: "trace" })),
     getDoc: vi.fn(async (ref: { parts?: unknown[] }) => {

@@ -48,11 +48,24 @@ describe("canonical KairaResponsePlan runtime integration", () => {
   });
 
   it("persists response-plan observability in both local and AI paths", () => {
-    const kntPlanWrites = server.match(/worldMemoryGuard,\s*epistemicAccess,\s*(?:selfMemoryRuntime,\s*)?(?:livedMemoryRuntime,\s*)?responsePlan,\s*\}\),/gu)?.length ?? 0;
-    const turnMetadataPlanWrites = server.match(/worldMemoryGuard,\s*epistemicAccess,\s*(?:selfMemoryRuntime,\s*)?(?:livedMemoryRuntime,\s*)?responsePlan,\s*timings:/gu)?.length ?? 0;
+    const localStart = server.indexOf("const firstEncounterFastPersistence");
+    const aiStart = server.indexOf("const relationship = kdm.trace.relationship", localStart);
 
-    expect(kntPlanWrites).toBeGreaterThanOrEqual(2);
-    expect(turnMetadataPlanWrites).toBeGreaterThanOrEqual(2);
+    expect(localStart).toBeGreaterThan(-1);
+    expect(aiStart).toBeGreaterThan(localStart);
+
+    const localPersistence = server.slice(localStart, aiStart);
+    const aiPersistence = server.slice(aiStart);
+
+    expect(localPersistence).toContain("saveKntTrace({");
+    expect(localPersistence).toContain("saveTestSessionTurn({");
+    expect(localPersistence).toContain("responsePlan,");
+    expect(localPersistence).toContain("timings: { semanticMs, memoryMs, kdmMs, aiMs: 0 }");
+
+    expect(aiPersistence).toContain("saveKntTrace({");
+    expect(aiPersistence).toContain("saveTestSessionTurn({");
+    expect(aiPersistence).toContain("responsePlan,");
+    expect(aiPersistence).toContain("timings:");
   });
 
   it("persists, hydrates and exposes the response plan per turn", () => {

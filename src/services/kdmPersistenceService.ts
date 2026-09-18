@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, limit, orderBy, query, setDoc, addDoc, getDocs, deleteDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, limit, orderBy, query, setDoc, addDoc, getDocs, deleteDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
   DroitDynamicState,
@@ -46,7 +46,7 @@ function normalizeDynamicState(value: unknown): DroitDynamicState | null {
     } } : {}),
   };
 }
-export interface KdmPersistencePayload { dynamicState: DroitDynamicState; reasoningTrace: ReasoningTrace; lastUserMessage: string; reply: string; userId?: string; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; semanticInterpretation?: SemanticInterpretation; }
+export interface KdmPersistencePayload { strictPersistence?: boolean; dynamicState: DroitDynamicState; reasoningTrace: ReasoningTrace; lastUserMessage: string; reply: string; userId?: string; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; semanticInterpretation?: SemanticInterpretation; }
 export interface KdmMemoryItem { sourceId?: string; userMessage: string; reply: string; createdAt?: string; reasoningTrace?: ReasoningTrace; dynamicState?: DroitDynamicState; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; semanticInterpretation?: SemanticInterpretation; }
 export interface KairoUserMemory { userName?: string; preferences: string[]; facts: string[]; goals: string[]; notes: string[]; updatedAt: string; }
 export interface KntTracePayload { userId?: string; testRunId?: string; sessionId?: string; userMessage: string; reply: string; reasoningTrace: ReasoningTrace; dynamicState: DroitDynamicState; timings: Record<string, number>; providerUsed?: string; semanticInterpretation?: SemanticInterpretation; semanticEvent?: unknown; semanticSource?: string; languageStyleMemory?: unknown; controlledSpontaneity?: unknown; speechIdentity?: unknown; worldStateAppraisal?: unknown; worldReasoningPolicy?: unknown; worldMemoryGuard?: unknown; epistemicAccess?: unknown; selfMemoryRuntime?: unknown; livedMemoryRuntime?: unknown; responsePlan?: unknown; createdAt?: string; }
@@ -60,8 +60,43 @@ async function safeWithTimeout<T>(promise: Promise<T>, ms: number, fallback: T):
 export async function saveKdmInteraction(payload: KdmPersistencePayload): Promise<void> {
   try { const userScope = scope(payload.userId); const now = new Date(); const previous = payload.dynamicState.relationship; const firstSeenAt = previous?.firstSeenAt || now.toISOString(); const previousCount = previous?.interactionCount || 0; const familiarityDays = Math.max(0, Math.floor((now.getTime() - new Date(firstSeenAt).getTime()) / 86400000));
     const relationship: RelationshipState = { firstSeenAt, lastInteractionAt: now.toISOString(), interactionCount: previousCount, familiarityDays, warmth: previous?.warmth ?? payload.reasoningTrace.relationship.warmthScore, trust: previous?.trust ?? payload.reasoningTrace.relationship.trustScore ?? 50, positiveEvents: previous?.positiveEvents ?? 0, negativeEvents: previous?.negativeEvents ?? 0, conflictScore: previous?.conflictScore ?? payload.reasoningTrace.relationship.conflictScore ?? 0, hurtScore: previous?.hurtScore ?? payload.reasoningTrace.relationship.hurtScore ?? 0, repairProgress: previous?.repairProgress ?? payload.reasoningTrace.relationship.repairProgress ?? 0, repeatedNegativeCount: previous?.repeatedNegativeCount ?? payload.reasoningTrace.relationship.repeatedNegativeCount ?? 0, ...(previous?.lastConflictAt ? { lastConflictAt: previous.lastConflictAt } : {}), ...(previous?.lastNegativePattern ? { lastNegativePattern: previous.lastNegativePattern } : {}), ...(previous?.lastNegativePatternAt ? { lastNegativePatternAt: previous.lastNegativePatternAt } : {}), ...(previous?.dyadicNorm ? { dyadicNorm: previous.dyadicNorm } : {}) };
-    const normalized = normalizeDynamicState(payload.dynamicState) || DEFAULT_DYNAMIC_STATE; const safeDynamicState: DroitDynamicState = { ...normalized, relationship: { ...relationship, ...(normalized.relationship || {}) } }; const stateRef = doc(db, STATE_COLLECTION, userScope); await setDoc(stateRef, { characterId: 'kairo', userId: userScope, dynamicState: safeDynamicState, reasoningTrace: payload.reasoningTrace, lastUserMessage: payload.lastUserMessage, lastReply: payload.reply, updatedAt: now.toISOString() }, { merge: true }); const traceRef = collection(stateRef, TRACE_COLLECTION); await addDoc(traceRef, { ...payload.reasoningTrace, userMessage: payload.lastUserMessage, reply: payload.reply, dynamicState: safeDynamicState, memoryScope: payload.memoryScope || 'episodic', dialogueAnalysis: payload.dialogueAnalysis || null, semanticInterpretation: payload.semanticInterpretation || null, userId: userScope, createdAt: now.toISOString() }); if (payload.memoryScope === 'durable_candidate') await updateStructuredUserMemory(userScope, payload.lastUserMessage, payload.semanticInterpretation).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));
-  } catch (err) { console.warn('[KDM Persistence] saveKdmInteraction skipped:', err); }
+    const normalized = normalizeDynamicState(payload.dynamicState) || DEFAULT_DYNAMIC_STATE;
+    const safeDynamicState: DroitDynamicState = { ...normalized, relationship: { ...relationship, ...(normalized.relationship || {}) } };
+    const stateRef = doc(db, STATE_COLLECTION, userScope);
+    const traceDocRef = doc(collection(stateRef, TRACE_COLLECTION));
+    const batch = writeBatch(db);
+    batch.set(stateRef, {
+      characterId: 'kairo',
+      userId: userScope,
+      dynamicState: safeDynamicState,
+      reasoningTrace: payload.reasoningTrace,
+      lastUserMessage: payload.lastUserMessage,
+      lastReply: payload.reply,
+      updatedAt: now.toISOString(),
+    }, { merge: true });
+    batch.set(traceDocRef, {
+      ...payload.reasoningTrace,
+      userMessage: payload.lastUserMessage,
+      reply: payload.reply,
+      dynamicState: safeDynamicState,
+      memoryScope: payload.memoryScope || 'episodic',
+      dialogueAnalysis: payload.dialogueAnalysis || null,
+      semanticInterpretation: payload.semanticInterpretation || null,
+      userId: userScope,
+      createdAt: now.toISOString(),
+    });
+    await batch.commit();
+    if (payload.memoryScope === 'durable_candidate') {
+      await updateStructuredUserMemory(
+        userScope,
+        payload.lastUserMessage,
+        payload.semanticInterpretation,
+      ).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));
+    }
+  } catch (err) {
+    console.warn('[KDM Persistence] saveKdmInteraction skipped:', err);
+    if (payload.strictPersistence) throw err;
+  }
 }
 export async function saveKntTrace(payload: KntTracePayload): Promise<void> { const userScope = scope(payload.userId); const stateRef = doc(db, STATE_COLLECTION, userScope); await addDoc(collection(stateRef, KNT_COLLECTION), { ...payload, userId: userScope, createdAt: payload.createdAt || new Date().toISOString() }); }
 export async function loadRecentKntTraces(maxItems = 20, userId?: string): Promise<any[]> { const userScope = scope(userId); const safeLimit = Math.max(1, Math.min(maxItems, 100)); const stateRef = doc(db, STATE_COLLECTION, userScope); const snapshot = await getDocs(query(collection(stateRef, KNT_COLLECTION), orderBy('createdAt', 'desc'), limit(safeLimit))); return snapshot.docs.map((item) => ({ id: item.id, ...item.data() })); }
@@ -74,6 +109,7 @@ export async function loadRecentKdmMemory(maxItems = 6, userId?: string): Promis
 
 export interface SaveTestSessionTurnPayload {
   sessionId: string;
+  strictPersistence?: boolean;
   testRunId?: string;
   testRunRecord?: unknown;
   userId?: string;
@@ -286,10 +322,6 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
     const turnsRef = collection(sessionRef, TURNS_COLLECTION);
     const turnDocRef = doc(turnsRef, turnId);
 
-    // Save individual turn document without undefined properties
-    await setDoc(turnDocRef, stripUndefined(turnRecord));
-
-    // Update parent session summary document
     const sessionUpdate: Partial<TestSessionSummary> & Record<string, any> = {
       sessionId,
       testRunId: payload.testRunId,
@@ -306,7 +338,10 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
       active: true,
     };
 
-    await setDoc(sessionRef, stripUndefined(sessionUpdate), { merge: true });
+    const batch = writeBatch(db);
+    batch.set(turnDocRef, stripUndefined(turnRecord));
+    batch.set(sessionRef, stripUndefined(sessionUpdate), { merge: true });
+    await batch.commit();
 
     // Store active sessionId in localStorage for fast reload on client
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -314,6 +349,7 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
     }
   } catch (err) {
     console.warn('[TestSessionPersistence] saveTestSessionTurn failed:', err);
+    if (payload.strictPersistence) throw err;
   }
 
   return turnRecord;
