@@ -756,6 +756,9 @@ app.post("/api/chat", async (req, res) => {
       }
       return res.json(payload);
     };
+    const sendFirstEncounterFastPayload = (payload: any) => {
+      res.json(payload);
+    };
     const shouldResolveActivityPermissionReply =
       kairaPolicy.autonomousActivityPlanning &&
       (conversationPhase !== "first_encounter" ||
