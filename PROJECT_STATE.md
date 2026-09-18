@@ -292,3 +292,16 @@ Current proof:
 - legacy non-TestRun chat gets no capture proof.
 
 This closes the final silent-failure gap before the first real live TestRun acceptance.
+
+
+## 20. Slice A9 — TestRun review packet
+A persisted live TestRun can now be projected into one stable review packet.
+
+Current proof:
+- one TestRun id resolves to its persisted TestSession transcript,
+- the review packet carries exact stored provenance, turn order, user/assistant text, provider, timings,
+  semantic evidence, reasoning trace, response plan, state/relationship changes, retrieved memory and consistency evidence,
+- review identity remains the canonical TestRun/session id; no parallel review id is invented,
+- the read-only review route is internal-authenticated and does not change live chat behavior.
+
+This is the review seam needed for joint live-beta inspection after REC proof.
