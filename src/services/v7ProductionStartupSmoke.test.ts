@@ -33,7 +33,10 @@ describe("V7 production startup smoke", () => {
       let stderr = "";
       child = spawn(process.execPath, [outfile], {
         cwd: process.cwd(),
-        env: { ...process.env },
+        env: {
+          ...process.env,
+          NODE_PATH: join(process.cwd(), "node_modules"),
+        },
       });
 
       const timeout = setTimeout(() => {
