@@ -441,3 +441,32 @@ Authority boundary:
 - `realizationVariantSeed` + `realizationVariantId` are persisted in TestRun metadata for deterministic replay/review.
 
 The temporary PrivatRoom local welcome pool is migration-only and must be removed from live production once the lifecycle gateway is deployed.
+
+
+## 32. First-encounter quality + latency evidence gate (2026-09-18)
+
+Live beta reproduced four concrete first-encounter failures in one room/TestRun:
+- scripted welcome wording,
+- `naber` degrading to generic acknowledgement (`he anladım`),
+- `napıyoruz burada` degrading to a non-answer (`heh, baya net söyledin`),
+- user-facing identity drift/generic labels, plus ~20s reply latency.
+
+The repair is explicitly evidence-gated by:
+- `docs/reviews/first-encounter-quality-latency-proof-plan.md`
+- `src/services/kairaFirstEncounterHistoricalRegression.test.ts`
+
+Authority decision:
+- SemanticInterpretation@2 remains the only user-semantic authority.
+- First-encounter speedups may only consume canonical socialRoutine / reconciled first-encounter semantic evidence.
+- PrivatRoom remains factual context only (room name / owner fact); it does not choose reply meaning or wording.
+- Kaira decision/response-plan remains WHAT/WHETHER authority.
+- First-encounter deterministic realizers are HOW-only and are still subjected to canonical delivery checks.
+- Conversation Graph remains observational.
+
+Runtime decision:
+- trivial canonical social routines and typed room-context questions may bypass provider calls during the first three real turns;
+- non-trivial first-encounter provider calls have explicit semantic/generation deadlines;
+- first-encounter repair does not launch an additional provider round-trip;
+- timing + realization variant provenance is persisted for live TestRun review.
+
+Historical RED evidence was captured in CI run `35333356648`: all four live failure fixtures failed before the repair.

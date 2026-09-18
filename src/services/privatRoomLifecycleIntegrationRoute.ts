@@ -156,6 +156,7 @@ export function registerPrivatRoomLifecycleIntegrationRoute(app: Express) {
             eventType: event.eventType,
             roomId: event.room.roomId,
             roomName: event.room.roomName,
+            actorIsOwner: event.actor.isOwner,
           },
           welcomeDecision: decision,
           realizationVariantSeed: realization.realizationVariantSeed,

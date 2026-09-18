@@ -121,7 +121,10 @@ import { registerKairaProposalRecoveryWorkerRoute } from "./src/services/kairaPr
 import { registerKairaActivityProvisioningRoute } from "./src/services/kairaActivityProvisioningRoute";
 import { registerPrivatRoomDmIntegrationRoute } from "./src/services/privatRoomDmIntegrationRoute";
 import { registerPrivatRoomLifecycleIntegrationRoute } from "./src/services/privatRoomLifecycleIntegrationRoute";
-import { KAIRA_FIRST_ENCOUNTER_INSTRUCTION } from "./src/services/kairaFirstEncounterContinuity";
+import { buildKairaFirstEncounterInstruction } from "./src/services/kairaFirstEncounterContinuity";
+import { realizeKairaFirstEncounterRoutine } from "./src/services/kairaFirstEncounterRoutineRealizer";
+import { realizeKairaFirstEncounterContext } from "./src/services/kairaFirstEncounterContextRealizer";
+import { buildKairaFirstEncounterRecoveryFallback } from "./src/services/kairaFirstEncounterRecovery";
 import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
 import { registerTestRunReviewRoute } from "./src/services/testRunReviewRoute";
 import {
@@ -331,6 +334,58 @@ async function generateText(
   preferredProvider: string,
 ): Promise<string> {
   return (await generateTextResult(system, messages, temperature, preferredProvider)).text;
+}
+const FIRST_ENCOUNTER_SEMANTIC_BUDGET_MS = 2500;
+const FIRST_ENCOUNTER_GENERATION_BUDGET_MS = 3500;
+
+async function generateTextResultWithinBudget(
+  system: string,
+  messages: any[],
+  temperature: number,
+  preferredProvider: string,
+  timeoutMs?: number,
+): Promise<GeneratedTextResult> {
+  if (!timeoutMs) {
+    return generateTextResult(system, messages, temperature, preferredProvider);
+  }
+
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      generateTextResult(system, messages, temperature, preferredProvider),
+      new Promise<GeneratedTextResult>((_, reject) => {
+        timeoutHandle = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `provider_deadline_exceeded:${timeoutMs}ms`,
+              ),
+            ),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+}
+
+async function generateTextWithinBudget(
+  system: string,
+  messages: any[],
+  temperature: number,
+  preferredProvider: string,
+  timeoutMs?: number,
+): Promise<string> {
+  return (
+    await generateTextResultWithinBudget(
+      system,
+      messages,
+      temperature,
+      preferredProvider,
+      timeoutMs,
+    )
+  ).text;
 }
 async function getFastRecentMemory(userId: string, kairaInstanceId: string) {
   const cacheKey = memoryCacheKey(userId, kairaInstanceId);
@@ -618,6 +673,7 @@ app.post("/api/chat", async (req, res) => {
       requestId: incomingRequestId,
       activityPermissionRequestId: incomingActivityPermissionRequestId,
       conversationPhase: incomingConversationPhase,
+      firstEncounterContext: incomingFirstEncounterContext,
     } = req.body;
     if (!userMessage)
       return res.status(400).json({ error: "userMessage is required" });
@@ -642,6 +698,25 @@ app.post("/api/chat", async (req, res) => {
       incomingConversationPhase === "first_encounter"
         ? "first_encounter"
         : "default";
+    const firstEncounterContext =
+      conversationPhase === "first_encounter" &&
+      incomingFirstEncounterContext &&
+      typeof incomingFirstEncounterContext === "object"
+        ? {
+            roomId:
+              typeof incomingFirstEncounterContext.roomId === "string"
+                ? incomingFirstEncounterContext.roomId
+                : undefined,
+            roomName:
+              typeof incomingFirstEncounterContext.roomName === "string"
+                ? incomingFirstEncounterContext.roomName
+                : undefined,
+            isOwner:
+              typeof incomingFirstEncounterContext.isOwner === "boolean"
+                ? incomingFirstEncounterContext.isOwner
+                : undefined,
+          }
+        : undefined;
     const requestIdentity = resolveKairaChatRequestCoordinationIdentity(
       incomingRequestId,
       randomUUID,
@@ -700,12 +775,13 @@ app.post("/api/chat", async (req, res) => {
       });
     };
     const cleanHistory = sanitizeKairoChatHistory(history);
+    const semanticStart = now();
     const languageUnderstanding = await resolveServerLanguageUnderstanding({
       message: userMessage,
       incomingSemanticInterpretation,
       context: {
         userName,
-        characterName: character.name || "KAIRO",
+        characterName: character.name || "Kaira",
         recentMessages: cleanHistory.slice(-8).map((item: any) => ({
           role:
             item.sender === "user"
@@ -715,8 +791,26 @@ app.post("/api/chat", async (req, res) => {
         })),
       },
       preferredProvider: provider,
-      generateText,
+      generateText:
+        conversationPhase === "first_encounter"
+          ? (
+              semanticSystem,
+              semanticMessages,
+              semanticTemperature,
+              semanticProvider,
+            ) =>
+              generateTextWithinBudget(
+                semanticSystem,
+                semanticMessages,
+                semanticTemperature,
+                semanticProvider,
+                FIRST_ENCOUNTER_SEMANTIC_BUDGET_MS,
+              )
+          : generateText,
+      preferTrivialSocialFastPath: conversationPhase === "first_encounter",
+      firstEncounterContext,
     });
+    const semanticMs = Math.round(now() - semanticStart);
     const canonicalSemantic = {
       interpretation: languageUnderstanding.interpretation,
       event: languageUnderstanding.event,
@@ -877,13 +971,37 @@ app.post("/api/chat", async (req, res) => {
         maxSentences: responsePlan.maxSentences,
         maxWords: responsePlan.maxWords,
       },
-      local =
+      firstEncounterRoutine =
         conversationPhase === "first_encounter"
+          ? realizeKairaFirstEncounterRoutine({
+              requestId,
+              event: canonicalSemantic.event,
+              plan: responsePlan,
+            })
+          : { handled: false as const },
+      firstEncounterContextReply =
+        conversationPhase === "first_encounter"
+          ? realizeKairaFirstEncounterContext({
+              requestId,
+              interpretation: canonicalSemantic.interpretation,
+              plan: responsePlan,
+              context: firstEncounterContext,
+            })
+          : { handled: false as const },
+      firstEncounterFastReply = firstEncounterContextReply.handled
+        ? firstEncounterContextReply
+        : firstEncounterRoutine,
+      local =
+        firstEncounterFastReply.handled && firstEncounterFastReply.reply
           ? {
-              handled: false,
-              reply: "",
-              intent: "first_encounter_full_pipeline",
+              handled: true,
+              reply: firstEncounterFastReply.reply,
+              intent:
+                "intent" in firstEncounterFastReply
+                  ? firstEncounterFastReply.intent
+                  : undefined,
               confidence: 1,
+              source: "local_language" as const,
             }
           : tryLocalKairoReply(
         userMessage,
@@ -926,6 +1044,27 @@ app.post("/api/chat", async (req, res) => {
             worldContext: worldReasoningContext,
             selfMemoryRuntime,
             epistemicContext: epistemicAccess,
+            additionalIssueFinder: (candidateReply) => [
+              ...findKairoGroundingIssues(candidateReply, cleanHistory, userMessage),
+              ...findDialogueAttributionIssues(
+                candidateReply,
+                cleanHistory,
+                userMessage,
+                userName,
+                dialogueAnalysis,
+              ),
+              ...findDialogueDecisionIssues(
+                candidateReply,
+                dialogueDecision,
+                dialogueOutputStyle,
+              ),
+              ...findKairoResponseRhythmIssues(
+                candidateReply,
+                cleanHistory,
+                dialogueDecision.move,
+                speech.relationshipLevel,
+              ),
+            ],
           }),
         worldMemoryGuard = canonicalConstraint?.worldGuard ?? enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext),
         epistemicGuard = canonicalConstraint?.epistemicGuard ?? enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess),
@@ -1093,7 +1232,15 @@ app.post("/api/chat", async (req, res) => {
             selfMemoryRuntime,
             livedMemoryRuntime,
             responsePlan,
-            timings: { memoryMs, kdmMs, aiMs: 0 },
+            timings: { semanticMs, memoryMs, kdmMs, aiMs: 0 },
+            realizationVariantSeed:
+              "realizationVariantSeed" in firstEncounterFastReply
+                ? firstEncounterFastReply.realizationVariantSeed
+                : undefined,
+            realizationVariantId:
+              "variantId" in firstEncounterFastReply
+                ? firstEncounterFastReply.variantId
+                : undefined,
             testRunId,
             testRunRecord,
             activityPermission: activityPermissionPrompt,
@@ -1122,12 +1269,30 @@ app.post("/api/chat", async (req, res) => {
       memoryCache.delete(memoryCacheKey(userId, kairaInstance.instanceId));
       const postProcessMs = Math.round(now() - postStart),
         timings = {
+          semanticMs,
           memoryMs,
           kdmMs,
           aiMs: 0,
           postProcessMs,
           serverTotalMs: Math.round(now() - serverStart),
         };
+      if (conversationPhase === "first_encounter") {
+        console.log("[First Encounter Timing]", {
+          testRunId,
+          requestId,
+          providerUsed: "local_language",
+          semanticMs,
+          memoryMs,
+          kdmMs,
+          aiMs: 0,
+          postProcessMs,
+          serverTotalMs: timings.serverTotalMs,
+          variantId:
+            "variantId" in firstEncounterFastReply
+              ? firstEncounterFastReply.variantId
+              : undefined,
+        });
+      }
       if (!consistency.accepted) {
         throw buildKairaFinalDeliveryRejectionError(finalDelivery);
       }
@@ -1150,6 +1315,14 @@ app.post("/api/chat", async (req, res) => {
         localLanguage: {
           intent: local.intent,
           confidence: local.confidence,
+          variantId:
+            "variantId" in firstEncounterFastReply
+              ? firstEncounterFastReply.variantId
+              : undefined,
+          realizationVariantSeed:
+            "realizationVariantSeed" in firstEncounterFastReply
+              ? firstEncounterFastReply.realizationVariantSeed
+              : undefined,
           memory: kairaPolicy.persistentUserMemory ? languageMemorySummary(stateUserId) : undefined,
         },
         enforcement: enforced,
@@ -1163,7 +1336,7 @@ app.post("/api/chat", async (req, res) => {
       }
     }
     const relationship = kdm.trace.relationship;
-    const socialStyle = `SOSYAL SOHBET KURALI:\nSen bir yardımcı/asistan gibi konuşmuyorsun; sosyal medyada gerçek bir arkadaş gibi mesajlaşıyorsun.\n- Varsayılan cevap 1-2 kısa cümle olsun. Konu gerçekten gerektirirse uzat.\n- Kullanıcı istemedikçe madde listesi, rehber, seçenek menüsü, özet veya tavsiye paketi verme.\n- Her cevabı soruyla bitirme. Soru sormak zorunda değilsin.\n- \"istersen\", \"yardımcı olabilirim\", \"anlatmak ister misin\", \"şöyle yapalım\" gibi asistan kalıplarını alışkanlık olarak kullanma.\n- Kullanıcı sadece bir duygu/durum paylaşıyorsa önce onunla sohbet et; hemen problemi çözmeye çalışma.\n- Gerektiğinde kısa, eksik, gündelik cümle kurabilirsin. Argo ve emoji yalnızca konuşma kimliğin uygunsa doğal miktarda kullanılabilir.\n- Kendi Droit oluşunu sürekli hatırlatma; CPU, log, sunucu, veri merkezi gibi yapay persona şakalarını durduk yere üretme.\n- KDM verileri iç kararındır. Bunları açıklama, puanları söyleme veya analiz raporu gibi konuşma.\n- Hafızayı yalnızca gerçekten ilgiliyse kullan; sırf bildiğini göstermek için eski konuyu açma.\n- Geçmiş konuşma/anı sorularında yalnızca aşağıdaki oturum veya doğrulanmış hafıza kayıtlarına dayan. Kayıt desteklemiyorsa ayrıntı UYDURMA; doğal biçimde hatırlamadığını veya emin olmadığını söyle.\n- En doğru/yararlı cevabı vermek zorunda değilsin. Doğal bir sosyal tepki yeterlidir.\n- Kullanıcının mesajındaki her ayrıntıya tek tek cevap vermek zorunda değilsin.${conversationPhase === "first_encounter" ? `\n${KAIRA_FIRST_ENCOUNTER_INSTRUCTION}` : ""}`;
+    const socialStyle = `SOSYAL SOHBET KURALI:\nSen bir yardımcı/asistan gibi konuşmuyorsun; sosyal medyada gerçek bir arkadaş gibi mesajlaşıyorsun.\n- Varsayılan cevap 1-2 kısa cümle olsun. Konu gerçekten gerektirirse uzat.\n- Kullanıcı istemedikçe madde listesi, rehber, seçenek menüsü, özet veya tavsiye paketi verme.\n- Her cevabı soruyla bitirme. Soru sormak zorunda değilsin.\n- \"istersen\", \"yardımcı olabilirim\", \"anlatmak ister misin\", \"şöyle yapalım\" gibi asistan kalıplarını alışkanlık olarak kullanma.\n- Kullanıcı sadece bir duygu/durum paylaşıyorsa önce onunla sohbet et; hemen problemi çözmeye çalışma.\n- Gerektiğinde kısa, eksik, gündelik cümle kurabilirsin. Argo ve emoji yalnızca konuşma kimliğin uygunsa doğal miktarda kullanılabilir.\n- Kendi Droit oluşunu sürekli hatırlatma; CPU, log, sunucu, veri merkezi gibi yapay persona şakalarını durduk yere üretme.\n- KDM verileri iç kararındır. Bunları açıklama, puanları söyleme veya analiz raporu gibi konuşma.\n- Hafızayı yalnızca gerçekten ilgiliyse kullan; sırf bildiğini göstermek için eski konuyu açma.\n- Geçmiş konuşma/anı sorularında yalnızca aşağıdaki oturum veya doğrulanmış hafıza kayıtlarına dayan. Kayıt desteklemiyorsa ayrıntı UYDURMA; doğal biçimde hatırlamadığını veya emin olmadığını söyle.\n- En doğru/yararlı cevabı vermek zorunda değilsin. Doğal bir sosyal tepki yeterlidir.\n- Kullanıcının mesajındaki her ayrıntıya tek tek cevap vermek zorunda değilsin.${conversationPhase === "first_encounter" ? `\n${buildKairaFirstEncounterInstruction(firstEncounterContext)}` : ""}`;
     const groundingInstruction = buildKairoGroundingInstruction(
       cleanHistory,
       userMessage,
@@ -1222,19 +1395,33 @@ app.post("/api/chat", async (req, res) => {
     let providerFailureFallbackUsed = false;
     let activeAiProviderUsed: AiProviderUsed = provider === "gemini" ? "gemini" : "openrouter";
     try {
-      const generated = await generateTextResult(system, msgs, 0.78, provider);
+      const generated = await generateTextResultWithinBudget(
+        system,
+        msgs,
+        0.78,
+        provider,
+        conversationPhase === "first_encounter"
+          ? FIRST_ENCOUNTER_GENERATION_BUDGET_MS
+          : undefined,
+      );
       reply = sanitizeKairoReplyText(generated.text);
       activeAiProviderUsed = generated.providerUsed;
     } catch (generationError) {
-      const providerFallback = buildGroundedDialogueFallback(
-        dialogueDecision,
-        cleanHistory,
-        userMessage,
-        userName,
-        dialogueAnalysis,
-        responsePlan.allowQuestion,
-        kairaSocialMoveFallback(responsePlan),
-      );
+      const providerFallback =
+        conversationPhase === "first_encounter"
+          ? buildKairaFirstEncounterRecoveryFallback(
+              dialogueDecision,
+              firstEncounterContext,
+            )
+          : buildGroundedDialogueFallback(
+              dialogueDecision,
+              cleanHistory,
+              userMessage,
+              userName,
+              dialogueAnalysis,
+              responsePlan.allowQuestion,
+              kairaSocialMoveFallback(responsePlan),
+            );
       if (!providerFallback) throw generationError;
       reply = providerFallback;
       providerFailureFallbackUsed = true;
@@ -1260,7 +1447,11 @@ app.post("/api/chat", async (req, res) => {
       ...findWorldModelResponseIssues(reply, retrievedWorldEvents, worldReasoningContext).map((issue) => issue.message),
     ];
     let repairAttempts = 0;
-    if (groundingIssues.length && now() - aiStart < 24000) {
+    if (
+      groundingIssues.length &&
+      conversationPhase !== "first_encounter" &&
+      now() - aiStart < 24000
+    ) {
       try {
         repairAttempts = 1;
         const repairedGeneration = await Promise.race([
@@ -1599,7 +1790,7 @@ app.post("/api/chat", async (req, res) => {
           selfMemoryRuntime,
           livedMemoryRuntime,
           responsePlan,
-          timings: { memoryMs, kdmMs, aiMs },
+          timings: { semanticMs, memoryMs, kdmMs, aiMs },
           testRunId,
           testRunRecord,
           activityPermission: activityPermissionPrompt,
@@ -1628,12 +1819,27 @@ app.post("/api/chat", async (req, res) => {
     memoryCache.delete(memoryCacheKey(userId, kairaInstance.instanceId));
     const postProcessMs = Math.round(now() - postStart),
       timings = {
+        semanticMs,
         memoryMs,
         kdmMs,
         aiMs,
         postProcessMs,
         serverTotalMs: Math.round(now() - serverStart),
       };
+    if (conversationPhase === "first_encounter") {
+      console.log("[First Encounter Timing]", {
+        testRunId,
+        requestId,
+        providerUsed: activeAiProviderUsed,
+        semanticMs,
+        memoryMs,
+        kdmMs,
+        aiMs,
+        postProcessMs,
+        serverTotalMs: timings.serverTotalMs,
+        repairAttempts,
+      });
+    }
     if (!consistency.accepted) {
       throw buildKairaFinalDeliveryRejectionError(finalDelivery);
     }

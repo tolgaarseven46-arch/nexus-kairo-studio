@@ -3,6 +3,11 @@ import type { TestSessionTurnRecord } from "../types/nexus";
 export interface KairaFirstEncounterContinuity {
   active: boolean;
   chatTurnsAfterWelcome: number;
+  context?: {
+    roomId?: string;
+    roomName?: string;
+    isOwner?: boolean;
+  };
   history: Array<{
     sender: "user" | "droit";
     text: string;
@@ -41,6 +46,29 @@ export function deriveKairaFirstEncounterContinuity(
       ? ordered.slice(Math.max(0, lastWelcomeIndex), -0 || undefined)
       : ordered.slice(-6);
 
+  const welcomeTurn = lastWelcomeIndex >= 0 ? ordered[lastWelcomeIndex] : undefined;
+  const platformEvent =
+    welcomeTurn?.metadata?.platformEvent &&
+    typeof welcomeTurn.metadata.platformEvent === "object"
+      ? (welcomeTurn.metadata.platformEvent as Record<string, unknown>)
+      : undefined;
+  const context = platformEvent
+    ? {
+        roomId:
+          typeof platformEvent.roomId === "string"
+            ? platformEvent.roomId
+            : undefined,
+        roomName:
+          typeof platformEvent.roomName === "string"
+            ? platformEvent.roomName
+            : undefined,
+        isOwner:
+          typeof platformEvent.actorIsOwner === "boolean"
+            ? platformEvent.actorIsOwner
+            : undefined,
+      }
+    : undefined;
+
   const history: KairaFirstEncounterContinuity["history"] = [];
   for (const turn of relevant) {
     if (isWelcomeTurn(turn)) {
@@ -73,16 +101,27 @@ export function deriveKairaFirstEncounterContinuity(
   return {
     active: lastWelcomeIndex >= 0 && chatTurnsAfterWelcome < 3,
     chatTurnsAfterWelcome,
+    context,
     history: history.slice(-8),
   };
 }
 
-export const KAIRA_FIRST_ENCOUNTER_INSTRUCTION = [
+export function buildKairaFirstEncounterInstruction(context?: KairaFirstEncounterContinuity["context"]) {
+  return [
+
   "İLK KARŞILAŞMA DEVAMLILIĞI:",
   "- Kaira bu kullanıcıyla bu odada az önce tanıştı; önceki welcome mesajıyla aynı kişi gibi devam et.",
   "- Kendini yeniden tanıtma ve welcome mesajını tekrar etme.",
   "- Kullanıcının kısa mesajına karakterli ama kısa, doğal bir sosyal cevap ver.",
   "- Her turu oda kurma konusuna bağlama.",
   "- En fazla bir açık soru sor; soru zorunlu değil.",
-  "- Yardım teklifini tekrarlama; kullanıcı yönü kendisi belirleyebilsin.",
-].join("\n");
+    "- Yardım teklifini tekrarlama; kullanıcı yönü kendisi belirleyebilsin.",
+    context?.roomName
+      ? `- Platform gerçeği: aktif oda adı "${context.roomName}". Bu bilgiyi yalnız gerçekten ilgiliyse kullan.`
+      : "",
+    context?.isOwner === true
+      ? "- Platform gerçeği: aktif kullanıcı bu odanın sahibi."
+      : "",
+  ].filter(Boolean).join("\n");
+}
+
