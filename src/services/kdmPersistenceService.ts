@@ -208,10 +208,13 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
   const speaker = payload.speaker || payload.userName || 'Kullanıcı';
 
   let turnNumber = 1;
+  let existingTestRunRecord: unknown = undefined;
   try {
     const existingSnap = await getDoc(doc(db, TEST_SESSIONS_COLLECTION, sessionId));
     if (existingSnap.exists()) {
-      turnNumber = Number(existingSnap.data()?.turnCount || 0) + 1;
+      const existingData = existingSnap.data();
+      turnNumber = Number(existingData?.turnCount || 0) + 1;
+      existingTestRunRecord = existingData?.testRunRecord;
     }
   } catch {}
 
@@ -282,7 +285,7 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
     const sessionUpdate: Partial<TestSessionSummary> & Record<string, any> = {
       sessionId,
       testRunId: payload.testRunId,
-      testRunRecord: payload.testRunRecord,
+      testRunRecord: existingTestRunRecord || payload.testRunRecord,
       userId: userScope,
       userName: speaker,
       characterId: 'kairo',
