@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 describe('controlled spontaneity observability contracts', () => {
   it('persists explicit local none and the AI decision in KNT traces', async () => {
     const server = await readFile('server.ts', 'utf8');
-    const localKnt = /providerUsed: \"local_language\",[\s\S]{0,160}?controlledSpontaneity: \{ mode: \"none\", eligible: false, probability: 0, roll: 0, reason: \"local_language_short_circuit\" \}/;
+    const localKnt = /providerUsed: \"local_language\",[\s\S]*?controlledSpontaneity:\s*\{[\s\S]*?mode:\s*\"none\"[\s\S]*?eligible:\s*false[\s\S]*?probability:\s*0[\s\S]*?roll:\s*0[\s\S]*?reason:\s*\"local_language_short_circuit\"[\s\S]*?\}/;
     const aiKnt = /providerUsed: activeAiProviderUsed,[\s\S]{0,160}?controlledSpontaneity: spontaneityDecision/;
 
     expect(server).toMatch(localKnt);
