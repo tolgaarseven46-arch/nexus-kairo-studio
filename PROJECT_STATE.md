@@ -665,3 +665,29 @@ The remaining visible wait is the durability barrier itself. v7 changes the barr
 - telemetry/autonomous observation remains non-causal and runs after continuity.
 
 Failure caveat: a process crash in the short post-response/pre-persistence window can lose the just-returned turn. The lease-held design removes stale-next-turn execution during normal operation but is not equivalent to pre-response crash durability. This tradeoff is explicit and bounded to the first-encounter trivial social fast path.
+
+
+## 39. First-encounter combined distributed coordination v8 (2026-09-18)
+
+v7 production timing proved the remaining response delay is dominated by request-start coordination rather than semantic, model, or persistence work:
+- `semanticMs=291`
+- `memoryMs=1454`
+- `kdmMs=36`
+- `aiMs=0`
+- `criticalPersistenceMs=0` before response
+- `postProcessMs=0`
+- `serverTotalMs=6706`
+- client wall time `7271ms`
+
+The measured work accounts for only ~1.8s, leaving ~4.9s in distributed coordination before semantic processing.
+
+v8 coordination rule:
+- first-encounter requests use one Firestore transaction to acquire both the distributed idempotency claim and the state-owner mutation lease;
+- replay and in-flight duplicate detection remain authoritative through the same idempotency record;
+- state-owner serialization remains authoritative through the same state-lock record;
+- both ownership records are written atomically only when neither an active duplicate nor an active state owner blocks the request;
+- first-encounter owner requests then adopt the already-acquired state lease without a second acquisition transaction;
+- default/non-first-encounter requests retain the existing coordinator path unchanged;
+- lease renewal, failure cleanup, replay completion and state release remain unchanged after acquisition.
+
+This removes one full Firestore transaction from the normal first-encounter critical path without weakening replay or state-serialization guarantees.
