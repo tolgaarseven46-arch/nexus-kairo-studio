@@ -232,3 +232,16 @@ Next Slice A work:
 - persist/populate a real TestRun record at runtime,
 - add demographic decision-parity characterization,
 - wire replay-local sinks without production side effects.
+
+
+## 16. Slice A4 — decision / realization data isolation
+The v0.4 product freeze requires demographic/profile facts to affect HOW only, never WHAT/WHETHER.
+
+Current proof seam:
+- `PlatformDecisionContextV1` structurally excludes form-of-address, gender, age-band, locale and room-style fields,
+- `ToneOnlyRealizationContextV1` owns those realization-only hints,
+- parity harness never passes tone context into the decision function,
+- a near-boundary moderation fixture proves the comparable decision projection remains identical across very different tone profiles,
+- realization may vary wording while the frozen decision object remains equal.
+
+This is additive proof infrastructure only; the live provider call split is not wired yet.
