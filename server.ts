@@ -120,6 +120,7 @@ import {
 import { registerKairaProposalRecoveryWorkerRoute } from "./src/services/kairaProposalRecoveryWorkerRoute";
 import { registerKairaActivityProvisioningRoute } from "./src/services/kairaActivityProvisioningRoute";
 import { registerPrivatRoomDmIntegrationRoute } from "./src/services/privatRoomDmIntegrationRoute";
+import { registerPrivatRoomLifecycleIntegrationRoute } from "./src/services/privatRoomLifecycleIntegrationRoute";
 import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
 import { registerTestRunReviewRoute } from "./src/services/testRunReviewRoute";
 import {
@@ -136,6 +137,7 @@ app.use(express.json());
 registerKairaProposalRecoveryWorkerRoute(app);
 registerKairaActivityProvisioningRoute(app);
 registerPrivatRoomDmIntegrationRoute(app);
+registerPrivatRoomLifecycleIntegrationRoute(app);
 registerTestRunProvenanceRoute(app);
 registerTestRunReviewRoute(app);
 let aiClient: GoogleGenAI | null = null;
