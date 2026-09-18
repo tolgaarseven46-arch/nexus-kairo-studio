@@ -124,6 +124,7 @@ import { registerPrivatRoomLifecycleIntegrationRoute } from "./src/services/priv
 import { buildKairaFirstEncounterInstruction } from "./src/services/kairaFirstEncounterContinuity";
 import { realizeKairaFirstEncounterRoutine } from "./src/services/kairaFirstEncounterRoutineRealizer";
 import { realizeKairaFirstEncounterContext } from "./src/services/kairaFirstEncounterContextRealizer";
+import { buildKairaFirstEncounterRecoveryFallback } from "./src/services/kairaFirstEncounterRecovery";
 import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
 import { registerTestRunReviewRoute } from "./src/services/testRunReviewRoute";
 import {
@@ -1385,15 +1386,21 @@ app.post("/api/chat", async (req, res) => {
       reply = sanitizeKairoReplyText(generated.text);
       activeAiProviderUsed = generated.providerUsed;
     } catch (generationError) {
-      const providerFallback = buildGroundedDialogueFallback(
-        dialogueDecision,
-        cleanHistory,
-        userMessage,
-        userName,
-        dialogueAnalysis,
-        responsePlan.allowQuestion,
-        kairaSocialMoveFallback(responsePlan),
-      );
+      const providerFallback =
+        conversationPhase === "first_encounter"
+          ? buildKairaFirstEncounterRecoveryFallback(
+              dialogueDecision,
+              firstEncounterContext,
+            )
+          : buildGroundedDialogueFallback(
+              dialogueDecision,
+              cleanHistory,
+              userMessage,
+              userName,
+              dialogueAnalysis,
+              responsePlan.allowQuestion,
+              kairaSocialMoveFallback(responsePlan),
+            );
       if (!providerFallback) throw generationError;
       reply = providerFallback;
       providerFailureFallbackUsed = true;
