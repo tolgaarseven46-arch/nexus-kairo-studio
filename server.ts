@@ -122,6 +122,7 @@ import { registerKairaActivityProvisioningRoute } from "./src/services/kairaActi
 import { registerPrivatRoomDmIntegrationRoute } from "./src/services/privatRoomDmIntegrationRoute";
 import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
 import { registerTestRunReviewRoute } from "./src/services/testRunReviewRoute";
+import { authorizeTestSessionRead } from "./src/services/testSessionReadAccess";
 import {
   buildTestRunCaptureProof,
   resolveChatTestRunBinding,
@@ -520,6 +521,16 @@ app.get("/api/test-sessions/active", async (q, r) => {
 app.get("/api/test-sessions/:sessionId", async (q, r) => {
   try {
     const { sessionId } = q.params;
+    const access = authorizeTestSessionRead({
+      sessionId,
+      authorizationHeader: q.get("authorization"),
+      configuredSecret:
+        process.env.PRIVATROOM_INTEGRATION_TOKEN ||
+        process.env.KAIRA_INTERNAL_TOKEN,
+    });
+    if (access.status !== "authorized" && access.status !== "public_legacy") {
+      return r.status(access.httpStatus).json({ ok: false, error: access.reason });
+    }
     const session = await loadTestSession(sessionId);
     if (!session) return r.status(404).json({ ok: false, error: "Session not found" });
     r.json({ ok: true, session });
