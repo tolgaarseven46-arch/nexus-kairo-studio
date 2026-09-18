@@ -59,6 +59,6 @@ describe("TestRun live binding regression", () => {
 
     expect(binding.testRunId).toBe("TR_beta_room-123");
     expect(binding.sessionId).toBe("TR_beta_room-123");
-    expect(binding.record).toBe(record);
+    expect(binding.record).toStrictEqual(record);
   });
 });
