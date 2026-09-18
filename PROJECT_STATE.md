@@ -394,3 +394,14 @@ Twenty deterministic Slice B fixture contracts are prepared but inactive at:
 They define expected invariants for cold/warm/experienced-owner, explicit reply/mention, unresolved refs, duplicate/conflicting ids, ordering, namespace isolation, unanswered-turn evidence, suppression receipts, escalation refs, semantic non-invention, replay and Droit self-events.
 
 No characterization RED has been run. W5 remains blocked by W2 independent review + W3 freeze.
+
+
+## 28. Slice B W2 machine-readable review intake
+The external W2 review can now be validated structurally before it is accepted:
+- schema: `docs/reviews/slice-b-w2-review.schema.json`
+- validator: `src/services/sliceBW2ReviewIntake.ts`
+- tests: `src/services/sliceBW2ReviewIntake.test.ts`
+
+The gate requires an explicitly independent reviewer, complete finding fields, all seven verdicts, zero remaining blockers and an explicit safe-to-enter-W3 verdict.
+
+This governance tooling does not satisfy W2 by itself and does not authorize W5.

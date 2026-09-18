@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus-kairo.local/schemas/slice-b-w2-review.json",
+  "title": "Slice B W2 Independent Red-Team Review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reviewer", "blockers", "nonBlockers", "future", "verdicts"],
+  "properties": {
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "independent", "reviewedAt"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "independent": { "const": true },
+        "reviewedAt": { "type": "string", "minLength": 1 }
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "nonBlockers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonBlockerFinding" }
+    },
+    "future": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/futureFinding" }
+    },
+    "verdicts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shadowSemanticAuthorityBlockerRemains",
+        "hiddenEngagementAuthorityBlockerRemains",
+        "isolationBlockerRemains",
+        "replayPurityBlockerRemains",
+        "determinismBlockerRemains",
+        "privacyBlockerRemains",
+        "safeToEnterW3AfterRepairs"
+      ],
+      "properties": {
+        "shadowSemanticAuthorityBlockerRemains": { "type": "boolean" },
+        "hiddenEngagementAuthorityBlockerRemains": { "type": "boolean" },
+        "isolationBlockerRemains": { "type": "boolean" },
+        "replayPurityBlockerRemains": { "type": "boolean" },
+        "determinismBlockerRemains": { "type": "boolean" },
+        "privacyBlockerRemains": { "type": "boolean" },
+        "safeToEnterW3AfterRepairs": { "type": "boolean" }
+      }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "counterexample", "violatedInvariant", "minimumRepair", "requiredTest"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "counterexample": { "type": "string", "minLength": 1 },
+        "violatedInvariant": { "type": "string", "minLength": 1 },
+        "minimumRepair": { "type": "string", "minLength": 1 },
+        "requiredTest": { "type": "string", "minLength": 1 }
+      }
+    },
+    "nonBlockerFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "rationale", "recommendedCleanupOrTest"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "recommendedCleanupOrTest": { "type": "string", "minLength": 1 }
+      }
+    },
+    "futureFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "whyOutOfScope"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "whyOutOfScope": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
