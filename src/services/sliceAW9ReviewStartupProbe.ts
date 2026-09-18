@@ -34,11 +34,18 @@ export function summarizeSliceAW9ReviewPacket(packet: ReturnType<typeof buildTes
   };
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export async function runSliceAW9StartupProbe(): Promise<void> {
   try {
-    const restored = await loadTestSession(SLICE_A_W9_TEST_RUN_ID);
+    let restored = await loadTestSession(SLICE_A_W9_TEST_RUN_ID);
+    for (const delayMs of [5_000, 15_000, 30_000]) {
+      if (restored) break;
+      await sleep(delayMs);
+      restored = await loadTestSession(SLICE_A_W9_TEST_RUN_ID);
+    }
     if (!restored) {
-      console.warn("[Slice A W9 Review Probe] test run not found", {
+      console.warn("[Slice A W9 Review Probe] test run not found after retries", {
         testRunId: SLICE_A_W9_TEST_RUN_ID,
       });
       return;
