@@ -722,12 +722,13 @@ app.post("/api/chat", async (req, res) => {
       });
     };
     const cleanHistory = sanitizeKairoChatHistory(history);
+    const semanticStart = now();
     const languageUnderstanding = await resolveServerLanguageUnderstanding({
       message: userMessage,
       incomingSemanticInterpretation,
       context: {
         userName,
-        characterName: character.name || "KAIRO",
+        characterName: character.name || "Kaira",
         recentMessages: cleanHistory.slice(-8).map((item: any) => ({
           role:
             item.sender === "user"
@@ -737,8 +738,26 @@ app.post("/api/chat", async (req, res) => {
         })),
       },
       preferredProvider: provider,
-      generateText,
+      generateText:
+        conversationPhase === "first_encounter"
+          ? (
+              semanticSystem,
+              semanticMessages,
+              semanticTemperature,
+              semanticProvider,
+            ) =>
+              generateTextWithinBudget(
+                semanticSystem,
+                semanticMessages,
+                semanticTemperature,
+                semanticProvider,
+                FIRST_ENCOUNTER_SEMANTIC_BUDGET_MS,
+              )
+          : generateText,
+      preferTrivialSocialFastPath: conversationPhase === "first_encounter",
+      firstEncounterContext,
     });
+    const semanticMs = Math.round(now() - semanticStart);
     const canonicalSemantic = {
       interpretation: languageUnderstanding.interpretation,
       event: languageUnderstanding.event,
