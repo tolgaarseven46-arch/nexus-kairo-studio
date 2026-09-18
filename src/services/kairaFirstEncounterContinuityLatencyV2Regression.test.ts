@@ -1,0 +1,65 @@
+import { describe, expect, it } from "vitest";
+import { resolveServerLanguageUnderstanding } from "./serverLanguageUnderstanding";
+
+describe("first-encounter continuity + latency v2", () => {
+  it("canonicalizes 'iyilik' as a contextual well-being reply without provider", async () => {
+    let providerCalls = 0;
+    const result = await resolveServerLanguageUnderstanding({
+      message: "iyilik",
+      context: {
+        userName: "Sen",
+        characterName: "Kaira",
+        recentMessages: [
+          { role: "assistant", content: "gayet iyiyim, sen nasılsın?" },
+        ],
+      },
+      preferredProvider: "openrouter",
+      preferTrivialSocialFastPath: true,
+      firstEncounterContext: { roomName: "deneme", isOwner: true },
+      generateText: async () => {
+        providerCalls += 1;
+        throw new Error("provider must not be called");
+      },
+    });
+
+    expect(providerCalls).toBe(0);
+    expect(result.event.socialRoutine).toBe("well_being_reply");
+    expect(result.interpretation.discourseFacets.socialRoutine).toBe(
+      "well_being_reply",
+    );
+    expect(
+      result.interpretation.evidence.some((evidence) =>
+        evidence.cues.includes("first_encounter_well_being_reply"),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps critical continuity before response but telemetry after response", async () => {
+    const fs = await import("node:fs/promises");
+    const server = await fs.readFile(new URL("../../server.ts", import.meta.url), "utf8");
+    const persistence = await fs.readFile(
+      new URL("./kdmPersistenceService.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(server).toContain("strictPersistence: firstEncounterFastPersistence");
+    expect(server).toContain('status: "not_applicable" as const');
+    expect(server).toContain("criticalPersistenceMs");
+
+    const localStart = server.indexOf("const firstEncounterFastPersistence");
+    const send = server.indexOf("await sendChatPayload({", localStart);
+    const background = server.indexOf(
+      'console.log("[First Encounter Background Persistence]"',
+      send,
+    );
+    expect(localStart).toBeGreaterThan(-1);
+    expect(send).toBeGreaterThan(localStart);
+    expect(background).toBeGreaterThan(send);
+
+    expect(persistence).toContain("writeBatch");
+    expect(persistence).toContain("batch.set(turnDocRef");
+    expect(persistence).toContain("batch.set(sessionRef");
+    expect(persistence).toContain("batch.set(stateRef");
+    expect(persistence).toContain("batch.set(traceDocRef");
+  });
+});
