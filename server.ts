@@ -1044,6 +1044,27 @@ app.post("/api/chat", async (req, res) => {
             worldContext: worldReasoningContext,
             selfMemoryRuntime,
             epistemicContext: epistemicAccess,
+            additionalIssueFinder: (candidateReply) => [
+              ...findKairoGroundingIssues(candidateReply, cleanHistory, userMessage),
+              ...findDialogueAttributionIssues(
+                candidateReply,
+                cleanHistory,
+                userMessage,
+                userName,
+                dialogueAnalysis,
+              ),
+              ...findDialogueDecisionIssues(
+                candidateReply,
+                dialogueDecision,
+                dialogueOutputStyle,
+              ),
+              ...findKairoResponseRhythmIssues(
+                candidateReply,
+                cleanHistory,
+                dialogueDecision.move,
+                speech.relationshipLevel,
+              ),
+            ],
           }),
         worldMemoryGuard = canonicalConstraint?.worldGuard ?? enforceWorldModelRecallResponse(local.reply, retrievedWorldEvents, worldReasoningContext),
         epistemicGuard = canonicalConstraint?.epistemicGuard ?? enforceKairaEpistemicResponse(worldMemoryGuard.reply, epistemicAccess),
