@@ -38,8 +38,8 @@ describe("KAIRA per-turn observability completeness contracts", () => {
   it("keeps provider and timing provenance on every saved turn", () => {
     expect(server).toContain("providerUsed: \"local_language\"");
     expect(server).toContain("providerUsed: activeAiProviderUsed");
-    expect(server).toContain("timings: { memoryMs, kdmMs, aiMs: 0 }");
-    expect(server).toContain("timings: { memoryMs, kdmMs, aiMs }");
+    expect(server).toContain("timings: { semanticMs, memoryMs, kdmMs, aiMs: 0 }");
+    expect(server).toContain("timings: { semanticMs, memoryMs, kdmMs, aiMs }");
 
     expect(persistence).toContain("providerUsed: payload.metadata?.providerUsed");
     expect(persistence).toContain("timings: payload.metadata?.timings");
