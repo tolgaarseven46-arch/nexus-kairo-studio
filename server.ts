@@ -1210,7 +1210,15 @@ app.post("/api/chat", async (req, res) => {
             selfMemoryRuntime,
             livedMemoryRuntime,
             responsePlan,
-            timings: { memoryMs, kdmMs, aiMs: 0 },
+            timings: { semanticMs, memoryMs, kdmMs, aiMs: 0 },
+            realizationVariantSeed:
+              "realizationVariantSeed" in firstEncounterFastReply
+                ? firstEncounterFastReply.realizationVariantSeed
+                : undefined,
+            realizationVariantId:
+              "variantId" in firstEncounterFastReply
+                ? firstEncounterFastReply.variantId
+                : undefined,
             testRunId,
             testRunRecord,
             activityPermission: activityPermissionPrompt,
@@ -1239,12 +1247,30 @@ app.post("/api/chat", async (req, res) => {
       memoryCache.delete(memoryCacheKey(userId, kairaInstance.instanceId));
       const postProcessMs = Math.round(now() - postStart),
         timings = {
+          semanticMs,
           memoryMs,
           kdmMs,
           aiMs: 0,
           postProcessMs,
           serverTotalMs: Math.round(now() - serverStart),
         };
+      if (conversationPhase === "first_encounter") {
+        console.log("[First Encounter Timing]", {
+          testRunId,
+          requestId,
+          providerUsed: "local_language",
+          semanticMs,
+          memoryMs,
+          kdmMs,
+          aiMs: 0,
+          postProcessMs,
+          serverTotalMs: timings.serverTotalMs,
+          variantId:
+            "variantId" in firstEncounterFastReply
+              ? firstEncounterFastReply.variantId
+              : undefined,
+        });
+      }
       if (!consistency.accepted) {
         throw buildKairaFinalDeliveryRejectionError(finalDelivery);
       }
@@ -1267,6 +1293,14 @@ app.post("/api/chat", async (req, res) => {
         localLanguage: {
           intent: local.intent,
           confidence: local.confidence,
+          variantId:
+            "variantId" in firstEncounterFastReply
+              ? firstEncounterFastReply.variantId
+              : undefined,
+          realizationVariantSeed:
+            "realizationVariantSeed" in firstEncounterFastReply
+              ? firstEncounterFastReply.realizationVariantSeed
+              : undefined,
           memory: kairaPolicy.persistentUserMemory ? languageMemorySummary(stateUserId) : undefined,
         },
         enforcement: enforced,
@@ -1728,7 +1762,7 @@ app.post("/api/chat", async (req, res) => {
           selfMemoryRuntime,
           livedMemoryRuntime,
           responsePlan,
-          timings: { memoryMs, kdmMs, aiMs },
+          timings: { semanticMs, memoryMs, kdmMs, aiMs },
           testRunId,
           testRunRecord,
           activityPermission: activityPermissionPrompt,
@@ -1757,12 +1791,27 @@ app.post("/api/chat", async (req, res) => {
     memoryCache.delete(memoryCacheKey(userId, kairaInstance.instanceId));
     const postProcessMs = Math.round(now() - postStart),
       timings = {
+        semanticMs,
         memoryMs,
         kdmMs,
         aiMs,
         postProcessMs,
         serverTotalMs: Math.round(now() - serverStart),
       };
+    if (conversationPhase === "first_encounter") {
+      console.log("[First Encounter Timing]", {
+        testRunId,
+        requestId,
+        providerUsed: activeAiProviderUsed,
+        semanticMs,
+        memoryMs,
+        kdmMs,
+        aiMs,
+        postProcessMs,
+        serverTotalMs: timings.serverTotalMs,
+        repairAttempts,
+      });
+    }
     if (!consistency.accepted) {
       throw buildKairaFinalDeliveryRejectionError(finalDelivery);
     }
