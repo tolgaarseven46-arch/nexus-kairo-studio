@@ -523,3 +523,30 @@ Required post-deploy proof:
 - continuity records exist before response;
 - telemetry runs after response;
 - first-encounter fast replies materially reduce server total latency while preserving replay/TestRun continuity.
+
+
+## 33. First-encounter well-being decision-authority live RED (2026-09-18)
+
+Post-#309 production probe exposed an authority-ordering defect that deterministic semantic-only coverage did not catch.
+
+Live RED evidence from temporary non-merge PR #310:
+- input: `iyilik` after Kaira `gayet iyiyim, sen nasılsın?`
+- canonical semantic routine: `well_being_reply`
+- semantic source: `fallback_regex`
+- actual provider: `openrouter`
+- actual reply: `he tamam o zaman`
+- `semanticMs=302`, `memoryMs=573`, `kdmMs=9`, `aiMs=2054`, `postProcessMs=4800`, `serverTotalMs=11582`
+- external probe wall time: `14735ms`
+
+Root cause:
+- `discourse.previousTurnDependency` was evaluated before the canonical social-routine decision.
+- That observational dependency converted the primary move to `follow_previous_answer` even though canonical semantics already classified the turn as `well_being_reply`.
+- The first-encounter HOW-only realizer correctly refused to override that decision, so runtime fell through to provider generation.
+
+Authority repair:
+- observational previous-turn dependency must not demote a typed `well_being_reply` semantic routine;
+- `well_being_reply` retains `complete_social_routine` as the primary dialogue move;
+- no new semantic authority, raw-text shortcut, or realizer-side decision override is introduced.
+
+Regression:
+- `kairaFirstEncounterContinuityLatencyV2Regression.test.ts` now reproduces the exact history + semantic + discourse composition and requires `complete_social_routine / well_being_reply`.
