@@ -1,4 +1,4 @@
-import type { TestRunRecordV1 } from "./testRunFrozenSnapshot";
+import { createTestRunRecord, type TestRunRecordV1 } from "./testRunFrozenSnapshot";
 
 export interface ChatTestRunBinding {
   testRunId?: string;
@@ -13,10 +13,16 @@ export function resolveChatTestRunBinding(input: {
   legacySessionId: string;
   record?: TestRunRecordV1 | null;
 }): ChatTestRunBinding {
-  const record = input.record || undefined;
-  if (!record) {
+  const candidate = input.record || undefined;
+  if (!candidate) {
     return { sessionId: input.legacySessionId };
   }
+
+  const record = createTestRunRecord({
+    provenance: candidate.provenance,
+    stateBinding: candidate.stateBinding,
+    replaySnapshot: candidate.replaySnapshot,
+  });
 
   const testRunId = record.provenance.identity.testRunId.trim();
   if (!testRunId) {
