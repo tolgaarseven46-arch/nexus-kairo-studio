@@ -738,14 +738,24 @@ app.post("/api/chat", async (req, res) => {
         await assertCoordinatedKairaChatStateOwnership(coordinationKey);
       }
     };
+    let firstEncounterTrivialSocial = false;
     const sendChatPayload = async (payload: any) => {
+      const deferCoordinationCompletion =
+        firstEncounterTrivialSocial && payload?.providerUsed === "local_language";
+      if (coordinationKey && ownsCoordinationClaim && deferCoordinationCompletion) {
+        ownsCoordinationClaim = false;
+        res.json(payload);
+        void completeCoordinatedKairaChatRequest(coordinationKey, payload).catch((error) => {
+          console.warn("[Kaira Idempotency] deferred completion failed:", error);
+        });
+        return;
+      }
       if (coordinationKey && ownsCoordinationClaim) {
         await completeCoordinatedKairaChatRequest(coordinationKey, payload);
         ownsCoordinationClaim = false;
       }
       return res.json(payload);
     };
-    let firstEncounterTrivialSocial = false;
     const shouldResolveActivityPermissionReply =
       kairaPolicy.autonomousActivityPlanning &&
       (conversationPhase !== "first_encounter" ||
@@ -920,15 +930,21 @@ app.post("/api/chat", async (req, res) => {
     const memoryStart = now();
     const [persistedState, persistentMemory] = await Promise.all([
       kairaPolicy.persistentRelationship ? loadKdmState(stateUserId).catch(() => null) : Promise.resolve(null),
-      suppressRecentMemory || !kairaPolicy.persistentUserMemory
+      firstEncounterTrivialSocial
         ? Promise.resolve([])
-        : persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move) === FAST_RECENT_MEMORY_LIMIT
-          ? getFastRecentMemory(userId, kairaInstance.instanceId)
-          : loadRecentKdmMemory(
-              persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move),
-              stateUserId,
-            ),
-      kairaPolicy.persistentUserMemory ? hydrateLanguageMemory(stateUserId) : Promise.resolve(),
+        : suppressRecentMemory || !kairaPolicy.persistentUserMemory
+          ? Promise.resolve([])
+          : persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move) === FAST_RECENT_MEMORY_LIMIT
+            ? getFastRecentMemory(userId, kairaInstance.instanceId)
+            : loadRecentKdmMemory(
+                persistentMemoryFetchLimitForDialogueMove(dialogueDecision.move),
+                stateUserId,
+              ),
+      firstEncounterTrivialSocial
+        ? Promise.resolve()
+        : kairaPolicy.persistentUserMemory
+          ? hydrateLanguageMemory(stateUserId)
+          : Promise.resolve(),
     ]);
     observeUserLanguageStyle(stateUserId, userMessage, kairaPolicy.persistentUserMemory);
     const memoryMs = Math.round(now() - memoryStart),
