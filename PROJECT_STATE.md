@@ -340,3 +340,19 @@ W10 decision:
 - Slice A measurement/isolation infrastructure is promoted/accepted.
 - The W0–W10 workflow remains authoritative for later slices.
 - Slice B may begin; Slice C behavior remains gated behind its own W0–W10 evidence chain.
+
+
+## 23. Slice B — W0/W1 multi-user observation checkpoint
+Slice A is accepted; Slice B has begun under the same W0–W10 workflow.
+
+Current scope is observation only:
+- Conversation Graph evidence,
+- cold / warm / experienced-owner fixtures,
+- addressedTo / suppressedResponse / ignoredBy / escalation evidence.
+
+The frozen pre-AI `R` multi-party engagement authority is NOT reopened. Conversation Graph may not decide WHETHER/WHAT Kaira says, grant capabilities, mutate relationship/appraisal state, or create canonical semantics.
+
+W0 product problem and W1 scenarios/failure classes are captured in:
+- `docs/slice-b-multi-user-observation-freeze-packet.md`
+
+W2 independent red-team and W3 Tolga product freeze remain mandatory. No W5 RED or implementation begins before both gates close.
