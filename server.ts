@@ -122,7 +122,6 @@ import { registerKairaActivityProvisioningRoute } from "./src/services/kairaActi
 import { registerPrivatRoomDmIntegrationRoute } from "./src/services/privatRoomDmIntegrationRoute";
 import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
 import { registerTestRunReviewRoute } from "./src/services/testRunReviewRoute";
-import { runSliceAW9StartupProbe } from "./src/services/sliceAW9ReviewStartupProbe";
 import {
   buildTestRunCaptureProof,
   resolveChatTestRunBinding,
@@ -1662,9 +1661,8 @@ async function startServer() {
     appType: "spa",
   });
   app.use(vite.middlewares);
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`NEXUS Kairo Studio running on http://0.0.0.0:${PORT}`);
-    void runSliceAW9StartupProbe();
-  });
+  app.listen(PORT, "0.0.0.0", () =>
+    console.log(`NEXUS Kairo Studio running on http://0.0.0.0:${PORT}`),
+  );
 }
 startServer();
