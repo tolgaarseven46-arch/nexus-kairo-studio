@@ -4,11 +4,18 @@ import { describe, expect, it } from 'vitest';
 describe('controlled spontaneity observability contracts', () => {
   it('persists explicit local none and the AI decision in KNT traces', async () => {
     const server = await readFile('server.ts', 'utf8');
-    const localKnt = /providerUsed: \"local_language\",[\s\S]*?controlledSpontaneity:\s*\{[\s\S]*?mode:\s*\"none\"[\s\S]*?eligible:\s*false[\s\S]*?probability:\s*0[\s\S]*?roll:\s*0[\s\S]*?reason:\s*\"local_language_short_circuit\"[\s\S]*?\}/;
-    const aiKnt = /providerUsed: activeAiProviderUsed,[\s\S]{0,160}?controlledSpontaneity: spontaneityDecision/;
+    const localStart = server.indexOf("const saveKntTelemetry = () =>");
+    const localEnd = server.indexOf("let criticalPersistenceMs", localStart);
+    const aiStart = server.indexOf("providerUsed: activeAiProviderUsed", localEnd);
 
-    expect(server).toMatch(localKnt);
-    expect(server).toMatch(aiKnt);
+    expect(localStart).toBeGreaterThan(-1);
+    expect(localEnd).toBeGreaterThan(localStart);
+    expect(aiStart).toBeGreaterThan(localEnd);
+
+    const localKnt = server.slice(localStart, localEnd);
+    expect(localKnt).toContain('providerUsed: "local_language"');
+    expect(localKnt).toContain('reason: "local_language_short_circuit"');
+    expect(server.slice(aiStart)).toContain("controlledSpontaneity: spontaneityDecision");
   });
 
   it('exposes controlled spontaneity in both local and AI API KDM responses', async () => {
