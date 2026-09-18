@@ -305,3 +305,27 @@ Current proof:
 - the read-only review route is internal-authenticated and does not change live chat behavior.
 
 This is the review seam needed for joint live-beta inspection after REC proof.
+
+
+## 21. Slice A10 — live-beta TestSession read privacy hardening + live acceptance proof
+
+The first real Slice A live acceptance passed against deployed Render services using an isolated synthetic room/user.
+
+Acceptance evidence:
+- GitHub Actions run: `35310419905`,
+- TestRun: `TR_live_beta_slice-a-acceptance-35310419905`,
+- PrivatRoom -> Kaira live bridge returned `testCapture.persisted=true`,
+- persisted turn id: `turn_1789708851349_avm4`,
+- persisted TestSession read-back returned the same TestRun/session id and one stored turn,
+- live provider reply was `merhaba`,
+- acceptance ended with `SLICE_A_LIVE_ACCEPTANCE=PASS`.
+
+The acceptance also exposed a privacy gap: predictable `TR_live_beta_*` TestSession ids were readable through the legacy public TestSession endpoints.
+
+A10 hardening:
+- exact `/api/test-sessions/:sessionId` reads require internal bearer auth when the id starts `TR_live_beta_`,
+- `/api/test-sessions/active` also refuses to return a protected live-beta session without internal auth,
+- legacy Studio TestSession ids remain backward-compatible/public under the existing test tooling contract,
+- the owner-facing PrivatRoom review path remains server-mediated and uses the server-side integration token after Firebase owner verification.
+
+This privacy gate must be live-verified before Slice A is declared complete.
