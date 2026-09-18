@@ -20,7 +20,6 @@ vi.mock('firebase/firestore', () => ({
     };
   }),
   addDoc: firestore.addDoc,
-  writeBatch: vi.fn(() => ({ set: (...args: unknown[]) => firestore.setDoc(...args), commit: vi.fn(async () => undefined) })),
   deleteDoc: vi.fn(), where: vi.fn(), limit: vi.fn((value: number) => ({ kind: 'limit', value })),
   orderBy: vi.fn((...args: unknown[]) => ({ kind: 'orderBy', args })), query: vi.fn((...args: unknown[]) => ({ kind: 'query', args })),
 }));
