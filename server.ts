@@ -724,7 +724,11 @@ app.post("/api/chat", async (req, res) => {
     const requestId = requestIdentity.requestId;
     coordinationKey = `${stateUserId}::${kairaInstance.instanceId}::${requestIdentity.coordinationRequestId}`;
     if (coordinationKey) {
-      const claim = await claimCoordinatedKairaChatRequest<any>(coordinationKey);
+      const preferCombinedFirstEncounterCoordination =
+        conversationPhase === "first_encounter";
+      const claim = await claimCoordinatedKairaChatRequest<any>(coordinationKey, {
+        preferCombinedFirstEncounterCoordination,
+      });
       if (claim.kind === "replay") return res.json(claim.payload);
       if (claim.kind === "wait") {
         const outcome = await claim.outcome;
