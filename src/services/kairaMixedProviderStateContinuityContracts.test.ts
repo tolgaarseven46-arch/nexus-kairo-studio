@@ -9,7 +9,7 @@ const kdmMarker = 'kdm = analyzeKdmInteractionCanonicalTurn(';
 describe('mixed local / AI provider state continuity contracts', () => {
   it('computes canonical KDM state once before the local-vs-AI response branch', () => {
     const kdm = server.indexOf(kdmMarker);
-    const local = server.indexOf('local = tryLocalKairoReply(');
+    const local = server.indexOf(': tryLocalKairoReply(', kdm);
     const branch = server.indexOf(localBranchMarker);
 
     expect(kdm).toBeGreaterThan(-1);

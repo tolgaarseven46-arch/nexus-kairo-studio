@@ -139,6 +139,10 @@ export interface SaveTestSessionTurnPayload {
     activityPermission?: { requestId: string; activityId: string; activityLabel: string; text: string } | null;
     testRunId?: string;
     testRunRecord?: unknown;
+    platformEvent?: unknown;
+    welcomeDecision?: unknown;
+    realizationVariantSeed?: string;
+    realizationVariantId?: string;
   };
 }
 
@@ -270,6 +274,10 @@ export async function saveTestSessionTurn(payload: SaveTestSessionTurnPayload): 
       activityPermission: payload.metadata?.activityPermission,
       testRunId: payload.metadata?.testRunId || payload.testRunId,
       testRunRecord: payload.metadata?.testRunRecord || payload.testRunRecord,
+      platformEvent: payload.metadata?.platformEvent,
+      welcomeDecision: payload.metadata?.welcomeDecision,
+      realizationVariantSeed: payload.metadata?.realizationVariantSeed,
+      realizationVariantId: payload.metadata?.realizationVariantId,
     },
   };
 

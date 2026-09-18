@@ -23,6 +23,10 @@ export interface TestRunReviewTurnV1 {
   retrievedMemories?: unknown[];
   memoryUpdate?: unknown;
   consistency?: unknown;
+  platformEvent?: unknown;
+  welcomeDecision?: unknown;
+  realizationVariantSeed?: string;
+  realizationVariantId?: string;
 }
 
 export interface TestRunReviewPacketV1 {
@@ -66,6 +70,10 @@ const toTurn = (turn: TestSessionTurnRecord): TestRunReviewTurnV1 => ({
   retrievedMemories: turn.retrievedMemories,
   memoryUpdate: turn.memoryUpdate,
   consistency: turn.consistency,
+  platformEvent: turn.metadata?.platformEvent,
+  welcomeDecision: turn.metadata?.welcomeDecision,
+  realizationVariantSeed: turn.metadata?.realizationVariantSeed,
+  realizationVariantId: turn.metadata?.realizationVariantId,
 });
 
 export function buildTestRunReviewPacket(

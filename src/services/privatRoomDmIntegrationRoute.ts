@@ -2,6 +2,8 @@ import type { Express, Request, Response } from "express";
 import { authorizeKairaInternalWorker } from "./kairaInternalWorkerAuth";
 import { buildRuntimeTestRunRecordV1 } from "./testRunRuntimeProvenance";
 import { resolveChatTestRunBinding } from "./testRunLiveBinding";
+import { loadTestSession } from "./kdmPersistenceService";
+import { deriveKairaFirstEncounterContinuity } from "./kairaFirstEncounterContinuity";
 
 const CONTRACT_VERSION = 1 as const;
 
@@ -127,6 +129,13 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
       record: testRunRecord,
     });
 
+    const restoredSession = await loadTestSession(testRunBinding.sessionId).catch(
+      () => null,
+    );
+    const firstEncounter = deriveKairaFirstEncounterContinuity(
+      restoredSession?.turns || [],
+    );
+
     const corePayload = {
       requestId: `privatroom_${safeId(event.eventId)}`,
       sessionId: testRunBinding.sessionId,
@@ -135,7 +144,8 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
       userName: event.actor.displayName,
       userMessage: event.message.text,
       kairaInstanceId: event.kairaInstanceId,
-      history: [],
+      history: firstEncounter.history,
+      conversationPhase: firstEncounter.active ? "first_encounter" : "default",
       provider: process.env.PRIVATROOM_KAIRA_PROVIDER || "openrouter",
     };
 

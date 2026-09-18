@@ -128,6 +128,10 @@ export interface TestSessionTurnRecord {
     activityPermission?: { requestId: string; activityId: string; activityLabel: string; text: string } | null;
     testRunId?: string;
     testRunRecord?: unknown;
+    platformEvent?: unknown;
+    welcomeDecision?: unknown;
+    realizationVariantSeed?: string;
+    realizationVariantId?: string;
   };
 }
 
