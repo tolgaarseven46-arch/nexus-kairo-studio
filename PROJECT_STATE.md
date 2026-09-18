@@ -550,3 +550,29 @@ Authority repair:
 
 Regression:
 - `kairaFirstEncounterContinuityLatencyV2Regression.test.ts` now reproduces the exact history + semantic + discourse composition and requires `complete_social_routine / well_being_reply`.
+
+
+## 34. First-encounter critical-path latency v3 (2026-09-18)
+
+Post-#311 production acceptance fixed the semantic/realization failure but still measured excessive latency:
+- reply: `güzel, sevindim`
+- provider: `local_language`
+- semantic routine: `well_being_reply`
+- `aiMs=0`
+- `serverTotalMs=7642`
+- external wall time: `9175ms`
+- `ownershipMs=775`
+- `criticalPersistenceMs=881`
+- `postProcessMs=1657`
+
+This proves the remaining latency is not provider generation and not required continuity persistence alone.
+
+v3 critical-path rule:
+- typed trivial first-encounter social turns may skip unrelated activity-permission lookup unless an explicit permission request id is being answered;
+- they may skip social-appraisal autobiographical/world-memory hydration because the canonical turn carries no appraisal/commitment obligation;
+- relationship/KDM state hydration remains enabled;
+- state-mutation ownership verification remains enabled;
+- relationship persistence and TestRun turn/session continuity remain strict and complete before response;
+- non-trivial/default turns retain the existing activity-permission and social-appraisal behavior.
+
+No new semantic or decision authority is introduced. The optimization is execution scheduling only.
