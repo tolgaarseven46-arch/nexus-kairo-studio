@@ -370,3 +370,11 @@ An internal adversarial pass found and hardened eight candidate authority/isolat
 - actor kind made explicit for Droit/system self-event observation.
 
 This pass is deliberately NON-AUTHORITATIVE and does not satisfy W2 independent review.
+
+
+## 25. Slice B W3/W4 preparation
+While W2 independent red-team remains open, a non-authoritative W3 freeze draft and W4 deterministic test map are prepared at:
+- `docs/slice-b-w3-freeze-draft-w4-test-map.md`
+
+This does not close W2 or W3 and does not authorize W5/implementation.
+The draft defines the candidate graph shape, fixture semantics and 20 characterization targets so W2 findings can be applied mechanically rather than restarting design.
