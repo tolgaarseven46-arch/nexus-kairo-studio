@@ -84,7 +84,7 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
       req.get("x-kaira-scenario-pack-version") || "",
     ).trim();
 
-    let testRunRecord = undefined;
+    let testRunRecord: ReturnType<typeof buildRuntimeTestRunRecordV1> | undefined;
     if (incomingTestRunId) {
       const conversationServerId = event.conversation.conversationId.replace(/^room:/, "");
       testRunRecord = buildRuntimeTestRunRecordV1({
@@ -115,6 +115,7 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
         contractVersion: CONTRACT_VERSION,
         sourceEventId: event.eventId,
         responseId: `no_reply_${safeId(event.eventId)}`,
+        testRunId: testRunRecord?.provenance.identity.testRunId,
         proposedActions: [],
         noReplyReason: "message_send_capability_not_granted",
       });
@@ -168,6 +169,7 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
           contractVersion: CONTRACT_VERSION,
           sourceEventId: event.eventId,
           responseId: `no_reply_${safeId(event.eventId)}`,
+          testRunId: testRunBinding.testRunId,
           proposedActions: [],
           noReplyReason: "kaira_core_returned_empty_reply",
         });
