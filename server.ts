@@ -334,6 +334,58 @@ async function generateText(
 ): Promise<string> {
   return (await generateTextResult(system, messages, temperature, preferredProvider)).text;
 }
+const FIRST_ENCOUNTER_SEMANTIC_BUDGET_MS = 2500;
+const FIRST_ENCOUNTER_GENERATION_BUDGET_MS = 3500;
+
+async function generateTextResultWithinBudget(
+  system: string,
+  messages: any[],
+  temperature: number,
+  preferredProvider: string,
+  timeoutMs?: number,
+): Promise<GeneratedTextResult> {
+  if (!timeoutMs) {
+    return generateTextResult(system, messages, temperature, preferredProvider);
+  }
+
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      generateTextResult(system, messages, temperature, preferredProvider),
+      new Promise<GeneratedTextResult>((_, reject) => {
+        timeoutHandle = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `provider_deadline_exceeded:${timeoutMs}ms`,
+              ),
+            ),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+}
+
+async function generateTextWithinBudget(
+  system: string,
+  messages: any[],
+  temperature: number,
+  preferredProvider: string,
+  timeoutMs?: number,
+): Promise<string> {
+  return (
+    await generateTextResultWithinBudget(
+      system,
+      messages,
+      temperature,
+      preferredProvider,
+      timeoutMs,
+    )
+  ).text;
+}
 async function getFastRecentMemory(userId: string, kairaInstanceId: string) {
   const cacheKey = memoryCacheKey(userId, kairaInstanceId);
   const c = memoryCache.get(cacheKey);
@@ -1287,7 +1339,15 @@ app.post("/api/chat", async (req, res) => {
     let providerFailureFallbackUsed = false;
     let activeAiProviderUsed: AiProviderUsed = provider === "gemini" ? "gemini" : "openrouter";
     try {
-      const generated = await generateTextResult(system, msgs, 0.78, provider);
+      const generated = await generateTextResultWithinBudget(
+        system,
+        msgs,
+        0.78,
+        provider,
+        conversationPhase === "first_encounter"
+          ? FIRST_ENCOUNTER_GENERATION_BUDGET_MS
+          : undefined,
+      );
       reply = sanitizeKairoReplyText(generated.text);
       activeAiProviderUsed = generated.providerUsed;
     } catch (generationError) {
@@ -1325,7 +1385,11 @@ app.post("/api/chat", async (req, res) => {
       ...findWorldModelResponseIssues(reply, retrievedWorldEvents, worldReasoningContext).map((issue) => issue.message),
     ];
     let repairAttempts = 0;
-    if (groundingIssues.length && now() - aiStart < 24000) {
+    if (
+      groundingIssues.length &&
+      conversationPhase !== "first_encounter" &&
+      now() - aiStart < 24000
+    ) {
       try {
         repairAttempts = 1;
         const repairedGeneration = await Promise.race([
