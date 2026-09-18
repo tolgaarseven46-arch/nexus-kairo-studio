@@ -529,6 +529,7 @@ if (
   }
   if (
     event.socialRoutine === "greeting" ||
+    event.socialRoutine === "well_being_reply" ||
     event.socialRoutine === "thanks" ||
     event.socialRoutine === "agreement" ||
     event.socialRoutine === "goodbye" ||
@@ -764,6 +765,7 @@ export function buildGroundedDialogueFallback(
   if (plan.move === "complete_social_routine") {
     if (plan.socialRoutine === "greeting")
       return plan.repeatGuard?.act === "greeting" ? "burdayım" : "selam";
+    if (plan.socialRoutine === "well_being_reply") return "iyi bari 😄";
     if (plan.socialRoutine === "thanks") return "rica ederim";
     if (plan.socialRoutine === "agreement")
       return plan.repeatGuard?.act === "agreement_ack" ? "devam edelim" : "aynen";
