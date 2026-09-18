@@ -233,6 +233,7 @@ function planDialogueResponseBase(
 
   if (
     discourse?.previousTurnDependency &&
+    event.socialRoutine !== "well_being_reply" &&
     event.discourseAct !== "recall_request" &&
     event.intent !== "information_request" &&
     !event.adviceRequested
