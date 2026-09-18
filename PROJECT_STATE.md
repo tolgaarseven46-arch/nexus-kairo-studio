@@ -262,3 +262,19 @@ Next Slice A work:
 - carry TestRun context from PrivatRoom beta room automatically,
 - persist/retrieve the populated TestRun record under an isolated test namespace,
 - connect turn-level KNT/session evidence to the TestRun id.
+
+
+## 18. Slice A6 — live beta TestRun binding
+Live PrivatRoom beta rooms now carry a deterministic TestRun identity into Kaira without changing ordinary chat behavior.
+
+Current binding:
+- PrivatRoom beta route derives one TestRun id per room/environment and forwards it with environment + exact PrivatRoom deploy SHA,
+- Kaira validates the incoming live TestRun record through the same provenance/state factories used by Slice A,
+- the TestRun id becomes the chat session id for beta test runs,
+- KNT traces receive both `testRunId` and `sessionId`,
+- TestSession turn records receive `testRunId` + full TestRun provenance,
+- parent TestSession summaries keep the same TestRun link,
+- non-TestRun callers retain the legacy session id path unchanged.
+
+This gives one stable review key for:
+PrivatRoom room → Kaira chat turn → KNT trace → TestSession transcript → exact build/prompt/policy provenance.
