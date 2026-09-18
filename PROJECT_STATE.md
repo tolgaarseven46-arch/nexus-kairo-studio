@@ -215,3 +215,20 @@ Current proof:
 - continuation does not see source state until an explicit validated fork is performed.
 
 This remains a pure proof seam; production memory/relationship persistence is not rewired yet.
+
+
+## 15. Slice A3 — frozen replay platform snapshot + TestRun record factory
+Replay inputs are now explicitly frozen before real runtime integration.
+
+Current proof:
+- replay records require a source TestRun + frozenSnapshotId,
+- replay snapshot freezes platform context, capability grants, rules, trial state, feature flags,
+  policyConfigVersion, integration contract version and conversation events,
+- TestRun record construction rejects source/snapshot/version mismatches,
+- non-replay runs cannot accidentally carry a replay snapshot,
+- replay readers return defensive copies so replay execution cannot mutate frozen source evidence.
+
+Next Slice A work:
+- persist/populate a real TestRun record at runtime,
+- add demographic decision-parity characterization,
+- wire replay-local sinks without production side effects.
