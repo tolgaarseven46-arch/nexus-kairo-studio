@@ -244,8 +244,7 @@ export async function resolveServerLanguageUnderstanding(
     const fastFloor = await understandTurkishMessage(input.message, {
       context: input.context,
     });
-    if (isSafeTrivialSocialFastPath(fastFloor)) {
-      const reconciledFast = reconcileServerCanonicalSemantics(
+    const reconciledFast = reconcileServerCanonicalSemantics(
       input.message,
       fastFloor,
     );
