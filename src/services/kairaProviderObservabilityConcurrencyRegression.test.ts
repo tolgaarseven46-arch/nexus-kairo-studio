@@ -15,8 +15,9 @@ describe('request-local provider observability regression', () => {
 
   it('binds the final provider to the generation result inside the current chat request', () => {
     expect(server).toContain('let activeAiProviderUsed: AiProviderUsed = provider === "gemini" ? "gemini" : "openrouter";');
-    expect(server).toContain('const generated = await generateTextResult(system, msgs, 0.78, provider);');
+    expect(server).toContain('const generated = await generateTextResultWithinBudget(');
     expect(server).toContain('activeAiProviderUsed = generated.providerUsed;');
+    expect(server).toContain('FIRST_ENCOUNTER_GENERATION_BUDGET_MS');
     expect(server).toContain('activeAiProviderUsed = "deterministic_fallback";');
   });
 
