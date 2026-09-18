@@ -110,6 +110,7 @@ export function registerPrivatRoomLifecycleIntegrationRoute(app: Express) {
             testerUserId: event.actor.userId,
             privatRoomCommit: incomingPrivatRoomCommit,
             scenarioPackVersion: "social-platform-v0.4",
+            integrationContractVersion: "privatroom-lifecycle-v1",
             trialState: "fresh",
           })
         : undefined;
