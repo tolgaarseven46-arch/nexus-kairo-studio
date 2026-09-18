@@ -65,6 +65,7 @@ export interface TestSessionTurnRecord {
   turnId: string;
   turnNumber: number;
   sessionId: string;
+  testRunId?: string;
   timestamp: string;
   userMessage: string;
   assistantReply: string;
@@ -125,11 +126,15 @@ export interface TestSessionTurnRecord {
     livedMemoryRuntime?: unknown;
     responsePlan?: unknown;
     activityPermission?: { requestId: string; activityId: string; activityLabel: string; text: string } | null;
+    testRunId?: string;
+    testRunRecord?: unknown;
   };
 }
 
 export interface TestSessionSummary {
   sessionId: string;
+  testRunId?: string;
+  testRunRecord?: unknown;
   userId: string;
   userName: string;
   characterId: string;
