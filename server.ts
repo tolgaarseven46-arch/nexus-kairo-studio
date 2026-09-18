@@ -513,6 +513,20 @@ app.get("/api/test-sessions/active", async (q, r) => {
     const kairaInstanceId = typeof q.query.kairaInstanceId === "string" ? q.query.kairaInstanceId : undefined;
     const instance = resolveKairaInstanceContext({ instanceId: kairaInstanceId });
     const session = await loadActiveTestSessionForUser(stateOwnerScope(userId, instance.instanceId));
+    const protectedSessionId =
+      session?.session?.testRunId ||
+      session?.session?.sessionId ||
+      "";
+    const access = authorizeTestSessionRead({
+      sessionId: protectedSessionId,
+      authorizationHeader: q.get("authorization"),
+      configuredSecret:
+        process.env.PRIVATROOM_INTEGRATION_TOKEN ||
+        process.env.KAIRA_INTERNAL_TOKEN,
+    });
+    if (access.status !== "authorized" && access.status !== "public_legacy") {
+      return r.status(access.httpStatus).json({ ok: false, error: access.reason });
+    }
     r.json({ ok: true, kairaInstanceId: instance.instanceId, session });
   } catch (e: any) {
     r.status(500).json({ ok: false, error: e?.message });
