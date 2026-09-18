@@ -6,9 +6,15 @@ describe("final delivery enforcement characterization", () => {
   it("gates every user-facing chat payload on final consistency acceptance", () => {
     const source = readFileSync(resolve(process.cwd(), "server.ts"), "utf8");
     const gateMatches = source.match(/if\s*\(\s*!consistency\.accepted\s*\)\s*\{/gu) ?? [];
-    const sendMatches = source.match(/await sendChatPayload\(\{/gu) ?? [];
-    expect(gateMatches.length).toBe(sendMatches.length);
+    const responsePayloadIndex = source.indexOf("const responsePayload =");
+    const fastSendIndex = source.indexOf("sendFirstEncounterFastPayload(responsePayload)", responsePayloadIndex);
+    const standardSendIndex = source.indexOf("await sendChatPayload(responsePayload)", responsePayloadIndex);
+    const localGateIndex = source.lastIndexOf("if (!consistency.accepted)", responsePayloadIndex);
     expect(gateMatches.length).toBeGreaterThanOrEqual(2);
+    expect(localGateIndex).toBeGreaterThan(-1);
+    expect(responsePayloadIndex).toBeGreaterThan(localGateIndex);
+    expect(fastSendIndex).toBeGreaterThan(responsePayloadIndex);
+    expect(standardSendIndex).toBeGreaterThan(responsePayloadIndex);
   });
 
   it("does not persist a rejected assistant candidate but keeps conversational persistence non-empty", () => {
