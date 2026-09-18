@@ -121,7 +121,9 @@ import { registerKairaProposalRecoveryWorkerRoute } from "./src/services/kairaPr
 import { registerKairaActivityProvisioningRoute } from "./src/services/kairaActivityProvisioningRoute";
 import { registerPrivatRoomDmIntegrationRoute } from "./src/services/privatRoomDmIntegrationRoute";
 import { registerPrivatRoomLifecycleIntegrationRoute } from "./src/services/privatRoomLifecycleIntegrationRoute";
-import { KAIRA_FIRST_ENCOUNTER_INSTRUCTION } from "./src/services/kairaFirstEncounterContinuity";
+import { buildKairaFirstEncounterInstruction } from "./src/services/kairaFirstEncounterContinuity";
+import { realizeKairaFirstEncounterRoutine } from "./src/services/kairaFirstEncounterRoutineRealizer";
+import { realizeKairaFirstEncounterContext } from "./src/services/kairaFirstEncounterContextRealizer";
 import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
 import { registerTestRunReviewRoute } from "./src/services/testRunReviewRoute";
 import {
@@ -618,6 +620,7 @@ app.post("/api/chat", async (req, res) => {
       requestId: incomingRequestId,
       activityPermissionRequestId: incomingActivityPermissionRequestId,
       conversationPhase: incomingConversationPhase,
+      firstEncounterContext: incomingFirstEncounterContext,
     } = req.body;
     if (!userMessage)
       return res.status(400).json({ error: "userMessage is required" });
@@ -642,6 +645,25 @@ app.post("/api/chat", async (req, res) => {
       incomingConversationPhase === "first_encounter"
         ? "first_encounter"
         : "default";
+    const firstEncounterContext =
+      conversationPhase === "first_encounter" &&
+      incomingFirstEncounterContext &&
+      typeof incomingFirstEncounterContext === "object"
+        ? {
+            roomId:
+              typeof incomingFirstEncounterContext.roomId === "string"
+                ? incomingFirstEncounterContext.roomId
+                : undefined,
+            roomName:
+              typeof incomingFirstEncounterContext.roomName === "string"
+                ? incomingFirstEncounterContext.roomName
+                : undefined,
+            isOwner:
+              typeof incomingFirstEncounterContext.isOwner === "boolean"
+                ? incomingFirstEncounterContext.isOwner
+                : undefined,
+          }
+        : undefined;
     const requestIdentity = resolveKairaChatRequestCoordinationIdentity(
       incomingRequestId,
       randomUUID,
