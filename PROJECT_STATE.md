@@ -419,3 +419,10 @@ Files:
 - `src/services/sliceBW2ToW3TransitionPlanner.test.ts`
 
 This still does not satisfy W2 by itself; it only prevents manual ambiguity once the external review arrives.
+
+
+## 30. Slice B W2 one-shot external handoff
+A single-copy external reviewer prompt is prepared at:
+- `docs/reviews/slice-b-w2-one-shot-external-prompt.md`
+
+It requires JSON output matching the already-merged W2 intake validator, so an external review can be processed immediately into blocker repairs and the W3 transition plan.
