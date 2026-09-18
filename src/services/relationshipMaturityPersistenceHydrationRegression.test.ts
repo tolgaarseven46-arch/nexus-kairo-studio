@@ -24,6 +24,12 @@ vi.mock("firebase/firestore", () => ({
       firestoreMemory.dynamicState = JSON.parse(JSON.stringify(value.dynamicState)) as DroitDynamicState;
     }
   }),
+  writeBatch: vi.fn(() => ({
+    set: (_ref: unknown, value: { dynamicState?: DroitDynamicState }) => {
+      if (value.dynamicState) firestoreMemory.dynamicState = JSON.parse(JSON.stringify(value.dynamicState)) as DroitDynamicState;
+    },
+    commit: vi.fn(async () => undefined),
+  })),
   addDoc: vi.fn(async () => ({ id: "trace" })),
   getDoc: vi.fn(async () => ({
     exists: () => firestoreMemory.dynamicState !== null,
