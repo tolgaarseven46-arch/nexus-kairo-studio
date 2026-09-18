@@ -4,6 +4,36 @@ import { buildTestRunReviewPacket } from "./testRunReviewPacket";
 const SLICE_A_W9_TEST_RUN_ID =
   "TR_live_beta_slice-a-acceptance-35310419905";
 
+export function summarizeSliceAW9ReviewPacket(packet: ReturnType<typeof buildTestRunReviewPacket>) {
+  return {
+    testRunId: packet.testRunId,
+    sessionId: packet.sessionId,
+    turnCount: packet.turnCount,
+    provenance: {
+      kairaCommit:
+        (packet.provenance as any)?.provenance?.versions?.kairaCommit ?? null,
+      privatRoomCommit:
+        (packet.provenance as any)?.provenance?.versions?.privatRoomCommit ?? null,
+    },
+    turns: packet.turns.map((turn) => ({
+      turnNumber: turn.turnNumber,
+      userMessage: turn.userMessage,
+      assistantReply: turn.assistantReply,
+      providerUsed: turn.providerUsed ?? null,
+      totalMs: turn.timings?.totalMs ?? null,
+      hasSemantic:
+        turn.semanticInterpretation != null || turn.semanticEvent != null,
+      hasReasoning: turn.reasoningTrace != null,
+      hasResponsePlan: turn.responsePlan != null,
+      hasState:
+        turn.dynamicStateBefore != null || turn.dynamicStateAfter != null,
+      hasRelationship: turn.relationshipState != null,
+      memoryCount: turn.retrievedMemories?.length ?? 0,
+      hasConsistency: turn.consistency != null,
+    })),
+  };
+}
+
 export async function runSliceAW9StartupProbe(): Promise<void> {
   try {
     const restored = await loadTestSession(SLICE_A_W9_TEST_RUN_ID);
@@ -15,33 +45,7 @@ export async function runSliceAW9StartupProbe(): Promise<void> {
     }
 
     const packet = buildTestRunReviewPacket(restored);
-    const sanitized = {
-      testRunId: packet.testRunId,
-      sessionId: packet.sessionId,
-      turnCount: packet.turnCount,
-      provenance: {
-        kairaCommit:
-          (packet.provenance as any)?.provenance?.versions?.kairaCommit ?? null,
-        privatRoomCommit:
-          (packet.provenance as any)?.provenance?.versions?.privatRoomCommit ?? null,
-      },
-      turns: packet.turns.map((turn) => ({
-        turnNumber: turn.turnNumber,
-        userMessage: turn.userMessage,
-        assistantReply: turn.assistantReply,
-        providerUsed: turn.providerUsed ?? null,
-        totalMs: turn.timings?.totalMs ?? null,
-        hasSemantic:
-          turn.semanticInterpretation != null || turn.semanticEvent != null,
-        hasReasoning: turn.reasoningTrace != null,
-        hasResponsePlan: turn.responsePlan != null,
-        hasState:
-          turn.dynamicStateBefore != null || turn.dynamicStateAfter != null,
-        hasRelationship: turn.relationshipState != null,
-        memoryCount: turn.retrievedMemories?.length ?? 0,
-        hasConsistency: turn.consistency != null,
-      })),
-    };
+    const sanitized = summarizeSliceAW9ReviewPacket(packet);
 
     console.log(
       "[Slice A W9 Review Probe] PASS",
