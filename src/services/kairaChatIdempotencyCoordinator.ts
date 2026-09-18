@@ -17,6 +17,7 @@ const stateMutations = createDistributedStateMutationCoordinator(firestoreStateM
 const distributedOwners = new Map<string, string>();
 const localFallbackKeys = new Set<string>();
 type StateMutationHandle = {
+  assertHeld: () => Promise<void>;
   assertOwned: () => Promise<void>;
   release: () => Promise<void>;
 };
@@ -36,10 +37,12 @@ async function acquireLocalStateMutation(key: string): Promise<StateMutationHand
   localStateTails.set(key, tail);
   await previous;
   let released = false;
+  const assertHeld = async () => {
+    if (released) throw new KairaStateMutationOwnershipLostError();
+  };
   return {
-    assertOwned: async () => {
-      if (released) throw new KairaStateMutationOwnershipLostError();
-    },
+    assertHeld,
+    assertOwned: assertHeld,
     release: async () => {
       if (released) return;
       released = true;
@@ -54,6 +57,7 @@ async function acquireStateMutation(requestKey: string) {
   try {
     const lease = await stateMutations.acquire(ownerKey);
     stateMutationHandles.set(requestKey, {
+      assertHeld: lease.assertHeld,
       assertOwned: lease.assertOwned,
       release: lease.release,
     });
@@ -68,7 +72,7 @@ export async function assertCoordinatedKairaChatStateOwnership(requestKey: strin
   if (!normalizedKey) return;
   const handle = stateMutationHandles.get(normalizedKey);
   if (!handle) throw new KairaStateMutationOwnershipLostError();
-  await handle.assertOwned();
+  await handle.assertHeld();
 }
 
 async function releaseStateMutation(requestKey: string) {
