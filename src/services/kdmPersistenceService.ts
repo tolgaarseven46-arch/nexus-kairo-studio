@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, limit, orderBy, query, setDoc, addDoc, getDocs, deleteDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, limit, orderBy, query, setDoc, addDoc, getDocs, deleteDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
   DroitDynamicState,
@@ -60,7 +60,39 @@ async function safeWithTimeout<T>(promise: Promise<T>, ms: number, fallback: T):
 export async function saveKdmInteraction(payload: KdmPersistencePayload): Promise<void> {
   try { const userScope = scope(payload.userId); const now = new Date(); const previous = payload.dynamicState.relationship; const firstSeenAt = previous?.firstSeenAt || now.toISOString(); const previousCount = previous?.interactionCount || 0; const familiarityDays = Math.max(0, Math.floor((now.getTime() - new Date(firstSeenAt).getTime()) / 86400000));
     const relationship: RelationshipState = { firstSeenAt, lastInteractionAt: now.toISOString(), interactionCount: previousCount, familiarityDays, warmth: previous?.warmth ?? payload.reasoningTrace.relationship.warmthScore, trust: previous?.trust ?? payload.reasoningTrace.relationship.trustScore ?? 50, positiveEvents: previous?.positiveEvents ?? 0, negativeEvents: previous?.negativeEvents ?? 0, conflictScore: previous?.conflictScore ?? payload.reasoningTrace.relationship.conflictScore ?? 0, hurtScore: previous?.hurtScore ?? payload.reasoningTrace.relationship.hurtScore ?? 0, repairProgress: previous?.repairProgress ?? payload.reasoningTrace.relationship.repairProgress ?? 0, repeatedNegativeCount: previous?.repeatedNegativeCount ?? payload.reasoningTrace.relationship.repeatedNegativeCount ?? 0, ...(previous?.lastConflictAt ? { lastConflictAt: previous.lastConflictAt } : {}), ...(previous?.lastNegativePattern ? { lastNegativePattern: previous.lastNegativePattern } : {}), ...(previous?.lastNegativePatternAt ? { lastNegativePatternAt: previous.lastNegativePatternAt } : {}), ...(previous?.dyadicNorm ? { dyadicNorm: previous.dyadicNorm } : {}) };
-    const normalized = normalizeDynamicState(payload.dynamicState) || DEFAULT_DYNAMIC_STATE; const safeDynamicState: DroitDynamicState = { ...normalized, relationship: { ...relationship, ...(normalized.relationship || {}) } }; const stateRef = doc(db, STATE_COLLECTION, userScope); await setDoc(stateRef, { characterId: 'kairo', userId: userScope, dynamicState: safeDynamicState, reasoningTrace: payload.reasoningTrace, lastUserMessage: payload.lastUserMessage, lastReply: payload.reply, updatedAt: now.toISOString() }, { merge: true }); const traceRef = collection(stateRef, TRACE_COLLECTION); await addDoc(traceRef, { ...payload.reasoningTrace, userMessage: payload.lastUserMessage, reply: payload.reply, dynamicState: safeDynamicState, memoryScope: payload.memoryScope || 'episodic', dialogueAnalysis: payload.dialogueAnalysis || null, semanticInterpretation: payload.semanticInterpretation || null, userId: userScope, createdAt: now.toISOString() }); if (payload.memoryScope === 'durable_candidate') await updateStructuredUserMemory(userScope, payload.lastUserMessage, payload.semanticInterpretation).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));
+    const normalized = normalizeDynamicState(payload.dynamicState) || DEFAULT_DYNAMIC_STATE;
+    const safeDynamicState: DroitDynamicState = { ...normalized, relationship: { ...relationship, ...(normalized.relationship || {}) } };
+    const stateRef = doc(db, STATE_COLLECTION, userScope);
+    const traceDocRef = doc(collection(stateRef, TRACE_COLLECTION));
+    const batch = writeBatch(db);
+    batch.set(stateRef, {
+      characterId: 'kairo',
+      userId: userScope,
+      dynamicState: safeDynamicState,
+      reasoningTrace: payload.reasoningTrace,
+      lastUserMessage: payload.lastUserMessage,
+      lastReply: payload.reply,
+      updatedAt: now.toISOString(),
+    }, { merge: true });
+    batch.set(traceDocRef, {
+      ...payload.reasoningTrace,
+      userMessage: payload.lastUserMessage,
+      reply: payload.reply,
+      dynamicState: safeDynamicState,
+      memoryScope: payload.memoryScope || 'episodic',
+      dialogueAnalysis: payload.dialogueAnalysis || null,
+      semanticInterpretation: payload.semanticInterpretation || null,
+      userId: userScope,
+      createdAt: now.toISOString(),
+    });
+    await batch.commit();
+    if (payload.memoryScope === 'durable_candidate') {
+      await updateStructuredUserMemory(
+        userScope,
+        payload.lastUserMessage,
+        payload.semanticInterpretation,
+      ).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));
+    }
   } catch (err) { console.warn('[KDM Persistence] saveKdmInteraction skipped:', err); }
 }
 export async function saveKntTrace(payload: KntTracePayload): Promise<void> { const userScope = scope(payload.userId); const stateRef = doc(db, STATE_COLLECTION, userScope); await addDoc(collection(stateRef, KNT_COLLECTION), { ...payload, userId: userScope, createdAt: payload.createdAt || new Date().toISOString() }); }
