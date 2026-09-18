@@ -361,3 +361,80 @@ export const isPlatformActionResultV1 = (
     (candidate.approvalId === undefined || typeof candidate.approvalId === 'string')
   );
 };
+
+
+export interface PlatformActionFeasibilityRequestV1 {
+  contractVersion: typeof PRIVATROOM_PLATFORM_CONTRACT_VERSION;
+  requestId: string;
+  intentId: string;
+  requestedCapability: PlatformCapability;
+  serverId: string;
+  roomId?: string;
+  targetUserId?: string;
+  requestedAt: number;
+}
+
+export type PlatformActionFeasibilityStatus =
+  | 'allowed'
+  | 'approval_required'
+  | 'propose_only'
+  | 'denied';
+
+export interface PlatformActionFeasibilityResultV1 {
+  contractVersion: typeof PRIVATROOM_PLATFORM_CONTRACT_VERSION;
+  requestId: string;
+  intentId: string;
+  requestedCapability: PlatformCapability;
+  status: PlatformActionFeasibilityStatus;
+  matchedGrantId?: string;
+  mode?: PlatformCapabilityMode;
+  constraints?: PlatformCapabilityConstraints;
+  checkedAt: number;
+  reason?: string;
+}
+
+export const isPlatformActionFeasibilityRequestV1 = (
+  value: unknown,
+): value is PlatformActionFeasibilityRequestV1 => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<PlatformActionFeasibilityRequestV1>;
+  return (
+    candidate.contractVersion === PRIVATROOM_PLATFORM_CONTRACT_VERSION &&
+    typeof candidate.requestId === 'string' &&
+    candidate.requestId.length > 0 &&
+    typeof candidate.intentId === 'string' &&
+    candidate.intentId.length > 0 &&
+    typeof candidate.requestedCapability === 'string' &&
+    CAPABILITIES.has(candidate.requestedCapability as PlatformCapability) &&
+    typeof candidate.serverId === 'string' &&
+    candidate.serverId.length > 0 &&
+    (candidate.roomId === undefined || typeof candidate.roomId === 'string') &&
+    (candidate.targetUserId === undefined || typeof candidate.targetUserId === 'string') &&
+    typeof candidate.requestedAt === 'number'
+  );
+};
+
+export const isPlatformActionFeasibilityResultV1 = (
+  value: unknown,
+): value is PlatformActionFeasibilityResultV1 => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<PlatformActionFeasibilityResultV1>;
+  return (
+    candidate.contractVersion === PRIVATROOM_PLATFORM_CONTRACT_VERSION &&
+    typeof candidate.requestId === 'string' &&
+    candidate.requestId.length > 0 &&
+    typeof candidate.intentId === 'string' &&
+    candidate.intentId.length > 0 &&
+    typeof candidate.requestedCapability === 'string' &&
+    CAPABILITIES.has(candidate.requestedCapability as PlatformCapability) &&
+    (candidate.status === 'allowed' ||
+      candidate.status === 'approval_required' ||
+      candidate.status === 'propose_only' ||
+      candidate.status === 'denied') &&
+    (candidate.matchedGrantId === undefined || typeof candidate.matchedGrantId === 'string') &&
+    (candidate.mode === undefined ||
+      CAPABILITY_MODES.has(candidate.mode as PlatformCapabilityMode)) &&
+    typeof candidate.checkedAt === 'number' &&
+    (candidate.reason === undefined || typeof candidate.reason === 'string')
+  );
+};
