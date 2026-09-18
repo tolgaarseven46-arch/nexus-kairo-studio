@@ -200,3 +200,18 @@ Current implementation slice:
 **Slice A1 — TestRun provenance v1 + replay sandbox policy.**
 
 Authority/behavior expansion is intentionally paused until Slice A measurement infrastructure is proven.
+
+
+## 14. Slice A2 — explicit Fresh / Continuation / Replay state isolation
+After Slice A1 merged, state isolation is characterized before any real persistence wiring.
+
+Current proof:
+- every TestRun state is namespaced by environment + testRun + server + Kaira instance,
+- Fresh has no implicit source,
+- Continuation requires an explicit sourceRunId and forks into a new namespace,
+- Replay requires explicit sourceRunId + frozenSnapshotId,
+- memory / relationship / appraisal / explicit address override / capability / KNT / trial /
+  conversation graph / repair state classes are all covered by deterministic zero-leak tests,
+- continuation does not see source state until an explicit validated fork is performed.
+
+This remains a pure proof seam; production memory/relationship persistence is not rewired yet.
