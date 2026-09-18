@@ -356,3 +356,17 @@ W0 product problem and W1 scenarios/failure classes are captured in:
 - `docs/slice-b-multi-user-observation-freeze-packet.md`
 
 W2 independent red-team and W3 Tolga product freeze remain mandatory. No W5 RED or implementation begins before both gates close.
+
+
+## 24. Slice B pre-red-team hardening
+An internal adversarial pass found and hardened eight candidate authority/isolation risks before W2:
+- resolved addressed-to truth replaced by explicit facts + inferred candidates,
+- `ignoredBy` renamed to observable unanswered-turn evidence,
+- escalation reduced to refs to existing owned evidence,
+- cold/warm/experienced-owner kept test-fixture-only,
+- suppression requires an owning decision receipt,
+- deterministic total order defined,
+- graph schema/derivation/snapshot provenance required,
+- actor kind made explicit for Droit/system self-event observation.
+
+This pass is deliberately NON-AUTHORITATIVE and does not satisfy W2 independent review.

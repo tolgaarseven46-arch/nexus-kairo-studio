@@ -255,3 +255,104 @@ After freeze, characterization must cover at minimum:
 - Kaira self-message non-recursion.
 
 No W5 characterization RED or production implementation starts before W2 + W3.
+
+
+## Non-authoritative pre-red-team hardening
+
+This section is internal adversarial preparation only. It does NOT satisfy W2 independent review.
+
+### Candidate blockers found internally
+
+#### PRT-B1 — `addressedToUserIds` risks becoming hidden engagement authority
+If stored as a plain resolved field, downstream consumers may treat it as truth instead of evidence.
+
+Hardening:
+- split explicit platform targets from inferred candidate targets,
+- explicit target evidence may contain platform reply/mention facts,
+- inferred target evidence must carry confidence + source + unresolved state,
+- no single resolved "targetUserId" field exists in ConversationGraphV1.
+
+#### PRT-B2 — `ignoredBy` is semantically loaded
+The label can imply intent/motive even when only absence-of-reply is observable.
+
+Hardening:
+- rename graph evidence to `unansweredAddressedTurn`,
+- store bounded observation window + source event ids,
+- downstream appraisal may interpret it later, but graph does not call anyone "ignoring" anyone.
+
+#### PRT-B3 — escalation must not be recomputed from raw text
+A graph-level escalation score would become shadow appraisal/semantic authority.
+
+Hardening:
+- graph stores only `escalationEvidenceRefs` pointing to already-owned canonical/appraisal evidence,
+- no raw-text sentiment/toxicity classifier inside graph,
+- graph may summarize monotonic evidence presence/count, never invent escalation meaning.
+
+#### PRT-B4 — cold/warm/experienced-owner is ambiguous
+If derived from message counts in graph, it can silently become relationship truth.
+
+Hardening:
+- fixture lifecycle class is test metadata only,
+- production graph stores objective counters/timestamps only,
+- no production `warm` or `experienced-owner` boolean/enum exists.
+
+#### PRT-B5 — suppression evidence needs ownership provenance
+A bare suppressedResponse flag could let graph become behavior authority.
+
+Hardening:
+- graph can only record a suppression receipt emitted by an owning decision layer,
+- receipt must include owner, decisionId, sourceEventId, occurredAt and reasonCode,
+- graph has no API that computes suppression.
+
+#### PRT-B6 — ordering needs one deterministic total-order rule
+`occurredAt` alone permits ties and replay drift.
+
+Hardening:
+- canonical graph order key = `occurredAt -> sourceSequence? -> eventId`,
+- sourceSequence, if platform-supplied, is factual evidence only,
+- eventId is deterministic final tie-breaker.
+
+#### PRT-B7 — graph version/provenance was under-specified
+Review/replay needs exact graph schema/derivation version.
+
+Hardening:
+- every graph snapshot carries `schemaVersion`, `derivationVersion`, `namespace`, and `builtFromEventIds`,
+- inferred edges carry derivation rule id/version,
+- replay compares snapshot/hash/version rather than rebuilding from live data.
+
+#### PRT-B8 — self-message non-recursion needs explicit input role
+Actor user id alone may be insufficient if Droit identities share user-like records.
+
+Hardening:
+- participant actor kind = `human | droit | system` from platform-owned identity fact,
+- graph records Kaira/Droit self events but never turns them into trigger decisions,
+- recursive engagement remains a downstream decision/runtime invariant.
+
+### Revised candidate ConversationGraphV1 shape
+
+- schemaVersion
+- derivationVersion
+- namespace: environmentId + testRunId? + serverId + roomId + kairaInstanceId
+- conversationId
+- participants: objective platform facts + firstSeenAt/lastSeenAt/messageCount
+- events: eventId, actorId, actorKind, occurredAt, sourceSequence?, semanticSnapshotRef?
+- explicitReplyEdges
+- explicitMentionEdges
+- inferredAddressCandidateEdges { fromEventId, toParticipantId, confidence, ruleId, evidenceEventIds }
+- unresolvedReferences
+- unansweredAddressedTurnEvidence { addressedEventId, addresseeId, windowStart, windowEnd, observedEventIds }
+- suppressionReceipts { decisionId, owner, sourceEventId, reasonCode, occurredAt }
+- escalationEvidenceRefs { eventId, evidenceOwner, evidenceRef }
+- builtFromEventIds
+- snapshotHash
+
+Explicit platform facts always outrank inferred edges. Inference can remain unresolved/ambiguous.
+
+### Remaining W2 questions after hardening
+
+Independent reviewer should focus on:
+1. whether even inferred address candidates belong in graph or should live in discourse/attention evidence,
+2. whether unanswered-turn evidence should exist at all before R engagement authority is opened,
+3. whether escalation evidence refs belong in graph or a parallel observational index,
+4. whether participant counters/timestamps can leak into downstream WHAT/WHETHER without an explicit adapter,
+5. whether namespace composition is sufficient for replay + cross-server + multi-Kaira isolation.
