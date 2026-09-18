@@ -108,6 +108,8 @@ const PROCRASTINATION_BANTER_RE =
 const SHORT_CONTEXTUAL_ANSWER_RE =
   /^(?:hiç\s*biri|hiçbiri|ikisi\s+de|hepsi|hiçbiri\s+değil|yok|hayır|evet|aynen|tamam|tamamdır|peki|olur|olmadı|bilmiyorum|fark\s+etmez|sen\s+seç|öbürü|diğeri|ilki|ikincisi)(?:\s+(?:ya|işte|kanka))?[.!?…]*$/i;
 const KAIRA_SHORT_ACK_RE = /^(?:tamam|tamamdır|peki|olur|evet|aynen|hmm|he|hee|anladım)[.!?…]*$/i;
+const KAIRA_DRESSED_ACK_RE =
+  /^(?:(?:heh?|hee?|hmm|tamam|anladım|aynen)[,\s]*)?(?:baya\s+)?(?:net\s+söyledin|anladım|tamam|belli|açık\s+oldu)[.!?…]*$/iu;
 const PREVIOUS_CONTEXT_INVITE_RE =
   /[?？]|\b(?:hangisi|hangisini|seç|mı|mi|mu|mü|ne dersin|sence|istersen|ister misin|ister miydin)\b/i;
 
@@ -661,7 +663,8 @@ export function findDialogueDecisionIssues(
   if (
     obligationType &&
     plan.obligation.satisfactionCriteria.forbiddenResponseClasses.includes("acknowledgement_only") &&
-    KAIRA_SHORT_ACK_RE.test(reply.trim())
+    (KAIRA_SHORT_ACK_RE.test(reply.trim()) ||
+      KAIRA_DRESSED_ACK_RE.test(reply.trim()))
   ) {
     issues.push(
       `DialogueDecision obligation karşılanmadı: ${obligationType} yalnız acknowledgement ile kapatılamaz`,
