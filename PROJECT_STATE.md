@@ -153,3 +153,24 @@ Current decision:
 - containment belongs to the existing `kairaRecoveryPolicy` seam,
 - recovery may remove the unsupported claim and emit only a bounded ResponsePlan-conformant fallback; it must not reinterpret user semantics or grant new WHAT/WHETHER permission,
 - characterization evidence must remain RED-before-fix and the fix must pass the same canonical constraint boundary plus full CI.
+
+
+## 12. PrivatRoom platform capability boundary — additive product expansion
+A new explicit product requirement expands the frozen system boundary: Kaira must operate inside PrivatRoom as a typed social-platform admin without moving platform authority into the Kaira core.
+
+Boundary decision:
+- the frozen semantic / memory / relationship / appraisal / decision / behavior authorities remain unchanged,
+- PrivatRoom owns platform facts, roles, rules source-of-truth, scoped capability grants, approval policy and execution,
+- Kaira may consume typed platform context and emit typed proposed platform actions,
+- social/group-fit inference is Kaira-owned and is intentionally excluded from `PlatformContextV1`,
+- event identity/version/idempotency remain in the event envelope, not the context snapshot,
+- rules are referenced by `rulesVersion` rather than copied into every message event,
+- capability grants are scoped and may expire; role identity does not imply executable capability,
+- this contract-only phase does not yet wire actions into the canonical decision runtime or change live response behavior.
+
+Initial contract proof:
+- `src/integrations/privatroom/platformContracts.ts`
+- `src/services/privatRoomPlatformContracts.test.ts`
+
+Next seam after contract closure:
+- characterize where `PlatformActionIntent` belongs in the existing canonical decision output before any runtime wiring.
