@@ -6,11 +6,30 @@ import {
   isPlatformContextV1,
   isPrivatRoomPlatformEventV1,
   isProposedPlatformAction,
+  type PlatformActorContextV1,
   type PlatformContextV1,
+  type PlatformServerContextV1,
   type ProposedPlatformAction,
 } from '../integrations/privatroom/platformContracts';
 
 describe('PrivatRoom platform contract v1', () => {
+  it('keeps Kaira-owned social inference and derived/stale facts out of platform context', () => {
+    type HasSocialContext = 'socialContext' extends keyof PlatformContextV1 ? true : false;
+    type HasKnownGroups = 'knownGroups' extends keyof PlatformContextV1 ? true : false;
+    type ServerEmbedsRules = 'rules' extends keyof PlatformServerContextV1 ? true : false;
+    type ActorEmbedsMembershipAge = 'membershipAgeMs' extends keyof PlatformActorContextV1 ? true : false;
+
+    const hasSocialContext: HasSocialContext = false;
+    const hasKnownGroups: HasKnownGroups = false;
+    const serverEmbedsRules: ServerEmbedsRules = false;
+    const actorEmbedsMembershipAge: ActorEmbedsMembershipAge = false;
+
+    expect(hasSocialContext).toBe(false);
+    expect(hasKnownGroups).toBe(false);
+    expect(serverEmbedsRules).toBe(false);
+    expect(actorEmbedsMembershipAge).toBe(false);
+  });
+
   const context: PlatformContextV1 = {
     server: {
       serverId: 'server_1',
