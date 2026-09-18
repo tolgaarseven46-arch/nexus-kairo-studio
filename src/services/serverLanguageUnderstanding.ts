@@ -81,6 +81,14 @@ function isSafeTrivialSocialFastPath(result: LanguageUnderstandingResult): boole
   );
 }
 
+function hasFirstEncounterRoomContextEvidence(
+  result: LanguageUnderstandingResult,
+): boolean {
+  return result.interpretation.evidence.some((evidence) =>
+    evidence.cues.includes("first_encounter_room_context_question"),
+  );
+}
+
 function reconcileFirstEncounterContextSemantics(
   message: string,
   result: LanguageUnderstandingResult,
@@ -238,14 +246,19 @@ export async function resolveServerLanguageUnderstanding(
     });
     if (isSafeTrivialSocialFastPath(fastFloor)) {
       const reconciledFast = reconcileServerCanonicalSemantics(
-        input.message,
-        fastFloor,
-      );
-      return reconcileFirstEncounterContextSemantics(
-        input.message,
-        reconciledFast,
-        input.firstEncounterContext,
-      );
+      input.message,
+      fastFloor,
+    );
+    const contextualFast = reconcileFirstEncounterContextSemantics(
+      input.message,
+      reconciledFast,
+      input.firstEncounterContext,
+    );
+    if (
+      isSafeTrivialSocialFastPath(contextualFast) ||
+      hasFirstEncounterRoomContextEvidence(contextualFast)
+    ) {
+      return contextualFast;
     }
   }
 
