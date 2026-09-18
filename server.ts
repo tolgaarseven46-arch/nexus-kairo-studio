@@ -120,6 +120,7 @@ import {
 import { registerKairaProposalRecoveryWorkerRoute } from "./src/services/kairaProposalRecoveryWorkerRoute";
 import { registerKairaActivityProvisioningRoute } from "./src/services/kairaActivityProvisioningRoute";
 import { registerPrivatRoomDmIntegrationRoute } from "./src/services/privatRoomDmIntegrationRoute";
+import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
 import type {
   DroitDynamicState,
 } from "./src/types/nexus";
@@ -130,6 +131,7 @@ app.use(express.json());
 registerKairaProposalRecoveryWorkerRoute(app);
 registerKairaActivityProvisioningRoute(app);
 registerPrivatRoomDmIntegrationRoute(app);
+registerTestRunProvenanceRoute(app);
 let aiClient: GoogleGenAI | null = null;
 const now = () => performance.now(),
   memoryCache = new Map<
