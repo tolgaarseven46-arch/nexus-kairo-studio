@@ -470,3 +470,56 @@ Runtime decision:
 - timing + realization variant provenance is persisted for live TestRun review.
 
 Historical RED evidence was captured in CI run `35333356648`: all four live failure fixtures failed before the repair.
+
+
+## 32. First-encounter continuity + latency v2
+
+Live beta TestRun evidence on 2026-09-18 exposed two remaining defects after the first canonical welcome repair:
+
+1. canonical fast social replies were semantically correct but still user-visible after multi-second persistence/post-process waits;
+2. contextual short replies such as `iyilik` after Kaira asked `sen nasılsın?` fell out of the canonical social fast path and could reach the provider, producing weak acknowledgement output.
+
+### Authority decision
+
+- `SemanticInterpretation@2` remains the only semantic authority.
+- A new canonical social routine `well_being_reply` represents a short contextual answer to Kaira's immediately preceding well-being prompt.
+- This reconciliation is context-bounded and evidence-backed inside `serverLanguageUnderstanding.ts`; no separate raw-string persona/intention engine is introduced.
+- First-encounter realization consumes canonical routine + response plan only.
+- Provider bypass is allowed only for canonical safe social routines already accepted by the existing final-delivery constraints.
+
+### Latency decision
+
+Critical user-visible continuity is defined as:
+- KDM relationship/state persistence when enabled;
+- TestRun turn + session summary persistence.
+
+Those writes must complete successfully before a first-encounter fast reply is returned.
+
+Non-critical telemetry/state observation:
+- KDM metric telemetry;
+- KNT trace telemetry;
+- autonomous activity observation;
+- lived/world memory persistence for trivial canonical social fast turns
+
+must not extend the user-visible critical path.
+
+Implementation:
+- KDM state + trace are committed in one Firestore batch.
+- TestRun turn + session summary are committed in one Firestore batch.
+- first-encounter fast turns use strict persistence semantics for critical continuity writes.
+- trivial social fast turns skip lived-world persistence as not applicable.
+- telemetry/autonomous observation runs after the response payload has been sent.
+- runtime logs now expose `ownershipMs`, `livedMemoryMs`, `criticalPersistenceMs`, `postProcessMs`, and `serverTotalMs`.
+
+### Acceptance evidence
+
+Historical live evidence before v2:
+- greeting: semantic ~137ms, AI 0ms, server total ~10.14s
+- how-are-you: semantic ~72ms, AI 0ms, server total ~6.37s
+- `iyilik`: fell through to provider and returned weak acknowledgement
+
+Required post-deploy proof:
+- `iyilik` resolves as `well_being_reply` with zero provider calls;
+- continuity records exist before response;
+- telemetry runs after response;
+- first-encounter fast replies materially reduce server total latency while preserving replay/TestRun continuity.
