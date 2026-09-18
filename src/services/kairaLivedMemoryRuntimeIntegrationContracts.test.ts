@@ -18,20 +18,25 @@ describe("Kaira lived autobiographical runtime integration", () => {
     expect(calls).toHaveLength(2);
   });
 
-  it("finishes lived-memory mutation before KNT and turn observability persistence", () => {
-    const firstCoordinator = server.indexOf("const livedMemoryRuntime = await persistWorldEventAndMaybeConsolidateLivedMemory({");
+  it("finishes applicable lived-memory mutation before KNT and turn observability persistence", () => {
+    const coordinators = Array.from(
+      server.matchAll(/persistWorldEventAndMaybeConsolidateLivedMemory\(\{/g),
+    ).map((match) => match.index ?? -1);
+    expect(coordinators).toHaveLength(2);
+
+    const firstCoordinator = coordinators[0];
     const firstKnt = server.indexOf("saveKntTrace({", firstCoordinator);
     const firstTurn = server.indexOf("saveTestSessionTurn({", firstCoordinator);
-    expect(firstCoordinator).toBeGreaterThan(-1);
     expect(firstKnt).toBeGreaterThan(firstCoordinator);
     expect(firstTurn).toBeGreaterThan(firstCoordinator);
 
-    const secondCoordinator = server.indexOf("const livedMemoryRuntime = await persistWorldEventAndMaybeConsolidateLivedMemory({", firstCoordinator + 1);
+    const secondCoordinator = coordinators[1];
     const secondKnt = server.indexOf("saveKntTrace({", secondCoordinator);
     const secondTurn = server.indexOf("saveTestSessionTurn({", secondCoordinator);
-    expect(secondCoordinator).toBeGreaterThan(firstCoordinator);
     expect(secondKnt).toBeGreaterThan(secondCoordinator);
     expect(secondTurn).toBeGreaterThan(secondCoordinator);
+
+    expect(server).toContain('firstEncounterFastPersistence\n        ? { status: "not_applicable" as const }');
   });
 
   it("exposes the same lived-memory result in KNT, turn metadata and API KDM output", () => {
