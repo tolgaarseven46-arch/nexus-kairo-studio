@@ -46,7 +46,7 @@ function normalizeDynamicState(value: unknown): DroitDynamicState | null {
     } } : {}),
   };
 }
-export interface KdmPersistencePayload { dynamicState: DroitDynamicState; reasoningTrace: ReasoningTrace; lastUserMessage: string; reply: string; userId?: string; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; semanticInterpretation?: SemanticInterpretation; }
+export interface KdmPersistencePayload { strictPersistence?: boolean; dynamicState: DroitDynamicState; reasoningTrace: ReasoningTrace; lastUserMessage: string; reply: string; userId?: string; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; semanticInterpretation?: SemanticInterpretation; }
 export interface KdmMemoryItem { sourceId?: string; userMessage: string; reply: string; createdAt?: string; reasoningTrace?: ReasoningTrace; dynamicState?: DroitDynamicState; memoryScope?: DialogueMemoryScope; dialogueAnalysis?: DialogueTurnAnalysis; semanticInterpretation?: SemanticInterpretation; }
 export interface KairoUserMemory { userName?: string; preferences: string[]; facts: string[]; goals: string[]; notes: string[]; updatedAt: string; }
 export interface KntTracePayload { userId?: string; testRunId?: string; sessionId?: string; userMessage: string; reply: string; reasoningTrace: ReasoningTrace; dynamicState: DroitDynamicState; timings: Record<string, number>; providerUsed?: string; semanticInterpretation?: SemanticInterpretation; semanticEvent?: unknown; semanticSource?: string; languageStyleMemory?: unknown; controlledSpontaneity?: unknown; speechIdentity?: unknown; worldStateAppraisal?: unknown; worldReasoningPolicy?: unknown; worldMemoryGuard?: unknown; epistemicAccess?: unknown; selfMemoryRuntime?: unknown; livedMemoryRuntime?: unknown; responsePlan?: unknown; createdAt?: string; }
@@ -93,7 +93,10 @@ export async function saveKdmInteraction(payload: KdmPersistencePayload): Promis
         payload.semanticInterpretation,
       ).catch((error) => console.warn('[Kairo User Memory] save skipped:', error));
     }
-  } catch (err) { console.warn('[KDM Persistence] saveKdmInteraction skipped:', err); }
+  } catch (err) {
+    console.warn('[KDM Persistence] saveKdmInteraction skipped:', err);
+    if (payload.strictPersistence) throw err;
+  }
 }
 export async function saveKntTrace(payload: KntTracePayload): Promise<void> { const userScope = scope(payload.userId); const stateRef = doc(db, STATE_COLLECTION, userScope); await addDoc(collection(stateRef, KNT_COLLECTION), { ...payload, userId: userScope, createdAt: payload.createdAt || new Date().toISOString() }); }
 export async function loadRecentKntTraces(maxItems = 20, userId?: string): Promise<any[]> { const userScope = scope(userId); const safeLimit = Math.max(1, Math.min(maxItems, 100)); const stateRef = doc(db, STATE_COLLECTION, userScope); const snapshot = await getDocs(query(collection(stateRef, KNT_COLLECTION), orderBy('createdAt', 'desc'), limit(safeLimit))); return snapshot.docs.map((item) => ({ id: item.id, ...item.data() })); }
