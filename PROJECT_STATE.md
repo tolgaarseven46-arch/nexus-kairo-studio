@@ -278,3 +278,17 @@ Current binding:
 
 This gives one stable review key for:
 PrivatRoom room → Kaira chat turn → KNT trace → TestSession transcript → exact build/prompt/policy provenance.
+
+
+## 19. Slice A8 — persisted live capture proof
+Live beta observability now distinguishes "reply succeeded" from "TestRun evidence persisted".
+
+Current proof:
+- chat response emits a typed TestRun capture proof only for TestRun-bound traffic,
+- `persisted=true` requires a concrete saved TestSession turn id,
+- missing/failed TestSession persistence cannot be presented as a successful recording,
+- PrivatRoom propagates the capture proof and logs `testRunId + persisted`,
+- beta owner UI shows `REC` / `NO REC` next to the TestRun id,
+- legacy non-TestRun chat gets no capture proof.
+
+This closes the final silent-failure gap before the first real live TestRun acceptance.
