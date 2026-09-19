@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildConversationGraphEvidenceViewV1,
+  parseConversationGraphExternalIngressV1,
   parseConversationGraphNamespaceV1,
   parseEscalationEvidenceRefV1,
   parseSuppressionReceiptV1,
@@ -71,6 +72,88 @@ describe("Slice B Conversation Graph external ingestion runtime guards", () => {
         evidenceStore,
       ),
     ).toThrow(/hash/i);
+  });
+
+  it("B-W2-R01: aggregate raw external-ingress parser rejects malformed payload before typing", () => {
+    expect(() =>
+      parseConversationGraphExternalIngressV1(
+        {
+          namespace: {
+            environmentId: "test",
+            serverId: "s1",
+            roomId: "r1",
+            kairaInstanceId: "k1",
+          },
+          suppressionReceipts: [
+            {
+              decisionId: "d1",
+              ownerId: "forged_owner",
+              ownerRegistryVersion: "decision-owners@1",
+              ownerAttestationRef: "attest:forged",
+              sourceEventId: "e1",
+              reasonCode: "not_addressed",
+              occurredAt: 1,
+            },
+          ],
+          escalationEvidenceRefs: [
+            {
+              eventId: "e1",
+              evidenceOwnerId: "social_appraisal",
+              evidenceRef: "ev:1",
+              evidenceHash: "sha256:wrong",
+            },
+          ],
+        },
+        {
+          decisionOwnerRegistry: ownerRegistry,
+          ownedEvidenceStore: evidenceStore,
+        },
+      ),
+    ).toThrow();
+  });
+
+  it("B-W2-R01: aggregate raw external-ingress parser returns typed values only after validation", () => {
+    const parsed = parseConversationGraphExternalIngressV1(
+      {
+        namespace: {
+          environmentId: "test",
+          testRunId: "TR_1",
+          serverId: "s1",
+          roomId: "r1",
+          kairaInstanceId: "k1",
+        },
+        suppressionReceipts: [
+          {
+            decisionId: "d1",
+            ownerId: "kaira_response_plan",
+            ownerRegistryVersion: "decision-owners@1",
+            ownerAttestationRef: "attest:kaira_response_plan:v1",
+            sourceEventId: "e1",
+            reasonCode: "not_addressed",
+            occurredAt: 1,
+          },
+        ],
+        escalationEvidenceRefs: [
+          {
+            eventId: "e1",
+            evidenceOwnerId: "social_appraisal",
+            evidenceRef: "ev:1",
+            evidenceHash: "sha256:abc",
+          },
+        ],
+      },
+      {
+        decisionOwnerRegistry: ownerRegistry,
+        ownedEvidenceStore: evidenceStore,
+      },
+    );
+
+    expect(parsed.namespace).toMatchObject({
+      environmentId: "test",
+      testRunId: "TR_1",
+    });
+    expect(parsed.suppressionReceipts).toHaveLength(1);
+    expect(parsed.escalationEvidenceRefs).toHaveLength(1);
   });
 
   it("NB-W2-04: constructs a real runtime-redacted evidence view", () => {
