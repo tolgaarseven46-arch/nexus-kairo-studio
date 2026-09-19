@@ -1188,3 +1188,26 @@ Repair on `fix/first-encounter-neutral-fast-floor-confidence`:
 - no new question/paraphrase regex is added.
 
 Closure requires exact-head CI GREEN, merge, Render LIVE, then repeat the unseen live paraphrase pack.
+
+
+## 59. Unseen paraphrase live latency — coordination/semantic overlap (2026-09-19)
+
+Independent-review live proof after the canonical platform-scope repairs produced the correct local first-encounter path but exceeded the acceptance latency:
+- unseen input: `işlevin ne senin`;
+- live end-to-end latency: ~9.4s;
+- Kaira timing: `semanticMs≈3.0s`, `memoryMs≈0.7s`, `aiMs=0`, `serverTotalMs≈8.2–8.9s`;
+- realization remained local (`providerUsed=local_language` after semantic classification).
+
+Root cause:
+- the unseen paraphrase correctly falls through to the canonical semantic provider;
+- first-encounter request coordination/idempotency claim and semantic resolution were awaited serially;
+- the provider cost and distributed coordination cost therefore accumulated even though semantic interpretation is read-only and does not require state-mutation ownership.
+
+Repair contract on `fix/first-encounter-coordinate-semantic-overlap`:
+- for ordinary first-encounter chat, start the coordination claim and canonical semantic resolution concurrently;
+- replay/wait/idempotency result is still awaited before any canonical downstream behavior, reply delivery, or state mutation;
+- explicit activity-permission resolution keeps the old serialized coordination path;
+- state-mutation ownership rules are unchanged;
+- no semantic, decision, memory, relationship, or realization authority is moved.
+
+Closure requires exact-head CI GREEN, merge, Render LIVE, then rerun the unseen live paraphrase pack with every response under the 6s gate.
