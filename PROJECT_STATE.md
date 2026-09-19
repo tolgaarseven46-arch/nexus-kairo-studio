@@ -774,3 +774,20 @@ v12 authority repair:
 - legacy direct-message and room callers without typed history retain the existing TestSession fallback.
 
 This removes a test-observability read from the live user-visible critical path without moving semantic, relationship, or first-encounter policy authority into PrivatRoom.
+
+
+## 44. Live-beta TestSession read privacy hardening (2026-09-19)
+
+Post first-encounter closure cleanup re-audited stale PR #292 against current main and confirmed the privacy gap still existed:
+- generic `GET /api/test-sessions/:sessionId` returned predictable `TR_live_beta_*` transcripts without internal authentication;
+- `GET /api/test-sessions/active` could likewise expose a protected live-beta session;
+- the original hardening branch had diverged and was never merged into current main.
+
+Fresh RED→GREEN repair:
+- RED: `3ef5f9f0736f7e2afed359562c324c981954b94e`;
+- only `TR_live_beta_*` sessions require the configured internal bearer token;
+- the token reuses the existing constant-time `authorizeKairaInternalWorker` boundary;
+- legacy Studio/TestLab session ids remain backward-compatible under the existing public test tooling contract;
+- both exact-id and active-session generic read routes enforce the same policy.
+
+This is privacy/access-control hardening only. It does not alter Kaira WHAT/WHETHER behavior, Conversation Graph authority, or Slice B design, so W2 remains independently gated.
