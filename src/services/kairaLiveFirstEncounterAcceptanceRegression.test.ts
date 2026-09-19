@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { decideKairaWelcome } from "./kairaWelcomeDecision";
 import { realizeKairaWelcome } from "./kairaWelcomeRealizer";
 import { resolveServerLanguageUnderstanding } from "./serverLanguageUnderstanding";
+import { realizeKairaFirstEncounterRoutine } from "./kairaFirstEncounterRoutineRealizer";
 
 const ROOM_SCOPE_PARAPHRASES = [
   "burada ne yapıcaz",
@@ -33,8 +34,26 @@ describe("live first-encounter acceptance RED", () => {
 
       expect(result.text).toMatch(/birlikte|beraber/iu);
       expect(result.text).toMatch(/oda|kural|düzen|ortam|arkadaş|insan/iu);
+      expect(result.text).toMatch(/\?/u);
       expect(result.text).not.toMatch(/droit|pipeline|system prompt|yapay zeka/iu);
     }
+  });
+
+  it("keeps steering after a zero-context user's naber", () => {
+    const result = realizeKairaFirstEncounterRoutine({
+      requestId: "live-naber",
+      event: { socialRoutine: "how_are_you" } as any,
+      plan: {
+        move: "natural_reaction",
+        relationshipLevel: "new",
+        allowQuestion: true,
+        allowHumor: true,
+      } as any,
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toMatch(/burayı|oda|ortam/iu);
+    expect(result.reply).toMatch(/nasıl/iu);
   });
 
   it.each(ROOM_SCOPE_PARAPHRASES)(

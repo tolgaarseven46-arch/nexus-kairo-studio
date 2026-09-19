@@ -40,11 +40,10 @@ const POOLS = {
     "selam ya",
   ],
   how_are_you: [
-    "iyiyim ya 😄 sende ne var ne yok?",
-    "gayet iyiyim, sen nasılsın?",
-    "iyi sayılır 😄 sende durumlar nasıl?",
-    "iyiyim, keyfim yerinde. sende?",
-    "fena değilim 😄 sen nasılsın?",
+    "iyiyim 😄 burayı beraber kuruyoruz; nasıl bir ortam olsun?",
+    "gayet iyi. burayı beraber toparlarız; nasıl bir yer olsun?",
+    "iyi ya 😄 burayı beraber şekillendiririz; nasıl olsun?",
+    "fena değilim 😄 ben de burayı toparlıyorum; nasıl bir yer olsun?",
   ],
   well_being_reply: [
     "iyi bari 😄",
@@ -119,7 +118,7 @@ export function realizeKairaFirstEncounterRoutine(
 
   if (!input.plan.allowQuestion) {
     reply = reply
-      .replace(/\s*(?:sende ne var ne yok|sen nasılsın|sende durumlar nasıl|sende|sen ne yapıyorsun|sen)\?$/iu, "")
+      .replace(/\s*(?:sende ne var ne yok|sen nasılsın|sende durumlar nasıl|sende|sen ne yapıyorsun|sen|nasıl bir ortam olsun|nasıl bir yer olsun|nasıl olsun)\?$/iu, "")
       .replace(/[?？]$/u, "")
       .trim();
   }

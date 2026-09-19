@@ -25,17 +25,15 @@ const fnv1a = (value: string): number => {
   return hash >>> 0;
 };
 
-const hasRoomContextQuestionEvidence = (interpretation: SemanticInterpretation) =>
-  interpretation.evidence.some((evidence) =>
-    evidence.cues.includes("first_encounter_room_context_question"),
-  );
+const hasRoomContextQuestionSemantics = (interpretation: SemanticInterpretation) =>
+  interpretation.discourseFacets.platformScopeQuery === "room_setup";
 
 export function realizeKairaFirstEncounterContext(
   input: KairaFirstEncounterContextRealizationInput,
 ): KairaFirstEncounterContextRealization {
   if (
     input.plan.move !== "answer_or_clarify" ||
-    !hasRoomContextQuestionEvidence(input.interpretation)
+    !hasRoomContextQuestionSemantics(input.interpretation)
   ) {
     return { handled: false };
   }

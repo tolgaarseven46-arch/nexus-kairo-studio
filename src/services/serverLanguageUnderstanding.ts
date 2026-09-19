@@ -61,8 +61,22 @@ const FAST_SOCIAL_ROUTINES = new Set([
   "good_night",
 ]);
 
-const FIRST_ENCOUNTER_ROOM_CONTEXT_RE =
-  /(?:^|\s)(?:napıyoruz|napicaz|napıcaz|ne\s+yapıyoruz|ne\s+yapacağız|burada\s+ne\s+yapıyoruz|burda\s+ne\s+yapıyoruz|burası\s+ne|bu\s+oda\s+ne\s+için|burada\s+ne\s+oluyor|burda\s+ne\s+oluyor)(?:\s|$|[?.!,])/iu;
+const FIRST_ENCOUNTER_ROOM_ANCHOR_RE =
+  /\b(?:burada|burda|burası|burasi|burayı|burayi|oda|odada|bu\s+oda)\b/iu;
+const FIRST_ENCOUNTER_ROOM_ACTION_RE =
+  /\b(?:nap\p{L}*|ne\s+yap\p{L}*|nasıl\s+kullan\p{L}*|nasil\s+kullan\p{L}*|ne\s+ol\p{L}*|ne\s+için|ne\s+icin)\b/iu;
+
+const isFirstEncounterRoomScopeQuestion = (
+  message: string,
+  context?: ResolveServerLanguageUnderstandingInput["firstEncounterContext"],
+) => {
+  if (!context) return false;
+  const normalized = message.toLocaleLowerCase("tr-TR").trim();
+  return (
+    FIRST_ENCOUNTER_ROOM_ANCHOR_RE.test(normalized) &&
+    FIRST_ENCOUNTER_ROOM_ACTION_RE.test(normalized)
+  );
+};
 
 const FIRST_ENCOUNTER_WELL_BEING_REPLY_RE =
   /^(?:iyi(?:yim|dir|lik)?|gayet\s+iyi(?:yim)?|çok\s+iyi(?:yim)?|fena\s+değil|idare|şükür|şükürler\s+olsun)(?:\s+(?:ya|işte|valla))?[.!?…]*$/iu;
@@ -142,12 +156,10 @@ function isSafeTrivialSocialFastPath(result: LanguageUnderstandingResult): boole
   );
 }
 
-function hasFirstEncounterRoomContextEvidence(
+function hasFirstEncounterRoomContextSemantics(
   result: LanguageUnderstandingResult,
 ): boolean {
-  return result.interpretation.evidence.some((evidence) =>
-    evidence.cues.includes("first_encounter_room_context_question"),
-  );
+  return result.interpretation.discourseFacets.platformScopeQuery === "room_setup";
 }
 
 function reconcileFirstEncounterContextSemantics(
@@ -155,7 +167,7 @@ function reconcileFirstEncounterContextSemantics(
   result: LanguageUnderstandingResult,
   context?: ResolveServerLanguageUnderstandingInput["firstEncounterContext"],
 ): LanguageUnderstandingResult {
-  if (!context || !FIRST_ENCOUNTER_ROOM_CONTEXT_RE.test(message.toLocaleLowerCase("tr-TR").trim())) {
+  if (!isFirstEncounterRoomScopeQuestion(message, context)) {
     return result;
   }
 
@@ -166,6 +178,7 @@ function reconcileFirstEncounterContextSemantics(
     discourseFacets: {
       ...result.interpretation.discourseFacets,
       socialRoutine: "none" as const,
+      platformScopeQuery: "room_setup" as const,
     },
     uncertainty: {
       ...result.interpretation.uncertainty,
@@ -321,7 +334,7 @@ export async function resolveServerLanguageUnderstanding(
     );
     if (
       isSafeTrivialSocialFastPath(contextualFast) ||
-      hasFirstEncounterRoomContextEvidence(contextualFast)
+      hasFirstEncounterRoomContextSemantics(contextualFast)
     ) {
       return contextualFast;
     }
