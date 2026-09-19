@@ -861,3 +861,37 @@ Important gate:
 - W3 remains blocked;
 - no W5 characterization or production Conversation Graph implementation may start;
 - an independent re-review of the repair delta must return zero blockers and `safeToEnterW3AfterRepairs=true` with trusted external provenance before W3 freeze.
+
+
+## 48. Slice B W2 second re-review + runtime ingestion blocker (2026-09-19)
+
+Second independent Claude re-review was supplied by Tolga and recorded in issue #340.
+
+Re-review result:
+- original B-W2-01..06: CLOSED;
+- new blocker: B-W2-R01;
+- non-blockers: NB-W2-04..06;
+- verdict: `safeToEnterW3AfterRepairs=false`.
+
+B-W2-R01 finding:
+- discriminated unions and branded TypeScript types are compile-time-only and cannot reject malformed raw external JSON;
+- the real external ingress boundary therefore needs runtime parsing/validation before any payload becomes a typed graph value.
+
+Historical RED:
+- commit `6e3a23620489c7904d2ddb2111ccdeb08af0cb2d`;
+- CI run `35436632970`;
+- only the new `sliceBConversationGraphIngressContracts.test.ts` suite failed because the runtime ingestion contract did not yet exist; 570 existing test files remained GREEN.
+
+Repair:
+- `src/services/sliceBConversationGraphIngressContracts.ts` is the canonical raw-payload validation seam;
+- test environment requires testRunId at runtime;
+- suppression owner must resolve through the versioned decision-owner registry and attestation;
+- escalation evidence owner/ref/hash must resolve through owned evidence;
+- `buildConversationGraphEvidenceViewV1` physically redacts excluded graph fields at runtime;
+- replay bundle validation fails closed on missing semanticSnapshotRef;
+- escalation evidence owner receives branded identity discipline too.
+
+Gate:
+- W3 remains CLOSED;
+- W5 remains INACTIVE;
+- a third independent Claude re-review of the runtime repair must return zero blockers and safe-to-enter-W3=true before freeze.
