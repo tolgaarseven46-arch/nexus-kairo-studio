@@ -130,30 +130,40 @@ export function registerPrivatRoomLifecycleIntegrationRoute(app: Express) {
       });
 
       const isInviteEvent = event.eventType === "kaira.invited_to_server";
-      const decision = isInviteEvent
-        ? decideKairaInviteIntroduction({
-            actorDisplayName: event.actor.displayName,
-            isOwner: event.actor.isOwner,
-          })
-        : decideKairaWelcome({
-            eventType: event.eventType,
-            actorDisplayName: event.actor.displayName,
-            roomName: event.room.roomName,
-            isOwner: event.actor.isOwner,
-          });
-      const realization = isInviteEvent
-        ? realizeKairaInviteIntroduction({
-            eventId: event.eventId,
-            kairaInstanceId: event.kairaInstanceId,
-            decision,
-          })
-        : realizeKairaWelcome({
-            eventId: event.eventId,
-            kairaInstanceId: event.kairaInstanceId,
-            actorDisplayName: event.actor.displayName,
-            roomName: event.room.roomName,
-            decision,
-          });
+      let decision:
+        | ReturnType<typeof decideKairaInviteIntroduction>
+        | ReturnType<typeof decideKairaWelcome>;
+      let realization:
+        | ReturnType<typeof realizeKairaInviteIntroduction>
+        | ReturnType<typeof realizeKairaWelcome>;
+
+      if (event.eventType === "kaira.invited_to_server") {
+        const inviteDecision = decideKairaInviteIntroduction({
+          actorDisplayName: event.actor.displayName,
+          isOwner: event.actor.isOwner,
+        });
+        decision = inviteDecision;
+        realization = realizeKairaInviteIntroduction({
+          eventId: event.eventId,
+          kairaInstanceId: event.kairaInstanceId,
+          decision: inviteDecision,
+        });
+      } else {
+        const welcomeDecision = decideKairaWelcome({
+          eventType: event.eventType,
+          actorDisplayName: event.actor.displayName,
+          roomName: event.room.roomName,
+          isOwner: event.actor.isOwner,
+        });
+        decision = welcomeDecision;
+        realization = realizeKairaWelcome({
+          eventId: event.eventId,
+          kairaInstanceId: event.kairaInstanceId,
+          actorDisplayName: event.actor.displayName,
+          roomName: event.room.roomName,
+          decision: welcomeDecision,
+        });
+      }
 
       await saveTestSessionTurn({
         sessionId: testRunBinding.sessionId,
@@ -168,7 +178,9 @@ export function registerPrivatRoomLifecycleIntegrationRoute(app: Express) {
         detectedEmotion: "nötr",
         retrievedMemories: [],
         metadata: {
-          providerUsed: "deterministic_welcome_realizer",
+          providerUsed: isInviteEvent
+            ? "deterministic_invite_introduction_realizer"
+            : "deterministic_welcome_realizer",
           testRunId: testRunBinding.testRunId,
           testRunRecord: testRunBinding.record,
           platformEvent: {
