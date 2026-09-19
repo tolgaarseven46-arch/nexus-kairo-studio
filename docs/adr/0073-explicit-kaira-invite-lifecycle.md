@@ -23,3 +23,14 @@ Access/trial state remains platform-owned gating context and must not change Kai
 ## Compatibility
 
 Legacy `room.created` and `participant.joined` lifecycle handling remains available for compatibility, but PrivatRoom's new room creation path must not emit a Kaira welcome before explicit invite.
+
+## Canonical introduction copy freeze
+
+Live acceptance on 2026-09-19 proved that event-hash intro variation can drift from the accepted explicit-invite product copy even while the underlying invite lifecycle is correct.
+
+For `kaira.invited_to_server`, the introduction realization is therefore frozen to exactly:
+
+`Selam 😄 ben Kaira. Sunucuyu yönetirken yanında olacağım.`
+
+This freeze applies only to the one-time invite introduction. It does not change Kaira's decision authority, relationship/memory rules, subsequent conversational realization, platform ownership of invite/presence facts, or idempotency semantics.
+

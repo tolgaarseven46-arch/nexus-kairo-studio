@@ -37,27 +37,14 @@ export const decideKairaInviteIntroduction = (
   prohibitedTerms: ["Droit", "capability", "pipeline", "system prompt", "yapay zeka"],
 });
 
-const VARIANTS = [
-  "Selam 😄 ben Kaira. Sunucuyu yönetirken yanında olacağım.",
-  "Selam 😄 Kaira ben. Sunucuyu yönetirken işlerini beraber toparlarız.",
-  "Hey 😄 ben Kaira. Sunucuyu yönetirken sana destek olacağım.",
-] as const;
-
-const fnv1a = (value: string): number => {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-};
+const CANONICAL_INVITE_INTRO =
+  "Selam 😄 ben Kaira. Sunucuyu yönetirken yanında olacağım.";
 
 export function realizeKairaInviteIntroduction(
   input: KairaInviteIntroductionRealizationInput,
 ): KairaInviteIntroductionRealization {
   const seed = `${input.eventId}:${input.kairaInstanceId}:invite_introduction`;
-  const index = fnv1a(seed) % VARIANTS.length;
-  const text = VARIANTS[index];
+  const text = CANONICAL_INVITE_INTRO;
 
   for (const term of input.decision.prohibitedTerms) {
     if (text.toLocaleLowerCase("tr-TR").includes(term.toLocaleLowerCase("tr-TR"))) {
@@ -67,7 +54,7 @@ export function realizeKairaInviteIntroduction(
 
   return {
     text,
-    variantId: `kaira_invited_v${index + 1}`,
+    variantId: "kaira_invited_v1",
     realizationVariantSeed: seed,
   };
 }
