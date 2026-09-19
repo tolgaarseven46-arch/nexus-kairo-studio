@@ -35,3 +35,8 @@ For a locally realized first-encounter turn, the distributed state-mutation leas
 ## Clarification — complete short realization
 
 First-encounter routine realizations must fit the already-authoritative ResponsePlan delivery budget without relying on mechanical mid-sentence truncation. The realization layer should choose a shorter complete utterance rather than widening global response limits. Human-live acceptance rejects incomplete endings such as "nasıl bir".
+
+
+## Clarification — idle-debounced non-critical persistence
+
+For first-encounter local fast replies, relationship and TestRun turn continuity remain the critical post-response persistence barrier and the distributed state lease is released immediately after those writes. Non-critical metric/KNT/autonomous observation writes are queued per user+Kaira instance and flushed only after a short conversational idle window. Each new first-encounter fast turn resets that idle window and all queued jobs are preserved and flushed sequentially. This prevents non-critical Firestore traffic from competing with the next user turn's coordination claim while preserving eventual evidence/telemetry writes.

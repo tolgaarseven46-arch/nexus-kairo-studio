@@ -150,6 +150,37 @@ registerPrivatRoomLifecycleIntegrationRoute(app);
 registerTestRunProvenanceRoute(app);
 registerTestRunReviewRoute(app);
 let aiClient: GoogleGenAI | null = null;
+type FirstEncounterBackgroundJob = () => Promise<void>;
+const FIRST_ENCOUNTER_BACKGROUND_IDLE_MS = 5_000;
+const firstEncounterBackgroundQueues = new Map<
+  string,
+  { timer: ReturnType<typeof setTimeout>; jobs: FirstEncounterBackgroundJob[] }
+>();
+
+function enqueueFirstEncounterBackgroundPersistence(
+  key: string,
+  job: FirstEncounterBackgroundJob,
+) {
+  const existing = firstEncounterBackgroundQueues.get(key);
+  const jobs = existing ? [...existing.jobs, job] : [job];
+  if (existing) clearTimeout(existing.timer);
+
+  const timer = setTimeout(async () => {
+    const queued = firstEncounterBackgroundQueues.get(key);
+    if (!queued || queued.timer !== timer) return;
+    firstEncounterBackgroundQueues.delete(key);
+    for (const queuedJob of queued.jobs) {
+      try {
+        await queuedJob();
+      } catch (error) {
+        console.warn("[First Encounter Background Queue] job failed:", error);
+      }
+    }
+  }, FIRST_ENCOUNTER_BACKGROUND_IDLE_MS);
+  (timer as any).unref?.();
+  firstEncounterBackgroundQueues.set(key, { timer, jobs });
+}
+
 const now = () => performance.now(),
   memoryCache = new Map<
     string,
@@ -1516,16 +1547,25 @@ app.post("/api/chat", async (req, res) => {
             await completeCoordinatedKairaChatRequest(coordinationKey, responsePayload);
             ownsCoordinationClaim = false;
           }
-          await Promise.allSettled([
-            saveMetricTelemetry(),
-            saveKntTelemetry(),
-            saveAutonomousState(),
-          ]);
-          console.log("[First Encounter Deferred Continuity]", {
+          const backgroundQueueKey = `${stateUserId}::${kairaInstance.instanceId}`;
+          enqueueFirstEncounterBackgroundPersistence(backgroundQueueKey, async () => {
+            const queuedBackgroundStart = now();
+            await saveMetricTelemetry();
+            await saveKntTelemetry();
+            await saveAutonomousState();
+            console.log("[First Encounter Deferred Continuity]", {
+              testRunId,
+              requestId,
+              criticalPersistenceMs,
+              backgroundPersistenceMs: Math.round(now() - queuedBackgroundStart),
+              idleDelayMs: FIRST_ENCOUNTER_BACKGROUND_IDLE_MS,
+            });
+          });
+          console.log("[First Encounter Deferred Continuity Queued]", {
             testRunId,
             requestId,
             criticalPersistenceMs,
-            backgroundPersistenceMs: Math.round(now() - backgroundStart),
+            queuedAfterIdleMs: FIRST_ENCOUNTER_BACKGROUND_IDLE_MS,
           });
         } catch (error) {
           console.error("[First Encounter Deferred Continuity] failed:", error);
