@@ -68,4 +68,77 @@ describe("server language understanding bridge", () => {
     expect(result.event.insult).toBe(true);
     expect(result.warnings.length).toBeGreaterThan(0);
   });
+
+  it("does not let the local Kaira-role regex overwrite full semantic-provider authority", async () => {
+    const providerOwned = {
+      ...completeV2,
+      raw: "x",
+      normalized: "sen ne yapıcaksın",
+      primaryIntent: "question",
+      secondarySocialActs: [],
+      target: "kaira",
+      valence: "neutral",
+      severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 },
+      discourseFacets: {
+        ...completeV2.discourseFacets,
+        socialRoutine: "none",
+        platformScopeQuery: undefined,
+      },
+      uncertainty: { overall: 0.12, intent: 0.08, target: 0.08, severity: 0.05 },
+      evidence: [{ source: "llm", cues: ["provider_owned_semantics"], confidence: 0.9 }],
+    };
+
+    const generateText = vi.fn(async () => JSON.stringify(providerOwned));
+    const result = await resolveServerLanguageUnderstanding({
+      message: "sen ne yapıcaksın",
+      preferredProvider: "openrouter",
+      firstEncounterContext: { roomName: "deneme", isOwner: true },
+      generateText,
+      context: { userName: "Tolga", characterName: "Kaira" },
+    });
+
+    expect(generateText).toHaveBeenCalled();
+    expect(result.semanticSource).toBe("semantic_provider");
+    expect(result.interpretation.discourseFacets.platformScopeQuery).toBeUndefined();
+  });
+
+  it.each([
+    "sen napıyosun burda",
+    "işlevin ne senin",
+    "burda ne iş yaparsın",
+    "senin burada fonksiyonun ne",
+    "bu sunucuda senin vazifen nedir",
+  ])("preserves canonical-provider Kaira-role semantics for unseen paraphrase: %s", async (message) => {
+    const providerOwned = {
+      ...completeV2,
+      raw: "x",
+      normalized: message,
+      primaryIntent: "question",
+      secondarySocialActs: [],
+      target: "kaira",
+      valence: "neutral",
+      severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 },
+      discourseFacets: {
+        ...completeV2.discourseFacets,
+        socialRoutine: "none",
+        platformScopeQuery: "kaira_role",
+      },
+      uncertainty: { overall: 0.1, intent: 0.06, target: 0.06, severity: 0.05 },
+      evidence: [{ source: "llm", cues: ["unseen_kaira_role_paraphrase"], confidence: 0.94 }],
+    };
+
+    const generateText = vi.fn(async () => JSON.stringify(providerOwned));
+    const result = await resolveServerLanguageUnderstanding({
+      message,
+      preferredProvider: "openrouter",
+      firstEncounterContext: { roomName: "deneme", isOwner: true },
+      generateText,
+      context: { userName: "Tolga", characterName: "Kaira" },
+    });
+
+    expect(generateText).toHaveBeenCalled();
+    expect(result.semanticSource).toBe("semantic_provider");
+    expect(result.interpretation.discourseFacets.platformScopeQuery).toBe("kaira_role");
+  });
+
 });
