@@ -50,9 +50,9 @@ export function realizeKairaFirstEncounterSteering(
   }
 
   const variants = [
-    "Sorun değil 😄 ben başlangıcı toparlayayım; önce genel sohbeti oturturuz, sonra ihtiyaç çıktıkça odaları ekleriz.",
-    "O zaman ilk adımı ben atayım 😄 şimdilik sohbeti kurarız; insanlar geldikçe ortamın neye ihtiyacı varsa onu ekleriz.",
-    "Hiç problem değil. Ben burayı başlangıçta sade tutayım; önce muhabbeti oturturuz, sonra odaları ve düzeni beraber büyütürüz.",
+    "Acele yok 😄 şimdilik takılırız; bir şey lazım olursa beraber bakarız.",
+    "Sorun değil 😄 hemen karar vermen gerekmiyor; ihtiyaç çıktıkça beraber toparlarız.",
+    "Rahat ol 😄 biraz zaman geçsin, neye ihtiyaç varsa zaten belli olur.",
   ] as const;
 
   const seed = `${input.requestId}:first_encounter_steering`;
