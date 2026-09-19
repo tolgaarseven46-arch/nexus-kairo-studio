@@ -809,3 +809,17 @@ Repair:
 - this governance hardening is NOT a W2 review and does not advance W3.
 
 Slice B remains blocked on an actual external independent W2 review submission plus separately verified provenance.
+
+
+## 46. Slice B W2 external submission surface (2026-09-19)
+
+W2 still requires an actual external independent review and separately verified provenance. To remove manual intake ambiguity once that review exists, a governed submission surface is added:
+
+- issue template: `.github/ISSUE_TEMPLATE/slice-b-w2-external-review.md`;
+- intake workflow: `.github/workflows/slice-b-w2-external-review-intake.yml`;
+- the workflow extracts the marked JSON payload and validates the same mandatory reviewer/findings/verdict envelope used by the W2 intake contract;
+- it reports blocker / non-blocker / future counts back to the issue;
+- structural validity is explicitly NON-AUTHORITATIVE for reviewer independence;
+- no issue submission, label or bot comment can open W3 without the separately verified trusted provenance required by section 45.
+
+This change is governance/observability tooling only. It does not satisfy W2, freeze W3, activate W5 fixtures, or alter production Kaira behavior.
