@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildConversationGraphV1,
@@ -59,6 +60,12 @@ const baseBuildInput = (): BuildConversationGraphInputV1 => ({
   },
   ownedEvidenceStore: {
     "evidence:1": { ownerId: "social_appraisal", hash: "sha256:abc" },
+  },
+  platformIdentityFacts: {
+    A: "human",
+    B: "human",
+    C: "human",
+    KAIRA: "droit",
   },
 });
 
@@ -366,7 +373,22 @@ describe("Slice B W5 Conversation Graph characterization", () => {
     expect(graph.snapshotHash).toEqual(expect.any(String));
   });
 
-  it("T-B21 raw graph is not the downstream evidence view", () => {
+  it("T-B21 raw graph is not importable by decision/behavior authority modules", () => {
+    const authorityFileName =
+      /(decision|response|behavior|appraisal|relationship|moderation|capability)/i;
+    const files = readdirSync(new URL(".", import.meta.url))
+      .filter((name) => name.endsWith(".ts"))
+      .filter((name) => !name.endsWith(".test.ts"))
+      .filter((name) => authorityFileName.test(name))
+      .filter((name) => name !== "sliceBConversationGraphRuntime.ts");
+
+    const rawImports = files.filter((name) => {
+      const source = readFileSync(new URL(name, import.meta.url), "utf8");
+      return /from\s+["'][^"']*sliceBConversationGraphRuntime["']/.test(source);
+    });
+
+    expect(rawImports).toEqual([]);
+
     const input = baseBuildInput();
     input.events = [event("e1", "A", 1)];
     input.inferredAddressCandidateEdges = [
@@ -435,12 +457,24 @@ describe("Slice B W5 Conversation Graph characterization", () => {
         { KAIRA: "droit" },
       ),
     ).toThrow(/actorKind/i);
-    expect(
-      validateActorKindFactV1(
-        { actorId: "KAIRA", actorKind: "droit" },
-        { KAIRA: "droit" },
-      ),
-    ).toBe(true);
+
+    const invalidBuild = baseBuildInput();
+    invalidBuild.events = [
+      {
+        eventId: "k1",
+        actorId: "KAIRA",
+        actorKind: "human",
+        occurredAt: 1,
+      },
+    ];
+    expect(() => buildConversationGraphV1(invalidBuild)).toThrow(/actorKind/i);
+
+    const validBuild = baseBuildInput();
+    validBuild.events = [event("k1", "KAIRA", 1)];
+    expect(buildConversationGraphV1(validBuild).events[0]).toMatchObject({
+      eventId: "k1",
+      actorKind: "droit",
+    });
   });
 
   it("T-B26 participant retention is bounded by retained source evidence", () => {
