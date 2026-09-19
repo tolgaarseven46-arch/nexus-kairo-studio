@@ -89,6 +89,21 @@ const isFirstEncounterKairaRoleQuestion = (
   message.toLocaleLowerCase("tr-TR").trim(),
 );
 
+const FIRST_ENCOUNTER_EXPLICIT_KAIRA_REFERENCE_RE =
+  /(?:^|\s)(?:sen|kaira)(?=$|\s|[?.!…])/iu;
+
+const isAmbiguousFirstEncounterPlatformQuestion = (
+  message: string,
+  context?: ResolveServerLanguageUnderstandingInput["firstEncounterContext"],
+) => {
+  if (!context || isFirstEncounterKairaRoleQuestion(message, context)) return false;
+  const normalized = message.toLocaleLowerCase("tr-TR").trim();
+  return (
+    FIRST_ENCOUNTER_ROOM_ANCHOR_RE.test(normalized) &&
+    FIRST_ENCOUNTER_EXPLICIT_KAIRA_REFERENCE_RE.test(normalized)
+  );
+};
+
 const FIRST_ENCOUNTER_WELL_BEING_REPLY_RE =
   /^(?:iyi(?:yim|dir|lik)?|gayet\s+iyi(?:yim)?|çok\s+iyi(?:yim)?|fena\s+değil|idare|şükür|şükürler\s+olsun)(?:\s+(?:ya|işte|valla))?[.!?…]*$/iu;
 const PREVIOUS_WELL_BEING_PROMPT_RE =
@@ -432,10 +447,17 @@ export async function resolveServerLanguageUnderstanding(
       contextualRoleFast,
       input.context,
     );
+    const ambiguousPlatformQuestion = isAmbiguousFirstEncounterPlatformQuestion(
+      input.message,
+      input.firstEncounterContext,
+    );
     if (
-      isSafeTrivialSocialFastPath(contextualFast) ||
-      hasFirstEncounterRoomContextSemantics(contextualFast) ||
-      isSafeFirstEncounterNeutralShortFastPath(contextualFast, input.firstEncounterContext)
+      !ambiguousPlatformQuestion &&
+      (
+        isSafeTrivialSocialFastPath(contextualFast) ||
+        hasFirstEncounterRoomContextSemantics(contextualFast) ||
+        isSafeFirstEncounterNeutralShortFastPath(contextualFast, input.firstEncounterContext)
+      )
     ) {
       return contextualFast;
     }
