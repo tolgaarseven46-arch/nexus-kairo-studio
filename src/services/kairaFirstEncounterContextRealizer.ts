@@ -32,10 +32,7 @@ const hasPlatformContextQuestionSemantics = (interpretation: SemanticInterpretat
 export function realizeKairaFirstEncounterContext(
   input: KairaFirstEncounterContextRealizationInput,
 ): KairaFirstEncounterContextRealization {
-  if (
-    input.plan.move !== "answer_or_clarify" ||
-    !hasPlatformContextQuestionSemantics(input.interpretation)
-  ) {
+  if (!hasPlatformContextQuestionSemantics(input.interpretation)) {
     return { handled: false };
   }
 
