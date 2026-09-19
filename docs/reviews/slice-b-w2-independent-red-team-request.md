@@ -9,7 +9,7 @@ Authority: reviewer findings are advisory until W3 product freeze
 1. `docs/slice-b-multi-user-observation-freeze-packet.md`
 2. `docs/slice-b-w3-freeze-draft-w4-test-map.md`
 3. `docs/adr/2026-09-18-social-platform-test-first-workflow.md`
-4. `PROJECT_STATE.md` sections 23–25
+4. `PROJECT_STATE.md` sections 23–31
 
 ## Reviewer mission
 
@@ -91,6 +91,20 @@ Answer each exactly:
 5. Determinism/idempotency blocker remains? YES/NO
 6. Privacy/data-minimization blocker remains? YES/NO
 7. Safe to enter W3 freeze after listed blocker repairs? YES/NO
+
+## Independence provenance rule
+
+The review content and the proof that the reviewer is independent are separate authorities.
+
+- `reviewer.independent=true` inside a returned payload is only a reviewer declaration.
+- That declaration alone MUST NOT open W3.
+- The project-side intake must attach separately verified provenance containing:
+  - external channel/artifact reference,
+  - reviewer identity,
+  - explicit independent-verification receipt,
+  - verifier identity.
+- A self-authored/self-attested payload without that trusted provenance remains structurally reviewable but promotion-ineligible.
+- This provenance rule is governance-only and does not count as W2 review evidence.
 
 Do not provide an overall score.
 Do not redesign unrelated frozen A–S architecture unless a concrete Slice B counterexample proves a frozen invariant violation.
