@@ -25,9 +25,12 @@ const validReview = {
 } as const;
 
 describe("Slice B W2 review intake", () => {
-  it("accepts a complete independent review envelope", () => {
+  it("accepts a complete independent review envelope structurally", () => {
     expect(validateSliceBW2ReviewIntake(validReview)).toBe(true);
-    expect(canEnterSliceBW3(validReview as any)).toBe(true);
+  });
+
+  it("does not let a self-attested payload open W3 without trusted external provenance", () => {
+    expect(canEnterSliceBW3(validReview as any)).toBe(false);
   });
 
   it("rejects self-review pretending to be independent", () => {
