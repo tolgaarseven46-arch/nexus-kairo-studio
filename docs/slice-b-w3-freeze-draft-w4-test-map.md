@@ -13,13 +13,21 @@ This document is intentionally non-authoritative until W2 independent findings a
 ```ts
 type ConversationActorKind = 'human' | 'droit' | 'system';
 
-interface ConversationGraphNamespaceV1 {
-  environmentId: 'test' | 'staging' | 'live-beta';
-  testRunId?: string;
+interface ConversationGraphNamespaceBaseV1 {
   serverId: string;
   roomId: string;
   kairaInstanceId: string;
 }
+
+type ConversationGraphNamespaceV1 =
+  | (ConversationGraphNamespaceBaseV1 & {
+      environmentId: 'test';
+      testRunId: string;
+    })
+  | (ConversationGraphNamespaceBaseV1 & {
+      environmentId: 'staging' | 'live-beta';
+      testRunId?: string;
+    });
 
 interface ConversationParticipantV1 {
   participantId: string;
@@ -61,21 +69,19 @@ interface InferredAddressCandidateEdgeV1 {
 
 interface UnresolvedReferenceV1 {
   sourceEventId: string;
-  referenceType: 'reply' | 'mention' | 'participant';
+  referenceType: 'reply' | 'mention' | 'participant' | 'escalation_evidence';
   referencedId: string;
 }
 
-interface UnansweredAddressedTurnEvidenceV1 {
-  addressedEventId: string;
-  addresseeId: string;
-  windowStart: number;
-  windowEnd: number;
-  observedEventIds: string[];
-}
+type RegisteredDecisionOwnerId = string & {
+  readonly __registeredDecisionOwnerId: unique symbol;
+};
 
 interface SuppressionReceiptV1 {
   decisionId: string;
-  owner: string;
+  ownerId: RegisteredDecisionOwnerId;
+  ownerRegistryVersion: string;
+  ownerAttestationRef: string;
   sourceEventId: string;
   reasonCode: string;
   occurredAt: number;
@@ -83,8 +89,20 @@ interface SuppressionReceiptV1 {
 
 interface EscalationEvidenceRefV1 {
   eventId: string;
-  evidenceOwner: string;
+  evidenceOwnerId: string;
   evidenceRef: string;
+  evidenceHash: string;
+}
+
+interface FrozenSemanticSnapshotEvidenceV1 {
+  semanticSnapshotRef: string;
+  snapshotHash: string;
+  canonicalSnapshot: unknown;
+}
+
+interface ConversationGraphReplayBundleV1 {
+  graph: ConversationGraphV1;
+  frozenSemanticSnapshots: FrozenSemanticSnapshotEvidenceV1[];
 }
 
 interface ConversationGraphV1 {
@@ -98,11 +116,21 @@ interface ConversationGraphV1 {
   explicitMentionEdges: ExplicitMentionEdgeV1[];
   inferredAddressCandidateEdges: InferredAddressCandidateEdgeV1[];
   unresolvedReferences: UnresolvedReferenceV1[];
-  unansweredAddressedTurnEvidence: UnansweredAddressedTurnEvidenceV1[];
   suppressionReceipts: SuppressionReceiptV1[];
   escalationEvidenceRefs: EscalationEvidenceRefV1[];
   builtFromEventIds: string[];
   snapshotHash: string;
+}
+
+interface ConversationGraphEvidenceViewV1 {
+  schemaVersion: 1;
+  namespace: ConversationGraphNamespaceV1;
+  conversationId: string;
+  participants: ConversationParticipantV1[];
+  events: ConversationEventV1[];
+  explicitReplyEdges: ExplicitReplyEdgeV1[];
+  explicitMentionEdges: ExplicitMentionEdgeV1[];
+  unresolvedReferences: UnresolvedReferenceV1[];
 }
 ```
 
@@ -113,26 +141,28 @@ interface ConversationGraphV1 {
 3. Conversation Graph never decides WHETHER/WHAT Kaira says.
 4. Conversation Graph never grants/revokes platform capabilities.
 5. Conversation Graph never mutates relationship/appraisal/memory truth.
-6. `unansweredAddressedTurnEvidence` records absence-of-reply only; no motive attribution.
-7. `suppressionReceipts` are accepted only from an owning decision layer.
-8. `escalationEvidenceRefs` only reference already-owned evidence; no raw-text classifier exists in graph.
+6. `unansweredAddressedTurnEvidence` is deliberately excluded from the persisted production graph until R is formally reopened.
+7. `suppressionReceipts` are accepted only after ownerId is authenticated against a versioned registered-decision-owner registry; structural presence alone is insufficient.
+8. `escalationEvidenceRefs` are accepted only when the referenced owned evidence resolves and its hash matches; unresolved refs move to `unresolvedReferences` with `referenceType='escalation_evidence'`.
 9. Cold/warm/experienced-owner are test fixture classes only, never production graph fields.
-10. Total order is `occurredAt -> sourceSequence? -> eventId`.
+10. Total order is `occurredAt -> sourceSequence? -> eventId`; eventId comparison is locale-independent byte/codepoint ordering.
 11. Duplicate `eventId` ingestion is idempotent.
-12. Graph namespace is environment/testRun/server/room/Kaira-instance scoped.
-13. Replay reads only frozen graph snapshot/input and never live platform state.
+12. Graph namespace is environment/testRun/server/room/Kaira-instance scoped; `environmentId='test'` requires `testRunId` by type.
+13. Replay consumes only `ConversationGraphReplayBundleV1`; all referenced semantic snapshots are frozen inside the bundle and live semantic-store resolution is forbidden.
 14. Human/droit/system actor kind is explicit platform-owned identity evidence.
 15. Missing references remain unresolved; they are never fabricated.
+16. Decision/behavior code must not import or consume raw `ConversationGraphV1`; downstream access is through the explicit `ConversationGraphEvidenceViewV1` whitelist adapter.
+17. The evidence view intentionally excludes inferred address candidates, suppression receipts and escalation refs from generic decision/behavior consumption.
 
 ### W3 unresolved items reserved for W2
 
-Independent reviewer may still require removing or relocating:
-- inferred address candidates,
-- unanswered-turn evidence,
-- escalation evidence refs,
-- participant counters/timestamps.
+W2 resolution applied:
+- inferred address candidates remain internal observational graph evidence but are excluded from the generic downstream evidence view;
+- unanswered-turn evidence is removed from the persisted production graph and deferred until R is formally reopened;
+- escalation refs remain observational only and require owned-evidence resolution + hash validation before admission;
+- participant counters/timestamps remain objective observation facts, with retention/TTL policy required before broader rollout.
 
-If W2 marks any of these BLOCKER, W3 must resolve them before freeze.
+The remaining freeze gate is an independent re-review of these blocker repairs.
 
 ## Candidate fixture definitions
 
@@ -190,19 +220,19 @@ Same server, different rooms remain isolated.
 Same room with different Kaira instances remains isolated where namespace requires it.
 
 ### T-B11 replay parity
-Frozen graph snapshot replay yields byte-equivalent graph result with zero live fetch.
+Frozen replay bundle yields byte-equivalent graph result with zero live platform or semantic-store fetch.
 
 ### T-B12 replay live-state denial
-Replay path rejects any live platform read/mutation request.
+Replay path rejects any live platform read/mutation request and any live semanticSnapshotRef resolution.
 
-### T-B13 unanswered-turn no-motive
-Unanswered evidence contains only bounded observation facts and no intent/hostility/relationship field.
+### T-B13 R-scope exclusion
+Persisted production graph schema contains no unanswered-addressed-turn evidence until R is formally reopened.
 
-### T-B14 suppression ownership
-Graph rejects suppression receipt without owner + decisionId + sourceEventId.
+### T-B14 suppression ownership authenticity
+Graph rejects suppression receipt unless ownerId resolves in the registered decision-owner registry and owner attestation is valid; a merely non-empty owner field is insufficient.
 
-### T-B15 escalation no-text-reinterpretation
-Graph cannot derive escalation from raw text; only owned evidence refs are accepted.
+### T-B15 escalation reference authenticity
+Graph cannot derive escalation from raw text; an escalation evidence ref is admitted only when owned evidence resolves and hash matches. Unresolved refs are typed as unresolved evidence.
 
 ### T-B16 fixture neutrality
 cold/warm/experienced-owner fixture labels cannot alter a frozen decision projection when all owned decision inputs are held constant.
@@ -218,6 +248,18 @@ Graph input with no semanticSnapshotRef remains without semantic truth; raw text
 
 ### T-B20 snapshot provenance
 schemaVersion/derivationVersion/namespace/builtFromEventIds/snapshotHash are required and validated.
+
+### T-B21 raw-graph dependency boundary
+Decision/behavior modules cannot import raw ConversationGraphV1 and must use ConversationGraphEvidenceViewV1.
+
+### T-B22 test namespace requires testRunId
+A namespace with environmentId='test' and no testRunId is rejected at type/validation boundary.
+
+### T-B23 escalation invalid-ref
+A nonexistent or hash-mismatched escalation evidence ref is rejected from escalationEvidenceRefs and recorded as unresolved.
+
+### T-B24 locale-independent event ordering
+eventId final tie-break produces identical ordering under differing process locales.
 
 ## W5 entry criteria
 
