@@ -21,6 +21,10 @@ export interface KairaPlatformRecentHistoryTurn {
   text: string;
   participantName?: string;
   isWelcome?: boolean;
+  participantId?: string;
+  eventId?: string;
+  occurredAt?: number;
+  actorKind?: "human" | "droit" | "system";
 }
 
 export function deriveKairaFirstEncounterContinuityFromPlatformHistory(input: {

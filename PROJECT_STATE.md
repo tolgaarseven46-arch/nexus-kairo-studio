@@ -1024,3 +1024,31 @@ Additional closure proofs:
 Next gate after merge:
 - rollback / promotion-stop criteria check;
 - then W8 live-beta TestRun.
+
+
+## 53. Slice B W8 live observation wiring (2026-09-19)
+
+W7 is merged on main `891fa138862f9bc38e9951a923022ae9a1a3c256`.
+
+Before W8 live-beta acceptance, one missing production seam was identified:
+- the frozen Conversation Graph runtime existed and was fully characterized,
+- but PrivatRoom live room ingress did not yet materialize that graph into TestRun evidence.
+
+W8 wiring on branch `feat/slice-b-live-observation-w8` closes that gap without adding behavior authority:
+- `privatRoomConversationGraphObservation.ts` builds ConversationGraphV1 only from platform-supplied room facts;
+- history turns without platform identity/event/time facts are ignored rather than guessed;
+- the current room event is always represented from explicit platform actor/message facts;
+- graph observation is passed into `/api/chat` as evidence only;
+- both local-language and provider-backed TestRun persistence paths record it under `metadata.conversationGraphObservation`;
+- no graph field is consumed to decide WHETHER/WHAT Kaira says;
+- the integration response may echo the observation for live proof/review;
+- the producer contract now accepts multi-user participant sets rather than a fixed two-party tuple.
+
+PrivatRoom counterpart:
+- authoritative recent room history now carries participantId, eventId, occurredAt and actorKind;
+- room history includes all human participants plus Kaira, not only the currently speaking user.
+
+Promotion rule remains unchanged:
+- W8 must prove the deployed Kaira + PrivatRoom commits live,
+- TestRun evidence must show graph observation persisted,
+- any cross-user/cross-server contamination or live/replay boundary violation stops promotion.
