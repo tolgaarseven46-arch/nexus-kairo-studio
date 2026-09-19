@@ -36,10 +36,11 @@ describe("first-encounter room-context driver acceptance", () => {
       const reply = String(result.reply);
       replies.add(reply);
 
-      expect(reply).not.toMatch(/sen yön ver|sen karar ver|nasıl bir yer olacağına sen/iu);
-      expect(reply).toMatch(/ben/u);
-      expect(reply).toMatch(/toparlayayım|kurayım|atayım/iu);
-      expect(reply).toMatch(/sohbet|oda|düzen|kural|ortam/iu);
+      const normalizedReply = reply.toLocaleLowerCase("tr-TR");
+      expect(normalizedReply).not.toMatch(/sen yön ver|sen karar ver|nasıl bir yer olacağına sen/u);
+      expect(normalizedReply).toMatch(/ben/u);
+      expect(normalizedReply).toMatch(/toparlayayım|kurayım|atayım/u);
+      expect(normalizedReply).toMatch(/sohbet|oda|düzen|kural|ortam/u);
     }
 
     expect(replies.size).toBeGreaterThanOrEqual(3);
