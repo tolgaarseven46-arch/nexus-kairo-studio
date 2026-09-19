@@ -189,6 +189,8 @@ export interface SemanticDiscourseFacets {
   stateAnswerShape?: boolean;
   /** Canonical utterance shape: compact turn used only for discourse dependency. */
   shortUtteranceShape?: boolean;
+  /** Canonical utterance shape: user expresses uncertainty/indecision as an answer. */
+  uncertaintyAnswerShape?: boolean;
   /** Canonical utterance shape: message can answer a pending what-doing question. */
   activityAnswerShape?: boolean;
 }
@@ -203,6 +205,7 @@ export interface SemanticDiscourseProjection {
   answerFriction?: boolean;
   stateAnswerShape?: boolean;
   shortUtteranceShape?: boolean;
+  uncertaintyAnswerShape?: boolean;
   activityAnswerShape?: boolean;
 }
 
