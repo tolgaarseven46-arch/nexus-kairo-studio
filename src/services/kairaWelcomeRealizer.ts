@@ -29,16 +29,16 @@ const OWNER_IDENTITIES = [
 const OWNER_ROOM_BEATS = [
   (roomName: string) =>
     roomName
-      ? `“${roomName}” daha yeni; güzel, birlikte oturturuz.`
-      : "Burası daha yeni; güzel, birlikte oturturuz.",
+      ? `“${roomName}” daha yeni; burayı beraber kurarız, odaları ve düzeni ben toparlarım — nasıl bir ortam olsun?`
+      : "Burası daha yeni; burayı beraber kurarız, odaları ve düzeni ben toparlarım — nasıl bir ortam olsun?",
   (_roomName: string) =>
-    "Yeni oda, boş sayfa sayılır 😄 zamanla kendi havasını bulur.",
+    "Yeni oda, boş sayfa 😄 beraber şekillendiririz; sen insanları toplarsın, ben odaları ve düzeni toparlarım — nasıl bir yer olsun?",
   (roomName: string) =>
     roomName
-      ? `“${roomName}” şimdilik tertemiz bir sayfa; bakalım nasıl bir yere dönüşecek.`
-      : "Şimdilik tertemiz bir sayfa; bakalım nasıl bir yere dönüşecek.",
+      ? `“${roomName}” daha yeni; beraber şekillendiririz, muhabbeti, odaları ve kuralları oturtmada ben buradayım — nasıl bir yer olsun?`
+      : "Burası daha yeni; beraber şekillendiririz, muhabbeti, odaları ve kuralları oturtmada ben buradayım — nasıl bir yer olsun?",
   (_roomName: string) =>
-    "Daha ilk dakikalar 😄 ortam birazdan kendi şeklini bulur.",
+    "Daha ilk dakikalar 😄 burayı beraber kurarız; sen ortamın havasını belirlersin, ben odaları ve düzeni toparlarım — nasıl olsun?",
 ] as const;
 
 const MEMBER_OPENINGS = [

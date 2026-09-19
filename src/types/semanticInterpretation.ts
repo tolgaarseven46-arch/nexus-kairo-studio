@@ -170,6 +170,8 @@ export interface SemanticWorldMemorySemantics {
  */
 export interface SemanticDiscourseFacets {
   socialRoutine: SemanticSocialRoutine;
+  /** Canonical platform-context meaning for explicit "what do we do here?" turns. */
+  platformScopeQuery?: "room_setup";
   discourseAct: SemanticDiscourseAct;
   repairSignal: SemanticRepairSignal;
   adviceRequested: boolean;
@@ -242,6 +244,7 @@ export type SemanticGroundingField =
   | "repairAttempt"
   | "stopRequest"
   | "socialRoutine"
+  | "platformScopeQuery"
   | "discourseAct"
   | "repairSignal"
   | "adviceRequested"
