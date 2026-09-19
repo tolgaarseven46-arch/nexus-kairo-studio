@@ -15,6 +15,23 @@ describe("PrivatRoom live graph observation regression", () => {
           participantIds: ["u1", "droit_kaira_beta"],
           roomContext: {
             roomId: "r1",
+            participants: [
+              {
+                participantId: "owner-1",
+                actorKind: "human",
+                platformRoles: ["owner"],
+              },
+              {
+                participantId: "u1",
+                actorKind: "human",
+                platformRoles: ["member"],
+              },
+              {
+                participantId: "droit_kaira_beta",
+                actorKind: "droit",
+                platformRoles: ["member"],
+              },
+            ],
             recentHistory: [
               {
                 sender: "droit",
@@ -35,6 +52,13 @@ describe("PrivatRoom live graph observation regression", () => {
     });
 
     expect(graph.events.map((event) => event.eventId)).toEqual(["welcome-1", "m1"]);
+    expect(graph.participants.filter((participant) => participant.actorKind === "human")).toHaveLength(2);
+    expect(graph.participants.find((participant) => participant.participantId === "owner-1")).toMatchObject({
+      participantId: "owner-1",
+      actorKind: "human",
+      platformRoles: ["owner"],
+      messageCount: 0,
+    });
     expect(graph).not.toHaveProperty("answerDecision");
     expect(graph).not.toHaveProperty("responseDecision");
 
