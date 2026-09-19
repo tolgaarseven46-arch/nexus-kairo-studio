@@ -44,15 +44,14 @@ describe("live first-encounter acceptance RED", () => {
     }
   });
 
-  it("keeps Kaira as the first-encounter conversation driver", () => {
+  it("keeps invited Kaira natural instead of forcing server onboarding", () => {
     const instruction = buildKairaFirstEncounterInstruction({
       roomName: "deneme",
       isOwner: true,
     });
-    expect(instruction).toMatch(/sohbetin yönünü Kaira taşısın/iu);
-    expect(instruction).toMatch(/doğru soruyu bilmesini bekleme/iu);
-    expect(instruction).toMatch(/kısa, kararsız|bilmiyorum/iu);
-    expect(instruction).not.toMatch(/kullanıcı yönü kendisi belirleyebilsin/iu);
+    expect(instruction).toMatch(/casual mesajlara casual cevap ver/iu);
+    expect(instruction).toMatch(/sunucu yönetimi konusunu kullanıcı sormadan zorla açma/iu);
+    expect(instruction).toMatch(/rolünü kısa ve doğal biçimde açıkla/iu);
   });
 
   it("keeps every naber steering variant complete within the delivery budget", () => {
@@ -73,15 +72,15 @@ describe("live first-encounter acceptance RED", () => {
       expect(result.handled).toBe(true);
       const reply = String(result.reply ?? "");
       replies.add(reply);
-      expect(reply).toMatch(/burayı/iu);
-      expect(reply).toMatch(/nasıl olsun\?$/iu);
-      expect(reply).not.toMatch(/nasıl bir\s*$/iu);
+      expect(reply).toMatch(/iyi|iyiyim|fena/iu);
+      expect(reply).toMatch(/sen|sende/iu);
+      expect(reply).not.toMatch(/burayı|oda|sunucu|nasıl olsun/iu);
       expect(reply.trim().split(/\s+/u).length).toBeLessThanOrEqual(8);
     }
     expect(replies.size).toBe(4);
   });
 
-  it("keeps steering after a zero-context user's naber", () => {
+  it("answers naber as normal small-talk after invitation", () => {
     const result = realizeKairaFirstEncounterRoutine({
       requestId: "live-naber",
       event: { socialRoutine: "how_are_you" } as any,
@@ -94,8 +93,8 @@ describe("live first-encounter acceptance RED", () => {
     });
 
     expect(result.handled).toBe(true);
-    expect(result.reply).toMatch(/burayı|oda|ortam/iu);
-    expect(result.reply).toMatch(/nasıl/iu);
+    expect(result.reply).toMatch(/iyi|iyiyim|fena/iu);
+    expect(result.reply).not.toMatch(/burayı|oda|sunucu|ortam/iu);
   });
 
   it("keeps a safe neutral short reply off the semantic provider and lets Kaira steer", async () => {
@@ -136,8 +135,41 @@ describe("live first-encounter acceptance RED", () => {
     });
 
     expect(realized.handled).toBe(true);
-    expect(realized.reply).toMatch(/ben|ilk adımı|başlangıcı/iu);
-    expect(realized.reply).toMatch(/sohbet|oda|ortam|düzen/iu);
+    expect(realized.reply).toMatch(/acele yok|sorun değil|rahat ol/iu);
+    expect(realized.reply).not.toMatch(/ilk adımı|başlangıcı toparlayayım|nasıl bir ortam/iu);
+  });
+
+
+  it.each([
+    "sen ne yapıcaksın",
+    "kaira sen ne yapıcaksın",
+    "sen ne işe yarıyorsun",
+    "burda sen ne yapıcaksın",
+    "görevin ne",
+  ])("classifies Kaira role question canonically: %s", async (message) => {
+    let providerCalls = 0;
+    const result = await resolveServerLanguageUnderstanding({
+      message,
+      preferredProvider: "openrouter",
+      preferTrivialSocialFastPath: true,
+      firstEncounterContext: { roomName: "deneme", isOwner: true },
+      context: {
+        userName: "Tolga",
+        characterName: "Kaira",
+        recentMessages: [
+          { role: "assistant", content: "Selam 😄 ben Kaira. Sunucuyu yönetirken yanında olacağım." },
+        ],
+      },
+      generateText: async () => {
+        providerCalls += 1;
+        throw new Error("semantic_provider_should_not_be_needed_for_kaira_role");
+      },
+    });
+
+    expect(providerCalls).toBe(0);
+    expect(result.interpretation.primaryIntent).toBe("question");
+    expect(result.interpretation.target).toBe("kaira");
+    expect(result.interpretation.discourseFacets.platformScopeQuery).toBe("kaira_role");
   });
 
   it.each(ROOM_SCOPE_PARAPHRASES)(
