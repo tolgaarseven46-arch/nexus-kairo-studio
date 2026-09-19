@@ -78,10 +78,73 @@ const isFirstEncounterRoomScopeQuestion = (
   );
 };
 
+
+const FIRST_ENCOUNTER_KAIRA_ROLE_RE =
+  /(?:(?:^|\s)(?:sen|kaira)(?:\s|.*?)?(?:ne\s+yap(?:acaksın|ıcaksın)|ne\s+işe\s+yar\p{L}*|görevin\s+ne|rolün\s+ne)(?=$|\s|[?.!…])|(?:^|\s)(?:görevin\s+ne|rolün\s+ne)(?=$|\s|[?.!…])|(?:^|\s)(?:burada|burda|sunucuda|odada)(?:\s|.*?)(?:sen\s+)?ne\s+yap(?:acaksın|ıcaksın)(?=$|\s|[?.!…]))/iu;
+
+const isFirstEncounterKairaRoleQuestion = (
+  message: string,
+  context?: ResolveServerLanguageUnderstandingInput["firstEncounterContext"],
+) => Boolean(context) && FIRST_ENCOUNTER_KAIRA_ROLE_RE.test(
+  message.toLocaleLowerCase("tr-TR").trim(),
+);
+
 const FIRST_ENCOUNTER_WELL_BEING_REPLY_RE =
   /^(?:iyi(?:yim|dir|lik)?|gayet\s+iyi(?:yim)?|çok\s+iyi(?:yim)?|fena\s+değil|idare|şükür|şükürler\s+olsun)(?:\s+(?:ya|işte|valla))?[.!?…]*$/iu;
 const PREVIOUS_WELL_BEING_PROMPT_RE =
   /(?:sen\s+nasılsın|sende\s+(?:durumlar\s+nasıl|ne\s+var\s+ne\s+yok)|senden\s+naber|sen\s+naber)\??$/iu;
+
+
+function reconcileFirstEncounterKairaRoleSemantics(
+  message: string,
+  result: LanguageUnderstandingResult,
+  context?: ResolveServerLanguageUnderstandingInput["firstEncounterContext"],
+): LanguageUnderstandingResult {
+  if (!isFirstEncounterKairaRoleQuestion(message, context)) return result;
+
+  const interpretation = {
+    ...result.interpretation,
+    primaryIntent: "question" as const,
+    target: "kaira" as const,
+    discourseFacets: {
+      ...result.interpretation.discourseFacets,
+      socialRoutine: "none" as const,
+      platformScopeQuery: "kaira_role" as const,
+    },
+    uncertainty: {
+      ...result.interpretation.uncertainty,
+      intent: Math.min(result.interpretation.uncertainty.intent, 0.06),
+      target: Math.min(result.interpretation.uncertainty.target, 0.06),
+      overall: Math.min(result.interpretation.uncertainty.overall, 0.08),
+    },
+    evidence: [
+      ...result.interpretation.evidence,
+      {
+        source: "reconciled" as const,
+        provider: "kaira_first_encounter_context_semantics",
+        cues: ["first_encounter_kaira_role_question"],
+        confidence: 0.98,
+      },
+    ].slice(-8),
+  };
+
+  const projected = projectSemanticEvent(interpretation);
+  const grounded = groundSemanticEventForAppraisal(
+    message,
+    projected,
+    result.entityResolution,
+  );
+
+  return {
+    ...result,
+    interpretation,
+    event: {
+      ...grounded.event,
+      semanticUncertainty: interpretation.uncertainty.overall,
+    },
+    worldEvent: grounded.worldEvent,
+  };
+}
 
 function reconcileFirstEncounterWellBeingReply(
   message: string,
@@ -189,7 +252,7 @@ function isSafeTrivialSocialFastPath(result: LanguageUnderstandingResult): boole
 function hasFirstEncounterRoomContextSemantics(
   result: LanguageUnderstandingResult,
 ): boolean {
-  return result.interpretation.discourseFacets.platformScopeQuery === "room_setup";
+  return result.interpretation.discourseFacets.platformScopeQuery != null;
 }
 
 function reconcileFirstEncounterContextSemantics(
@@ -357,9 +420,14 @@ export async function resolveServerLanguageUnderstanding(
       reconciledFast,
       input.firstEncounterContext,
     );
-    const contextualFast = reconcileFirstEncounterWellBeingReply(
+    const contextualRoleFast = reconcileFirstEncounterKairaRoleSemantics(
       input.message,
       contextualRoomFast,
+      input.firstEncounterContext,
+    );
+    const contextualFast = reconcileFirstEncounterWellBeingReply(
+      input.message,
+      contextualRoleFast,
       input.context,
     );
     if (
@@ -398,9 +466,14 @@ export async function resolveServerLanguageUnderstanding(
     reconciledResult,
     input.firstEncounterContext,
   );
-  const contextualResult = reconcileFirstEncounterWellBeingReply(
+  const contextualRoleResult = reconcileFirstEncounterKairaRoleSemantics(
     input.message,
     contextualRoomResult,
+    input.firstEncounterContext,
+  );
+  const contextualResult = reconcileFirstEncounterWellBeingReply(
+    input.message,
+    contextualRoleResult,
     input.context,
   );
   const result = groundCanonicalAttribution(contextualResult);

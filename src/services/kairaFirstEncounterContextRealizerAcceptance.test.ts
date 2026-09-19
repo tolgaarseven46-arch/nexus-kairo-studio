@@ -1,7 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { realizeKairaFirstEncounterContext } from "./kairaFirstEncounterContextRealizer";
 
-describe("first-encounter room-context driver acceptance", () => {
+describe("first-encounter platform-context acceptance", () => {
+  it("answers explicit Kaira role questions without pushing onboarding", () => {
+    const result = realizeKairaFirstEncounterContext({
+      requestId: "role-q",
+      interpretation: {
+        discourseFacets: {
+          socialRoutine: "none",
+          platformScopeQuery: "kaira_role",
+          discourseAct: "question",
+        },
+      } as any,
+      plan: {
+        move: "answer_or_clarify",
+        relationshipLevel: "new",
+        allowQuestion: true,
+        allowHumor: true,
+      } as any,
+      context: { roomName: "deneme", isOwner: true },
+    });
+
+    expect(result.handled).toBe(true);
+    expect(result.reply).toMatch(/sunucu|yönetim/iu);
+    expect(result.reply).toMatch(/yardım|yanındayım|beraber/iu);
+    expect(result.reply).not.toMatch(/nasıl bir ortam|ilk adımı ben atayım/iu);
+  });
+
   it("keeps Kaira as the conversation driver for every owner variant", () => {
     const replies = new Set<string>();
 
