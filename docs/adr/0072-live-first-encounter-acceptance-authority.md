@@ -88,3 +88,14 @@ A local room-scope regex may not claim a compact first-encounter turn when the s
 Example: `sen napıyosun burda` contains a room anchor and an explicit Kaira-facing reference, but is not safely distinguishable as `room_setup` vs `kaira_role` by the local fast floor. Such overlap is treated as ambiguous and bypasses all local first-encounter fast returns so the canonical semantic provider decides the typed `platformScopeQuery`.
 
 Known unambiguous fast-floor phrases remain unchanged. This rule narrows local authority; it does not add a new paraphrase classifier.
+
+
+## Clarification — first-encounter latency may overlap read-only semantics with coordination
+
+For first-encounter requests, canonical semantic interpretation is read-only with respect to relationship/state mutation ownership. It may therefore run concurrently with the request idempotency/state-coordination claim to avoid additive network latency.
+
+The coordination result remains authoritative before downstream execution:
+- replay/wait outcomes are resolved before canonical behavior planning or delivery;
+- owner state is established before any mutation;
+- explicit activity-permission replies remain serialized;
+- concurrency is a latency optimization only and must not change semantic, decision, memory, relationship, or persistence authority.
