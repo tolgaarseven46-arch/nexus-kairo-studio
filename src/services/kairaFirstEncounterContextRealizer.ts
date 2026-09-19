@@ -25,17 +25,35 @@ const fnv1a = (value: string): number => {
   return hash >>> 0;
 };
 
-const hasRoomContextQuestionSemantics = (interpretation: SemanticInterpretation) =>
-  interpretation.discourseFacets.platformScopeQuery === "room_setup";
+const hasPlatformContextQuestionSemantics = (interpretation: SemanticInterpretation) =>
+  interpretation.discourseFacets.platformScopeQuery === "room_setup" ||
+  interpretation.discourseFacets.platformScopeQuery === "kaira_role";
 
 export function realizeKairaFirstEncounterContext(
   input: KairaFirstEncounterContextRealizationInput,
 ): KairaFirstEncounterContextRealization {
   if (
     input.plan.move !== "answer_or_clarify" ||
-    !hasRoomContextQuestionSemantics(input.interpretation)
+    !hasPlatformContextQuestionSemantics(input.interpretation)
   ) {
     return { handled: false };
+  }
+
+  const query = input.interpretation.discourseFacets.platformScopeQuery;
+  if (query === "kaira_role") {
+    const variants = [
+      "Sunucuyu yönetmende yardımcı olacağım. Odalar, düzen ve kurallar gerektiğinde beraber toparlarız.",
+      "Ben burada yönetim işlerinde yanındayım. Düzen, odalar ve kurallar gerektiğinde beraber hallederiz.",
+      "Sunucu büyüdükçe yönetim işlerini beraber taşırız; odalar, düzen ve kurallarda yardımcı olurum.",
+    ] as const;
+    const seed = `${input.requestId}:kaira_role`;
+    const index = fnv1a(seed) % variants.length;
+    return {
+      handled: true,
+      reply: variants[index],
+      variantId: `first_encounter_kaira_role_v${index + 1}`,
+      realizationVariantSeed: seed,
+    };
   }
 
   const roomName = input.context?.roomName?.trim();
