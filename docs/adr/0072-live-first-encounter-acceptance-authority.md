@@ -55,3 +55,16 @@ A new first-encounter request pauses any pending non-critical background flush f
 
 When first-encounter canonical semantics already resolve a typed `platformScopeQuery` such as `kaira_role` or `room_setup`, the reply is deterministic platform-context realization. Those turns must skip unrelated social-appraisal/autobiographical/recent-memory hydration before delivery, just like other first-encounter local fast replies. This is a latency optimization only: semantic recognition still happens first, the typed facet remains the sole authority, and relationship/memory semantics are not allowed to alter the frozen platform-role answer.
 
+
+
+## Clarification — platform-scope semantic authority
+
+Local regex recognizers for first-encounter `room_setup` and `kaira_role` are latency floors only. They may resolve already-covered common phrasings before a provider round trip, but once the canonical semantic provider runs, no regex/pattern reconciler may enrich or overwrite `platformScopeQuery`.
+
+The full semantic provider owns paraphrase-invariant platform-scope classification:
+- `room_setup` means the user asks what the room/server/area is for, what happens there, or how it is used;
+- `kaira_role` means the user asks what Kaira does there or what her role/function/duty is;
+- unseen paraphrases must fall through to the provider rather than expanding a finite phrase list;
+- uncertainty must remain explicit when the provider cannot distinguish the meaning.
+
+This preserves the typed `platformScopeQuery` as the single canonical authority consumed by deterministic platform-context realization.
