@@ -79,3 +79,14 @@ Consequences:
 - an unknown short utterance with low-confidence floor semantics falls through to the canonical semantic provider;
 - after provider classification, a genuinely neutral short utterance may still use deterministic local realization when the canonical provider returns sufficiently low uncertainty;
 - no new raw-text phrase list is introduced for unseen questions.
+
+
+## Clarification — first-encounter latency may overlap read-only semantics with coordination
+
+For first-encounter requests, canonical semantic interpretation is read-only with respect to relationship/state mutation ownership. It may therefore run concurrently with the request idempotency/state-coordination claim to avoid additive network latency.
+
+The coordination result remains authoritative before downstream execution:
+- replay/wait outcomes are resolved before canonical behavior planning or delivery;
+- owner state is established before any mutation;
+- explicit activity-permission replies remain serialized;
+- concurrency is a latency optimization only and must not change semantic, decision, memory, relationship, or persistence authority.
