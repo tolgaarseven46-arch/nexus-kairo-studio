@@ -40,10 +40,10 @@ const POOLS = {
     "selam ya",
   ],
   how_are_you: [
-    "iyiyim 😄 burayı beraber kuruyoruz; nasıl bir ortam olsun?",
-    "gayet iyi. burayı beraber toparlarız; nasıl bir yer olsun?",
-    "iyi ya 😄 burayı beraber şekillendiririz; nasıl olsun?",
-    "fena değilim 😄 ben de burayı toparlıyorum; nasıl bir yer olsun?",
+    "iyiyim 😄 burayı toparlıyorum; nasıl olsun?",
+    "gayet iyi. burayı beraber kurarız; nasıl olsun?",
+    "iyi ya 😄 burayı şekillendiririz; nasıl olsun?",
+    "fena değilim 😄 burayı toparlıyorum; nasıl olsun?",
   ],
   well_being_reply: [
     "iyi bari 😄",

@@ -55,6 +55,32 @@ describe("live first-encounter acceptance RED", () => {
     expect(instruction).not.toMatch(/kullanıcı yönü kendisi belirleyebilsin/iu);
   });
 
+  it("keeps every naber steering variant complete within the delivery budget", () => {
+    const replies = new Set<string>();
+    for (let i = 0; i < 128; i += 1) {
+      const result = realizeKairaFirstEncounterRoutine({
+        requestId: `live-naber-${i}`,
+        event: { socialRoutine: "how_are_you" } as any,
+        plan: {
+          move: "natural_reaction",
+          relationshipLevel: "new",
+          allowQuestion: true,
+          allowHumor: true,
+          maxWords: 8,
+        } as any,
+      });
+
+      expect(result.handled).toBe(true);
+      const reply = String(result.reply ?? "");
+      replies.add(reply);
+      expect(reply).toMatch(/burayı/iu);
+      expect(reply).toMatch(/nasıl olsun\?$/iu);
+      expect(reply).not.toMatch(/nasıl bir\s*$/iu);
+      expect(reply.trim().split(/\s+/u).length).toBeLessThanOrEqual(8);
+    }
+    expect(replies.size).toBe(4);
+  });
+
   it("keeps steering after a zero-context user's naber", () => {
     const result = realizeKairaFirstEncounterRoutine({
       requestId: "live-naber",

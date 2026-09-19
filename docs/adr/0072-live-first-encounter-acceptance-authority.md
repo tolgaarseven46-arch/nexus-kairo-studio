@@ -30,3 +30,8 @@ During first encounter, a safe neutral short utterance may use the local canonic
 ## Clarification — first-encounter state lease latency
 
 For a locally realized first-encounter turn, the distributed state-mutation lease protects the critical continuity write, not non-critical idempotency completion or telemetry. After relationship + TestRun continuity persistence completes, the state lease is released before distributed idempotency completion and telemetry. Duplicate-request idempotency remains owned until completion; only the per-user state lease is released. This prevents a completed user-visible fast reply from blocking the next distinct turn for several seconds while preserving ordered critical state mutation.
+
+
+## Clarification — complete short realization
+
+First-encounter routine realizations must fit the already-authoritative ResponsePlan delivery budget without relying on mechanical mid-sentence truncation. The realization layer should choose a shorter complete utterance rather than widening global response limits. Human-live acceptance rejects incomplete endings such as "nasıl bir".
