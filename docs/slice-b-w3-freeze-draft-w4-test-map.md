@@ -164,6 +164,14 @@ W2 resolution applied:
 
 The remaining freeze gate is an independent re-review of these blocker repairs.
 
+### Data minimization / retention candidate rule
+
+- participant `firstSeenAt`, `lastSeenAt` and `messageCount` are namespace-local observational snapshot facts only;
+- they may not be aggregated into a cross-room/cross-server behavioral profile;
+- their persistence must not outlive the retention of the source room events/transcript from which they were derived;
+- deleting/expiring the source event set requires the derived counters/timestamps to expire or be recomputed from the remaining retained evidence;
+- this graph does not create an independent long-term participant-retention policy.
+
 ## Candidate fixture definitions
 
 ### cold
@@ -260,6 +268,12 @@ A nonexistent or hash-mismatched escalation evidence ref is rejected from escala
 
 ### T-B24 locale-independent event ordering
 eventId final tie-break produces identical ordering under differing process locales.
+
+### T-B25 actorKind platform-fact integrity
+Platform ingress proves Droit/system identities are mapped to actorKind consistently; a Droit self-event mislabeled as human must fail the platform identity contract rather than silently enter graph evidence.
+
+### T-B26 participant retention bounded by source evidence
+Participant counters/timestamps cannot outlive or escape the namespace/retention window of the source events from which they were derived.
 
 ## W5 entry criteria
 
