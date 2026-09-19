@@ -1188,3 +1188,22 @@ Repair on `fix/first-encounter-neutral-fast-floor-confidence`:
 - no new question/paraphrase regex is added.
 
 Closure requires exact-head CI GREEN, merge, Render LIVE, then repeat the unseen live paraphrase pack.
+
+
+## 59. Explicit-invite independent review — ambiguous room/Kaira fast-floor overlap (2026-09-19)
+
+After PR #362 fixed the generic neutral-short confidence leak, live unseen proof exposed one narrower RED:
+- input: `sen napıyosun burda`;
+- local room-scope floor matched `burda + nap...`;
+- the turn returned locally before the canonical provider could decide whether the user asked about the room or Kaira's role.
+
+Repair on `fix/ambiguous-platform-fast-floor`:
+- if a turn has a room anchor plus explicit `sen|Kaira` reference,
+- and the existing known Kaira-role fast-floor did not already resolve it,
+- local first-encounter fast return is blocked;
+- the full canonical semantic provider decides `room_setup` vs `kaira_role`;
+- no new paraphrase phrase list is added.
+
+Regression adds `sen napıyosun burda` to the existing provider-authority neighbor pack.
+
+Closure requires exact-head CI GREEN, merge + Render LIVE, then rerun the production unseen platform-scope proof.
