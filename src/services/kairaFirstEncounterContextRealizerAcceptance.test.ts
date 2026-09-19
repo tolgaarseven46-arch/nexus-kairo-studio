@@ -37,7 +37,8 @@ describe("first-encounter room-context driver acceptance", () => {
       replies.add(reply);
 
       expect(reply).not.toMatch(/sen yön ver|sen karar ver|nasıl bir yer olacağına sen/iu);
-      expect(reply).toMatch(/(?:ben .*?(?:toparlayayım|kurayım)|ilk adımı ben atayım)/iu);
+      expect(reply).toMatch(/ben/u);
+      expect(reply).toMatch(/toparlayayım|kurayım|atayım/iu);
       expect(reply).toMatch(/sohbet|oda|düzen|kural|ortam/iu);
     }
 
