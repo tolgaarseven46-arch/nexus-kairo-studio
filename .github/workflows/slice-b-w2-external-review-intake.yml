@@ -1,0 +1,170 @@
+name: Slice B W2 External Review Intake
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  validate-w2-review:
+    if: startsWith(github.event.issue.title, '[Slice B W2 Review]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Structurally validate submitted review JSON
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            const startMarker = '<!-- W2_REVIEW_JSON_START -->';
+            const endMarker = '<!-- W2_REVIEW_JSON_END -->';
+            const start = body.indexOf(startMarker);
+            const end = body.indexOf(endMarker);
+
+            const marker = '<!-- slice-b-w2-intake-bot -->';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.payload.issue.number;
+
+            function nonEmpty(value) {
+              return typeof value === 'string' && value.trim().length > 0;
+            }
+
+            function invalid(reason) {
+              return {
+                ok: false,
+                reason,
+              };
+            }
+
+            function validateReview(value) {
+              if (!value || typeof value !== 'object') return invalid('root must be an object');
+
+              const reviewer = value.reviewer;
+              if (
+                !reviewer ||
+                !nonEmpty(reviewer.name) ||
+                reviewer.independent !== true ||
+                !nonEmpty(reviewer.reviewedAt)
+              ) {
+                return invalid('reviewer envelope is incomplete');
+              }
+
+              if (!Array.isArray(value.blockers)) return invalid('blockers must be an array');
+              if (!Array.isArray(value.nonBlockers)) return invalid('nonBlockers must be an array');
+              if (!Array.isArray(value.future)) return invalid('future must be an array');
+
+              for (const finding of value.blockers) {
+                if (
+                  !nonEmpty(finding?.id) ||
+                  !nonEmpty(finding?.counterexample) ||
+                  !nonEmpty(finding?.violatedInvariant) ||
+                  !nonEmpty(finding?.minimumRepair) ||
+                  !nonEmpty(finding?.requiredTest)
+                ) {
+                  return invalid('one or more blocker findings are incomplete');
+                }
+              }
+
+              for (const finding of value.nonBlockers) {
+                if (
+                  !nonEmpty(finding?.id) ||
+                  !nonEmpty(finding?.rationale) ||
+                  !nonEmpty(finding?.recommendedCleanupOrTest)
+                ) {
+                  return invalid('one or more non-blocker findings are incomplete');
+                }
+              }
+
+              for (const finding of value.future) {
+                if (!nonEmpty(finding?.id) || !nonEmpty(finding?.whyOutOfScope)) {
+                  return invalid('one or more future findings are incomplete');
+                }
+              }
+
+              const verdicts = value.verdicts;
+              const verdictKeys = [
+                'shadowSemanticAuthorityBlockerRemains',
+                'hiddenEngagementAuthorityBlockerRemains',
+                'isolationBlockerRemains',
+                'replayPurityBlockerRemains',
+                'determinismBlockerRemains',
+                'privacyBlockerRemains',
+                'safeToEnterW3AfterRepairs',
+              ];
+
+              if (
+                !verdicts ||
+                !verdictKeys.every((key) => typeof verdicts[key] === 'boolean')
+              ) {
+                return invalid('all seven boolean verdicts are required');
+              }
+
+              return { ok: true, review: value };
+            }
+
+            let result;
+            if (start < 0 || end < 0 || end <= start) {
+              result = invalid('W2 review JSON markers are missing');
+            } else {
+              const section = body.slice(start + startMarker.length, end);
+              const match = section.match(/```json\s*([\s\S]*?)\s*```/i);
+              if (!match) {
+                result = invalid('JSON code fence was not found between markers');
+              } else {
+                try {
+                  result = validateReview(JSON.parse(match[1]));
+                } catch (error) {
+                  result = invalid(`invalid JSON: ${error.message}`);
+                }
+              }
+            }
+
+            const comments = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.data.find(
+              (comment) => comment.body && comment.body.includes(marker),
+            );
+
+            const bodyText = result.ok
+              ? [
+                  marker,
+                  '✅ **W2 review payload is structurally valid.**',
+                  '',
+                  `Blockers submitted: **${result.review.blockers.length}**`,
+                  `Non-blockers submitted: **${result.review.nonBlockers.length}**`,
+                  `Future/out-of-scope submitted: **${result.review.future.length}**`,
+                  '',
+                  '⚠️ Structural validity is **not** trusted independence provenance and does **not** open W3.',
+                  'A project-side verifier must separately confirm the external artifact/review reference, reviewer identity, independence, and verifier identity.',
+                ].join('\n')
+              : [
+                  marker,
+                  '❌ **W2 review payload is structurally invalid.**',
+                  '',
+                  `Reason: ${result.reason}`,
+                  '',
+                  'W2 and W3 remain closed.',
+                ].join('\n');
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body: bodyText,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: bodyText,
+              });
+            }
