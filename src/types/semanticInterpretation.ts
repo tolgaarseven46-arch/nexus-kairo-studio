@@ -171,7 +171,7 @@ export interface SemanticWorldMemorySemantics {
 export interface SemanticDiscourseFacets {
   socialRoutine: SemanticSocialRoutine;
   /** Canonical platform-context meaning for explicit "what do we do here?" turns. */
-  platformScopeQuery?: "room_setup";
+  platformScopeQuery?: "room_setup" | "kaira_role";
   discourseAct: SemanticDiscourseAct;
   repairSignal: SemanticRepairSignal;
   adviceRequested: boolean;
