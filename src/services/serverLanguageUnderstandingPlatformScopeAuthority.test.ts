@@ -192,4 +192,17 @@ describe("platform-scope canonical provider authority", () => {
     expect(tail).not.toContain("reconcileFirstEncounterContextSemantics(\n    input.message");
     expect(tail).not.toContain("reconcileFirstEncounterKairaRoleSemantics(\n    input.message");
   });
+
+  it("documents durable Kaira-role ontology separately from momentary what_doing", () => {
+    const source = readFileSync(
+      new URL("./llmSemanticUnderstandingProvider.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("kalıcı rolünü, işlevini, sorumluluğunu, görev alanını");
+    expect(source).toContain("yalnız \"ne yapıyorsun / napıyorsun\"");
+    expect(source).toContain('platformScopeQuery:"kaira_role"');
+    expect(source).toContain("semantik özne ve sorulan şey belirleyicidir");
+  });
+
 });
