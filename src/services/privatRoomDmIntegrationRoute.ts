@@ -174,6 +174,24 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
           })
         : undefined;
 
+    const conversationGraphObservationProof = conversationGraphObservation
+      ? {
+          schemaVersion: conversationGraphObservation.schemaVersion,
+          derivationVersion: conversationGraphObservation.derivationVersion,
+          environmentId: conversationGraphObservation.namespace.environmentId,
+          participantCount: conversationGraphObservation.participants.length,
+          humanParticipantCount: conversationGraphObservation.participants.filter(
+            (participant) => participant.actorKind === "human",
+          ).length,
+          droitParticipantCount: conversationGraphObservation.participants.filter(
+            (participant) => participant.actorKind === "droit",
+          ).length,
+          eventCount: conversationGraphObservation.events.length,
+          builtFromEventCount: conversationGraphObservation.builtFromEventIds.length,
+          snapshotHash: conversationGraphObservation.snapshotHash,
+        }
+      : undefined;
+
     const corePayload = {
       requestId: `privatroom_${safeId(event.eventId)}`,
       sessionId: testRunBinding.sessionId,
@@ -225,7 +243,7 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
           responseId: `no_reply_${safeId(event.eventId)}`,
           testRunId: testRunBinding.testRunId,
           testCapture,
-          conversationGraphObservation,
+          conversationGraphObservationProof,
           proposedActions: [],
           noReplyReason: "kaira_core_returned_empty_reply",
         });
@@ -237,7 +255,7 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
         responseId: `reply_${safeId(event.eventId)}`,
         testRunId: responseTestRunId,
         testCapture,
-        conversationGraphObservation,
+        conversationGraphObservationProof,
         proposedActions: [
           {
             type: "message.send",
