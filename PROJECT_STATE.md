@@ -1165,3 +1165,26 @@ Closure requires:
 - exact-head CI GREEN on the repaired branch;
 - merge + Render LIVE;
 - model-in-the-loop/live proof with unseen paraphrases, not only phrases present in the fast regex set.
+
+
+## 58. Independent review live RED — neutral-short fast-floor authority leak (2026-09-19)
+
+After the platform-scope provider-authority repair reached production, unseen live input `işlevin ne senin` still failed:
+- canonical expected: `platformScopeQuery=kaira_role`;
+- live reply: `Acele yok 😄 şimdilik takılırız; bir şey lazım olursa beraber bakarız.`;
+- live TestRun: `TR_unseen_platform_scope_1789840084000_0`;
+- timing: semanticMs=397, aiMs=0, serverTotalMs=3805;
+- realization variant: `first_encounter_steering_v2`.
+
+Root cause:
+- the full semantic-provider authority was no longer overwritten;
+- however `preferTrivialSocialFastPath` still allowed a low-confidence regex-floor `other/smalltalk` reading to satisfy the generic neutral-short gate before the provider was called;
+- therefore unseen short questions could be swallowed by local steering without reaching canonical paraphrase classification.
+
+Repair on `fix/first-encounter-neutral-fast-floor-confidence`:
+- neutral-short fast eligibility additionally requires low canonical intent + overall uncertainty;
+- low-confidence regex-floor short utterances fall through to the semantic provider;
+- known social and known platform-scope deterministic floors remain unchanged;
+- no new question/paraphrase regex is added.
+
+Closure requires exact-head CI GREEN, merge, Render LIVE, then repeat the unseen live paraphrase pack.

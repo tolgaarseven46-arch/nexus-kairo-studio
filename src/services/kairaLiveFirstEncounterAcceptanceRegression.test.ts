@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SEMANTIC_INTERPRETATION_SCHEMA_VERSION } from "../types/semanticInterpretation";
 import { decideKairaWelcome } from "./kairaWelcomeDecision";
 import { realizeKairaWelcome } from "./kairaWelcomeRealizer";
 import {
@@ -97,10 +98,11 @@ describe("live first-encounter acceptance RED", () => {
     expect(result.reply).not.toMatch(/burayı|oda|sunucu|ortam/iu);
   });
 
-  it("keeps a safe neutral short reply off the semantic provider and lets Kaira steer", async () => {
+  it("uses provider authority for an unknown neutral short reply, then lets Kaira steer locally", async () => {
     let providerCalls = 0;
+    const message = "bilmiyom daha";
     const result = await resolveServerLanguageUnderstanding({
-      message: "bilmiyom daha",
+      message,
       preferredProvider: "openrouter",
       preferTrivialSocialFastPath: true,
       firstEncounterContext: { roomName: "deneme", isOwner: true },
@@ -113,11 +115,45 @@ describe("live first-encounter acceptance RED", () => {
       },
       generateText: async () => {
         providerCalls += 1;
-        throw new Error("semantic_provider_should_not_be_needed_for_safe_short_first_encounter");
+        return JSON.stringify({
+          schemaVersion: SEMANTIC_INTERPRETATION_SCHEMA_VERSION,
+          raw: message,
+          normalized: message,
+          primaryIntent: "smalltalk",
+          secondarySocialActs: [],
+          target: "unknown",
+          valence: "neutral",
+          severity: { disrespect: 0, coercion: 0, manipulation: 0, privacy: 0, aggression: 0 },
+          jokingConfidence: 0,
+          sincerityConfidence: 0.8,
+          affection: 0,
+          support: 0,
+          compliment: 0,
+          emotionalLoad: 0.1,
+          apology: false,
+          repairAttempt: false,
+          stopRequest: false,
+          discourseFacets: {
+            socialRoutine: "none",
+            shortUtteranceShape: true,
+            discourseAct: "none",
+            repairSignal: "none",
+            adviceRequested: false,
+            knowledgeQuery: null,
+            selfMemoryQuery: null,
+            relationalAct: "none",
+            relationalIntensity: 0,
+            stopQuestions: false,
+            stopTalking: false,
+          },
+          uncertainty: { overall: 0.12, intent: 0.08, target: 0.2, severity: 0.04 },
+          evidence: [{ source: "llm", cues: ["neutral_short_reply"], confidence: 0.9 }],
+        });
       },
     });
 
-    expect(providerCalls).toBe(0);
+    expect(providerCalls).toBe(1);
+    expect(result.semanticSource).toBe("semantic_provider");
     expect(isSafeFirstEncounterNeutralShortFastPath(
       result,
       { roomName: "deneme", isOwner: true },

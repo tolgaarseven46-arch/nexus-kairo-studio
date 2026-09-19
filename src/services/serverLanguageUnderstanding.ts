@@ -210,6 +210,8 @@ export function isSafeFirstEncounterNeutralShortFastPath(
   return Boolean(context) &&
     interpretation.discourseFacets.shortUtteranceShape === true &&
     (interpretation.primaryIntent === "other" || interpretation.primaryIntent === "smalltalk") &&
+    interpretation.uncertainty.intent <= 0.35 &&
+    interpretation.uncertainty.overall <= 0.45 &&
     interpretation.target !== "third_party" &&
     (interpretation.valence === "neutral" || interpretation.valence === "positive") &&
     interpretation.emotionalLoad <= 0.35 &&
