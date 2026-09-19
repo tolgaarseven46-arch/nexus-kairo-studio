@@ -1076,3 +1076,35 @@ Regression:
 - owner appears as a second human even when only Kaira welcome + current member message exist;
 - owner role is preserved;
 - response/answer authority remains absent.
+
+
+## 55. Slice B W8 GREEN / W9 reviewed / W10 promoted (2026-09-19)
+
+Slice B is complete.
+
+W8 live proof:
+- workflow run `35441979293`: GREEN;
+- artifact id `10584092956`;
+- TestRun `TR_live_beta_slice_b_w8_35441979293`;
+- persisted=true;
+- graph proof: 3 participants = 2 humans + 1 Droit;
+- 3 observed events;
+- snapshot hash `fnv1a32:708466b9`.
+
+Live commits:
+- Kaira `d7ec31fc431d6c1938d1f079aa2098ecc2c5ebb6`: Render LIVE;
+- PrivatRoom `c731bbae1ea4f3d6aa358d09dbb872ce4694f8a4`: Render LIVE.
+
+W9 review:
+- same TestRun observed in both services;
+- no error/critical/fatal logs in the proof window;
+- no promotion-stop condition triggered;
+- observation authority remains isolated from WHAT/WHETHER, semantic, relationship/appraisal and capability authority.
+
+W10:
+- Slice B Conversation Graph observation foundation is PROMOTED.
+- Multi-party engagement authority R remains CLOSED.
+- Any future graph-driven response/engagement behavior requires a new slice and authority review.
+
+Final record:
+- `docs/slice-b-w9-w10-promotion-2026-09-19.md`.
