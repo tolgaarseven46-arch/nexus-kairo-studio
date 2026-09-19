@@ -784,7 +784,7 @@ Post first-encounter closure cleanup re-audited stale PR #292 against current ma
 - the original hardening branch had diverged and was never merged into current main.
 
 Fresh RED→GREEN repair:
-- RED: `3ef5f9f0736f7e2afed359562c324c981954b94e`;
+- RED: `ae129b3ba22cc3c42150f05850293824b38c0ae7`;
 - only `TR_live_beta_*` sessions require the configured internal bearer token;
 - the token reuses the existing constant-time `authorizeKairaInternalWorker` boundary;
 - legacy Studio/TestLab session ids remain backward-compatible under the existing public test tooling contract;
