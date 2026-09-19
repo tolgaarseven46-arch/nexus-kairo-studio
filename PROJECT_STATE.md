@@ -1228,3 +1228,17 @@ Repair:
 - ContextRealizer remains before Routine/Steering in the first-encounter local realization order.
 
 Closure requires exact-head CI GREEN, merge + Render LIVE, then repeat the production unseen Kaira-role pack.
+
+
+## 61. Explicit-invite live proof — provider Kaira-role ontology hardening (2026-09-19)
+
+After PR #369 merged and deployed, the final unseen production proof still returned a steering reply for a clear durable-role question. The context realizer authority fix was active, so the remaining failure was upstream: the canonical semantic provider omitted `platformScopeQuery=kaira_role` for a durable role/function paraphrase.
+
+Repair on `fix/platform-scope-provider-role-ontology`:
+- keep full semantic-provider output as canonical authority; do not re-enable post-provider regex overwrite;
+- strengthen the provider ontology for `kaira_role` around durable role/function/responsibility/task-purpose semantics;
+- explicitly distinguish momentary social `what_doing` from durable platform-role questions;
+- keep room-vs-Kaira subject separation explicit;
+- no raw unseen-test sentence is promoted to a regex or deterministic phrase list.
+
+Closure requires exact-head CI GREEN, merge, Render LIVE, then a fresh production paraphrase pack not copied verbatim from the prompt contract.

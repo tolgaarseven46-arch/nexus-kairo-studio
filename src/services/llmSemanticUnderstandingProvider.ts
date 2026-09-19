@@ -112,7 +112,10 @@ DISCOURSE FACETS utterance-level sinyallerdir, cevap kararı değildir:
 socialRoutine = none | greeting | how_are_you | what_doing | thanks | agreement | goodbye | good_night | emotional_opening
 platformScopeQuery OPTIONALDIR ve yalnız açık platform-bağlam sorularında kullanılır:
 - "room_setup" = kullanıcı bu oda/sunucu/alanın ne için olduğunu, burada ne yapılacağını veya nasıl kullanılacağını soruyor.
-- "kaira_role" = kullanıcı Kaira'nın burada ne yaptığını, görevinin/rolünün/işlevinin ne olduğunu soruyor.
+- "kaira_role" = kullanıcı Kaira'nın bu oda/sunucudaki kalıcı rolünü, işlevini, sorumluluğunu, görev alanını, üstlendiği işi veya burada neye yaradığı/ne için bulunduğunu soruyor.
+- Kaira-role ile anlık sosyal rutin ayrımını koru: yalnız "ne yapıyorsun / napıyorsun" gibi o andaki aktivite sorusu socialRoutine:what_doing olabilir; fakat cümle Kaira'nın burada üstlendiği görev/işlev/sorumluluk/rol/purpose anlamını soruyorsa platformScopeQuery:"kaira_role" kullan ve socialRoutine:"none" tut.
+- Oda/sunucu özne ise ve soru alanın amacı/kullanımı/işleyişi hakkındaysa "room_setup"; Kaira/ikinci şahıs özne ise ve soru kalıcı fonksiyon/görev/sorumluluk hakkındaysa "kaira_role".
+- "burada/burda/sunucuda/odada" gibi yer ankrajı tek başına room_setup yapmaz; semantik özne ve sorulan şey belirleyicidir.
 - Bunları kelime/regex eşlemesiyle değil, paraphrase-invariant utterance anlamıyla sınıflandır.
 - Aynı yüzey sözcükleri farklı anlam taşıyorsa anlamı tercih et; emin değilsen platformScopeQuery alanını OMIT et ve uncertainty'yi yükselt.
 - Başka mesajlarda platformScopeQuery alanını OMIT et.
