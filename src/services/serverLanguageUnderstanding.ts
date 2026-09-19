@@ -420,9 +420,14 @@ export async function resolveServerLanguageUnderstanding(
       reconciledFast,
       input.firstEncounterContext,
     );
-    const contextualFast = reconcileFirstEncounterWellBeingReply(
+    const contextualRoleFast = reconcileFirstEncounterKairaRoleSemantics(
       input.message,
       contextualRoomFast,
+      input.firstEncounterContext,
+    );
+    const contextualFast = reconcileFirstEncounterWellBeingReply(
+      input.message,
+      contextualRoleFast,
       input.context,
     );
     if (
@@ -461,9 +466,14 @@ export async function resolveServerLanguageUnderstanding(
     reconciledResult,
     input.firstEncounterContext,
   );
-  const contextualResult = reconcileFirstEncounterWellBeingReply(
+  const contextualRoleResult = reconcileFirstEncounterKairaRoleSemantics(
     input.message,
     contextualRoomResult,
+    input.firstEncounterContext,
+  );
+  const contextualResult = reconcileFirstEncounterWellBeingReply(
+    input.message,
+    contextualRoleResult,
     input.context,
   );
   const result = groundCanonicalAttribution(contextualResult);
