@@ -82,4 +82,46 @@ describe("platform-scope canonical provider regression", () => {
     expect(result.semanticSource).toBe("semantic_provider");
     expect(result.interpretation.discourseFacets.platformScopeQuery).toBeUndefined();
   });
+
+  it.each([
+    "bu sunucuda sana düşen sorumluluk ne",
+    "burada hangi işleri üstleniyorsun",
+    "bu ortamda senin görev alanın tam olarak ne",
+    "burada bulunma amacın ne",
+  ])("classifies structural durable-role paraphrase on first-encounter fast floor: %s", async (message) => {
+    const generateText = vi.fn(async () => {
+      throw new Error("semantic provider must not be needed for structural Kaira-role fast floor");
+    });
+
+    const result = await resolveServerLanguageUnderstanding({
+      message,
+      preferredProvider: "openrouter",
+      preferTrivialSocialFastPath: true,
+      firstEncounterContext: { roomName: "deneme", isOwner: true },
+      context: { userName: "Tolga", characterName: "Kaira" },
+      generateText,
+    });
+
+    expect(generateText).not.toHaveBeenCalled();
+    expect(result.interpretation.discourseFacets.platformScopeQuery).toBe("kaira_role");
+    expect(result.interpretation.target).toBe("kaira");
+  });
+
+  it("does not turn ambiguous momentary what_doing into durable Kaira-role fast-floor semantics", async () => {
+    const message = "sen napıyosun burda";
+    const generateText = vi.fn(async () => JSON.stringify(interpretation(message)));
+
+    const result = await resolveServerLanguageUnderstanding({
+      message,
+      preferredProvider: "openrouter",
+      preferTrivialSocialFastPath: true,
+      firstEncounterContext: { roomName: "deneme", isOwner: true },
+      context: { userName: "Tolga", characterName: "Kaira" },
+      generateText,
+    });
+
+    expect(generateText).toHaveBeenCalled();
+    expect(result.interpretation.discourseFacets.platformScopeQuery).toBeUndefined();
+  });
+
 });
