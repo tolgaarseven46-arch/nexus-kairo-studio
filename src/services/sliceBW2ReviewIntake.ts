@@ -33,6 +33,14 @@ export interface SliceBW2ReviewIntake {
   verdicts: SliceBW2ReviewVerdicts;
 }
 
+export interface SliceBW2TrustedReviewProvenance {
+  source: "github_review" | "external_artifact";
+  evidenceRef: string;
+  reviewerIdentity: string;
+  verifiedIndependent: true;
+  verifiedBy: string;
+}
+
 const nonEmpty = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
@@ -98,7 +106,27 @@ export const validateSliceBW2ReviewIntake = (
   return blockerOk && nonBlockerOk && futureOk && verdictsOk;
 };
 
-export const canEnterSliceBW3 = (review: SliceBW2ReviewIntake): boolean =>
+export const validateSliceBW2TrustedReviewProvenance = (
+  value: unknown,
+): value is SliceBW2TrustedReviewProvenance => {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<SliceBW2TrustedReviewProvenance>;
+
+  return (
+    (candidate.source === "github_review" ||
+      candidate.source === "external_artifact") &&
+    nonEmpty(candidate.evidenceRef) &&
+    nonEmpty(candidate.reviewerIdentity) &&
+    candidate.verifiedIndependent === true &&
+    nonEmpty(candidate.verifiedBy)
+  );
+};
+
+export const canEnterSliceBW3 = (
+  review: SliceBW2ReviewIntake,
+  provenance?: SliceBW2TrustedReviewProvenance,
+): boolean =>
+  validateSliceBW2TrustedReviewProvenance(provenance) &&
   review.blockers.length === 0 &&
   Object.entries(review.verdicts)
     .filter(([key]) => key !== "safeToEnterW3AfterRepairs")
