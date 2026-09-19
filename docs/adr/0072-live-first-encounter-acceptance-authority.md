@@ -102,3 +102,16 @@ Therefore:
 - `platformScopeQuery=kaira_role` deterministically selects the Kaira-role realizer;
 - `platformScopeQuery=room_setup` deterministically selects the room-context realizer;
 - Steering/Routine realizers may only run when no platform-scope realization handled the turn.
+
+
+## Clarification — provider ontology for durable Kaira role
+
+The full semantic provider remains canonical authority for `platformScopeQuery`. Local regex recognizers remain fast-floor only and must not overwrite provider output after provider execution.
+
+For provider classification:
+- `kaira_role` means a question about Kaira's durable function, role, responsibility, task scope, or purpose in the room/server;
+- `what_doing` remains the correct social routine for a merely momentary activity question;
+- room/server purpose or usage belongs to `room_setup`;
+- location words alone do not determine the scope; semantic subject and predicate do.
+
+This preserves paraphrase generalization without turning the full provider path into a growing regex inventory.
