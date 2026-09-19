@@ -87,9 +87,13 @@ interface SuppressionReceiptV1 {
   occurredAt: number;
 }
 
+type RegisteredEvidenceOwnerId = string & {
+  readonly __registeredEvidenceOwnerId: unique symbol;
+};
+
 interface EscalationEvidenceRefV1 {
   eventId: string;
-  evidenceOwnerId: string;
+  evidenceOwnerId: RegisteredEvidenceOwnerId;
   evidenceRef: string;
   evidenceHash: string;
 }
@@ -153,6 +157,9 @@ interface ConversationGraphEvidenceViewV1 {
 15. Missing references remain unresolved; they are never fabricated.
 16. Decision/behavior code must not import or consume raw `ConversationGraphV1`; downstream access is through the explicit `ConversationGraphEvidenceViewV1` whitelist adapter.
 17. The evidence view intentionally excludes inferred address candidates, suppression receipts and escalation refs from generic decision/behavior consumption.
+18. Compile-time types are not accepted as ingress proof. Every external raw payload must pass the canonical runtime parser before it can become ConversationGraphNamespaceV1, SuppressionReceiptV1 or EscalationEvidenceRefV1.
+19. The downstream evidence view is built by a real runtime redaction constructor that copies only whitelisted fields; TypeScript structural typing alone is insufficient.
+20. Replay fails closed when any event semanticSnapshotRef is absent from frozenSemanticSnapshots; no fallback live lookup exists.
 
 ### W3 unresolved items reserved for W2
 
@@ -274,6 +281,15 @@ Platform ingress proves Droit/system identities are mapped to actorKind consiste
 
 ### T-B26 participant retention bounded by source evidence
 Participant counters/timestamps cannot outlive or escape the namespace/retention window of the source events from which they were derived.
+
+### T-B27 external raw-ingress runtime validation
+Feed raw JSON directly into the canonical graph-ingress parser. Missing testRunId in test env, unregistered suppression owner, invalid owner attestation, unresolved escalation evidence and hash mismatch all fail closed before a typed graph value exists.
+
+### T-B28 evidence-view runtime redaction
+The runtime evidence-view constructor returns an object with no inferredAddressCandidateEdges, suppressionReceipts or escalationEvidenceRefs keys present.
+
+### T-B29 replay missing semantic snapshot fails closed
+If any event semanticSnapshotRef is absent from frozenSemanticSnapshots, replay validation rejects the bundle and performs no live semantic-store lookup.
 
 ## W5 entry criteria
 
