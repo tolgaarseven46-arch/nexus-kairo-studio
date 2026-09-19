@@ -1108,3 +1108,36 @@ W10:
 
 Final record:
 - `docs/slice-b-w9-w10-promotion-2026-09-19.md`.
+
+
+## 56. Explicit-invite live UI latency — busy lease root cause and repair (2026-09-19)
+
+Live Chromium acceptance for the explicit-invite flow proved the UI path through:
+- room starts human-only with Kaira absent;
+- owner sees the separate `Kaira'yı çağır` card;
+- invite click adds Kaira and renders the single canonical introduction;
+- casual `naber` resolves through the local first-encounter routine.
+
+The remaining RED was latency on the canonical Kaira-role query:
+- input: `sen ne yapıcaksın`;
+- Chromium end-to-end latency: 6377 ms;
+- Kaira timing for the same turn: `semanticMs=1`, `memoryMs=0`, `kdmMs=0`, `aiMs=0`, `serverTotalMs=5839`;
+- realization variant: `first_encounter_kaira_role_v2`.
+
+Root cause:
+- the role answer was already deterministic/local;
+- the next first-encounter request waited before semantic work on the previous turn's distributed state-mutation lease;
+- therefore the delay was coordination contention, not provider/model latency.
+
+Repair contract on `fix/first-encounter-busy-lease-latency`:
+- idempotency ownership remains distributed and request-scoped;
+- if the first-encounter state lease is busy, combined coordination returns a deferred-state owner instead of polling on the response path;
+- state-mutation ownership is acquired lazily at the actual persistence boundary;
+- fast first-encounter replies are sent before waiting for deferred state ownership;
+- relationship/TestRun continuity writes still require serialized state-mutation ownership;
+- no semantic, decision, relationship, memory, or realization authority is moved.
+
+Proof:
+- regression: `kairaFirstEncounterBusyLeaseLatencyV10Regression.test.ts`;
+- live Chromium reproduction/run: `35457373648`;
+- promotion still requires full CI GREEN, merge, Render LIVE and a repeated Chromium acceptance with all three messages under the live latency gate.
