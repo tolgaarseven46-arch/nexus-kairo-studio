@@ -895,3 +895,41 @@ Gate:
 - W3 remains CLOSED;
 - W5 remains INACTIVE;
 - a third independent Claude re-review of the runtime repair must return zero blockers and safe-to-enter-W3=true before freeze.
+
+
+## 49. Slice B W2 CLOSED / W3 FROZEN (2026-09-19)
+
+Final independent Claude runtime re-review was supplied by Tolga and recorded in issue #341.
+
+Final W2 result:
+- BLOCKER: 0;
+- NON-BLOCKER: 2 (NB-W2-07, NB-W2-08);
+- FUTURE: 0;
+- all six blocker verdict classes: false;
+- `safeToEnterW3AfterRepairs=true`;
+- trusted project-side provenance attached.
+
+Promotion proof:
+- historical RED commit: `6e3a23620489c7904d2ddb2111ccdeb08af0cb2d`;
+- RED CI run: `35436632970`;
+- GREEN repair head: `851c6acb8bd87ca1b7c046566674cbabf99c25f6`;
+- GREEN CI run: `35436891246`;
+- PR #339 merged to main as `cc7bf07fcb2b3ba9c412e44b7356280164728a79`.
+
+W3 is now FROZEN / AUTHORITATIVE:
+- exact ConversationGraphV1 field set is frozen;
+- raw external payloads must pass runtime ingress parsers before typed graph values exist;
+- test namespace requires testRunId at runtime;
+- suppression receipts require registered owner + attestation;
+- escalation refs require owned evidence + owner/hash match;
+- unanswered-turn evidence remains excluded until R is formally reopened;
+- downstream consumers use runtime-redacted ConversationGraphEvidenceViewV1 rather than raw graph;
+- replay is self-contained and fails closed on missing frozen semantic snapshots;
+- graph remains observation-only and has no WHAT/WHETHER, relationship/appraisal, moderation/capability, or canonical semantic authority.
+
+W4 test map is now active.
+W5 implementation still follows characterization RED -> minimal GREEN.
+
+Tracked non-blockers:
+- NB-W2-07: deep participant/event element whitelist in evidence-view hardening;
+- NB-W2-08: cryptographic owner attestation only if the registry later crosses a less-trusted boundary.

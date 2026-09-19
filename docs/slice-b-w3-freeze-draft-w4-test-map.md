@@ -1,12 +1,15 @@
-# Slice B — W3 freeze draft + W4 test map
+# Slice B — W3 frozen contract + W4 test map
 
-Date: 2026-09-18
-Status: DRAFT ONLY — blocked by W2 independent red-team
+Date: 2026-09-19
+Status: W3 FROZEN / AUTHORITATIVE — W4 test map active
 Scope: Conversation Graph observational evidence
 
-## W3 freeze draft
+## W3 frozen contract
 
-This document is intentionally non-authoritative until W2 independent findings are resolved and Tolga freezes the product boundary.
+W2 independent review is complete and promotion-eligible final re-review is recorded in issue #341 with zero blockers and `safeToEnterW3AfterRepairs=true`.
+
+The field set and rules below are now the authoritative Slice B Conversation Graph v1 boundary.
+Any later change that alters authority, field ownership, replay semantics, namespace isolation, suppression ownership, escalation evidence admission, or downstream evidence-view exposure must reopen W3 rather than silently modifying this contract.
 
 ### Candidate ConversationGraphV1
 
@@ -161,7 +164,7 @@ interface ConversationGraphEvidenceViewV1 {
 19. The downstream evidence view is built by a real runtime redaction constructor that copies only whitelisted fields; TypeScript structural typing alone is insufficient.
 20. Replay fails closed when any event semanticSnapshotRef is absent from frozenSemanticSnapshots; no fallback live lookup exists.
 
-### W3 unresolved items reserved for W2
+### W2 resolutions incorporated into W3
 
 W2 resolution applied:
 - inferred address candidates remain internal observational graph evidence but are excluded from the generic downstream evidence view;
@@ -169,7 +172,7 @@ W2 resolution applied:
 - escalation refs remain observational only and require owned-evidence resolution + hash validation before admission;
 - participant counters/timestamps remain objective observation facts, with retention/TTL policy required before broader rollout.
 
-The remaining freeze gate is an independent re-review of these blocker repairs.
+The independent re-review gate is satisfied by issue #341. No W2 blocker remains.
 
 ### Data minimization / retention candidate rule
 
@@ -291,12 +294,16 @@ The runtime evidence-view constructor returns an object with no inferredAddressC
 ### T-B29 replay missing semantic snapshot fails closed
 If any event semanticSnapshotRef is absent from frozenSemanticSnapshots, replay validation rejects the bundle and performs no live semantic-store lookup.
 
-## W5 entry criteria
+## W4 / W5 transition
 
-W5 characterization RED may begin only when:
-- W2 independent reviewer findings are attached to issue #298,
-- all W2 BLOCKERs are resolved,
-- Tolga freezes W3,
-- the exact field set above (or its W2-revised form) is marked authoritative.
+W4 test map above is now active under this frozen W3 contract.
 
-Until then this file is planning evidence only.
+W5 characterization RED may begin when each active W4 target has a deterministic fixture/assertion mapping.
+Implementation still follows RED → minimal GREEN:
+- characterize the frozen contract first,
+- prove intended REDs fail for missing implementation rather than bad fixtures,
+- only then add minimal runtime implementation.
+
+The two final re-review non-blockers remain tracked hardening work, not promotion blockers:
+- NB-W2-07: deep field whitelist for participant/event elements in the downstream evidence view;
+- NB-W2-08: cryptographic attestation only if the decision-owner registry later crosses a less-trusted boundary.
