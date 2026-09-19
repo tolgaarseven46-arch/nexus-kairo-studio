@@ -27,6 +27,11 @@ type PrivatRoomDmEvent = {
       roomId?: string;
       roomName?: string;
       actorIsOwner?: boolean;
+      participants?: Array<{
+        participantId: string;
+        actorKind: "human" | "droit" | "system";
+        platformRoles: Array<"owner" | "admin" | "moderator" | "member">;
+      }>;
       recentHistory?: KairaPlatformRecentHistoryTurn[];
     };
   };
@@ -71,7 +76,9 @@ function isEvent(value: unknown): value is PrivatRoomDmEvent {
     (event.conversation?.roomContext === undefined ||
       (typeof event.conversation.roomContext === "object" &&
         (event.conversation.roomContext.recentHistory === undefined ||
-          Array.isArray(event.conversation.roomContext.recentHistory)))) &&
+          Array.isArray(event.conversation.roomContext.recentHistory)) &&
+        (event.conversation.roomContext.participants === undefined ||
+          Array.isArray(event.conversation.roomContext.participants)))) &&
     Array.isArray(event.conversation?.participantIds) &&
     event.conversation!.participantIds.length >= 2 &&
     typeof event.actor?.userId === "string" &&
