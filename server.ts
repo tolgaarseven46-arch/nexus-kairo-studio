@@ -127,6 +127,7 @@ import { realizeKairaFirstEncounterContext } from "./src/services/kairaFirstEnco
 import { buildKairaFirstEncounterRecoveryFallback } from "./src/services/kairaFirstEncounterRecovery";
 import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
 import { registerTestRunReviewRoute } from "./src/services/testRunReviewRoute";
+import { authorizeTestSessionRead } from "./src/services/testSessionReadAccess";
 import {
   buildTestRunCaptureProof,
   resolveChatTestRunBinding,
@@ -570,6 +571,20 @@ app.get("/api/test-sessions/active", async (q, r) => {
     const kairaInstanceId = typeof q.query.kairaInstanceId === "string" ? q.query.kairaInstanceId : undefined;
     const instance = resolveKairaInstanceContext({ instanceId: kairaInstanceId });
     const session = await loadActiveTestSessionForUser(stateOwnerScope(userId, instance.instanceId));
+    const protectedSessionId =
+      session?.session?.testRunId ||
+      session?.session?.sessionId ||
+      "";
+    const access = authorizeTestSessionRead({
+      sessionId: protectedSessionId,
+      authorizationHeader: q.get("authorization"),
+      configuredSecret:
+        process.env.PRIVATROOM_INTEGRATION_TOKEN ||
+        process.env.KAIRA_INTERNAL_TOKEN,
+    });
+    if (access.status !== "authorized" && access.status !== "public_legacy") {
+      return r.status(access.httpStatus).json({ ok: false, error: access.reason });
+    }
     r.json({ ok: true, kairaInstanceId: instance.instanceId, session });
   } catch (e: any) {
     r.status(500).json({ ok: false, error: e?.message });
@@ -578,6 +593,16 @@ app.get("/api/test-sessions/active", async (q, r) => {
 app.get("/api/test-sessions/:sessionId", async (q, r) => {
   try {
     const { sessionId } = q.params;
+    const access = authorizeTestSessionRead({
+      sessionId,
+      authorizationHeader: q.get("authorization"),
+      configuredSecret:
+        process.env.PRIVATROOM_INTEGRATION_TOKEN ||
+        process.env.KAIRA_INTERNAL_TOKEN,
+    });
+    if (access.status !== "authorized" && access.status !== "public_legacy") {
+      return r.status(access.httpStatus).json({ ok: false, error: access.reason });
+    }
     const session = await loadTestSession(sessionId);
     if (!session) return r.status(404).json({ ok: false, error: "Session not found" });
     r.json({ ok: true, session });
