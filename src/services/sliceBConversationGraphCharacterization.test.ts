@@ -5,6 +5,8 @@ import {
   replayConversationGraphV1,
   applyConversationGraphRetentionV1,
   validateActorKindFactV1,
+  type BuildConversationGraphInputV1,
+  type RawConversationGraphEventV1,
 } from "./sliceBConversationGraphRuntime";
 import {
   buildConversationGraphEvidenceViewV1,
@@ -33,7 +35,7 @@ const event = (
   actorId: string,
   occurredAt: number,
   extra: Record<string, unknown> = {},
-) => ({
+): RawConversationGraphEventV1 => ({
   eventId,
   actorId,
   actorKind: actorId === "KAIRA" ? "droit" : "human",
@@ -41,14 +43,14 @@ const event = (
   ...extra,
 });
 
-const baseBuildInput = () => ({
+const baseBuildInput = (): BuildConversationGraphInputV1 => ({
   namespace,
   conversationId: "conversation-a",
   participants,
-  events: [] as Array<Record<string, unknown>>,
-  inferredAddressCandidateEdges: [] as Array<Record<string, unknown>>,
-  suppressionReceipts: [] as Array<Record<string, unknown>>,
-  escalationEvidenceRefs: [] as Array<Record<string, unknown>>,
+  events: [],
+  inferredAddressCandidateEdges: [],
+  suppressionReceipts: [],
+  escalationEvidenceRefs: [],
   decisionOwnerRegistry: {
     version: "decision-owners@1",
     owners: {
