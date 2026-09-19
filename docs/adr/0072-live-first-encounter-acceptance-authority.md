@@ -90,3 +90,15 @@ The coordination result remains authoritative before downstream execution:
 - owner state is established before any mutation;
 - explicit activity-permission replies remain serialized;
 - concurrency is a latency optimization only and must not change semantic, decision, memory, relationship, or persistence authority.
+
+
+## Clarification — typed platformScopeQuery owns platform-context realization
+
+Once canonical semantic interpretation emits `discourseFacets.platformScopeQuery`, that typed facet is sufficient authority for first-encounter platform-context realization.
+
+`KairaFirstEncounterContextRealizer` must not require an additional DialogueDecision move such as `answer_or_clarify` to become eligible. DialogueDecision/ResponsePlan may constrain HOW the reply is expressed, but they cannot veto WHAT typed platform scope the semantic authority says the user asked about.
+
+Therefore:
+- `platformScopeQuery=kaira_role` deterministically selects the Kaira-role realizer;
+- `platformScopeQuery=room_setup` deterministically selects the room-context realizer;
+- Steering/Routine realizers may only run when no platform-scope realization handled the turn.
