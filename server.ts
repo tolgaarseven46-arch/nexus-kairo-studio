@@ -7,7 +7,7 @@ import { analyzeKdmInteractionCanonicalTurn } from "./src/services/kdmConsistenc
 import { selectEffectiveKdmDynamicState } from "./src/services/kdmEffectiveStateSelector";
 import { normalizeBehaviorPolicyInput } from "./src/services/behaviorPolicyInput";
 import { normalizeKairaAffectBaseline } from "./src/services/kairaAffectBaseline";
-import { assertCoordinatedKairaChatStateOwnership, claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";
+import { assertCoordinatedKairaChatStateOwnership, claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest, releaseCoordinatedKairaChatStateMutation } from "./src/services/kairaChatIdempotencyCoordinator";
 import { resolveKairaChatRequestCoordinationIdentity } from "./src/services/kairaChatRequestCoordinationIdentity";
 import { normalizeDroitPersonality } from "./src/services/droitPersonalityNormalizer";
 import {
@@ -1509,6 +1509,9 @@ app.post("/api/chat", async (req, res) => {
         const backgroundStart = now();
         try {
           await persistFirstEncounterContinuity();
+          if (coordinationKey && ownsCoordinationClaim) {
+            await releaseCoordinatedKairaChatStateMutation(coordinationKey);
+          }
           if (coordinationKey && ownsCoordinationClaim) {
             await completeCoordinatedKairaChatRequest(coordinationKey, responsePayload);
             ownsCoordinationClaim = false;

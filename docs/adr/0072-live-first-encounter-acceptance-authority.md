@@ -25,3 +25,8 @@ For a zero-context owner entering a new server/room, Kaira is the first conversa
 ## Clarification — safe neutral short replies
 
 During first encounter, a safe neutral short utterance may use the local canonical floor without a semantic-provider round trip when the already-produced SemanticInterpretation proves it is low-load, non-harmful, non-question, non-memory, non-third-party, and structurally short. Eligibility is derived only from canonical semantic fields; downstream realization must not match raw phrases such as "bilmiyorum". This exists to preserve the conversation-driver behavior without creating a second semantic authority or routing serious short messages into onboarding.
+
+
+## Clarification — first-encounter state lease latency
+
+For a locally realized first-encounter turn, the distributed state-mutation lease protects the critical continuity write, not non-critical idempotency completion or telemetry. After relationship + TestRun continuity persistence completes, the state lease is released before distributed idempotency completion and telemetry. Duplicate-request idempotency remains owned until completion; only the per-user state lease is released. This prevents a completed user-visible fast reply from blocking the next distinct turn for several seconds while preserving ordered critical state mutation.
