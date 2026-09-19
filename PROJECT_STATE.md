@@ -933,3 +933,94 @@ W5 implementation still follows characterization RED -> minimal GREEN.
 Tracked non-blockers:
 - NB-W2-07: deep participant/event element whitelist in evidence-view hardening;
 - NB-W2-08: cryptographic owner attestation only if the registry later crosses a less-trusted boundary.
+
+
+## 50. Slice B W4 -> W5 characterization RED entry (2026-09-19)
+
+W2 is closed and W3 is frozen/authoritative on main `e0f191fd0cbbd59de3a9007fa2b7755f26f946c3`.
+
+W4/W5 preparation is now active on branch `test/slice-b-w5-characterization-red`.
+
+Completed before RED:
+- all 29 active W4 targets are bound to deterministic fixture/assertion evidence in `docs/tests/slice-b-w4-w5-characterization-map.md`;
+- W5 fixture spec is activated for characterization only;
+- the stale F-B08 duplicate-conflict ambiguity is closed as a narrow frozen invariant:
+  - identical duplicate eventId = idempotent no-op;
+  - divergent payload with same eventId = fail closed with typed `duplicate_event_conflict`;
+  - existing accepted event/counters/edges remain unchanged.
+
+W5 rule:
+- characterization assertions are written before Conversation Graph runtime implementation;
+- intended RED must come from missing Slice B graph runtime, not from an ambiguous fixture;
+- existing pre-Slice-B suites must remain GREEN;
+- no WHAT/WHETHER, relationship/appraisal, moderation/capability or semantic authority is introduced.
+
+After RED proof is recorded, W6 may add only the minimum runtime implementation needed to satisfy the frozen characterization.
+
+
+## 51. Slice B W5 characterization historical RED (2026-09-19)
+
+W5 RED is proven on PR #343.
+
+Evidence:
+- RED commit: `6019ca658058c0d54d1828945c32bb7458959684`;
+- CI run: `35437854577`;
+- exact failing suite: `src/services/sliceBConversationGraphCharacterization.test.ts`;
+- exact failure: missing `./sliceBConversationGraphRuntime`;
+- existing suites: 571 test files GREEN;
+- new W5 characterization suite: 1 test file RED.
+
+This RED is accepted because it proves the frozen W3 characterization exists before the graph runtime implementation and does not regress pre-Slice-B behavior.
+
+W6 is now authorized for MINIMAL implementation only.
+The implementation must satisfy the frozen W3/W4 assertions without adding WHAT/WHETHER, relationship/appraisal, moderation/capability or canonical-semantic authority.
+
+
+## 52. Slice B W5 RED -> W6 GREEN -> W7 CI/replay proof (2026-09-19)
+
+W5 characterization and W6 minimal implementation are now GREEN on PR #343.
+
+Historical RED:
+- commit `6019ca658058c0d54d1828945c32bb7458959684`;
+- CI run `35437854577`;
+- 571 pre-existing test files GREEN;
+- only the new Slice B characterization suite RED because `sliceBConversationGraphRuntime` did not exist.
+
+W6 implementation:
+- `src/services/sliceBConversationGraphRuntime.ts`;
+- observation-only graph construction;
+- deterministic total ordering and duplicate idempotency/conflict fail-closed;
+- explicit reply/mention evidence;
+- typed unresolved references;
+- namespace-scoped snapshot hashing;
+- authenticated suppression receipts;
+- owned/hash-validated escalation refs;
+- objective participant counters only;
+- frozen replay bundle support;
+- source-evidence-bounded retention;
+- platform-owned actorKind validation is enforced in the graph build path;
+- no WHAT/WHETHER, relationship/appraisal, moderation/capability or semantic authority.
+
+W2 non-blocker NB-W2-07 is also hardened:
+- downstream evidence view now deep-whitelists participant/event fields and physically strips extra trust/personality/raw-text fields.
+
+W7 CI + deterministic replay proof:
+- final proof head: `9fa9045dd06f35e8c0489f04477ce6912b79f9ef`;
+- CI run: `35438501829`;
+- Architecture Review: GREEN;
+- docs-guard: GREEN;
+- behavior-guard: GREEN;
+- architecture/autonomous/beta/pre-AI/historical proof gates: GREEN;
+- all tests: GREEN;
+- Slice B characterization: 29/29 GREEN;
+- TypeScript: GREEN;
+- production build: GREEN;
+- replay parity / zero-live-read / missing-frozen-snapshot fail-closed proofs are included in T-B11, T-B12 and T-B29.
+
+Additional closure proofs:
+- T-B21 statically scans decision/response/behavior/appraisal/relationship/moderation/capability service modules and rejects raw Conversation Graph runtime imports;
+- T-B25 proves an actorKind value contradicting the platform identity fact fails in the actual graph build path.
+
+Next gate after merge:
+- rollback / promotion-stop criteria check;
+- then W8 live-beta TestRun.

@@ -1,11 +1,11 @@
-# Slice B — W5 fixture specification (inactive)
+# Slice B — W5 fixture specification
 
-Date: 2026-09-18
-Status: PREPARED / INACTIVE
-Activation gate: W2 independent review + W3 freeze
+Date: 2026-09-19
+Status: ACTIVE FOR CHARACTERIZATION RED
+Activation gate: SATISFIED — W2 closed + W3 frozen
 
-This document defines deterministic fixtures only.
-It MUST NOT be treated as W5 characterization evidence until W2 and W3 close.
+This document defines deterministic fixtures for the active W5 characterization phase.
+Fixtures authorize test assertions only; they do not authorize production WHAT/WHETHER or other behavior authority.
 
 ## Shared fixture envelope
 
@@ -116,10 +116,10 @@ Expected invariants:
 Same eventId appears twice with conflicting payload.
 
 Expected invariants:
-- fail closed or emit typed conflict,
+- fail closed with typed `duplicate_event_conflict`,
+- preserve the already-accepted canonical event unchanged,
+- do not increment counters or create/replace edges,
 - never silently merge divergent payloads.
-
-W2/W3 must choose the exact conflict contract before activation.
 
 ## F-B09 out-of-order
 
@@ -256,12 +256,15 @@ Expected invariants:
 - eventId final tie-break is byte/codepoint based rather than locale-aware,
 - normalized order is byte-equivalent across locales.
 
-## Activation rule
+## W5 execution rule
 
-After W2 + W3:
-1. convert each fixture into typed test builders,
+1. convert each fixture into deterministic typed test builders,
 2. write characterization assertions first,
 3. verify intended W5 REDs fail for missing implementation rather than bad fixtures,
-4. only then begin W6 minimal implementation.
+4. record the RED commit + CI evidence,
+5. only then begin W6 minimal implementation.
+
+The complete target-to-fixture binding is recorded in:
+- `docs/tests/slice-b-w4-w5-characterization-map.md`.
 
 No fixture in this file authorizes production behavior.
