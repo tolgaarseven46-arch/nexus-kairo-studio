@@ -20,11 +20,17 @@ describe("first-encounter combined coordination v8", () => {
     expect(server).toContain("claimCoordinatedKairaChatRequest<any>(coordinationKey, {");
   });
 
-  it("keeps a preclaimed state lease held until coordinated completion", async () => {
+  it("releases the preclaimed state lease after critical continuity and before distributed completion", async () => {
     const coordinator = await readFile(new URL("./kairaChatIdempotencyCoordinator.ts", import.meta.url), "utf8");
+    const server = await readFile(new URL("../../server.ts", import.meta.url), "utf8");
     expect(coordinator).toContain("claimFirstEncounterCoordination");
     expect(coordinator).toContain("registerPreclaimedStateMutation");
-    expect(coordinator).toContain("distributedOwners.set(normalizedKey");
-    expect(coordinator).toContain("stateMutationHandles.set(requestKey");
+    expect(coordinator).toContain("export async function releaseCoordinatedKairaChatStateMutation");
+    const persistIndex = server.indexOf("await persistFirstEncounterContinuity();");
+    const releaseIndex = server.indexOf("await releaseCoordinatedKairaChatStateMutation(coordinationKey);");
+    const completeIndex = server.indexOf("await completeCoordinatedKairaChatRequest(coordinationKey, responsePayload);");
+    expect(persistIndex).toBeGreaterThanOrEqual(0);
+    expect(releaseIndex).toBeGreaterThan(persistIndex);
+    expect(completeIndex).toBeGreaterThan(releaseIndex);
   });
 });

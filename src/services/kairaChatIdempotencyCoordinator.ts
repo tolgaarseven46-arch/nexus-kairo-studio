@@ -189,6 +189,12 @@ export async function claimCoordinatedKairaChatRequest<T = unknown>(
   }
 }
 
+export async function releaseCoordinatedKairaChatStateMutation(key: string) {
+  const normalizedKey = key.trim();
+  if (!normalizedKey) return;
+  await releaseStateMutation(normalizedKey);
+}
+
 export async function completeCoordinatedKairaChatRequest<T = unknown>(key: string, payload: T) {
   const normalizedKey = key.trim();
   if (!normalizedKey) return;
