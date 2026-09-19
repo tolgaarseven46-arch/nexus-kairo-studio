@@ -31,6 +31,11 @@ export interface PrivatRoomGraphEventInput {
       roomId?: string;
       roomName?: string;
       actorIsOwner?: boolean;
+      participants?: Array<{
+        participantId: string;
+        actorKind: ConversationActorKind;
+        platformRoles?: PlatformRole[];
+      }>;
       recentHistory?: PrivatRoomGraphHistoryTurn[];
     };
   };
@@ -68,6 +73,29 @@ export function buildPrivatRoomConversationGraphObservation(input: {
   const rawEvents: RawConversationGraphEventV1[] = [];
   const participantFacts = new Map<string, RawConversationParticipantV1>();
   const identityFacts: Record<string, ConversationActorKind> = {};
+
+  const roomParticipants = Array.isArray(
+    event.conversation.roomContext?.participants,
+  )
+    ? event.conversation.roomContext?.participants || []
+    : [];
+
+  for (const participant of roomParticipants) {
+    if (
+      !participant.participantId ||
+      (participant.actorKind !== "human" &&
+        participant.actorKind !== "droit" &&
+        participant.actorKind !== "system")
+    ) {
+      continue;
+    }
+    identityFacts[participant.participantId] = participant.actorKind;
+    participantFacts.set(participant.participantId, {
+      participantId: participant.participantId,
+      actorKind: participant.actorKind,
+      platformRoles: [...(participant.platformRoles || [])],
+    });
+  }
 
   const history = Array.isArray(event.conversation.roomContext?.recentHistory)
     ? event.conversation.roomContext?.recentHistory || []
@@ -109,11 +137,13 @@ export function buildPrivatRoomConversationGraphObservation(input: {
     explicitReplyToEventId: event.message.replyToMessageId,
   });
   identityFacts[event.actor.userId] = "human";
-  participantFacts.set(event.actor.userId, {
-    participantId: event.actor.userId,
-    actorKind: "human",
-    platformRoles: platformRolesFor(event.actor.userId, event),
-  });
+  if (!participantFacts.has(event.actor.userId)) {
+    participantFacts.set(event.actor.userId, {
+      participantId: event.actor.userId,
+      actorKind: "human",
+      platformRoles: platformRolesFor(event.actor.userId, event),
+    });
+  }
 
   return buildConversationGraphV1({
     namespace: {
