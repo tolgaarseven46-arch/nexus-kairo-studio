@@ -50,3 +50,8 @@ KNT trace persistence is evidence/telemetry only and gains no new behavior or se
 ## Clarification — request-start background pause
 
 A new first-encounter request pauses any pending non-critical background flush for the same user+Kaira instance before distributed coordination is claimed. Queued telemetry jobs are preserved, not discarded. After the current turn's critical continuity barrier completes, enqueueing the new job restarts the conversational idle window for the full preserved queue. This prevents a prior turn's delayed Firestore telemetry flush from waking up while the next user turn is in progress.
+
+## Clarification — deterministic platform-context fast path
+
+When first-encounter canonical semantics already resolve a typed `platformScopeQuery` such as `kaira_role` or `room_setup`, the reply is deterministic platform-context realization. Those turns must skip unrelated social-appraisal/autobiographical/recent-memory hydration before delivery, just like other first-encounter local fast replies. This is a latency optimization only: semantic recognition still happens first, the typed facet remains the sole authority, and relationship/memory semantics are not allowed to alter the frozen platform-role answer.
+
