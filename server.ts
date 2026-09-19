@@ -699,6 +699,7 @@ app.post("/api/chat", async (req, res) => {
       activityPermissionRequestId: incomingActivityPermissionRequestId,
       conversationPhase: incomingConversationPhase,
       firstEncounterContext: incomingFirstEncounterContext,
+      conversationGraphObservation: incomingConversationGraphObservation,
     } = req.body;
     if (!userMessage)
       return res.status(400).json({ error: "userMessage is required" });
@@ -1321,6 +1322,11 @@ app.post("/api/chat", async (req, res) => {
                 : undefined,
             testRunId,
             testRunRecord,
+            conversationGraphObservation:
+              incomingConversationGraphObservation &&
+              typeof incomingConversationGraphObservation === "object"
+                ? incomingConversationGraphObservation
+                : undefined,
             activityPermission: activityPermissionPrompt,
           },
         }).then((turn) => {
@@ -1969,6 +1975,11 @@ app.post("/api/chat", async (req, res) => {
           timings: { semanticMs, memoryMs, kdmMs, aiMs },
           testRunId,
           testRunRecord,
+          conversationGraphObservation:
+            incomingConversationGraphObservation &&
+            typeof incomingConversationGraphObservation === "object"
+              ? incomingConversationGraphObservation
+              : undefined,
           activityPermission: activityPermissionPrompt,
         },
       }).then((t) => {
