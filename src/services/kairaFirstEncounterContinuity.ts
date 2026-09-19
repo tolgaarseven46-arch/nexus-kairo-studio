@@ -15,6 +15,68 @@ export interface KairaFirstEncounterContinuity {
   }>;
 }
 
+
+export interface KairaPlatformRecentHistoryTurn {
+  sender: "user" | "droit";
+  text: string;
+  participantName?: string;
+  isWelcome?: boolean;
+}
+
+export function deriveKairaFirstEncounterContinuityFromPlatformHistory(input: {
+  roomId?: string;
+  roomName?: string;
+  isOwner?: boolean;
+  recentHistory: KairaPlatformRecentHistoryTurn[];
+}): KairaFirstEncounterContinuity {
+  const normalized = input.recentHistory
+    .map((turn) => ({
+      sender: turn.sender,
+      text: String(turn.text || "").trim(),
+      participantName: turn.participantName?.trim() || undefined,
+      isWelcome: turn.isWelcome === true,
+    }))
+    .filter((turn) => Boolean(turn.text))
+    .slice(-12);
+
+  let lastWelcomeIndex = -1;
+  normalized.forEach((turn, index) => {
+    if (turn.isWelcome) lastWelcomeIndex = index;
+  });
+
+  const chatTurnsAfterWelcome =
+    lastWelcomeIndex >= 0
+      ? normalized
+          .slice(lastWelcomeIndex + 1)
+          .filter((turn) => turn.sender === "user" && !turn.isWelcome).length
+      : 0;
+
+  const relevant =
+    lastWelcomeIndex >= 0
+      ? normalized.slice(lastWelcomeIndex)
+      : normalized.slice(-8);
+
+  return {
+    active: lastWelcomeIndex >= 0 && chatTurnsAfterWelcome < 3,
+    chatTurnsAfterWelcome,
+    context:
+      input.roomId || input.roomName || typeof input.isOwner === "boolean"
+        ? {
+            roomId: input.roomId,
+            roomName: input.roomName,
+            isOwner: input.isOwner,
+          }
+        : undefined,
+    history: relevant
+      .map(({ sender, text, participantName }) => ({
+        sender,
+        text,
+        participantName,
+      }))
+      .slice(-8),
+  };
+}
+
 const isWelcomeTurn = (turn: TestSessionTurnRecord) =>
   turn.intent === "platform_welcome" ||
   turn.metadata?.platformEvent != null;
