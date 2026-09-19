@@ -716,3 +716,22 @@ v9 rule:
 - deferred continuity persistence remains lease-held exactly as in v7/v8.
 
 This is a first-turn scheduling optimization only; no semantic or relationship authority is changed.
+
+
+## 41. Natural compositional first-welcome realization v10 (2026-09-19)
+
+After continuity/latency closure, the remaining first-encounter UX defect was the lifecycle welcome itself:
+- the realizer stored full user-visible welcome sentences in two fixed arrays;
+- repeated whole-message variants made the opening feel templated/assistant-like;
+- this risk matched the earlier architecture warning not to freeze a permanent `kaira_welcome_pool`.
+
+v10 keeps the existing welcome decision authority unchanged and replaces only the HOW layer:
+- no full welcome-message pool remains;
+- realization is composed from independent axes: `opening + identity + roomBeat` for room creators and `opening + roomBeat` for participant joins;
+- each axis is selected deterministically from the lifecycle event seed, preserving idempotent replay;
+- owner cold-start still introduces Kaira once, but avoids support-first assistant wording such as “nasıl yardımcı olabilirim”, “bir şeye ihtiyacın olursa”, and repeated “gerektiğinde ...” formulations;
+- ordinary participant joins do not re-introduce Kaira;
+- prohibited internal terms remain enforced after composition;
+- the decision layer still controls introduce-self/tone/relationship mode and remains the only welcome policy authority.
+
+This is realization diversification, not a new semantic or relationship policy.
