@@ -16,6 +16,18 @@ describe("PrivatRoom -> Slice B live observation wiring", () => {
             roomId: "room-1",
             roomName: "Genel",
             actorIsOwner: false,
+            participants: [
+              {
+                participantId: "u1",
+                actorKind: "human",
+                platformRoles: ["member"],
+              },
+              {
+                participantId: "droit_kaira_beta",
+                actorKind: "droit",
+                platformRoles: ["member"],
+              },
+            ],
             recentHistory: [
               {
                 sender: "user",
@@ -77,6 +89,18 @@ describe("PrivatRoom -> Slice B live observation wiring", () => {
           participantIds: ["u2", "droit_kaira_beta"],
           roomContext: {
             roomId: "room-1",
+            participants: [
+              {
+                participantId: "u1",
+                actorKind: "human",
+                platformRoles: ["member"],
+              },
+              {
+                participantId: "droit_kaira_beta",
+                actorKind: "droit",
+                platformRoles: ["member"],
+              },
+            ],
             recentHistory: [
               { sender: "user", text: "legacy history", participantName: "Biri" },
             ],
@@ -90,6 +114,10 @@ describe("PrivatRoom -> Slice B live observation wiring", () => {
     });
 
     expect(graph.events.map((event) => event.eventId)).toEqual(["m3"]);
-    expect(graph.participants.map((participant) => participant.participantId)).toEqual(["u2"]);
+    expect(graph.participants.map((participant) => participant.participantId)).toEqual([
+      "droit_kaira_beta",
+      "u1",
+      "u2",
+    ]);
   });
 });
