@@ -1141,3 +1141,27 @@ Proof:
 - regression: `kairaFirstEncounterBusyLeaseLatencyV10Regression.test.ts`;
 - live Chromium reproduction/run: `35457373648`;
 - promotion still requires full CI GREEN, merge, Render LIVE and a repeated Chromium acceptance with all three messages under the live latency gate.
+
+
+## 57. Explicit-invite independent review — platform-scope authority repair (2026-09-19)
+
+Independent closure review challenged whether `kaira_role` / `room_setup` recognition was truly paraphrase-invariant or merely a growing regex list.
+
+Forensic result:
+- local regex recognizers were correctly useful as first-encounter fast floors;
+- however the same reconcilers were also applied after the full semantic provider;
+- therefore a matching regex could enrich/overwrite provider-owned canonical semantics;
+- this violated the intended single semantic authority even though existing acceptance phrases were GREEN.
+
+Repair on `fix/platform-scope-canonical-provider-v2`:
+- regex room/role recognizers remain only on the pre-provider fast floor;
+- full semantic-provider output is no longer post-reconciled by those regexes;
+- the canonical provider prompt now explicitly defines optional `platformScopeQuery = room_setup | kaira_role` using paraphrase-invariant utterance meaning;
+- unseen Kaira-role and room-scope paraphrases are covered through provider-path characterization;
+- existing known fast-floor phrases keep their provider-free latency path.
+
+Closure requires:
+- historical RED evidence from the old authority-overwrite behavior;
+- exact-head CI GREEN on the repaired branch;
+- merge + Render LIVE;
+- model-in-the-loop/live proof with unseen paraphrases, not only phrases present in the fast regex set.

@@ -461,19 +461,12 @@ export async function resolveServerLanguageUnderstanding(
     context: input.context,
   });
   const reconciledResult = reconcileServerCanonicalSemantics(input.message, rawResult);
-  const contextualRoomResult = reconcileFirstEncounterContextSemantics(
-    input.message,
-    reconciledResult,
-    input.firstEncounterContext,
-  );
-  const contextualRoleResult = reconcileFirstEncounterKairaRoleSemantics(
-    input.message,
-    contextualRoomResult,
-    input.firstEncounterContext,
-  );
+  // Full semantic-provider output is canonical authority for platformScopeQuery.
+  // Regex-based room/role recognizers above are a local fast floor only and must
+  // never overwrite provider-owned semantics after the provider has run.
   const contextualResult = reconcileFirstEncounterWellBeingReply(
     input.message,
-    contextualRoleResult,
+    reconciledResult,
     input.context,
   );
   const result = groundCanonicalAttribution(contextualResult);
