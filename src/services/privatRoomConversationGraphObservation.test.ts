@@ -16,16 +16,19 @@ describe("PrivatRoom -> Slice B live observation wiring", () => {
             roomId: "room-1",
             roomName: "Genel",
             actorIsOwner: false,
-            recentHistory: [
+            participants: [
               {
-                sender: "user",
-                text: "selam millet",
-                participantName: "Ali",
                 participantId: "u1",
-                eventId: "m1",
-                occurredAt: 100,
                 actorKind: "human",
+                platformRoles: ["owner"],
               },
+              {
+                participantId: "droit_kaira_beta",
+                actorKind: "droit",
+                platformRoles: ["member"],
+              },
+            ],
+            recentHistory: [
               {
                 sender: "droit",
                 text: "selam",
@@ -52,7 +55,7 @@ describe("PrivatRoom -> Slice B live observation wiring", () => {
       roomId: "room-1",
       kairaInstanceId: "kaira-main",
     });
-    expect(graph.events.map((event) => event.eventId)).toEqual(["m1", "m2", "m3"]);
+    expect(graph.events.map((event) => event.eventId)).toEqual(["m2", "m3"]);
     expect(graph.participants.map((participant) => participant.participantId)).toEqual([
       "droit_kaira_beta",
       "u1",
