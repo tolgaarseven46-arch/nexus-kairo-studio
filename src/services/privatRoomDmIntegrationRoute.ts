@@ -3,6 +3,7 @@ import { authorizeKairaInternalWorker } from "./kairaInternalWorkerAuth";
 import { buildRuntimeTestRunRecordV1 } from "./testRunRuntimeProvenance";
 import { resolveChatTestRunBinding } from "./testRunLiveBinding";
 import { loadTestSession } from "./kdmPersistenceService";
+import { buildPrivatRoomConversationGraphObservation } from "./privatRoomConversationGraphObservation";
 import {
   deriveKairaFirstEncounterContinuity,
   deriveKairaFirstEncounterContinuityFromPlatformHistory,
@@ -21,7 +22,7 @@ type PrivatRoomDmEvent = {
   conversation: {
     kind: "direct" | "room";
     conversationId: string;
-    participantIds: [string, string];
+    participantIds: string[];
     roomContext?: {
       roomId?: string;
       roomName?: string;
@@ -72,7 +73,7 @@ function isEvent(value: unknown): value is PrivatRoomDmEvent {
         (event.conversation.roomContext.recentHistory === undefined ||
           Array.isArray(event.conversation.roomContext.recentHistory)))) &&
     Array.isArray(event.conversation?.participantIds) &&
-    event.conversation!.participantIds.length === 2 &&
+    event.conversation!.participantIds.length >= 2 &&
     typeof event.actor?.userId === "string" &&
     typeof event.actor?.displayName === "string" &&
     typeof event.message?.messageId === "string" &&
@@ -163,6 +164,16 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
       platformFirstEncounter ||
       deriveKairaFirstEncounterContinuity(restoredSession?.turns || []);
 
+    const conversationGraphObservation =
+      event.conversation.kind === "room"
+        ? buildPrivatRoomConversationGraphObservation({
+            event,
+            environmentId:
+              testRunRecord?.provenance.identity.environmentId || "live-beta",
+            testRunId: testRunBinding.testRunId,
+          })
+        : undefined;
+
     const corePayload = {
       requestId: `privatroom_${safeId(event.eventId)}`,
       sessionId: testRunBinding.sessionId,
@@ -174,6 +185,7 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
       history: firstEncounter.history,
       conversationPhase: firstEncounter.active ? "first_encounter" : "default",
       firstEncounterContext: firstEncounter.context,
+      conversationGraphObservation,
       provider: process.env.PRIVATROOM_KAIRA_PROVIDER || "openrouter",
     };
 
@@ -213,6 +225,7 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
           responseId: `no_reply_${safeId(event.eventId)}`,
           testRunId: testRunBinding.testRunId,
           testCapture,
+          conversationGraphObservation,
           proposedActions: [],
           noReplyReason: "kaira_core_returned_empty_reply",
         });
@@ -224,6 +237,7 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
         responseId: `reply_${safeId(event.eventId)}`,
         testRunId: responseTestRunId,
         testCapture,
+        conversationGraphObservation,
         proposedActions: [
           {
             type: "message.send",
