@@ -228,21 +228,159 @@ export const buildConversationGraphEvidenceViewV1 = (
     throw new Error("ConversationGraphV1 schemaVersion must be 1");
   }
 
+  const participants = requireArray(input.participants, "participants").map(
+    (value, index) => {
+      const participant = requireRecord(value, `participants[${index}]`);
+      const actorKind = requireString(
+        participant.actorKind,
+        `participants[${index}].actorKind`,
+      );
+      if (
+        actorKind !== "human" &&
+        actorKind !== "droit" &&
+        actorKind !== "system"
+      ) {
+        throw new Error(
+          `participants[${index}].actorKind must be human, droit, or system`,
+        );
+      }
+      const platformRoles = requireArray(
+        participant.platformRoles,
+        `participants[${index}].platformRoles`,
+      ).map((role, roleIndex) =>
+        requireString(
+          role,
+          `participants[${index}].platformRoles[${roleIndex}]`,
+        ),
+      );
+      return {
+        participantId: requireString(
+          participant.participantId,
+          `participants[${index}].participantId`,
+        ),
+        actorKind,
+        platformRoles,
+        firstSeenAt: requireFiniteNumber(
+          participant.firstSeenAt,
+          `participants[${index}].firstSeenAt`,
+        ),
+        lastSeenAt: requireFiniteNumber(
+          participant.lastSeenAt,
+          `participants[${index}].lastSeenAt`,
+        ),
+        messageCount: requireFiniteNumber(
+          participant.messageCount,
+          `participants[${index}].messageCount`,
+        ),
+      };
+    },
+  );
+
+  const events = requireArray(input.events, "events").map((value, index) => {
+    const event = requireRecord(value, `events[${index}]`);
+    const actorKind = requireString(
+      event.actorKind,
+      `events[${index}].actorKind`,
+    );
+    if (
+      actorKind !== "human" &&
+      actorKind !== "droit" &&
+      actorKind !== "system"
+    ) {
+      throw new Error(
+        `events[${index}].actorKind must be human, droit, or system`,
+      );
+    }
+    const normalized: Record<string, unknown> = {
+      eventId: requireString(event.eventId, `events[${index}].eventId`),
+      actorId: requireString(event.actorId, `events[${index}].actorId`),
+      actorKind,
+      occurredAt: requireFiniteNumber(
+        event.occurredAt,
+        `events[${index}].occurredAt`,
+      ),
+    };
+    if (event.sourceSequence !== undefined) {
+      normalized.sourceSequence = requireFiniteNumber(
+        event.sourceSequence,
+        `events[${index}].sourceSequence`,
+      );
+    }
+    if (event.semanticSnapshotRef !== undefined) {
+      normalized.semanticSnapshotRef = requireString(
+        event.semanticSnapshotRef,
+        `events[${index}].semanticSnapshotRef`,
+      );
+    }
+    return normalized;
+  });
+
+  const explicitReplyEdges = requireArray(
+    input.explicitReplyEdges,
+    "explicitReplyEdges",
+  ).map((value, index) => {
+    const edge = requireRecord(value, `explicitReplyEdges[${index}]`);
+    return {
+      fromEventId: requireString(
+        edge.fromEventId,
+        `explicitReplyEdges[${index}].fromEventId`,
+      ),
+      toEventId: requireString(
+        edge.toEventId,
+        `explicitReplyEdges[${index}].toEventId`,
+      ),
+      source: "platform",
+    };
+  });
+
+  const explicitMentionEdges = requireArray(
+    input.explicitMentionEdges,
+    "explicitMentionEdges",
+  ).map((value, index) => {
+    const edge = requireRecord(value, `explicitMentionEdges[${index}]`);
+    return {
+      fromEventId: requireString(
+        edge.fromEventId,
+        `explicitMentionEdges[${index}].fromEventId`,
+      ),
+      toParticipantId: requireString(
+        edge.toParticipantId,
+        `explicitMentionEdges[${index}].toParticipantId`,
+      ),
+      source: "platform",
+    };
+  });
+
+  const unresolvedReferences = requireArray(
+    input.unresolvedReferences,
+    "unresolvedReferences",
+  ).map((value, index) => {
+    const ref = requireRecord(value, `unresolvedReferences[${index}]`);
+    return {
+      sourceEventId: requireString(
+        ref.sourceEventId,
+        `unresolvedReferences[${index}].sourceEventId`,
+      ),
+      referenceType: requireString(
+        ref.referenceType,
+        `unresolvedReferences[${index}].referenceType`,
+      ),
+      referencedId: requireString(
+        ref.referencedId,
+        `unresolvedReferences[${index}].referencedId`,
+      ),
+    };
+  });
+
   return {
     schemaVersion: 1,
     namespace: parseConversationGraphNamespaceV1(input.namespace),
     conversationId: requireString(input.conversationId, "conversationId"),
-    participants: [...requireArray(input.participants, "participants")],
-    events: [...requireArray(input.events, "events")],
-    explicitReplyEdges: [
-      ...requireArray(input.explicitReplyEdges, "explicitReplyEdges"),
-    ],
-    explicitMentionEdges: [
-      ...requireArray(input.explicitMentionEdges, "explicitMentionEdges"),
-    ],
-    unresolvedReferences: [
-      ...requireArray(input.unresolvedReferences, "unresolvedReferences"),
-    ],
+    participants,
+    events,
+    explicitReplyEdges,
+    explicitMentionEdges,
+    unresolvedReferences,
   };
 };
 
