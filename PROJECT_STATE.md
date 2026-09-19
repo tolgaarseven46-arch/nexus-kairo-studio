@@ -1052,3 +1052,27 @@ Promotion rule remains unchanged:
 - W8 must prove the deployed Kaira + PrivatRoom commits live,
 - TestRun evidence must show graph observation persisted,
 - any cross-user/cross-server contamination or live/replay boundary violation stops promotion.
+
+
+## 54. Slice B W8 live blocker — roster-only human missing from graph (2026-09-19)
+
+Live W8 proof reached deployed TestRun persistence but did not satisfy the two-human graph threshold.
+
+Root cause:
+- PrivatRoom correctly exposes authoritative room membership under `roomContext.participants`;
+- Kaira graph observation previously built participant nodes only from message history + current actor;
+- therefore a real room owner who had not sent a message was absent from ConversationGraphV1 even though platform membership proved that participant existed.
+
+This is an observation-completeness bug, not response authority.
+
+Repair on `fix/slice-b-w8-consume-room-roster`:
+- consume authenticated platform room roster as objective participant facts;
+- preserve platform role facts (owner/member/etc.);
+- roster-only participants may have `messageCount=0`;
+- malformed actorKind/role facts fail closed at the integration boundary;
+- graph remains observation-only and does not consume roster facts for WHAT/WHETHER.
+
+Regression:
+- owner appears as a second human even when only Kaira welcome + current member message exist;
+- owner role is preserved;
+- response/answer authority remains absent.
