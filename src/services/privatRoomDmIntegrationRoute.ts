@@ -61,6 +61,42 @@ function authorize(req: Request, res: Response): boolean {
   return true;
 }
 
+function isValidRoomContext(
+  value: PrivatRoomDmEvent["conversation"]["roomContext"] | undefined,
+): boolean {
+  if (value === undefined) return true;
+  if (!value || typeof value !== "object") return false;
+  if (value.recentHistory !== undefined && !Array.isArray(value.recentHistory)) {
+    return false;
+  }
+  if (value.participants === undefined) return true;
+  if (!Array.isArray(value.participants)) return false;
+
+  return value.participants.every((participant) => {
+    if (
+      !participant ||
+      typeof participant.participantId !== "string" ||
+      participant.participantId.length === 0 ||
+      (participant.actorKind !== "human" &&
+        participant.actorKind !== "droit" &&
+        participant.actorKind !== "system")
+    ) {
+      return false;
+    }
+    if (participant.platformRoles === undefined) return true;
+    return (
+      Array.isArray(participant.platformRoles) &&
+      participant.platformRoles.every(
+        (role) =>
+          role === "owner" ||
+          role === "admin" ||
+          role === "moderator" ||
+          role === "member",
+      )
+    );
+  });
+}
+
 function isEvent(value: unknown): value is PrivatRoomDmEvent {
   if (!value || typeof value !== "object") return false;
   const event = value as Partial<PrivatRoomDmEvent>;
@@ -68,41 +104,21 @@ function isEvent(value: unknown): value is PrivatRoomDmEvent {
     event.contractVersion === CONTRACT_VERSION &&
     event.source === "privatroom" &&
     event.eventType === "message.created" &&
-    typeof event.eventId === "string" && event.eventId.length > 0 &&
-    typeof event.kairaInstanceId === "string" && event.kairaInstanceId.length > 0 &&
+    typeof event.eventId === "string" &&
+    event.eventId.length > 0 &&
+    typeof event.kairaInstanceId === "string" &&
+    event.kairaInstanceId.length > 0 &&
     (event.conversation?.kind === "direct" ||
       event.conversation?.kind === "room") &&
     typeof event.conversation?.conversationId === "string" &&
-    (event.conversation?.roomContext === undefined ||
-      (typeof event.conversation.roomContext === "object" &&
-        (event.conversation.roomContext.recentHistory === undefined ||
-          Array.isArray(event.conversation.roomContext.recentHistory)) &&
-        (event.conversation.roomContext.participants === undefined ||
-          (Array.isArray(event.conversation.roomContext.participants) &&
-            event.conversation.roomContext.participants.every((participant) =>
-              Boolean(
-                participant &&
-                typeof participant.participantId === "string" &&
-                participant.participantId.length > 0 &&
-                (participant.actorKind === "human" ||
-                  participant.actorKind === "droit" ||
-                  participant.actorKind === "system") &&
-                (participant.platformRoles === undefined ||
-                  (Array.isArray(participant.platformRoles) &&
-                    participant.platformRoles.every((role) =>
-                      role === "owner" ||
-                      role === "admin" ||
-                      role === "moderator" ||
-                      role === "member"
-                    )))
-              )
-            )))) &&
+    isValidRoomContext(event.conversation?.roomContext) &&
     Array.isArray(event.conversation?.participantIds) &&
     event.conversation!.participantIds.length >= 2 &&
     typeof event.actor?.userId === "string" &&
     typeof event.actor?.displayName === "string" &&
     typeof event.message?.messageId === "string" &&
-    typeof event.message?.text === "string" && event.message.text.trim().length > 0 &&
+    typeof event.message?.text === "string" &&
+    event.message.text.trim().length > 0 &&
     typeof event.message?.createdAt === "number" &&
     Array.isArray(event.capabilities)
   );
