@@ -4,12 +4,13 @@ import { describe, expect, it } from 'vitest';
 describe('server chat request coordination wiring', () => {
   const serverSource = readFileSync('server.ts', 'utf8');
 
-  it('assigns every chat turn a coordination identity before claiming ownership', () => {
+  it('assigns every chat turn a coordination identity before starting ownership claim', () => {
     expect(serverSource).toContain('resolveKairaChatRequestCoordinationIdentity(');
     expect(serverSource).toContain('incomingRequestId,\n      randomUUID,');
     expect(serverSource).toContain('requestIdentity.coordinationRequestId');
     expect(serverSource).toContain('claimCoordinatedKairaChatRequest<any>(coordinationKey, {');
-    expect(serverSource).toContain('preferCombinedFirstEncounterCoordination,');
+    expect(serverSource).toContain('preferCombinedFirstEncounterCoordination:');
+    expect(serverSource).toContain('conversationPhase === "first_encounter"');
   });
 
   it('does not gate state-owner coordination on the presence of an external requestId', () => {
