@@ -13,18 +13,18 @@ describe("first-encounter idle background persistence wiring", () => {
 
   it("queues non-critical first-encounter writes behind an idle window", () => {
     expect(source).toContain("FIRST_ENCOUNTER_BACKGROUND_IDLE_MS = 5_000");
-    expect(source).toContain("enqueueFirstEncounterBackgroundPersistence(backgroundQueueKey");
+    expect(source).toContain("enqueueFirstEncounterBackgroundPersistence(firstEncounterBackgroundQueueKey");
     expect(source).toContain("await saveMetricTelemetry();");
     expect(source).toContain("await saveKntTelemetry();");
     expect(source).toContain("await saveAutonomousState();");
     const release = source.indexOf("await releaseCoordinatedKairaChatStateMutation(coordinationKey);");
-    const enqueue = source.indexOf("enqueueFirstEncounterBackgroundPersistence(backgroundQueueKey");
+    const enqueue = source.indexOf("enqueueFirstEncounterBackgroundPersistence(firstEncounterBackgroundQueueKey");
     expect(enqueue).toBeGreaterThan(release);
   });
 
   it("debounces per user+Kaira key without dropping queued jobs", () => {
     expect(source).toContain("const jobs = existing ? [...existing.jobs, job] : [job]");
-    expect(source).toContain("if (existing) clearTimeout(existing.timer)");
+    expect(source).toContain("if (existing?.timer) clearTimeout(existing.timer)");
     expect(source).toContain("for (const queuedJob of queued.jobs)");
   });
 });
