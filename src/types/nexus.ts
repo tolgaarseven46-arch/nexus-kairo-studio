@@ -132,6 +132,7 @@ export interface TestSessionTurnRecord {
     welcomeDecision?: unknown;
     realizationVariantSeed?: string;
     realizationVariantId?: string;
+    conversationGraphObservation?: unknown;
   };
 }
 
