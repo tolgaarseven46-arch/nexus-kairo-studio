@@ -5,7 +5,7 @@ import {
 } from "./kairaInviteIntroduction";
 
 describe("Kaira explicit invite introduction", () => {
-  it("is minimal, natural, and only explains the invited role", () => {
+  it("uses the frozen canonical invite introduction for every event", () => {
     const decision = decideKairaInviteIntroduction({
       actorDisplayName: "Tolga",
       isOwner: true,
@@ -18,11 +18,11 @@ describe("Kaira explicit invite introduction", () => {
         decision,
       });
 
-      expect(realized.text).toMatch(/kaira/iu);
-      expect(realized.text).toMatch(/sunucu/iu);
-      expect(realized.text).toMatch(/yardım|yanında|destek|beraber/iu);
+      expect(realized.text).toBe(
+        "Selam 😄 ben Kaira. Sunucuyu yönetirken yanında olacağım.",
+      );
+      expect(realized.variantId).toBe("kaira_invited_v1");
       expect(realized.text).not.toMatch(/oda adı|nasıl bir ortam|droit|pipeline|yapay zeka/iu);
-      expect((realized.text.match(/[.!?]/g) || []).length).toBeLessThanOrEqual(2);
       expect(realized.text).not.toMatch(/\?$/u);
     }
   });
