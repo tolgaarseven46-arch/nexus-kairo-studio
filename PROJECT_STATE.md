@@ -1242,3 +1242,31 @@ Repair on `fix/platform-scope-provider-role-ontology`:
 - no raw unseen-test sentence is promoted to a regex or deterministic phrase list.
 
 Closure requires exact-head CI GREEN, merge, Render LIVE, then a fresh production paraphrase pack not copied verbatim from the prompt contract.
+
+
+## 62. Explicit-invite live proof — structural Kaira-role fast semantic floor (2026-09-19)
+
+Fresh production paraphrases still exposed two costs when durable Kaira-role questions reached the full semantic provider: classification variance and multi-second provider latency. The accepted first-encounter role fast floor was therefore generalized structurally instead of adding post-provider overwrite.
+
+Repair:
+- keep full provider output canonical after provider execution;
+- before provider execution, extend the existing first-encounter Kaira-role fast semantic floor with durable role concepts: görev/rol/işlev/fonksiyon/sorumluluk/vazife/amaç/üstlenme;
+- require explicit question shape plus either second-person possessive/addressee evidence or second-person `üstlen...` morphology;
+- do not classify plain momentary activity such as `sen napıyosun burda` as durable Kaira-role semantics;
+- eligible durable-role turns therefore resolve to typed `platformScopeQuery=kaira_role` without provider latency, then flow to the existing deterministic role realizer.
+
+Characterization RED on head `d371c068...` proved all four durable-role cases invoked the provider before this repair. The negative control showed the existing social fast path may legitimately answer momentary `what_doing` locally, so closure asserts semantic separation rather than requiring a provider call.
+
+Closure requires exact-head CI GREEN, merge + Render LIVE, and a single-trigger serialized live proof under the 6s gate.
+
+
+### Follow-up — room-scope false positive removed
+
+Exact-head CI on `292a1cc...` exposed one real cross-recognizer bug and three stale expectations:
+- `sen napıyosun burda` was being promoted to `room_setup` because the room fast floor saw both a room anchor and a generic action token;
+- three earlier regression tests still required the full semantic provider for explicit durable-role phrases that the new bounded fast floor now intentionally owns.
+
+Correction:
+- second-person present-activity forms such as `sen/kaira ... ne yapıyorsun/napıyorsun` are excluded from the room-scope fast floor;
+- they remain social `what_doing`, not `room_setup` and not durable `kaira_role`;
+- legacy tests now assert the new authority boundary: explicit durable-role semantics resolve before provider execution.

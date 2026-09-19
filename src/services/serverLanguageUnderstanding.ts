@@ -66,12 +66,18 @@ const FIRST_ENCOUNTER_ROOM_ANCHOR_RE =
 const FIRST_ENCOUNTER_ROOM_ACTION_RE =
   /(?:nap\p{L}*|ne\s+yap\p{L}*|nasıl\s+kullan\p{L}*|nasil\s+kullan\p{L}*|ne\s+ol\p{L}*|ne\s+için|ne\s+icin)/iu;
 
+const FIRST_ENCOUNTER_SECOND_PERSON_MOMENTARY_ACTIVITY_RE =
+  /(?:^|\s)(?:sen|kaira)(?=$|\s|[?.!…]).*?(?:nap(?:ıyorsun|ıyosun|iyosun|ıyon|iyon)|ne\s+yap(?:ıyorsun|ıyosun|iyosun|ıyon|iyon))(?=$|\s|[?.!…])/iu;
+
 const isFirstEncounterRoomScopeQuestion = (
   message: string,
   context?: ResolveServerLanguageUnderstandingInput["firstEncounterContext"],
 ) => {
   if (!context) return false;
   const normalized = message.toLocaleLowerCase("tr-TR").trim();
+  if (FIRST_ENCOUNTER_SECOND_PERSON_MOMENTARY_ACTIVITY_RE.test(normalized)) {
+    return false;
+  }
   return (
     FIRST_ENCOUNTER_ROOM_ANCHOR_RE.test(normalized) &&
     FIRST_ENCOUNTER_ROOM_ACTION_RE.test(normalized)
@@ -81,13 +87,34 @@ const isFirstEncounterRoomScopeQuestion = (
 
 const FIRST_ENCOUNTER_KAIRA_ROLE_RE =
   /(?:(?:^|\s)(?:sen|kaira)(?:\s|.*?)?(?:ne\s+yap(?:acaksın|ıcaksın)|ne\s+işe\s+yar\p{L}*|görevin\s+ne|rolün\s+ne)(?=$|\s|[?.!…])|(?:^|\s)(?:görevin\s+ne|rolün\s+ne)(?=$|\s|[?.!…])|(?:^|\s)(?:burada|burda|sunucuda|odada)(?:\s|.*?)(?:sen\s+)?ne\s+yap(?:acaksın|ıcaksın)(?=$|\s|[?.!…]))/iu;
+const FIRST_ENCOUNTER_KAIRA_DURABLE_ROLE_DIRECT_RE =
+  /(?:^|\s)(?:görevin|rolün|işlevin|fonksiyonun|sorumluluğun|vazifen|amacın)(?=$|\s|[?.!…])/iu;
+const FIRST_ENCOUNTER_KAIRA_DURABLE_ROLE_CONCEPT_RE =
+  /(?:^|\s)(?:görev\p{L}*|rol\p{L}*|işlev\p{L}*|fonksiyon\p{L}*|sorumluluk\p{L}*|vazife\p{L}*|amaç\p{L}*|üstlen\p{L}*)(?=$|\s|[?.!…])/iu;
+const FIRST_ENCOUNTER_KAIRA_DURABLE_ROLE_ADDRESSEE_RE =
+  /(?:^|\s)(?:sen|senin|sana|kaira)(?=$|\s|[?.!…])/iu;
+const FIRST_ENCOUNTER_KAIRA_DURABLE_ROLE_SECOND_PERSON_RE =
+  /(?:^|\s)üstlen\p{L}*(?:sun|sın)(?=$|\s|[?.!…])/iu;
+const FIRST_ENCOUNTER_KAIRA_DURABLE_ROLE_QUESTION_RE =
+  /[?？]|(?:^|\s)(?:ne|nedir|hangi|neden|niye)(?=$|\s|[?.!…])/iu;
 
 const isFirstEncounterKairaRoleQuestion = (
   message: string,
   context?: ResolveServerLanguageUnderstandingInput["firstEncounterContext"],
-) => Boolean(context) && FIRST_ENCOUNTER_KAIRA_ROLE_RE.test(
-  message.toLocaleLowerCase("tr-TR").trim(),
-);
+) => {
+  if (!context) return false;
+  const normalized = message.toLocaleLowerCase("tr-TR").trim();
+  if (FIRST_ENCOUNTER_KAIRA_ROLE_RE.test(normalized)) return true;
+  if (!FIRST_ENCOUNTER_KAIRA_DURABLE_ROLE_QUESTION_RE.test(normalized)) return false;
+  if (FIRST_ENCOUNTER_KAIRA_DURABLE_ROLE_DIRECT_RE.test(normalized)) return true;
+  if (
+    FIRST_ENCOUNTER_KAIRA_DURABLE_ROLE_ADDRESSEE_RE.test(normalized) &&
+    FIRST_ENCOUNTER_KAIRA_DURABLE_ROLE_CONCEPT_RE.test(normalized)
+  ) {
+    return true;
+  }
+  return FIRST_ENCOUNTER_KAIRA_DURABLE_ROLE_SECOND_PERSON_RE.test(normalized);
+};
 
 const FIRST_ENCOUNTER_WELL_BEING_REPLY_RE =
   /^(?:iyi(?:yim|dir|lik)?|gayet\s+iyi(?:yim)?|çok\s+iyi(?:yim)?|fena\s+değil|idare|şükür|şükürler\s+olsun)(?:\s+(?:ya|işte|valla))?[.!?…]*$/iu;
