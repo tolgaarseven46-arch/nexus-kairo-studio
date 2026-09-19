@@ -50,8 +50,10 @@ describe("first-encounter neutral short fast-floor confidence", () => {
     "işlevin ne senin",
     "bu sunucuda senin vazifen nedir",
     "senin burada fonksiyonun ne",
-  ])("does not swallow unseen platform-role question before semantic provider: %s", async (message) => {
-    const generateText = vi.fn(async () => JSON.stringify(providerKairaRole(message)));
+  ])("routes explicit durable platform-role question through structural fast floor: %s", async (message) => {
+    const generateText = vi.fn(async () => {
+      throw new Error("provider should not be needed for explicit durable role semantics");
+    });
 
     const result = await resolveServerLanguageUnderstanding({
       message,
@@ -62,8 +64,8 @@ describe("first-encounter neutral short fast-floor confidence", () => {
       generateText,
     });
 
-    expect(generateText).toHaveBeenCalled();
-    expect(result.semanticSource).toBe("semantic_provider");
+    expect(generateText).not.toHaveBeenCalled();
     expect(result.interpretation.discourseFacets.platformScopeQuery).toBe("kaira_role");
+    expect(result.interpretation.target).toBe("kaira");
   });
 });
