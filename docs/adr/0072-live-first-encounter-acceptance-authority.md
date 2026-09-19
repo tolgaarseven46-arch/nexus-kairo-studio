@@ -115,3 +115,17 @@ For provider classification:
 - location words alone do not determine the scope; semantic subject and predicate do.
 
 This preserves paraphrase generalization without turning the full provider path into a growing regex inventory.
+
+
+## Clarification — bounded structural fast floor for durable Kaira-role questions
+
+The pre-provider first-encounter fast semantic floor may classify `kaira_role` only when durable-role meaning is structurally explicit.
+
+Accepted evidence is bounded:
+- explicit durable-role concepts such as role, function, duty, responsibility, purpose, or undertaking;
+- question form;
+- Kaira/second-person addressee or possessive evidence, or equivalent second-person morphology.
+
+A merely momentary activity question remains `what_doing` and must not be promoted to `kaira_role`.
+
+This fast floor is an early typed-semantic optimization. It does not authorize regex reconciliation after the full semantic provider has executed; provider output remains canonical on the full-provider path.
