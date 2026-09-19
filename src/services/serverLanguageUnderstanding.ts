@@ -67,7 +67,7 @@ const FIRST_ENCOUNTER_ROOM_ACTION_RE =
   /(?:nap\p{L}*|ne\s+yap\p{L}*|nasıl\s+kullan\p{L}*|nasil\s+kullan\p{L}*|ne\s+ol\p{L}*|ne\s+için|ne\s+icin)/iu;
 
 const FIRST_ENCOUNTER_SECOND_PERSON_MOMENTARY_ACTIVITY_RE =
-  /(?:^|\s)(?:sen|kaira)(?=$|\s|[?.!…]).*?(?:nap(?:ıyorsun|iyosun|ıyon|iyon)|ne\s+yap(?:ıyorsun|iyosun|ıyon|iyon))(?=$|\s|[?.!…])/iu;
+  /(?:^|\s)(?:sen|kaira)(?=$|\s|[?.!…]).*?(?:nap(?:ıyorsun|ıyosun|iyosun|ıyon|iyon)|ne\s+yap(?:ıyorsun|ıyosun|iyosun|ıyon|iyon))(?=$|\s|[?.!…])/iu;
 
 const isFirstEncounterRoomScopeQuestion = (
   message: string,
