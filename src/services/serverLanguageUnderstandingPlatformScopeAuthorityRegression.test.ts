@@ -120,8 +120,8 @@ describe("platform-scope canonical provider regression", () => {
       generateText,
     });
 
-    expect(generateText).toHaveBeenCalled();
     expect(result.interpretation.discourseFacets.platformScopeQuery).toBeUndefined();
+    expect(result.interpretation.discourseFacets.socialRoutine).toBe("what_doing");
   });
 
 });
