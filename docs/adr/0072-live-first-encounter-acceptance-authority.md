@@ -79,3 +79,12 @@ Consequences:
 - an unknown short utterance with low-confidence floor semantics falls through to the canonical semantic provider;
 - after provider classification, a genuinely neutral short utterance may still use deterministic local realization when the canonical provider returns sufficiently low uncertainty;
 - no new raw-text phrase list is introduced for unseen questions.
+
+
+## Clarification — ambiguous room/Kaira fast-floor questions fail closed
+
+A local room-scope regex may not claim a compact first-encounter turn when the same surface also contains an explicit Kaira/second-person reference and the known local Kaira-role recognizer did not already resolve it.
+
+Example: `sen napıyosun burda` contains a room anchor and an explicit Kaira-facing reference, but is not safely distinguishable as `room_setup` vs `kaira_role` by the local fast floor. Such overlap is treated as ambiguous and bypasses all local first-encounter fast returns so the canonical semantic provider decides the typed `platformScopeQuery`.
+
+Known unambiguous fast-floor phrases remain unchanged. This rule narrows local authority; it does not add a new paraphrase classifier.
