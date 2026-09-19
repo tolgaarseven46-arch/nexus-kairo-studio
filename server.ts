@@ -1269,9 +1269,12 @@ app.post("/api/chat", async (req, res) => {
       const firstEncounterTurnId = firstEncounterFastPersistence
         ? `turn_${String(requestId || randomUUID()).replace(/[^a-zA-Z0-9_-]/g, "_")}`
         : undefined;
-      const ownershipStart = now();
-      await assertStateMutationOwnership();
-      const ownershipMs = Math.round(now() - ownershipStart);
+      let ownershipMs = 0;
+      if (!firstEncounterFastPersistence) {
+        const ownershipStart = now();
+        await assertStateMutationOwnership();
+        ownershipMs = Math.round(now() - ownershipStart);
+      }
       const livedMemoryStart = now();
       const livedMemoryRuntime = firstEncounterFastPersistence
         ? { status: "not_applicable" as const }
@@ -1552,6 +1555,9 @@ app.post("/api/chat", async (req, res) => {
         sendFirstEncounterFastPayload(responsePayload);
         const backgroundStart = now();
         try {
+          const deferredOwnershipStart = now();
+          await assertStateMutationOwnership();
+          const deferredOwnershipMs = Math.round(now() - deferredOwnershipStart);
           await persistFirstEncounterContinuity();
           if (coordinationKey && ownsCoordinationClaim) {
             await releaseCoordinatedKairaChatStateMutation(coordinationKey);
@@ -1576,6 +1582,7 @@ app.post("/api/chat", async (req, res) => {
           console.log("[First Encounter Deferred Continuity Queued]", {
             testRunId,
             requestId,
+            deferredOwnershipMs,
             criticalPersistenceMs,
             queuedAfterIdleMs: FIRST_ENCOUNTER_BACKGROUND_IDLE_MS,
           });
