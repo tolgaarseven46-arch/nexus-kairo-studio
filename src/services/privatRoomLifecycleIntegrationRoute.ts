@@ -5,13 +5,17 @@ import { resolveChatTestRunBinding } from "./testRunLiveBinding";
 import { saveTestSessionTurn } from "./kdmPersistenceService";
 import { decideKairaWelcome } from "./kairaWelcomeDecision";
 import { realizeKairaWelcome } from "./kairaWelcomeRealizer";
+import {
+  decideKairaInviteIntroduction,
+  realizeKairaInviteIntroduction,
+} from "./kairaInviteIntroduction";
 
 const CONTRACT_VERSION = 1 as const;
 
 type PrivatRoomLifecycleEvent = {
   contractVersion: 1;
   source: "privatroom";
-  eventType: "room.created" | "participant.joined";
+  eventType: "room.created" | "participant.joined" | "kaira.invited_to_server";
   eventId: string;
   occurredAt: number;
   kairaInstanceId: string;
@@ -46,7 +50,11 @@ const isEvent = (value: unknown): value is PrivatRoomLifecycleEvent => {
   return (
     event.contractVersion === CONTRACT_VERSION &&
     event.source === "privatroom" &&
-    (event.eventType === "room.created" || event.eventType === "participant.joined") &&
+    (
+      event.eventType === "room.created" ||
+      event.eventType === "participant.joined" ||
+      event.eventType === "kaira.invited_to_server"
+    ) &&
     typeof event.eventId === "string" &&
     event.eventId.length > 0 &&
     typeof event.occurredAt === "number" &&
@@ -121,19 +129,31 @@ export function registerPrivatRoomLifecycleIntegrationRoute(app: Express) {
         record: testRunRecord,
       });
 
-      const decision = decideKairaWelcome({
-        eventType: event.eventType,
-        actorDisplayName: event.actor.displayName,
-        roomName: event.room.roomName,
-        isOwner: event.actor.isOwner,
-      });
-      const realization = realizeKairaWelcome({
-        eventId: event.eventId,
-        kairaInstanceId: event.kairaInstanceId,
-        actorDisplayName: event.actor.displayName,
-        roomName: event.room.roomName,
-        decision,
-      });
+      const isInviteEvent = event.eventType === "kaira.invited_to_server";
+      const decision = isInviteEvent
+        ? decideKairaInviteIntroduction({
+            actorDisplayName: event.actor.displayName,
+            isOwner: event.actor.isOwner,
+          })
+        : decideKairaWelcome({
+            eventType: event.eventType,
+            actorDisplayName: event.actor.displayName,
+            roomName: event.room.roomName,
+            isOwner: event.actor.isOwner,
+          });
+      const realization = isInviteEvent
+        ? realizeKairaInviteIntroduction({
+            eventId: event.eventId,
+            kairaInstanceId: event.kairaInstanceId,
+            decision,
+          })
+        : realizeKairaWelcome({
+            eventId: event.eventId,
+            kairaInstanceId: event.kairaInstanceId,
+            actorDisplayName: event.actor.displayName,
+            roomName: event.room.roomName,
+            decision,
+          });
 
       await saveTestSessionTurn({
         sessionId: testRunBinding.sessionId,
@@ -144,7 +164,7 @@ export function registerPrivatRoomLifecycleIntegrationRoute(app: Express) {
         userMessage: `[platform:${event.eventType}]`,
         assistantReply: realization.text,
         speaker: event.actor.displayName,
-        intent: "platform_welcome",
+        intent: isInviteEvent ? "platform_invite_introduction" : "platform_welcome",
         detectedEmotion: "nötr",
         retrievedMemories: [],
         metadata: {
