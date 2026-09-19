@@ -228,7 +228,7 @@
     {
       "id": "live-beta-test-session-read-auth",
       "invariant": "Persisted live-beta TestRun transcripts must require the configured internal bearer token on generic TestSession read paths, while legacy Studio TestSession reads retain the existing compatibility contract.",
-      "redSha": "3ef5f9f0736f7e2afed359562c324c981954b94e",
+      "redSha": "ae129b3ba22cc3c42150f05850293824b38c0ae7",
       "testFile": "src/services/testSessionReadAccessRegression.test.ts",
       "reported": "reported: blocks a predictable live-beta TestRun read without internal auth",
       "neighbors": [
