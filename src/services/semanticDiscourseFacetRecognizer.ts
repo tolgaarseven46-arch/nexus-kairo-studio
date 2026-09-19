@@ -11,6 +11,7 @@ export interface CanonicalDiscourseSignalReading {
   answerFriction: boolean;
   stateAnswerShape: boolean;
   shortUtteranceShape: boolean;
+  uncertaintyAnswerShape: boolean;
   activityAnswerShape: boolean;
 }
 
@@ -23,6 +24,9 @@ const PRIOR_ANSWER_FRICTION_RE =
 const STATE_ANSWER_PREFIX_RE =
   /^(?:iyi(?:yim|dir)?|k[öo]t[üu](?:y[üu]m)?|fena\s+değil|eh\b|idare\b|normal\b|ayn[ıi]\b|moral(?:im)?\b|mod(?:um)?\b)/iu;
 
+const UNCERTAINTY_ANSWER_RE =
+  /^(?:bilm(?:iyorum|iyom|iyorum|em)|karars[ıi]z(?:ım|im)?|emin\s+değilim|fikrim\s+yok|daha\s+bilmiyorum)(?:\s+.*)?$/iu;
+
 const ACTIVITY_ANSWER_PREFIX_RE =
   /^(?:tak[ıi]l|çalış|çal[ıi][şs]|otur|evde|işte|okulda|dışarı|boş|hiçbir|bi\s+şey|bir\s+şey)/iu;
 
@@ -34,6 +38,7 @@ export function recognizeCanonicalDiscourseSignals(message: string): CanonicalDi
     answerFriction: PRIOR_ANSWER_FRICTION_RE.test(text),
     stateAnswerShape: STATE_ANSWER_PREFIX_RE.test(text),
     shortUtteranceShape: text.length > 0 && wordCount <= 4,
+    uncertaintyAnswerShape: UNCERTAINTY_ANSWER_RE.test(text),
     activityAnswerShape: ACTIVITY_ANSWER_PREFIX_RE.test(text),
   };
 }
