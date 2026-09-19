@@ -3,7 +3,11 @@ import { authorizeKairaInternalWorker } from "./kairaInternalWorkerAuth";
 import { buildRuntimeTestRunRecordV1 } from "./testRunRuntimeProvenance";
 import { resolveChatTestRunBinding } from "./testRunLiveBinding";
 import { loadTestSession } from "./kdmPersistenceService";
-import { deriveKairaFirstEncounterContinuity } from "./kairaFirstEncounterContinuity";
+import {
+  deriveKairaFirstEncounterContinuity,
+  deriveKairaFirstEncounterContinuityFromPlatformHistory,
+  type KairaPlatformRecentHistoryTurn,
+} from "./kairaFirstEncounterContinuity";
 
 const CONTRACT_VERSION = 1 as const;
 
@@ -18,6 +22,12 @@ type PrivatRoomDmEvent = {
     kind: "direct" | "room";
     conversationId: string;
     participantIds: [string, string];
+    roomContext?: {
+      roomId?: string;
+      roomName?: string;
+      actorIsOwner?: boolean;
+      recentHistory?: KairaPlatformRecentHistoryTurn[];
+    };
   };
   actor: {
     userId: string;
@@ -57,6 +67,10 @@ function isEvent(value: unknown): value is PrivatRoomDmEvent {
     (event.conversation?.kind === "direct" ||
       event.conversation?.kind === "room") &&
     typeof event.conversation?.conversationId === "string" &&
+    (event.conversation?.roomContext === undefined ||
+      (typeof event.conversation.roomContext === "object" &&
+        (event.conversation.roomContext.recentHistory === undefined ||
+          Array.isArray(event.conversation.roomContext.recentHistory)))) &&
     Array.isArray(event.conversation?.participantIds) &&
     event.conversation!.participantIds.length === 2 &&
     typeof event.actor?.userId === "string" &&
@@ -130,12 +144,24 @@ export function registerPrivatRoomDmIntegrationRoute(app: Express) {
       record: testRunRecord,
     });
 
-    const restoredSession = await loadTestSession(testRunBinding.sessionId).catch(
-      () => null,
-    );
-    const firstEncounter = deriveKairaFirstEncounterContinuity(
-      restoredSession?.turns || [],
-    );
+    const platformFirstEncounter =
+      event.conversation.kind === "room" &&
+      Array.isArray(event.conversation.roomContext?.recentHistory)
+        ? deriveKairaFirstEncounterContinuityFromPlatformHistory({
+            roomId:
+              event.conversation.roomContext?.roomId ||
+              event.conversation.conversationId.replace(/^room:/, ""),
+            roomName: event.conversation.roomContext?.roomName,
+            isOwner: event.conversation.roomContext?.actorIsOwner,
+            recentHistory: event.conversation.roomContext?.recentHistory || [],
+          })
+        : null;
+    const restoredSession = platformFirstEncounter
+      ? null
+      : await loadTestSession(testRunBinding.sessionId).catch(() => null);
+    const firstEncounter =
+      platformFirstEncounter ||
+      deriveKairaFirstEncounterContinuity(restoredSession?.turns || []);
 
     const corePayload = {
       requestId: `privatroom_${safeId(event.eventId)}`,
