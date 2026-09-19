@@ -691,3 +691,28 @@ v8 coordination rule:
 - lease renewal, failure cleanup, replay completion and state release remain unchanged after acquisition.
 
 This removes one full Firestore transaction from the normal first-encounter critical path without weakening replay or state-serialization guarantees.
+
+
+## 40. First-encounter first-user hydration v9 (2026-09-18)
+
+v8 production proof:
+- reply `güzel, sevindim`
+- `providerUsed=local_language`
+- `socialRoutine=well_being_reply`
+- `aiMs=0`
+- `semanticMs=226`
+- `memoryMs=1386`
+- `kdmMs=13`
+- `postProcessMs=0`
+- `serverTotalMs=5654`
+- client wall time `6019ms`
+
+The remaining measured avoidable cost is remote relationship hydration on the first user turn of a first-encounter flow.
+
+v9 rule:
+- if `conversationPhase=first_encounter` and sanitized history contains no prior user turn, persisted relationship state is not fetched from Firestore before response;
+- explicit request dynamicState remains authoritative when supplied;
+- later first-encounter turns and all default turns keep persistent relationship hydration unchanged;
+- deferred continuity persistence remains lease-held exactly as in v7/v8.
+
+This is a first-turn scheduling optimization only; no semantic or relationship authority is changed.

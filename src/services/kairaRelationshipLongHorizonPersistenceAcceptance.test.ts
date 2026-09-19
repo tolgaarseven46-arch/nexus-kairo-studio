@@ -123,7 +123,8 @@ describe("Kaira long-horizon relationship progression and persistence acceptance
 
   it("keeps the production persistence seam scoped to persistent Kaira instances", () => {
     const server = readFileSync("server.ts", "utf8");
-    expect(server).toContain("const persistedStatePromise = kairaPolicy.persistentRelationship");
+    expect(server).toContain("const persistedStatePromise = isFirstEncounterFirstUserTurn");
+    expect(server).toContain("kairaPolicy.persistentRelationship");
     expect(server).toContain("loadKdmState(stateUserId)");
     expect(server).toContain("kairaPolicy.persistentRelationship ? saveKdmInteraction({");
     expect(server).toContain("dynamicState: kdm.nextDynamicState");
