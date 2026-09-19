@@ -1,6 +1,7 @@
 import {
   canEnterSliceBW3,
   type SliceBW2ReviewIntake,
+  type SliceBW2TrustedReviewProvenance,
 } from "./sliceBW2ReviewIntake";
 
 export interface SliceBW2ToW3TransitionPlan {
@@ -26,11 +27,12 @@ const BASE_FREEZE_CHECKLIST = [
 
 export const buildSliceBW2ToW3TransitionPlan = (
   review: SliceBW2ReviewIntake,
+  provenance?: SliceBW2TrustedReviewProvenance,
 ): SliceBW2ToW3TransitionPlan => {
   const unresolvedBlockerIds = review.blockers.map((blocker) => blocker.id);
 
   return {
-    canFreezeW3: canEnterSliceBW3(review),
+    canFreezeW3: canEnterSliceBW3(review, provenance),
     unresolvedBlockerIds,
     requiredRepairs: review.blockers.map((blocker) => ({
       blockerId: blocker.id,

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildSliceBW2ToW3TransitionPlan } from "./sliceBW2ToW3TransitionPlanner";
-import type { SliceBW2ReviewIntake } from "./sliceBW2ReviewIntake";
+import type {
+  SliceBW2ReviewIntake,
+  SliceBW2TrustedReviewProvenance,
+} from "./sliceBW2ReviewIntake";
 
 const cleanReview: SliceBW2ReviewIntake = {
   reviewer: {
@@ -22,9 +25,26 @@ const cleanReview: SliceBW2ReviewIntake = {
   },
 };
 
+const trustedProvenance: SliceBW2TrustedReviewProvenance = {
+  source: "github_review",
+  evidenceRef:
+    "https://github.com/tolgaarseven46-arch/nexus-kairo-studio/pull/305#pullrequestreview-123",
+  reviewerIdentity: "external-reviewer[bot]",
+  verifiedIndependent: true,
+  verifiedBy: "w2-review-intake",
+};
+
 describe("Slice B W2 → W3 transition planner", () => {
-  it("opens W3 only for a clean accepted review", () => {
+  it("keeps W3 closed without separately trusted external provenance", () => {
     const plan = buildSliceBW2ToW3TransitionPlan(cleanReview);
+    expect(plan.canFreezeW3).toBe(false);
+  });
+
+  it("opens W3 only for a clean accepted review with trusted provenance", () => {
+    const plan = buildSliceBW2ToW3TransitionPlan(
+      cleanReview,
+      trustedProvenance,
+    );
     expect(plan.canFreezeW3).toBe(true);
     expect(plan.unresolvedBlockerIds).toEqual([]);
     expect(plan.requiredRepairs).toEqual([]);
@@ -50,7 +70,9 @@ describe("Slice B W2 → W3 transition planner", () => {
       },
     };
 
-    expect(buildSliceBW2ToW3TransitionPlan(review)).toMatchObject({
+    expect(
+      buildSliceBW2ToW3TransitionPlan(review, trustedProvenance),
+    ).toMatchObject({
       canFreezeW3: false,
       unresolvedBlockerIds: ["B-W2-01"],
       requiredRepairs: [
@@ -81,7 +103,7 @@ describe("Slice B W2 → W3 transition planner", () => {
       ],
     };
 
-    const plan = buildSliceBW2ToW3TransitionPlan(review);
+    const plan = buildSliceBW2ToW3TransitionPlan(review, trustedProvenance);
     expect(plan.canFreezeW3).toBe(true);
     expect(plan.unresolvedBlockerIds).toEqual([]);
   });

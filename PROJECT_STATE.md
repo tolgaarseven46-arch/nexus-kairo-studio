@@ -791,3 +791,21 @@ Fresh RED→GREEN repair:
 - both exact-id and active-session generic read routes enforce the same policy.
 
 This is privacy/access-control hardening only. It does not alter Kaira WHAT/WHETHER behavior, Conversation Graph authority, or Slice B design, so W2 remains independently gated.
+
+
+## 45. Slice B W2 independence provenance hardening (2026-09-19)
+
+A governance gap was identified in the W2 intake gate: the review payload itself could self-declare `reviewer.independent=true`, and the W3 entry function did not require a separately trusted provenance receipt.
+
+RED:
+- historical RED commit: `e32547d0013367b5ce70d6c987303932aa466719`;
+- a structurally valid self-attested review payload incorrectly opened W3.
+
+Repair:
+- payload shape validation remains separate from reviewer-independence verification;
+- W3 entry now requires a trusted provenance object with an external GitHub review or external-artifact reference, reviewer identity, `verifiedIndependent=true`, and verifier identity;
+- the W2→W3 transition planner receives the same trusted provenance and remains closed without it;
+- reviewer handoff docs explicitly state that `reviewer.independent=true` is declaration only and cannot open W3;
+- this governance hardening is NOT a W2 review and does not advance W3.
+
+Slice B remains blocked on an actual external independent W2 review submission plus separately verified provenance.
