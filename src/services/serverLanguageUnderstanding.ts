@@ -80,7 +80,7 @@ const isFirstEncounterRoomScopeQuestion = (
 
 
 const FIRST_ENCOUNTER_KAIRA_ROLE_RE =
-  /(?:(?:^|\s)(?:sen|kaira)(?:\s|.*?)?(?:ne\s+yap(?:acaksın|ıcaksın)|ne\s+işe\s+yara\p{L}*|görevin\s+ne|rolün\s+ne)(?=$|\s|[?.!…])|(?:^|\s)(?:görevin\s+ne|rolün\s+ne)(?=$|\s|[?.!…])|(?:^|\s)(?:burada|burda|sunucuda|odada)(?:\s|.*?)(?:sen\s+)?ne\s+yap(?:acaksın|ıcaksın)(?=$|\s|[?.!…]))/iu;
+  /(?:(?:^|\s)(?:sen|kaira)(?:\s|.*?)?(?:ne\s+yap(?:acaksın|ıcaksın)|ne\s+işe\s+yar\p{L}*|görevin\s+ne|rolün\s+ne)(?=$|\s|[?.!…])|(?:^|\s)(?:görevin\s+ne|rolün\s+ne)(?=$|\s|[?.!…])|(?:^|\s)(?:burada|burda|sunucuda|odada)(?:\s|.*?)(?:sen\s+)?ne\s+yap(?:acaksın|ıcaksın)(?=$|\s|[?.!…]))/iu;
 
 const isFirstEncounterKairaRoleQuestion = (
   message: string,
