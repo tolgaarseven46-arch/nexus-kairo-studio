@@ -14,27 +14,49 @@ export interface KairaWelcomeRealization {
   realizationVariantSeed: string;
 }
 
-const ROOM_CREATED_VARIANTS = [
-  (_name: string) => "Selam, ben Kaira. Burayı sen şekillendiriyorsun; ben de gerektiğinde yanında olur, ortamı birlikte canlandırırım.",
-  (_name: string) => "Hey, Kaira ben 😄 Yeni odadayız; sen yön ver, ben gerektiğinde el atarım.",
-  (_name: string) => "Selam! Ben Kaira. Sana yardımcı olmak için buradayım; bu odayı beraber güzel bir yere çeviririz.",
-  (_name: string) => "Kaira ben. Sen ortamı kuruyorsun, ben de gerektiğinde toparlar ve hareketlendiririm 😄",
-  (_name: string) => "Selam, ben Kaira. Burası senin alanın; ihtiyaç olduğunda yanındayım, gerisini beraber şekillendiririz.",
-  (_name: string) => "Hey 😄 Ben Kaira. Burada işini kolaylaştırırım; oda nasıl bir yere dönüşecek, onu sen belirlersin.",
-  (_name: string) => "Selam! Kaira ben. Sen bu odaya karakterini ver, ben de gerektiğinde destek olayım.",
-  (_name: string) => "Ben Kaira. Burayı birlikte canlı bir ortama çevirebiliriz; ne zaman lazım olursam buradayım.",
-];
+const OWNER_OPENINGS = [
+  "Selam",
+  "Hey 😄",
+  "Selam 😄",
+  "Hey",
+] as const;
 
-const PARTICIPANT_JOINED_VARIANTS = [
-  (name: string) => `Selam ${name}, hoş geldin. Ben Kaira; bir şeye ihtiyacın olursa buradayım.`,
-  (name: string) => `Hoş geldin ${name}. Kaira ben — yabancılık çekme, gerektiğinde seslen.`,
-  (name: string) => `Hey ${name}, geldin demek 😄 Hoş geldin; ben Kaira, buralardayım.`,
-  (name: string) => `Selam ${name}. Yeni geldin diye uzun konuşmayayım; hoş geldin, ben Kaira.`,
-  (name: string) => `${name}, hoş geldin. Ben Kaira; ortamı sen keşfet, ihtiyaç olursa yanındayım.`,
-  (name: string) => `Hoş geldin ${name}. Ben Kaira — keyfine bak, bir şey gerekirse seslen yeter.`,
-  (name: string) => `Selam! Kaira ben. Hoş geldin ${name}; rahat ol, burası senin de ortamın artık.`,
-  (name: string) => `Yeni biri geldi 👀 ${name}, hoş geldin. Ben Kaira, burada denk geliriz.`,
-];
+const OWNER_IDENTITIES = [
+  "Kaira ben",
+  "Ben Kaira",
+] as const;
+
+const OWNER_ROOM_BEATS = [
+  (roomName: string) =>
+    roomName
+      ? `“${roomName}” daha yeni; güzel, birlikte oturturuz.`
+      : "Burası daha yeni; güzel, birlikte oturturuz.",
+  (_roomName: string) =>
+    "Yeni oda, boş sayfa sayılır 😄 zamanla kendi havasını bulur.",
+  (roomName: string) =>
+    roomName
+      ? `“${roomName}” şimdilik tertemiz bir sayfa; bakalım nasıl bir yere dönüşecek.`
+      : "Şimdilik tertemiz bir sayfa; bakalım nasıl bir yere dönüşecek.",
+  (_roomName: string) =>
+    "Daha ilk dakikalar 😄 ortam birazdan kendi şeklini bulur.",
+] as const;
+
+const MEMBER_OPENINGS = [
+  (name: string) => `Selam ${name}, hoş geldin.`,
+  (name: string) => `Hey ${name} 😄 hoş geldin.`,
+  (name: string) => `${name}, hoş geldin.`,
+  (name: string) => `Hoş geldin ${name}.`,
+] as const;
+
+const MEMBER_ROOM_BEATS = [
+  (_roomName: string) => "Rahat ol, buralar çabuk tanıdık gelir.",
+  (_roomName: string) => "Tam zamanında geldin 😄",
+  (_roomName: string) => "Yerleş, birazdan ortamı kaparsın.",
+  (roomName: string) =>
+    roomName
+      ? `“${roomName}”a hoş geldin; takıl kafana göre.`
+      : "Takıl kafana göre, hoş geldin.",
+] as const;
 
 const fnv1a = (value: string): number => {
   let hash = 2166136261;
@@ -45,28 +67,70 @@ const fnv1a = (value: string): number => {
   return hash >>> 0;
 };
 
+const combinationIndex = (seed: string, combinations: number) =>
+  fnv1a(seed) % combinations;
+
+const cleanDisplayName = (value: string) => {
+  const displayName = value.trim() || "arkadaşım";
+  return /^(?:beta kullanıcısı|oyuncu|siz|sen|kullanıcı)$/iu.test(displayName)
+    ? ""
+    : displayName;
+};
+
+const cleanSpacing = (value: string) =>
+  value
+    .replace(/\s+([,.!?])/gu, "$1")
+    .replace(/\s{2,}/gu, " ")
+    .trim();
+
 export function realizeKairaWelcome(
   input: KairaWelcomeRealizationInput,
 ): KairaWelcomeRealization {
   const seed = `${input.eventId}:${input.kairaInstanceId}:${input.decision.tone}`;
-  const variants =
-    input.decision.introduceSelf ? ROOM_CREATED_VARIANTS : PARTICIPANT_JOINED_VARIANTS;
-  const index = fnv1a(seed) % variants.length;
-  const variantId = `${input.decision.introduceSelf ? "room_created" : "participant_joined"}_v${index + 1}`;
-  const displayName = input.actorDisplayName.trim() || "arkadaşım";
-  const genericName = /^(?:beta kullanıcısı|oyuncu|siz|sen|kullanıcı)$/iu.test(displayName);
-  const realized = variants[index](displayName);
-  const text = genericName
-    ? realized
-        .replace(
-          new RegExp("(^|\\s)" + displayName + "(?=[,.!?\\s]|$)", "giu"),
-          "$1",
-        )
-        .replace(/^\s*[,.-]+\s*/u, "")
-        .replace(/\s+([,.!?])/gu, "$1")
-        .replace(/\s{2,}/gu, " ")
-        .trim()
-    : realized;
+  const roomName = input.roomName.trim();
+  const displayName = cleanDisplayName(input.actorDisplayName);
+
+  let text: string;
+  let variantId: string;
+
+  if (input.decision.introduceSelf) {
+    const combination = combinationIndex(
+      seed,
+      OWNER_OPENINGS.length * OWNER_IDENTITIES.length * OWNER_ROOM_BEATS.length,
+    );
+    const openingIndex = combination % OWNER_OPENINGS.length;
+    const identityIndex =
+      Math.floor(combination / OWNER_OPENINGS.length) % OWNER_IDENTITIES.length;
+    const roomBeatIndex =
+      Math.floor(
+        combination / (OWNER_OPENINGS.length * OWNER_IDENTITIES.length),
+      ) % OWNER_ROOM_BEATS.length;
+
+    const opening = OWNER_OPENINGS[openingIndex];
+    const identity = OWNER_IDENTITIES[identityIndex];
+    const roomBeat = OWNER_ROOM_BEATS[roomBeatIndex](roomName);
+
+    text = cleanSpacing(`${opening}, ${identity}. ${roomBeat}`);
+    variantId = `room_created_o${openingIndex + 1}_i${identityIndex + 1}_r${roomBeatIndex + 1}`;
+  } else {
+    const combination = combinationIndex(
+      seed,
+      MEMBER_OPENINGS.length * MEMBER_ROOM_BEATS.length,
+    );
+    const openingIndex = combination % MEMBER_OPENINGS.length;
+    const roomBeatIndex =
+      Math.floor(combination / MEMBER_OPENINGS.length) % MEMBER_ROOM_BEATS.length;
+
+    const opening = displayName
+      ? MEMBER_OPENINGS[openingIndex](displayName)
+      : ["Selam, hoş geldin.", "Hey 😄 hoş geldin.", "Hoş geldin.", "Selam 😄 hoş geldin."][
+          openingIndex
+        ];
+    const roomBeat = MEMBER_ROOM_BEATS[roomBeatIndex](roomName);
+
+    text = cleanSpacing(`${opening} ${roomBeat}`);
+    variantId = `participant_joined_o${openingIndex + 1}_r${roomBeatIndex + 1}`;
+  }
 
   for (const term of input.decision.prohibitedTerms) {
     if (text.toLocaleLowerCase("tr-TR").includes(term.toLocaleLowerCase("tr-TR"))) {
