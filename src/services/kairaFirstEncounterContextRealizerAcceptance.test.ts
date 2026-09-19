@@ -70,4 +70,38 @@ describe("first-encounter platform-context acceptance", () => {
 
     expect(replies.size).toBeGreaterThanOrEqual(3);
   });
+
+  it.each([
+    ["kaira_role", "natural_reaction"],
+    ["room_setup", "natural_reaction"],
+  ] as const)(
+    "lets typed platform scope own realization even when dialogue move is %s/%s",
+    (platformScopeQuery, move) => {
+      const result = realizeKairaFirstEncounterContext({
+        requestId: `typed-scope-${platformScopeQuery}`,
+        interpretation: {
+          discourseFacets: {
+            socialRoutine: "none",
+            platformScopeQuery,
+            discourseAct: "question",
+          },
+        } as any,
+        plan: {
+          move,
+          relationshipLevel: "new",
+          allowQuestion: false,
+          allowHumor: true,
+        } as any,
+        context: { roomName: "deneme", isOwner: true },
+      });
+
+      expect(result.handled).toBe(true);
+      if (platformScopeQuery === "kaira_role") {
+        expect(result.reply).toMatch(/sunucu|yönetim/iu);
+      } else {
+        expect(result.reply).toMatch(/oda|sohbet|ortam/iu);
+      }
+    },
+  );
+
 });
