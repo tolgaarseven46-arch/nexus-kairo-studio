@@ -45,3 +45,8 @@ For first-encounter local fast replies, relationship and TestRun turn continuity
 ## Clarification — KNT Firestore payload hygiene
 
 KNT trace persistence is evidence/telemetry only and gains no new behavior or semantic authority. Before a KNT trace is written to Firestore, undefined values are removed recursively from the complete payload, including nested dynamic relationship state. This keeps live TestRun evidence durable without changing the canonical in-memory state or response path.
+
+
+## Clarification — request-start background pause
+
+A new first-encounter request pauses any pending non-critical background flush for the same user+Kaira instance before distributed coordination is claimed. Queued telemetry jobs are preserved, not discarded. After the current turn's critical continuity barrier completes, enqueueing the new job restarts the conversational idle window for the full preserved queue. This prevents a prior turn's delayed Firestore telemetry flush from waking up while the next user turn is in progress.

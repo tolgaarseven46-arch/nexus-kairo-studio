@@ -154,8 +154,15 @@ type FirstEncounterBackgroundJob = () => Promise<void>;
 const FIRST_ENCOUNTER_BACKGROUND_IDLE_MS = 5_000;
 const firstEncounterBackgroundQueues = new Map<
   string,
-  { timer: ReturnType<typeof setTimeout>; jobs: FirstEncounterBackgroundJob[] }
+  { timer: ReturnType<typeof setTimeout> | null; jobs: FirstEncounterBackgroundJob[] }
 >();
+
+function pauseFirstEncounterBackgroundPersistence(key: string) {
+  const existing = firstEncounterBackgroundQueues.get(key);
+  if (!existing?.timer) return;
+  clearTimeout(existing.timer);
+  firstEncounterBackgroundQueues.set(key, { timer: null, jobs: existing.jobs });
+}
 
 function enqueueFirstEncounterBackgroundPersistence(
   key: string,
@@ -163,7 +170,7 @@ function enqueueFirstEncounterBackgroundPersistence(
 ) {
   const existing = firstEncounterBackgroundQueues.get(key);
   const jobs = existing ? [...existing.jobs, job] : [job];
-  if (existing) clearTimeout(existing.timer);
+  if (existing?.timer) clearTimeout(existing.timer);
 
   const timer = setTimeout(async () => {
     const queued = firstEncounterBackgroundQueues.get(key);
@@ -778,6 +785,11 @@ app.post("/api/chat", async (req, res) => {
                 : undefined,
           }
         : undefined;
+    const firstEncounterBackgroundQueueKey =
+      `${stateUserId}::${kairaInstance.instanceId}`;
+    if (conversationPhase === "first_encounter") {
+      pauseFirstEncounterBackgroundPersistence(firstEncounterBackgroundQueueKey);
+    }
     const requestIdentity = resolveKairaChatRequestCoordinationIdentity(
       incomingRequestId,
       randomUUID,
@@ -1547,8 +1559,7 @@ app.post("/api/chat", async (req, res) => {
             await completeCoordinatedKairaChatRequest(coordinationKey, responsePayload);
             ownsCoordinationClaim = false;
           }
-          const backgroundQueueKey = `${stateUserId}::${kairaInstance.instanceId}`;
-          enqueueFirstEncounterBackgroundPersistence(backgroundQueueKey, async () => {
+          enqueueFirstEncounterBackgroundPersistence(firstEncounterBackgroundQueueKey, async () => {
             const queuedBackgroundStart = now();
             await saveMetricTelemetry();
             await saveKntTelemetry();
