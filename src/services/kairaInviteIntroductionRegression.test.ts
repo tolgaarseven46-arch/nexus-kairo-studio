@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+import {
+  decideKairaInviteIntroduction,
+  realizeKairaInviteIntroduction,
+} from "./kairaInviteIntroduction";
+
+describe("Kaira explicit invite introduction", () => {
+  it("is minimal, natural, and only explains the invited role", () => {
+    const decision = decideKairaInviteIntroduction({
+      actorDisplayName: "Tolga",
+      isOwner: true,
+    });
+
+    for (let i = 0; i < 24; i += 1) {
+      const realized = realizeKairaInviteIntroduction({
+        eventId: `invite-${i}`,
+        kairaInstanceId: "kaira_reference_001",
+        decision,
+      });
+
+      expect(realized.text).toMatch(/kaira/iu);
+      expect(realized.text).toMatch(/sunucu/iu);
+      expect(realized.text).toMatch(/yardım|yanında|destek|beraber/iu);
+      expect(realized.text).not.toMatch(/oda adı|nasıl bir ortam|droit|pipeline|yapay zeka/iu);
+      expect((realized.text.match(/[.!?]/g) || []).length).toBeLessThanOrEqual(2);
+      expect(realized.text).not.toMatch(/\?$/u);
+    }
+  });
+
+  it("is deterministic for the same invite event", () => {
+    const decision = decideKairaInviteIntroduction({
+      actorDisplayName: "Tolga",
+      isOwner: true,
+    });
+    const input = {
+      eventId: "invite-same",
+      kairaInstanceId: "kaira_reference_001",
+      decision,
+    };
+    expect(realizeKairaInviteIntroduction(input)).toEqual(
+      realizeKairaInviteIntroduction(input),
+    );
+  });
+});
