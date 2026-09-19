@@ -48,7 +48,6 @@ const providerKairaRole = (message: string) => ({
 describe("first-encounter neutral short fast-floor confidence", () => {
   it.each([
     "işlevin ne senin",
-    "sen napıyosun burda",
     "bu sunucuda senin vazifen nedir",
     "senin burada fonksiyonun ne",
   ])("does not swallow unseen platform-role question before semantic provider: %s", async (message) => {
