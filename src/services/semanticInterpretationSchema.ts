@@ -41,6 +41,10 @@ const ROUTINES = new Set<SemanticSocialRoutine>([
   "none", "greeting", "how_are_you", "what_doing", "thanks", "agreement",
   "goodbye", "good_night", "emotional_opening",
 ]);
+const PLATFORM_SCOPE_QUERIES = new Set<NonNullable<SemanticDiscourseFacets["platformScopeQuery"]>>([
+  "room_setup",
+  "kaira_role",
+]);
 const DISCOURSE_ACTS = new Set<SemanticDiscourseAct>([
   "none", "correction", "topic_shift", "recall_request", "confusion_or_challenge",
 ]);
@@ -194,6 +198,9 @@ function normalizeDiscourseFacets(value: unknown): SemanticDiscourseFacets {
   const v = (value ?? {}) as Record<string, unknown>;
   return {
     socialRoutine: ROUTINES.has(v.socialRoutine as SemanticSocialRoutine) ? v.socialRoutine as SemanticSocialRoutine : "none",
+    ...(PLATFORM_SCOPE_QUERIES.has(v.platformScopeQuery as NonNullable<SemanticDiscourseFacets["platformScopeQuery"]>)
+      ? { platformScopeQuery: v.platformScopeQuery as NonNullable<SemanticDiscourseFacets["platformScopeQuery"]> }
+      : {}),
     discourseAct: DISCOURSE_ACTS.has(v.discourseAct as SemanticDiscourseAct) ? v.discourseAct as SemanticDiscourseAct : "none",
     repairSignal: REPAIR_SIGNALS.has(v.repairSignal as SemanticRepairSignal) ? v.repairSignal as SemanticRepairSignal : "none",
     adviceRequested: asBool(v.adviceRequested), knowledgeQuery: normalizeQuery(v.knowledgeQuery), selfMemoryQuery: normalizeSelfMemoryQuery(v.selfMemoryQuery),
