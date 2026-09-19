@@ -933,3 +933,26 @@ W5 implementation still follows characterization RED -> minimal GREEN.
 Tracked non-blockers:
 - NB-W2-07: deep participant/event element whitelist in evidence-view hardening;
 - NB-W2-08: cryptographic owner attestation only if the registry later crosses a less-trusted boundary.
+
+
+## 50. Slice B W4 -> W5 characterization RED entry (2026-09-19)
+
+W2 is closed and W3 is frozen/authoritative on main `e0f191fd0cbbd59de3a9007fa2b7755f26f946c3`.
+
+W4/W5 preparation is now active on branch `test/slice-b-w5-characterization-red`.
+
+Completed before RED:
+- all 29 active W4 targets are bound to deterministic fixture/assertion evidence in `docs/tests/slice-b-w4-w5-characterization-map.md`;
+- W5 fixture spec is activated for characterization only;
+- the stale F-B08 duplicate-conflict ambiguity is closed as a narrow frozen invariant:
+  - identical duplicate eventId = idempotent no-op;
+  - divergent payload with same eventId = fail closed with typed `duplicate_event_conflict`;
+  - existing accepted event/counters/edges remain unchanged.
+
+W5 rule:
+- characterization assertions are written before Conversation Graph runtime implementation;
+- intended RED must come from missing Slice B graph runtime, not from an ambiguous fixture;
+- existing pre-Slice-B suites must remain GREEN;
+- no WHAT/WHETHER, relationship/appraisal, moderation/capability or semantic authority is introduced.
+
+After RED proof is recorded, W6 may add only the minimum runtime implementation needed to satisfy the frozen characterization.
