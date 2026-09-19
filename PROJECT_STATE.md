@@ -1165,3 +1165,24 @@ Closure requires:
 - exact-head CI GREEN on the repaired branch;
 - merge + Render LIVE;
 - model-in-the-loop/live proof with unseen paraphrases, not only phrases present in the fast regex set.
+
+
+## 58. Explicit-invite independent review — neutral-short fast-path leak (2026-09-19)
+
+Live unseen-paraphrase proof after the platform-scope authority repair exposed a second blocker.
+
+Production RED:
+- input: `işlevin ne senin`;
+- expected: canonical provider -> `platformScopeQuery=kaira_role` -> deterministic role realizer;
+- actual: provider was skipped;
+- actual reply: `Sorun değil 😄 hemen karar vermen gerekmiyor; ihtiyaç çıktıkça beraber toparlarız.`;
+- cause: `isSafeFirstEncounterNeutralShortFastPath` accepted any harmless short `other|smalltalk` utterance, so an unseen short question was mistaken for a “bilmiyom daha” style answer.
+
+Repair on `fix/neutral-short-fastpath-fail-closed`:
+- add typed ingestion-time `uncertaintyAnswerShape`;
+- local uncertainty/indecision replies remain provider-free;
+- generic unclassified short utterances no longer qualify for neutral steering;
+- unseen platform-scope questions fail closed to the canonical semantic provider;
+- steering realizer consumes the typed cue and does not parse raw text.
+
+Closure requires exact-head CI GREEN, merge + Render LIVE, then repeat the unseen paraphrase production proof.
