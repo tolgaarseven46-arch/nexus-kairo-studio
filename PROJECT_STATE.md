@@ -1052,3 +1052,22 @@ Promotion rule remains unchanged:
 - W8 must prove the deployed Kaira + PrivatRoom commits live,
 - TestRun evidence must show graph observation persisted,
 - any cross-user/cross-server contamination or live/replay boundary violation stops promotion.
+
+
+## 54. Slice B W8 participant-roster proof repair (2026-09-19)
+
+The first W8 live-proof workflow reached production successfully, but could not satisfy the frozen multi-user acceptance threshold because the synthetic beta probe endpoint did not itself persist a second human room membership into the platform transcript context.
+
+This is a proof-path defect, not a reason to weaken W8 acceptance.
+
+Repair:
+- PrivatRoom room context now carries the authoritative room participant roster as platform facts;
+- Kaira Conversation Graph observation may create participant nodes from that roster even when a roster participant has not authored a message;
+- roster-only participants do not create fabricated message events;
+- actor kind and platform roles remain platform-owned facts;
+- W8 still requires at least two human participants, one Droit/Kaira participant, and three total participants;
+- no WHAT/WHETHER, semantic, relationship, appraisal or moderation authority is introduced.
+
+Counterpart PrivatRoom repair:
+- beta participant.joined persists membership only on betaCreated rooms;
+- the one-shot W8 workflow creates a fresh beta room, joins a second human, then sends the live proof message.
