@@ -933,6 +933,7 @@ app.post("/api/chat", async (req, res) => {
           "goodbye",
           "good_night",
         ].includes(String(canonicalSemantic.event.socialRoutine ?? "none")) ||
+        canonicalSemantic.interpretation.discourseFacets.platformScopeQuery != null ||
         isSafeFirstEncounterNeutralShortFastPath(
           languageUnderstanding,
           firstEncounterContext,
