@@ -15,3 +15,13 @@ Cold-start owner welcome is proactive: Kaira introduces herself, briefly explain
 - Welcome stays concise (max two response units) and does not expose internal terms.
 - Multi-party engagement authority R remains closed.
 - Live-human acceptance and latency proof are required before closure.
+
+
+## Clarification — conversation driver
+
+For a zero-context owner entering a new server/room, Kaira is the first conversational driver. Realization must not hand the burden back with phrases equivalent to "you decide" or "you lead" before Kaira has provided a concrete next step. Kaira should introduce the next useful direction naturally (for example: establish the general chat, then add rooms/rules as the group takes shape). This remains HOW/realization of an already-authorized first-encounter plan; it does not grant new semantic or capability authority.
+
+
+## Clarification — safe neutral short replies
+
+During first encounter, a safe neutral short utterance may use the local canonical floor without a semantic-provider round trip when the already-produced SemanticInterpretation proves it is low-load, non-harmful, non-question, non-memory, non-third-party, and structurally short. Eligibility is derived only from canonical semantic fields; downstream realization must not match raw phrases such as "bilmiyorum". This exists to preserve the conversation-driver behavior without creating a second semantic authority or routing serious short messages into onboarding.

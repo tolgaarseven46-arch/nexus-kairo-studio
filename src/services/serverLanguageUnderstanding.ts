@@ -138,6 +138,36 @@ function reconcileFirstEncounterWellBeingReply(
   };
 }
 
+export function isSafeFirstEncounterNeutralShortFastPath(
+  result: LanguageUnderstandingResult,
+  context?: ResolveServerLanguageUnderstandingInput["firstEncounterContext"],
+): boolean {
+  const interpretation = result.interpretation;
+  const event = result.event;
+  return Boolean(context) &&
+    interpretation.discourseFacets.shortUtteranceShape === true &&
+    (interpretation.primaryIntent === "other" || interpretation.primaryIntent === "smalltalk") &&
+    interpretation.target !== "third_party" &&
+    (interpretation.valence === "neutral" || interpretation.valence === "positive") &&
+    interpretation.emotionalLoad <= 0.35 &&
+    interpretation.secondarySocialActs.length === 0 &&
+    interpretation.discourseFacets.socialRoutine === "none" &&
+    interpretation.discourseFacets.discourseAct === "none" &&
+    interpretation.discourseFacets.repairSignal === "none" &&
+    interpretation.discourseFacets.knowledgeQuery == null &&
+    interpretation.discourseFacets.selfMemoryQuery == null &&
+    !interpretation.stopRequest &&
+    !event.insult &&
+    !event.redLine &&
+    !event.apology &&
+    !event.repairAttempt &&
+    !event.stopTalking &&
+    !event.stopQuestions &&
+    event.coercion === 0 &&
+    event.manipulation === 0 &&
+    event.privacyViolation === 0;
+}
+
 function isSafeTrivialSocialFastPath(result: LanguageUnderstandingResult): boolean {
   const event = result.event;
   return (
@@ -334,7 +364,8 @@ export async function resolveServerLanguageUnderstanding(
     );
     if (
       isSafeTrivialSocialFastPath(contextualFast) ||
-      hasFirstEncounterRoomContextSemantics(contextualFast)
+      hasFirstEncounterRoomContextSemantics(contextualFast) ||
+      isSafeFirstEncounterNeutralShortFastPath(contextualFast, input.firstEncounterContext)
     ) {
       return contextualFast;
     }

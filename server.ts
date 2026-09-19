@@ -10,7 +10,10 @@ import { normalizeKairaAffectBaseline } from "./src/services/kairaAffectBaseline
 import { assertCoordinatedKairaChatStateOwnership, claimCoordinatedKairaChatRequest, completeCoordinatedKairaChatRequest, failCoordinatedKairaChatRequest } from "./src/services/kairaChatIdempotencyCoordinator";
 import { resolveKairaChatRequestCoordinationIdentity } from "./src/services/kairaChatRequestCoordinationIdentity";
 import { normalizeDroitPersonality } from "./src/services/droitPersonalityNormalizer";
-import { resolveServerLanguageUnderstanding } from "./src/services/serverLanguageUnderstanding";
+import {
+  resolveServerLanguageUnderstanding,
+  isSafeFirstEncounterNeutralShortFastPath,
+} from "./src/services/serverLanguageUnderstanding";
 import { resolveGeneratedReplySemanticVerification } from "./src/services/kairaGeneratedReplySemanticVerification";
 import { buildBehaviorContract, behaviorContractInstruction } from "./src/services/behaviorContract";
 import { enforceBehaviorContract } from "./src/services/behaviorContractEnforcer";
@@ -124,6 +127,7 @@ import { registerPrivatRoomLifecycleIntegrationRoute } from "./src/services/priv
 import { buildKairaFirstEncounterInstruction } from "./src/services/kairaFirstEncounterContinuity";
 import { realizeKairaFirstEncounterRoutine } from "./src/services/kairaFirstEncounterRoutineRealizer";
 import { realizeKairaFirstEncounterContext } from "./src/services/kairaFirstEncounterContextRealizer";
+import { realizeKairaFirstEncounterSteering } from "./src/services/kairaFirstEncounterSteeringRealizer";
 import { buildKairaFirstEncounterRecoveryFallback } from "./src/services/kairaFirstEncounterRecovery";
 import { registerTestRunProvenanceRoute } from "./src/services/testRunProvenanceRoute";
 import { registerTestRunReviewRoute } from "./src/services/testRunReviewRoute";
@@ -875,16 +879,22 @@ app.post("/api/chat", async (req, res) => {
     };
     firstEncounterTrivialSocial =
       conversationPhase === "first_encounter" &&
-      [
-        "greeting",
-        "how_are_you",
-        "well_being_reply",
-        "what_doing",
-        "thanks",
-        "agreement",
-        "goodbye",
-        "good_night",
-      ].includes(String(canonicalSemantic.event.socialRoutine ?? "none"));
+      (
+        [
+          "greeting",
+          "how_are_you",
+          "well_being_reply",
+          "what_doing",
+          "thanks",
+          "agreement",
+          "goodbye",
+          "good_night",
+        ].includes(String(canonicalSemantic.event.socialRoutine ?? "none")) ||
+        isSafeFirstEncounterNeutralShortFastPath(
+          languageUnderstanding,
+          firstEncounterContext,
+        )
+      );
     const retrievedWorldEvents = kairaPolicy.persistentWorldModel && shouldRetrieveWorldEvents(canonicalSemantic.interpretation)
       ? rankWorldEventObservations(
           userMessage,
@@ -1068,9 +1078,19 @@ app.post("/api/chat", async (req, res) => {
               context: firstEncounterContext,
             })
           : { handled: false as const },
+      firstEncounterSteeringReply =
+        conversationPhase === "first_encounter"
+          ? realizeKairaFirstEncounterSteering({
+              requestId,
+              interpretation: canonicalSemantic.interpretation,
+              plan: responsePlan,
+            })
+          : { handled: false as const },
       firstEncounterFastReply = firstEncounterContextReply.handled
         ? firstEncounterContextReply
-        : firstEncounterRoutine,
+        : firstEncounterRoutine.handled
+          ? firstEncounterRoutine
+          : firstEncounterSteeringReply,
       local =
         firstEncounterFastReply.handled && firstEncounterFastReply.reply
           ? {

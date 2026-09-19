@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { decideKairaWelcome } from "./kairaWelcomeDecision";
 import { realizeKairaWelcome } from "./kairaWelcomeRealizer";
-import { resolveServerLanguageUnderstanding } from "./serverLanguageUnderstanding";
+import {
+  resolveServerLanguageUnderstanding,
+  isSafeFirstEncounterNeutralShortFastPath,
+} from "./serverLanguageUnderstanding";
 import { realizeKairaFirstEncounterRoutine } from "./kairaFirstEncounterRoutineRealizer";
 import { buildKairaFirstEncounterInstruction } from "./kairaFirstEncounterContinuity";
+import { realizeKairaFirstEncounterSteering } from "./kairaFirstEncounterSteeringRealizer";
 
 const ROOM_SCOPE_PARAPHRASES = [
   "burada ne yapıcaz",
@@ -66,6 +70,48 @@ describe("live first-encounter acceptance RED", () => {
     expect(result.handled).toBe(true);
     expect(result.reply).toMatch(/burayı|oda|ortam/iu);
     expect(result.reply).toMatch(/nasıl/iu);
+  });
+
+  it("keeps a safe neutral short reply off the semantic provider and lets Kaira steer", async () => {
+    let providerCalls = 0;
+    const result = await resolveServerLanguageUnderstanding({
+      message: "bilmiyom daha",
+      preferredProvider: "openrouter",
+      preferTrivialSocialFastPath: true,
+      firstEncounterContext: { roomName: "deneme", isOwner: true },
+      context: {
+        userName: "Tolga",
+        characterName: "Kaira",
+        recentMessages: [
+          { role: "assistant", content: "Nasıl bir ortam olsun?" },
+        ],
+      },
+      generateText: async () => {
+        providerCalls += 1;
+        throw new Error("semantic_provider_should_not_be_needed_for_safe_short_first_encounter");
+      },
+    });
+
+    expect(providerCalls).toBe(0);
+    expect(isSafeFirstEncounterNeutralShortFastPath(
+      result,
+      { roomName: "deneme", isOwner: true },
+    )).toBe(true);
+
+    const realized = realizeKairaFirstEncounterSteering({
+      requestId: "live-unsure",
+      interpretation: result.interpretation,
+      plan: {
+        move: "natural_reaction",
+        relationshipLevel: "new",
+        allowQuestion: true,
+        allowHumor: true,
+      } as any,
+    });
+
+    expect(realized.handled).toBe(true);
+    expect(realized.reply).toMatch(/ben|ilk adımı|başlangıcı/iu);
+    expect(realized.reply).toMatch(/sohbet|oda|ortam|düzen/iu);
   });
 
   it.each(ROOM_SCOPE_PARAPHRASES)(
