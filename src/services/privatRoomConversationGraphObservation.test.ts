@@ -65,6 +65,43 @@ describe("PrivatRoom -> Slice B live observation wiring", () => {
     expect(graph).not.toHaveProperty("responseDecision");
   });
 
+  it("includes platform roster participants even when they have no message event", () => {
+    const graph = buildPrivatRoomConversationGraphObservation({
+      event: {
+        eventId: "evt-current",
+        occurredAt: 300,
+        kairaInstanceId: "kaira-main",
+        conversation: {
+          kind: "room",
+          conversationId: "room:room-1",
+          participantIds: ["owner", "member", "droit_kaira_beta"],
+          roomContext: {
+            roomId: "room-1",
+            participants: [
+              { participantId: "owner", actorKind: "human", platformRoles: ["owner"] },
+              { participantId: "member", actorKind: "human", platformRoles: ["member"] },
+              { participantId: "droit_kaira_beta", actorKind: "droit", platformRoles: ["member"] },
+            ],
+            recentHistory: [],
+          },
+        },
+        actor: { userId: "member", displayName: "Member" },
+        message: { messageId: "m1", text: "selam", createdAt: 300 },
+      },
+      environmentId: "live-beta",
+      testRunId: "TR_live_beta_room-1",
+    });
+
+    expect(graph.events.map((event) => event.eventId)).toEqual(["m1"]);
+    expect(graph.participants.map((participant) => participant.participantId)).toEqual([
+      "droit_kaira_beta",
+      "member",
+      "owner",
+    ]);
+    expect(graph.participants.find((participant) => participant.participantId === "owner"))
+      .toMatchObject({ actorKind: "human", platformRoles: ["owner"], messageCount: 0 });
+  });
+
   it("does not invent platform history identities when metadata is absent", () => {
     const graph = buildPrivatRoomConversationGraphObservation({
       event: {

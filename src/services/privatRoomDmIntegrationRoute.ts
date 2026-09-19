@@ -27,6 +27,11 @@ type PrivatRoomDmEvent = {
       roomId?: string;
       roomName?: string;
       actorIsOwner?: boolean;
+      participants?: Array<{
+        participantId: string;
+        actorKind: "human" | "droit" | "system";
+        platformRoles?: Array<"owner" | "admin" | "moderator" | "member">;
+      }>;
       recentHistory?: KairaPlatformRecentHistoryTurn[];
     };
   };
