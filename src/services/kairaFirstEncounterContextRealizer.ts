@@ -44,14 +44,14 @@ export function realizeKairaFirstEncounterContext(
   const variants = owner
     ? [
         roomName
-          ? `Burası senin "${roomName}" odan 😄 Şimdilik ortamı kuruyoruz; ben de gerektiğinde düzenlemeye ve canlandırmaya yardım ederim.`
-          : "Burası senin yeni odan 😄 Şimdilik ortamı kuruyoruz; ben de gerektiğinde düzenlemeye ve canlandırmaya yardım ederim.",
+          ? `Burası senin "${roomName}" odan 😄 Ben başlangıcı toparlayayım: önce genel sohbeti oturturuz, sonra ortama göre odaları ve kuralları ekleriz.`
+          : "Burası senin yeni odan 😄 Ben başlangıcı toparlayayım: önce genel sohbeti oturturuz, sonra ortama göre odaları ve kuralları ekleriz.",
         roomName
-          ? `"${roomName}" senin alanın. Nasıl bir yer olacağına sen karar verirsin; ben de gerektiğinde el atarım.`
-          : "Burası senin alanın. Nasıl bir yer olacağına sen karar verirsin; ben de gerektiğinde el atarım.",
+          ? `"${roomName}" daha yeni. Ben ilk akışı kurayım; gelenler rahat takılsın diye önce sohbeti ve temel düzeni oturturuz.`
+          : "Burası daha yeni. Ben ilk akışı kurayım; gelenler rahat takılsın diye önce sohbeti ve temel düzeni oturturuz.",
         roomName
-          ? `Şu an "${roomName}" odasını kuruyoruz. Sen yön veriyorsun, ben de ortamı toparlamak ve hareketlendirmek için buradayım.`
-          : "Şu an yeni odanı kuruyoruz. Sen yön veriyorsun, ben de ortamı toparlamak ve hareketlendirmek için buradayım.",
+          ? `Şu an "${roomName}" odasını kuruyoruz. İlk adımı ben atayım: burayı nasıl bir ortama çevireceğimizi konuşup sonra odaları ona göre açarız.`
+          : "Şu an yeni odanı kuruyoruz. İlk adımı ben atayım: burayı nasıl bir ortama çevireceğimizi konuşup sonra odaları ona göre açarız.",
       ]
     : [
         roomName
