@@ -956,3 +956,21 @@ W5 rule:
 - no WHAT/WHETHER, relationship/appraisal, moderation/capability or semantic authority is introduced.
 
 After RED proof is recorded, W6 may add only the minimum runtime implementation needed to satisfy the frozen characterization.
+
+
+## 51. Slice B W5 characterization historical RED (2026-09-19)
+
+W5 RED is proven on PR #343.
+
+Evidence:
+- RED commit: `6019ca658058c0d54d1828945c32bb7458959684`;
+- CI run: `35437854577`;
+- exact failing suite: `src/services/sliceBConversationGraphCharacterization.test.ts`;
+- exact failure: missing `./sliceBConversationGraphRuntime`;
+- existing suites: 571 test files GREEN;
+- new W5 characterization suite: 1 test file RED.
+
+This RED is accepted because it proves the frozen W3 characterization exists before the graph runtime implementation and does not regress pre-Slice-B behavior.
+
+W6 is now authorized for MINIMAL implementation only.
+The implementation must satisfy the frozen W3/W4 assertions without adding WHAT/WHETHER, relationship/appraisal, moderation/capability or canonical-semantic authority.
