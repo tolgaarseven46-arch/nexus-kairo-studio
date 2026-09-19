@@ -45,10 +45,7 @@ export function isKairaFirstEncounterSteeringEligible(
 export function realizeKairaFirstEncounterSteering(
   input: KairaFirstEncounterSteeringInput,
 ): KairaFirstEncounterSteeringRealization {
-  if (
-    !isKairaFirstEncounterSteeringEligible(input.interpretation) ||
-    input.plan.move === "stay_silent"
-  ) {
+  if (!isKairaFirstEncounterSteeringEligible(input.interpretation)) {
     return { handled: false };
   }
 
@@ -60,7 +57,7 @@ export function realizeKairaFirstEncounterSteering(
 
   const seed = `${input.requestId}:first_encounter_steering`;
   const index = fnv1a(seed) % variants.length;
-  let reply = variants[index];
+  let reply: string = variants[index];
 
   if (!input.plan.allowHumor) {
     reply = reply.replace(/\s*[😄🙂]/gu, "").trim();
