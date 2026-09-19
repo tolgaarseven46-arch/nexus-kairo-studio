@@ -68,3 +68,12 @@ The full semantic provider owns paraphrase-invariant platform-scope classificati
 - uncertainty must remain explicit when the provider cannot distinguish the meaning.
 
 This preserves the typed `platformScopeQuery` as the single canonical authority consumed by deterministic platform-context realization.
+
+
+## Clarification — neutral-short fast path must fail closed
+
+The first-encounter neutral-short optimization may not treat every unclassified compact utterance as a safe steering answer. Doing so can hide unseen questions from the canonical semantic provider.
+
+Fast steering is therefore limited to a typed ingestion-time `uncertaintyAnswerShape` cue (for example uncertainty/indecision answers such as “bilmiyorum”, “emin değilim”, “kararsızım”). The cue is only a latency eligibility signal; it does not classify platform scope.
+
+If a compact utterance is not a recognized trivial social routine, not a known local platform-scope floor, and not a typed uncertainty answer, the fast path fails closed and the canonical semantic provider must run. This keeps unseen `kaira_role` / `room_setup` paraphrases eligible for paraphrase-invariant provider classification.
