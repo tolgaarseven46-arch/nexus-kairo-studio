@@ -16,16 +16,24 @@ describe("PrivatRoom -> Slice B live observation wiring", () => {
             roomId: "room-1",
             roomName: "Genel",
             actorIsOwner: false,
-            recentHistory: [
+            participants: [
               {
-                sender: "user",
-                text: "selam millet",
-                participantName: "Ali",
                 participantId: "u1",
-                eventId: "m1",
-                occurredAt: 100,
                 actorKind: "human",
+                platformRoles: ["owner"],
               },
+              {
+                participantId: "u2",
+                actorKind: "human",
+                platformRoles: ["member"],
+              },
+              {
+                participantId: "droit_kaira_beta",
+                actorKind: "droit",
+                platformRoles: ["member"],
+              },
+            ],
+            recentHistory: [
               {
                 sender: "droit",
                 text: "selam",
@@ -39,7 +47,7 @@ describe("PrivatRoom -> Slice B live observation wiring", () => {
           },
         },
         actor: { userId: "u2", displayName: "Ayşe" },
-        message: { messageId: "m3", text: "naber", createdAt: 300, replyToMessageId: "m1" },
+        message: { messageId: "m3", text: "naber", createdAt: 300 },
       },
       environmentId: "live-beta",
       testRunId: "TR_live_beta_room-1",
@@ -52,15 +60,19 @@ describe("PrivatRoom -> Slice B live observation wiring", () => {
       roomId: "room-1",
       kairaInstanceId: "kaira-main",
     });
-    expect(graph.events.map((event) => event.eventId)).toEqual(["m1", "m2", "m3"]);
+    expect(graph.events.map((event) => event.eventId)).toEqual(["m2", "m3"]);
     expect(graph.participants.map((participant) => participant.participantId)).toEqual([
       "droit_kaira_beta",
       "u1",
       "u2",
     ]);
-    expect(graph.explicitReplyEdges).toEqual([
-      { fromEventId: "m3", toEventId: "m1", source: "platform" },
-    ]);
+    expect(graph.explicitReplyEdges).toEqual([]);
+    expect(graph.participants.find((participant) => participant.participantId === "u1")).toMatchObject({
+      participantId: "u1",
+      actorKind: "human",
+      platformRoles: ["owner"],
+      messageCount: 0,
+    });
     expect(graph).not.toHaveProperty("answerDecision");
     expect(graph).not.toHaveProperty("responseDecision");
   });
@@ -93,3 +105,36 @@ describe("PrivatRoom -> Slice B live observation wiring", () => {
     expect(graph.participants.map((participant) => participant.participantId)).toEqual(["u2"]);
   });
 });
+
+
+  it("fails closed on malformed platform participant roster facts", () => {
+    expect(() =>
+      buildPrivatRoomConversationGraphObservation({
+        event: {
+          eventId: "evt-current",
+          occurredAt: 300,
+          kairaInstanceId: "kaira-main",
+          conversation: {
+            kind: "room",
+            conversationId: "room:room-1",
+            participantIds: ["u2", "droit_kaira_beta"],
+            roomContext: {
+              roomId: "room-1",
+              participants: [
+                {
+                  participantId: "u1",
+                  actorKind: "not-real" as any,
+                  platformRoles: ["owner"],
+                },
+              ],
+              recentHistory: [],
+            },
+          },
+          actor: { userId: "u2", displayName: "Ayşe" },
+          message: { messageId: "m3", text: "naber", createdAt: 300 },
+        },
+        environmentId: "live-beta",
+        testRunId: "TR_live_beta_room-1",
+      }),
+    ).toThrow(/invalid_privatroom_room_participant_fact/);
+  });
