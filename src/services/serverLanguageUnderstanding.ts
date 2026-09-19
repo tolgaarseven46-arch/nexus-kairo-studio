@@ -62,9 +62,9 @@ const FAST_SOCIAL_ROUTINES = new Set([
 ]);
 
 const FIRST_ENCOUNTER_ROOM_ANCHOR_RE =
-  /\b(?:burada|burda|burası|burasi|burayı|burayi|oda|odada|bu\s+oda)\b/iu;
+  /(?:burada|burda|burası|burasi|burayı|burayi|odada|bu\s+oda|oda)/iu;
 const FIRST_ENCOUNTER_ROOM_ACTION_RE =
-  /\b(?:nap\p{L}*|ne\s+yap\p{L}*|nasıl\s+kullan\p{L}*|nasil\s+kullan\p{L}*|ne\s+ol\p{L}*|ne\s+için|ne\s+icin)\b/iu;
+  /(?:nap\p{L}*|ne\s+yap\p{L}*|nasıl\s+kullan\p{L}*|nasil\s+kullan\p{L}*|ne\s+ol\p{L}*|ne\s+için|ne\s+icin)/iu;
 
 const isFirstEncounterRoomScopeQuestion = (
   message: string,

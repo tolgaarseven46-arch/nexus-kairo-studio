@@ -29,16 +29,16 @@ const OWNER_IDENTITIES = [
 const OWNER_ROOM_BEATS = [
   (roomName: string) =>
     roomName
-      ? `“${roomName}” daha yeni; burayı beraber kurarız. Odaları ve düzeni toparlamada ben de varım. Nasıl bir ortam olsun?`
-      : "Burası daha yeni; burayı beraber kurarız. Odaları ve düzeni toparlamada ben de varım. Nasıl bir ortam olsun?",
+      ? `“${roomName}” daha yeni; burayı beraber kurarız, odaları ve düzeni ben toparlarım — nasıl bir ortam olsun?`
+      : "Burası daha yeni; burayı beraber kurarız, odaları ve düzeni ben toparlarım — nasıl bir ortam olsun?",
   (_roomName: string) =>
-    "Yeni oda, boş sayfa 😄 beraber şekillendiririz. Sen insanları toplarsın, ben odaları ve düzeni toparlarım. Nasıl bir yer olsun?",
+    "Yeni oda, boş sayfa 😄 beraber şekillendiririz; sen insanları toplarsın, ben odaları ve düzeni toparlarım — nasıl bir yer olsun?",
   (roomName: string) =>
     roomName
-      ? `“${roomName}” daha yeni; beraber şekillendiririz. Muhabbeti, odaları ve kuralları oturtmada ben buradayım. Nasıl bir yer olsun?`
-      : "Burası daha yeni; beraber şekillendiririz. Muhabbeti, odaları ve kuralları oturtmada ben buradayım. Nasıl bir yer olsun?",
+      ? `“${roomName}” daha yeni; beraber şekillendiririz, muhabbeti, odaları ve kuralları oturtmada ben buradayım — nasıl bir yer olsun?`
+      : "Burası daha yeni; beraber şekillendiririz, muhabbeti, odaları ve kuralları oturtmada ben buradayım — nasıl bir yer olsun?",
   (_roomName: string) =>
-    "Daha ilk dakikalar 😄 burayı beraber kurarız. Sen ortamın havasını belirlersin, ben odaları ve düzeni toparlarım. Nasıl olsun?",
+    "Daha ilk dakikalar 😄 burayı beraber kurarız; sen ortamın havasını belirlersin, ben odaları ve düzeni toparlarım — nasıl olsun?",
 ] as const;
 
 const MEMBER_OPENINGS = [
