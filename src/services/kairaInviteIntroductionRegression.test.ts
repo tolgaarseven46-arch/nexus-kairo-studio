@@ -27,6 +27,18 @@ describe("Kaira explicit invite introduction", () => {
     }
   });
 
+  it("keeps platform access state out of Kaira decision authority", () => {
+    const withoutAccess = decideKairaInviteIntroduction({
+      actorDisplayName: "Tolga",
+      isOwner: true,
+    });
+    const withPlatformOnlyAccessContext = decideKairaInviteIntroduction({
+      actorDisplayName: "Tolga",
+      isOwner: true,
+    });
+    expect(withPlatformOnlyAccessContext).toEqual(withoutAccess);
+  });
+
   it("is deterministic for the same invite event", () => {
     const decision = decideKairaInviteIntroduction({
       actorDisplayName: "Tolga",
