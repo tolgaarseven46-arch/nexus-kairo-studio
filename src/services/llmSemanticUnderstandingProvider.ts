@@ -29,6 +29,7 @@ const schemaExample: SemanticInterpretation = {
   stopRequest: false,
   discourseFacets: {
     socialRoutine: "none",
+    platformScopeQuery: "room_setup",
     discourseAct: "none",
     repairSignal: "none",
     adviceRequested: false,
@@ -110,6 +111,12 @@ AFFECTION/SUPPORT/COMPLIMENT/EMOTIONAL LOAD 0..1:
 
 DISCOURSE FACETS utterance-level sinyallerdir, cevap kararı değildir:
 socialRoutine = none | greeting | how_are_you | what_doing | thanks | agreement | goodbye | good_night | emotional_opening
+platformScopeQuery OPTIONALDIR ve yalnız açık platform-bağlam sorularında kullanılır:
+- "room_setup" = kullanıcı bu oda/sunucu/alanın ne için olduğunu, burada ne yapılacağını veya nasıl kullanılacağını soruyor.
+- "kaira_role" = kullanıcı Kaira'nın burada ne yaptığını, görevinin/rolünün/işlevinin ne olduğunu soruyor.
+- Bunları kelime/regex eşlemesiyle değil, paraphrase-invariant utterance anlamıyla sınıflandır.
+- Aynı yüzey sözcükleri farklı anlam taşıyorsa anlamı tercih et; emin değilsen platformScopeQuery alanını OMIT et ve uncertainty'yi yükselt.
+- Başka mesajlarda platformScopeQuery alanını OMIT et.
 discourseAct = none | correction | topic_shift | recall_request | confusion_or_challenge
 repairSignal = none | clarification_request | relevance_challenge
 adviceRequested = yalnız açık tavsiye/öneri isteniyorsa true
