@@ -103,6 +103,7 @@ export interface BuildConversationGraphInputV1 {
   escalationEvidenceRefs?: ReadonlyArray<unknown>;
   decisionOwnerRegistry: DecisionOwnerRegistryV1;
   ownedEvidenceStore: OwnedEvidenceStoreV1;
+  platformIdentityFacts: Readonly<Record<string, ConversationActorKind>>;
   [key: string]: unknown;
 }
 
@@ -340,6 +341,26 @@ export const buildConversationGraphV1 = (
   input: BuildConversationGraphInputV1,
 ): ConversationGraphV1 => {
   const namespace = parseConversationGraphNamespaceV1(input.namespace);
+
+  for (const participant of input.participants) {
+    validateActorKindFactV1(
+      {
+        actorId: participant.participantId,
+        actorKind: participant.actorKind,
+      },
+      input.platformIdentityFacts,
+    );
+  }
+  for (const rawEvent of input.events) {
+    validateActorKindFactV1(
+      {
+        actorId: rawEvent.actorId,
+        actorKind: rawEvent.actorKind,
+      },
+      input.platformIdentityFacts,
+    );
+  }
+
   const events = normalizeConversationEventsV1(input.events);
   const acceptedEventIds = new Set(events.map((event) => event.eventId));
   const participantIds = new Set(
