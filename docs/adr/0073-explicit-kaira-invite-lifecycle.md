@@ -23,3 +23,11 @@ Access/trial state remains platform-owned gating context and must not change Kai
 ## Compatibility
 
 Legacy `room.created` and `participant.joined` lifecycle handling remains available for compatibility, but PrivatRoom's new room creation path must not emit a Kaira welcome before explicit invite.
+
+## 2026-09-19 live acceptance clarification
+
+Production acceptance showed that deterministic variant selection could emit alternate invite introductions even though the product copy is frozen. For `kaira.invited_to_server`, realization is therefore intentionally single-copy and must emit exactly:
+
+`Selam 😄 ben Kaira. Sunucuyu yönetirken yanında olacağım.`
+
+This clarification changes only realization wording. Platform invite authority, presence, access state, memory boundaries, relationship/appraisal ownership, and idempotency remain unchanged.
