@@ -3,6 +3,7 @@ import { decideKairaWelcome } from "./kairaWelcomeDecision";
 import { realizeKairaWelcome } from "./kairaWelcomeRealizer";
 import { resolveServerLanguageUnderstanding } from "./serverLanguageUnderstanding";
 import { realizeKairaFirstEncounterRoutine } from "./kairaFirstEncounterRoutineRealizer";
+import { buildKairaFirstEncounterInstruction } from "./kairaFirstEncounterContinuity";
 
 const ROOM_SCOPE_PARAPHRASES = [
   "burada ne yapıcaz",
@@ -37,6 +38,17 @@ describe("live first-encounter acceptance RED", () => {
       expect(result.text).toMatch(/\?/u);
       expect(result.text).not.toMatch(/droit|pipeline|system prompt|yapay zeka/iu);
     }
+  });
+
+  it("keeps Kaira as the first-encounter conversation driver", () => {
+    const instruction = buildKairaFirstEncounterInstruction({
+      roomName: "deneme",
+      isOwner: true,
+    });
+    expect(instruction).toMatch(/sohbetin yönünü Kaira taşısın/iu);
+    expect(instruction).toMatch(/doğru soruyu bilmesini bekleme/iu);
+    expect(instruction).toMatch(/kısa, kararsız|bilmiyorum/iu);
+    expect(instruction).not.toMatch(/kullanıcı yönü kendisi belirleyebilsin/iu);
   });
 
   it("keeps steering after a zero-context user's naber", () => {
