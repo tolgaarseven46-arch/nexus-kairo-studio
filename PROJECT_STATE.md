@@ -735,3 +735,19 @@ v10 keeps the existing welcome decision authority unchanged and replaces only th
 - the decision layer still controls introduce-self/tone/relationship mode and remains the only welcome policy authority.
 
 This is realization diversification, not a new semantic or relationship policy.
+
+
+## 42. First-class PrivatRoom room conversation ingress v11 (2026-09-19)
+
+After first-encounter continuity/latency/welcome closure, the remaining room-chat boundary defect was transport typing:
+- PrivatRoom room messages were being encoded through the DM integration contract as `conversation.kind="direct"`;
+- mentionless behavior already existed operationally in the beta room bridge, but the contract falsely described a room as a DM.
+
+v11 boundary decision:
+- Kaira ingress accepts `conversation.kind="direct" | "room"`;
+- room traffic remains mention-agnostic; no `@Kaira` text gate is introduced;
+- user text is forwarded unchanged as canonical `userMessage`;
+- existing direct-message callers remain backward-compatible;
+- platform conversation kind remains transport metadata and does not become semantic/relationship authority.
+
+Rollout order is intentionally backward-compatible: Kaira accepts `room` first, then PrivatRoom producers switch from the legacy `direct` encoding to `room`.
