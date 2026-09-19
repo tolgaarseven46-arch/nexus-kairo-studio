@@ -40,3 +40,8 @@ First-encounter routine realizations must fit the already-authoritative Response
 ## Clarification — idle-debounced non-critical persistence
 
 For first-encounter local fast replies, relationship and TestRun turn continuity remain the critical post-response persistence barrier and the distributed state lease is released immediately after those writes. Non-critical metric/KNT/autonomous observation writes are queued per user+Kaira instance and flushed only after a short conversational idle window. Each new first-encounter fast turn resets that idle window and all queued jobs are preserved and flushed sequentially. This prevents non-critical Firestore traffic from competing with the next user turn's coordination claim while preserving eventual evidence/telemetry writes.
+
+
+## Clarification — KNT Firestore payload hygiene
+
+KNT trace persistence is evidence/telemetry only and gains no new behavior or semantic authority. Before a KNT trace is written to Firestore, undefined values are removed recursively from the complete payload, including nested dynamic relationship state. This keeps live TestRun evidence durable without changing the canonical in-memory state or response path.
