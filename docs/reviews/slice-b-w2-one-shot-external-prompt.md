@@ -9,7 +9,7 @@ Your job is NOT to approve by default. Attack the design and return only structu
 - docs/slice-b-w3-freeze-draft-w4-test-map.md
 - docs/tests/slice-b-w5-fixture-spec.md
 - docs/reviews/slice-b-w2-independent-red-team-request.md
-- PROJECT_STATE.md sections 23–29
+- PROJECT_STATE.md sections 23–31
 
 ## Review goals
 Try to falsify the claim that Conversation Graph is observation-only and cannot become:
@@ -79,3 +79,5 @@ Rules:
 - If there are no blockers, use an empty blockers array.
 - Do not give an overall score.
 - Do not redesign unrelated frozen A–S architecture unless a concrete Slice B counterexample proves a frozen invariant violation.
+- The JSON field `reviewer.independent=true` is reviewer self-declaration only; it never opens W3 by itself.
+- Do not add a provenance object to the JSON. The project intake layer must attach separately verified external provenance (review channel/artifact reference + reviewer identity + independent-verification receipt) before W3 can open.
