@@ -1211,3 +1211,20 @@ Repair contract on `fix/first-encounter-coordinate-semantic-overlap-v3`:
 - no semantic, decision, memory, relationship, or realization authority is moved.
 
 Closure requires exact-head CI GREEN, merge, Render LIVE, then rerun the unseen live paraphrase pack with genuinely Kaira-role paraphrases and every response under the 6s gate.
+
+
+## 60. Explicit-invite independent review — platform-scope realization authority (2026-09-19)
+
+Final live unseen-paraphrase proof exposed a second authority mismatch after canonical `platformScopeQuery` classification was repaired:
+- production input `işlevin ne senin` reached first-encounter semantic resolution and stayed under the new latency gate;
+- however Kaira returned a generic steering/uncertainty reply instead of the Kaira-role realization;
+- root cause: `KairaFirstEncounterContextRealizer` required both typed `platformScopeQuery` and `plan.move === answer_or_clarify`;
+- DialogueDecision does not own or consume `platformScopeQuery`, so the response-plan move could veto the canonical platform-scope semantic authority and allow steering to take the turn.
+
+Repair:
+- typed `platformScopeQuery = room_setup | kaira_role` alone owns eligibility for the deterministic first-encounter platform-context realizer;
+- `KairaResponsePlan` still constrains expression (humor/question/length) but cannot veto which semantic scope is being answered;
+- no raw-text paraphrase list is added;
+- ContextRealizer remains before Routine/Steering in the first-encounter local realization order.
+
+Closure requires exact-head CI GREEN, merge + Render LIVE, then repeat the production unseen Kaira-role pack.
