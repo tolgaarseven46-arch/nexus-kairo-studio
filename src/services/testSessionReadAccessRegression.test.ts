@@ -10,7 +10,7 @@ describe("live-beta TestSession read auth", () => {
     expect(requiresInternalTestSessionReadAuth("session_test_user_x")).toBe(false);
   });
 
-  it("reported: blocks predictable live-beta reads without internal auth", () => {
+  it("reported: blocks a predictable live-beta TestRun read without internal auth", () => {
     expect(
       authorizeTestSessionRead({
         sessionId: "TR_live_beta_room-1",
@@ -19,7 +19,16 @@ describe("live-beta TestSession read auth", () => {
     ).toMatchObject({ status: "unauthorized", httpStatus: 401 });
   });
 
-  it("neighbor: rejects a wrong bearer token", () => {
+  it("neighbor-1: another room-scoped live-beta TestRun id requires the same internal auth", () => {
+    expect(
+      authorizeTestSessionRead({
+        sessionId: "TR_live_beta_other-room",
+        configuredSecret: "shared-secret",
+      }),
+    ).toMatchObject({ status: "unauthorized", httpStatus: 401 });
+  });
+
+  it("neighbor-2: a wrong bearer token is rejected for protected live-beta sessions", () => {
     expect(
       authorizeTestSessionRead({
         sessionId: "TR_live_beta_room-2",
@@ -29,7 +38,7 @@ describe("live-beta TestSession read auth", () => {
     ).toMatchObject({ status: "forbidden", httpStatus: 403 });
   });
 
-  it("counterexample: preserves legacy Studio TestSession compatibility", () => {
+  it("counterexample: legacy Studio TestSession read compatibility remains unchanged", () => {
     expect(
       authorizeTestSessionRead({ sessionId: "session_test_user_x" }),
     ).toEqual({ status: "public_legacy" });
