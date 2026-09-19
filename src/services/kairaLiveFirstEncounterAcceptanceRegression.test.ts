@@ -146,14 +146,6 @@ describe("live first-encounter acceptance RED", () => {
             stopQuestions: false,
             stopTalking: false,
           },
-          propositions: [{
-            id: "p1",
-            content: message,
-            modality: "statement",
-            confidence: 0.9,
-            provenance: ["current_turn"],
-          }],
-          worldMemory: { claims: [], query: null },
           uncertainty: { overall: 0.12, intent: 0.08, target: 0.2, severity: 0.04 },
           evidence: [{ source: "llm", cues: ["neutral_short_reply"], confidence: 0.9 }],
         });
