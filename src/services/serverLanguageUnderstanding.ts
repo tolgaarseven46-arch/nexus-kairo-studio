@@ -209,6 +209,7 @@ export function isSafeFirstEncounterNeutralShortFastPath(
   const event = result.event;
   return Boolean(context) &&
     interpretation.discourseFacets.shortUtteranceShape === true &&
+    interpretation.discourseFacets.uncertaintyAnswerShape === true &&
     (interpretation.primaryIntent === "other" || interpretation.primaryIntent === "smalltalk") &&
     interpretation.target !== "third_party" &&
     (interpretation.valence === "neutral" || interpretation.valence === "positive") &&
