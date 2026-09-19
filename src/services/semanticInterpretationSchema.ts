@@ -207,7 +207,8 @@ function normalizeDiscourseFacets(value: unknown): SemanticDiscourseFacets {
     relationalAct: RELATIONAL_ACTS.has(v.relationalAct as SemanticRelationalAct) ? v.relationalAct as SemanticRelationalAct : "none",
     relationalIntensity: clamp01(v.relationalIntensity), stopQuestions: asBool(v.stopQuestions), stopTalking: asBool(v.stopTalking),
     signalsAlreadyAnswered: asBool(v.signalsAlreadyAnswered), answerFriction: asBool(v.answerFriction), stateAnswerShape: asBool(v.stateAnswerShape),
-    shortUtteranceShape: asBool(v.shortUtteranceShape), activityAnswerShape: asBool(v.activityAnswerShape),
+    shortUtteranceShape: asBool(v.shortUtteranceShape), uncertaintyAnswerShape: asBool(v.uncertaintyAnswerShape),
+    activityAnswerShape: asBool(v.activityAnswerShape),
   };
 }
 
