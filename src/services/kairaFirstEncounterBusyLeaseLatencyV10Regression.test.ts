@@ -21,28 +21,50 @@ describe("first-encounter busy state lease latency v10", () => {
       "utf8",
     );
 
+    const assertionStart = source.indexOf(
+      "export async function assertCoordinatedKairaChatStateOwnership",
+    );
+    const deferredCheck = source.indexOf(
+      "deferredStateMutationKeys.has(normalizedKey)",
+      assertionStart,
+    );
+    const deferredAcquire = source.indexOf(
+      "await acquireStateMutation(normalizedKey)",
+      deferredCheck,
+    );
+
     expect(source).toContain("const deferredStateMutationKeys = new Set<string>()");
     expect(source).toContain("deferredStateMutationKeys.add(normalizedKey)");
-    expect(source).toMatch(
-      /assertCoordinatedKairaChatStateOwnership[sS]*?deferredStateMutationKeys.has(normalizedKey)[sS]*?await acquireStateMutation(normalizedKey)/,
-    );
+    expect(assertionStart).toBeGreaterThan(-1);
+    expect(deferredCheck).toBeGreaterThan(assertionStart);
+    expect(deferredAcquire).toBeGreaterThan(deferredCheck);
   });
 
   it("sends a first-encounter fast reply before waiting for deferred state ownership", async () => {
     const source = await readFile(new URL("../../server.ts", import.meta.url), "utf8");
 
-    const fastBranch = source.indexOf("if (firstEncounterFastPersistence) {");
-    const send = source.indexOf("sendFirstEncounterFastPayload(responsePayload);", fastBranch);
-    const deferredClaim = source.indexOf("await assertStateMutationOwnership();", send);
-
-    expect(fastBranch).toBeGreaterThan(-1);
-    expect(send).toBeGreaterThan(fastBranch);
-    expect(deferredClaim).toBeGreaterThan(send);
-
-    const preFast = source.slice(
-      source.indexOf("let ownershipMs = 0;", fastBranch - 10000),
+    const ownershipDeclaration = source.indexOf("let ownershipMs = 0;");
+    const nonFastOwnershipGate = source.indexOf(
+      "if (!firstEncounterFastPersistence)",
+      ownershipDeclaration,
+    );
+    const fastBranch = source.indexOf(
+      "if (firstEncounterFastPersistence) {",
+      nonFastOwnershipGate,
+    );
+    const send = source.indexOf(
+      "sendFirstEncounterFastPayload(responsePayload);",
       fastBranch,
     );
-    expect(preFast).toContain("if (!firstEncounterFastPersistence)");
+    const deferredClaim = source.indexOf(
+      "await assertStateMutationOwnership();",
+      send,
+    );
+
+    expect(ownershipDeclaration).toBeGreaterThan(-1);
+    expect(nonFastOwnershipGate).toBeGreaterThan(ownershipDeclaration);
+    expect(fastBranch).toBeGreaterThan(nonFastOwnershipGate);
+    expect(send).toBeGreaterThan(fastBranch);
+    expect(deferredClaim).toBeGreaterThan(send);
   });
 });
