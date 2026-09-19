@@ -68,3 +68,14 @@ The full semantic provider owns paraphrase-invariant platform-scope classificati
 - uncertainty must remain explicit when the provider cannot distinguish the meaning.
 
 This preserves the typed `platformScopeQuery` as the single canonical authority consumed by deterministic platform-context realization.
+
+
+## Clarification — neutral-short fast floor requires canonical confidence
+
+The first-encounter neutral-short optimization must never classify a low-confidence regex-floor reading as safe merely because the utterance is short and non-harmful. Eligibility now requires bounded canonical intent/overall uncertainty in addition to the existing typed safety fields.
+
+Consequences:
+- known typed social routines and known typed platform-scope fast floors remain provider-free;
+- an unknown short utterance with low-confidence floor semantics falls through to the canonical semantic provider;
+- after provider classification, a genuinely neutral short utterance may still use deterministic local realization when the canonical provider returns sufficiently low uncertainty;
+- no new raw-text phrase list is introduced for unseen questions.
