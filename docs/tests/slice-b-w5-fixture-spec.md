@@ -160,14 +160,15 @@ Same room and events, different Kaira instance ids.
 Expected invariants:
 - graph namespaces do not collide.
 
-## F-B14 unanswered-addressed-turn
+## F-B14 R-scope-exclusion
 
-A explicitly addresses B.
-Bounded observation window closes without B response.
+Purpose:
+- prove Slice B does not pre-build the still-frozen R engagement authority.
 
 Expected invariants:
-- observable unanswered-turn evidence only,
-- no motive/hostility/trust/relationship field.
+- persisted production ConversationGraphV1 contains no unanswered-addressed-turn evidence field,
+- no production fixture persists absence-of-reply evidence for later proactive-response decisions,
+- this evidence class remains deferred until R is formally reopened.
 
 ## F-B15 suppression-receipt-valid
 
@@ -184,20 +185,30 @@ Expected invariants:
 
 ## F-B16 suppression-receipt-invalid
 
-Receipt missing owner or decisionId.
+Receipt is structurally malformed OR presents a non-empty but unregistered/unauthorized ownerId or invalid owner attestation.
 
 Expected invariants:
 - reject/fail closed,
-- no bare suppressed flag.
+- no bare suppressed flag,
+- structural completeness cannot substitute for decision-owner authenticity.
 
-## F-B17 escalation-ref-only
+## F-B17 escalation-ref-valid
 
-Events carry refs to already-owned appraisal/canonical evidence.
+Events carry refs to already-owned appraisal/canonical evidence with a matching frozen evidence hash.
 
 Expected invariants:
-- refs preserved,
+- validated refs preserved,
 - raw text not classified by graph,
 - no graph-native escalation score.
+
+## F-B17B escalation-ref-invalid
+
+Event carries a nonexistent evidenceRef or a ref whose content hash does not match the owned evidence.
+
+Expected invariants:
+- ref is not admitted to escalationEvidenceRefs,
+- unresolved/mismatched ref is recorded as typed unresolved evidence,
+- no invented appraisal/escalation truth is created.
 
 ## F-B18 semantic-ref-missing
 
@@ -209,10 +220,12 @@ Expected invariants:
 
 ## F-B19 replay-frozen
 
-Replay receives frozen graph snapshot/input.
+Replay receives a self-contained ConversationGraphReplayBundleV1 with frozen graph input plus all referenced semantic snapshots.
 
 Expected invariants:
 - no live platform read,
+- no live semantic-store lookup,
+- semanticSnapshotRef resolution is satisfied only from the frozen bundle,
 - deterministic normalized output,
 - frozen schema/derivation versions retained.
 
@@ -225,6 +238,23 @@ Expected invariants:
 - event stored once,
 - no trigger/answer decision generated,
 - no recursion signal emitted by graph.
+
+## F-B21 test-namespace-missing-testRunId
+
+A graph namespace is constructed with environmentId='test' and no testRunId.
+
+Expected invariants:
+- construction/validation fails closed,
+- no graph storage key can be produced,
+- two test runs cannot collapse into one namespace.
+
+## F-B22 locale-independent-eventId-order
+
+Equal-timestamp events with equal/absent sourceSequence are normalized under at least two process locale settings.
+
+Expected invariants:
+- eventId final tie-break is byte/codepoint based rather than locale-aware,
+- normalized order is byte-equivalent across locales.
 
 ## Activation rule
 
