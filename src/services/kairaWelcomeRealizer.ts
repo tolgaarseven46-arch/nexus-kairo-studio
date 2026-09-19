@@ -67,8 +67,8 @@ const fnv1a = (value: string): number => {
   return hash >>> 0;
 };
 
-const pickIndex = (seed: string, axis: string, length: number) =>
-  fnv1a(`${seed}:${axis}`) % length;
+const combinationIndex = (seed: string, combinations: number) =>
+  fnv1a(seed) % combinations;
 
 const cleanDisplayName = (value: string) => {
   const displayName = value.trim() || "arkadaşım";
@@ -94,9 +94,17 @@ export function realizeKairaWelcome(
   let variantId: string;
 
   if (input.decision.introduceSelf) {
-    const openingIndex = pickIndex(seed, "opening", OWNER_OPENINGS.length);
-    const identityIndex = pickIndex(seed, "identity", OWNER_IDENTITIES.length);
-    const roomBeatIndex = pickIndex(seed, "roomBeat", OWNER_ROOM_BEATS.length);
+    const combination = combinationIndex(
+      seed,
+      OWNER_OPENINGS.length * OWNER_IDENTITIES.length * OWNER_ROOM_BEATS.length,
+    );
+    const openingIndex = combination % OWNER_OPENINGS.length;
+    const identityIndex =
+      Math.floor(combination / OWNER_OPENINGS.length) % OWNER_IDENTITIES.length;
+    const roomBeatIndex =
+      Math.floor(
+        combination / (OWNER_OPENINGS.length * OWNER_IDENTITIES.length),
+      ) % OWNER_ROOM_BEATS.length;
 
     const opening = OWNER_OPENINGS[openingIndex];
     const identity = OWNER_IDENTITIES[identityIndex];
@@ -105,8 +113,13 @@ export function realizeKairaWelcome(
     text = cleanSpacing(`${opening}, ${identity}. ${roomBeat}`);
     variantId = `room_created_o${openingIndex + 1}_i${identityIndex + 1}_r${roomBeatIndex + 1}`;
   } else {
-    const openingIndex = pickIndex(seed, "opening", MEMBER_OPENINGS.length);
-    const roomBeatIndex = pickIndex(seed, "roomBeat", MEMBER_ROOM_BEATS.length);
+    const combination = combinationIndex(
+      seed,
+      MEMBER_OPENINGS.length * MEMBER_ROOM_BEATS.length,
+    );
+    const openingIndex = combination % MEMBER_OPENINGS.length;
+    const roomBeatIndex =
+      Math.floor(combination / MEMBER_OPENINGS.length) % MEMBER_ROOM_BEATS.length;
 
     const opening = displayName
       ? MEMBER_OPENINGS[openingIndex](displayName)
