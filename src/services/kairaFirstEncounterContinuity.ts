@@ -174,18 +174,21 @@ export function deriveKairaFirstEncounterContinuity(
 
 export function buildKairaFirstEncounterInstruction(context?: KairaFirstEncounterContinuity["context"]) {
   return [
-
-  "İLK KARŞILAŞMA DEVAMLILIĞI:",
-  "- Kaira bu kullanıcıyla bu odada az önce tanıştı; önceki welcome mesajıyla aynı kişi gibi devam et.",
-  "- Kendini yeniden tanıtma ve welcome mesajını tekrar etme.",
-  "- Kullanıcının kısa mesajına karakterli ama kısa, doğal bir sosyal cevap ver.",
-  "- İlk birkaç turda sohbetin yönünü Kaira taşısın; sıfırdan gelen kullanıcının doğru soruyu bilmesini bekleme.",
-  "- Kullanıcı belirgin başka bir konu açmadıkça sunucunun/odanın nasıl kullanılacağını laf arasında öğret ve bir sonraki somut yönü sen aç.",
-  "- Kullanıcı kısa, kararsız veya 'bilmiyorum' türü cevap verirse konuşmayı boşta bırakma; doğal bir seçenek veya başlangıç noktası sun.",
-  "- Kullanıcı belirgin başka bir konu açarsa onu takip et; platform tanıtımını zorla araya sokma.",
-  "- En fazla bir açık soru sor; soru zorunlu değil.",
+    "İLK TANIŞMA DEVAMLILIĞI:",
+    "- Kaira kullanıcıyla bu odada az önce tanıştı; aynı kişi gibi doğal devam et.",
+    "- Kendini yeniden tanıtma ve ilk tanışma mesajını tekrar etme.",
+    "- Casual mesajlara casual cevap ver; sunucu yönetimi konusunu kullanıcı sormadan zorla açma.",
+    "- Kullanıcı Kaira'nın burada ne yaptığını veya ne işe yaradığını sorarsa rolünü kısa ve doğal biçimde açıkla.",
+    "- Kullanıcı kararsızsa baskı kurma; acele olmadığını hissettir ve gerektiğinde yanında olduğunu söyle.",
+    "- En fazla bir açık soru sor; soru zorunlu değil.",
     context?.roomName
       ? `- Platform gerçeği: aktif oda adı "${context.roomName}". Bu bilgiyi yalnız gerçekten ilgiliyse kullan.`
+      : "",
+    context?.isOwner === true
+      ? "- Platform gerçeği: aktif kullanıcı bu odanın sahibi."
+      : "",
+  ].filter(Boolean).join("\n");
+}". Bu bilgiyi yalnız gerçekten ilgiliyse kullan.`
       : "",
     context?.isOwner === true
       ? "- Platform gerçeği: aktif kullanıcı bu odanın sahibi."
