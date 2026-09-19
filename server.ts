@@ -796,19 +796,43 @@ app.post("/api/chat", async (req, res) => {
     );
     const requestId = requestIdentity.requestId;
     coordinationKey = `${stateUserId}::${kairaInstance.instanceId}::${requestIdentity.coordinationRequestId}`;
-    if (coordinationKey) {
-      const preferCombinedFirstEncounterCoordination =
-        conversationPhase === "first_encounter";
-      const claim = await claimCoordinatedKairaChatRequest<any>(coordinationKey, {
-        preferCombinedFirstEncounterCoordination,
-      });
-      if (claim.kind === "replay") return res.json(claim.payload);
+    const canOverlapFirstEncounterCoordination =
+      conversationPhase === "first_encounter" &&
+      !(
+        kairaPolicy.autonomousActivityPlanning &&
+        typeof incomingActivityPermissionRequestId === "string" &&
+        incomingActivityPermissionRequestId.trim().length > 0
+      );
+    const coordinationStartedAt = now();
+    let coordinationClaimMs = 0;
+    let coordinationWaitAfterSemanticMs = 0;
+    const coordinationClaimPromise = coordinationKey
+      ? claimCoordinatedKairaChatRequest<any>(coordinationKey, {
+          preferCombinedFirstEncounterCoordination:
+            conversationPhase === "first_encounter",
+        })
+      : null;
+    const settleCoordinationClaim = async () => {
+      if (!coordinationClaimPromise) return false;
+      const claim = await coordinationClaimPromise;
+      coordinationClaimMs = Math.round(now() - coordinationStartedAt);
+      if (claim.kind === "replay") {
+        res.json(claim.payload);
+        return true;
+      }
       if (claim.kind === "wait") {
         const outcome = await claim.outcome;
-        if (outcome.ok === true) return res.json(outcome.payload);
+        if (outcome.ok === true) {
+          res.json(outcome.payload);
+          return true;
+        }
         throw new Error(outcome.errorMessage);
       }
       ownsCoordinationClaim = true;
+      return false;
+    };
+    if (coordinationClaimPromise && !canOverlapFirstEncounterCoordination) {
+      if (await settleCoordinationClaim()) return;
     }
     const assertStateMutationOwnership = async () => {
       if (coordinationKey && ownsCoordinationClaim) {
@@ -915,6 +939,11 @@ app.post("/api/chat", async (req, res) => {
       firstEncounterContext,
     });
     const semanticMs = Math.round(now() - semanticStart);
+    if (coordinationClaimPromise && canOverlapFirstEncounterCoordination) {
+      const coordinationWaitStart = now();
+      if (await settleCoordinationClaim()) return;
+      coordinationWaitAfterSemanticMs = Math.round(now() - coordinationWaitStart);
+    }
     const canonicalSemantic = {
       interpretation: languageUnderstanding.interpretation,
       event: languageUnderstanding.event,
@@ -1486,6 +1515,8 @@ app.post("/api/chat", async (req, res) => {
       const postProcessMs = Math.round(now() - postStart),
         timings = {
           semanticMs,
+          coordinationClaimMs,
+          coordinationWaitAfterSemanticMs,
           memoryMs,
           kdmMs,
           aiMs: 0,
@@ -1498,6 +1529,8 @@ app.post("/api/chat", async (req, res) => {
           requestId,
           providerUsed: "local_language",
           semanticMs,
+          coordinationClaimMs,
+          coordinationWaitAfterSemanticMs,
           memoryMs,
           kdmMs,
           aiMs: 0,
