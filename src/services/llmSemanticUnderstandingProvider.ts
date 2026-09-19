@@ -29,7 +29,6 @@ const schemaExample: SemanticInterpretation = {
   stopRequest: false,
   discourseFacets: {
     socialRoutine: "none",
-    platformScopeQuery: "room_setup",
     discourseAct: "none",
     repairSignal: "none",
     adviceRequested: false,
