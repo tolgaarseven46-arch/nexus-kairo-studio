@@ -15,7 +15,7 @@ type PrivatRoomDmEvent = {
   occurredAt: number;
   kairaInstanceId: string;
   conversation: {
-    kind: "direct";
+    kind: "direct" | "room";
     conversationId: string;
     participantIds: [string, string];
   };
@@ -54,7 +54,8 @@ function isEvent(value: unknown): value is PrivatRoomDmEvent {
     event.eventType === "message.created" &&
     typeof event.eventId === "string" && event.eventId.length > 0 &&
     typeof event.kairaInstanceId === "string" && event.kairaInstanceId.length > 0 &&
-    event.conversation?.kind === "direct" &&
+    (event.conversation?.kind === "direct" ||
+      event.conversation?.kind === "room") &&
     typeof event.conversation?.conversationId === "string" &&
     Array.isArray(event.conversation?.participantIds) &&
     event.conversation!.participantIds.length === 2 &&
