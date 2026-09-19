@@ -1258,3 +1258,15 @@ Repair:
 Characterization RED on head `d371c068...` proved all four durable-role cases invoked the provider before this repair. The negative control showed the existing social fast path may legitimately answer momentary `what_doing` locally, so closure asserts semantic separation rather than requiring a provider call.
 
 Closure requires exact-head CI GREEN, merge + Render LIVE, and a single-trigger serialized live proof under the 6s gate.
+
+
+### Follow-up — room-scope false positive removed
+
+Exact-head CI on `292a1cc...` exposed one real cross-recognizer bug and three stale expectations:
+- `sen napıyosun burda` was being promoted to `room_setup` because the room fast floor saw both a room anchor and a generic action token;
+- three earlier regression tests still required the full semantic provider for explicit durable-role phrases that the new bounded fast floor now intentionally owns.
+
+Correction:
+- second-person present-activity forms such as `sen/kaira ... ne yapıyorsun/napıyorsun` are excluded from the room-scope fast floor;
+- they remain social `what_doing`, not `room_setup` and not durable `kaira_role`;
+- legacy tests now assert the new authority boundary: explicit durable-role semantics resolve before provider execution.
