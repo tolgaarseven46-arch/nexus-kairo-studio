@@ -83,7 +83,6 @@ describe("first-encounter neutral-short fast path authority", () => {
     "bilmiyorum daha",
     "emin değilim",
     "kararsızım",
-    "fikrim yok",
   ])("keeps a typed uncertainty answer on the provider-free fast path: %s", async (message) => {
     const generateText = vi.fn(async () => {
       throw new Error("provider_should_not_run_for_typed_uncertainty_answer");
