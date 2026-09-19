@@ -26,6 +26,7 @@ type StateMutationHandle = {
   release: () => Promise<void>;
 };
 const stateMutationHandles = new Map<string, StateMutationHandle>();
+const deferredStateMutationKeys = new Set<string>();
 const localStateTails = new Map<string, Promise<void>>();
 
 function stateOwnerKey(requestKey: string) {
@@ -124,12 +125,17 @@ async function acquireStateMutation(requestKey: string) {
 export async function assertCoordinatedKairaChatStateOwnership(requestKey: string) {
   const normalizedKey = requestKey.trim();
   if (!normalizedKey) return;
+  if (!stateMutationHandles.has(normalizedKey) && deferredStateMutationKeys.has(normalizedKey)) {
+    await acquireStateMutation(normalizedKey);
+    deferredStateMutationKeys.delete(normalizedKey);
+  }
   const handle = stateMutationHandles.get(normalizedKey);
   if (!handle) throw new KairaStateMutationOwnershipLostError();
   await handle.assertHeld();
 }
 
 async function releaseStateMutation(requestKey: string) {
+  deferredStateMutationKeys.delete(requestKey);
   const handle = stateMutationHandles.get(requestKey);
   stateMutationHandles.delete(requestKey);
   if (!handle) return;
@@ -154,6 +160,13 @@ export async function claimCoordinatedKairaChatRequest<T = unknown>(
         registerPreclaimedStateMutation(normalizedKey, combined.stateOwnerToken);
         distributedOwners.set(normalizedKey, combined.idempotencyOwnerToken);
         localFallbackKeys.delete(normalizedKey);
+        deferredStateMutationKeys.delete(normalizedKey);
+        return { kind: 'owner' };
+      }
+      if (combined.kind === 'owner_deferred_state') {
+        distributedOwners.set(normalizedKey, combined.idempotencyOwnerToken);
+        localFallbackKeys.delete(normalizedKey);
+        deferredStateMutationKeys.add(normalizedKey);
         return { kind: 'owner' };
       }
       if (combined.kind === 'replay') return combined;
@@ -247,5 +260,6 @@ export function clearCoordinatedKairaChatIdempotencyForTests() {
   distributedOwners.clear();
   localFallbackKeys.clear();
   stateMutationHandles.clear();
+  deferredStateMutationKeys.clear();
   localStateTails.clear();
 }
