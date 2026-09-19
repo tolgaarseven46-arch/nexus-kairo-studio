@@ -823,3 +823,41 @@ W2 still requires an actual external independent review and separately verified 
 - no issue submission, label or bot comment can open W3 without the separately verified trusted provenance required by section 45.
 
 This change is governance/observability tooling only. It does not satisfy W2, freeze W3, activate W5 fixtures, or alter production Kaira behavior.
+
+
+## 47. Slice B W2 external review received + blocker repair draft (2026-09-19)
+
+An actual independent Claude review artifact was supplied by Tolga and recorded in GitHub issue #338.
+
+Validated intake:
+- reviewer: Claude (Anthropic, Sonnet) — independent chat-session reviewer;
+- 6 BLOCKER;
+- 3 NON-BLOCKER;
+- 2 FUTURE / OUT-OF-SCOPE;
+- initial verdict: `safeToEnterW3AfterRepairs=false`.
+
+The six blocker classes are:
+1. raw `ConversationGraphV1` consumption can become shadow semantic/engagement authority;
+2. persisted unanswered-turn evidence pre-builds frozen R engagement authority;
+3. escalation evidence refs can be accepted without proving the referenced owned evidence exists;
+4. suppression receipt owner identity can be structurally forged;
+5. `environmentId='test'` allowed an omitted `testRunId`;
+6. replay could indirectly resolve `semanticSnapshotRef` from live semantic state.
+
+Current repair draft:
+- add `ConversationGraphEvidenceViewV1` and forbid decision/behavior raw-graph imports;
+- remove unanswered-turn evidence from the persisted production graph until R is formally reopened;
+- require escalation ref resolution + hash verification and route unresolved refs to typed unresolved evidence;
+- require registered decision-owner identity + attestation for suppression receipts;
+- make test namespace require `testRunId` by discriminated union;
+- add a self-contained `ConversationGraphReplayBundleV1` carrying frozen semantic snapshots so replay never calls the live semantic store;
+- harden participant retention, locale-independent event ordering and actorKind platform-fact integrity.
+
+Repair record:
+- `docs/reviews/slice-b-w2-repair-resolution-2026-09-19.md`.
+
+Important gate:
+- these edits do NOT close W2;
+- W3 remains blocked;
+- no W5 characterization or production Conversation Graph implementation may start;
+- an independent re-review of the repair delta must return zero blockers and `safeToEnterW3AfterRepairs=true` with trusted external provenance before W3 freeze.
