@@ -751,3 +751,26 @@ v11 boundary decision:
 - platform conversation kind remains transport metadata and does not become semantic/relationship authority.
 
 Rollout order is intentionally backward-compatible: Kaira accepts `room` first, then PrivatRoom producers switch from the legacy `direct` encoding to `room`.
+
+
+## 43. PrivatRoom-owned room transcript authority v12 (2026-09-19)
+
+Live end-to-end room proof after v11:
+- plain `selam` without any @mention returned Kaira reply `merhaba` — mentionless behavior GREEN;
+- client wall time was 12.187s — latency RED;
+- PrivatRoom observed the request for ~11.58s.
+
+Root cause:
+- `privatRoomDmIntegrationRoute` restored TestSession from Firestore before every room message;
+- `loadTestSession` can wait up to 8s and fetches both session summary and turn collection;
+- TestSession is a proof/observation artifact and must not be the live room transcript authority.
+
+v12 authority repair:
+- PrivatRoom may send typed recent room history in `conversation.roomContext.recentHistory`;
+- the platform owns transcript facts and welcome-message origin;
+- Kaira owns the policy decision for whether that history is still in `first_encounter`;
+- Kaira derives continuity from the supplied typed transcript;
+- when typed room history is present, TestSession restore is skipped completely;
+- legacy direct-message and room callers without typed history retain the existing TestSession fallback.
+
+This removes a test-observability read from the live user-visible critical path without moving semantic, relationship, or first-encounter policy authority into PrivatRoom.
