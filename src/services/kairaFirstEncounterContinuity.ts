@@ -188,11 +188,4 @@ export function buildKairaFirstEncounterInstruction(context?: KairaFirstEncounte
       ? "- Platform gerçeği: aktif kullanıcı bu odanın sahibi."
       : "",
   ].filter(Boolean).join("\n");
-}". Bu bilgiyi yalnız gerçekten ilgiliyse kullan.`
-      : "",
-    context?.isOwner === true
-      ? "- Platform gerçeği: aktif kullanıcı bu odanın sahibi."
-      : "",
-  ].filter(Boolean).join("\n");
 }
-
