@@ -66,7 +66,9 @@ const FIRST_ENCOUNTER_ROOM_ANCHOR_RE =
 const FIRST_ENCOUNTER_ROOM_ACTION_RE =
   /(?:nap\p{L}*|ne\s+yap\p{L}*|nasıl\s+kullan\p{L}*|nasil\s+kullan\p{L}*|ne\s+ol\p{L}*|ne\s+için|ne\s+icin)/iu;
 const FIRST_ENCOUNTER_COLLABORATIVE_ROOM_SETUP_RE =
-  /^(?:(?:peki|ee|e|şimdi)\s+)?(?:(?:ne|neler)\s+yap(?:abiliriz|alım)|nap(?:abiliriz|alım))(?:\s*ki)?[?.!…]*$/iu;
+  /^(?:(?:peki|ee|e|şimdi)\s+)?(?:(?:ne|neler)\s+yap(?:abiliriz|alım|acağız|ıcaz|acaz)|nap(?:abiliriz|alım|acağız|ıcaz|acaz))(?:\s*ki)?[?.!…]*$/iu;
+const FIRST_ENCOUNTER_ROOM_PROPOSAL_RE =
+  /^(?:(?:peki|ee|e|şimdi)\s+)?(?:bir\s+)?(?:oda|kanal)(?:yı|yi|u|ü)?\s+(?:kuralım|açalım)(?:\s+m[ıiuü])?[?.!…]*$/iu;
 
 const FIRST_ENCOUNTER_SECOND_PERSON_MOMENTARY_ACTIVITY_RE =
   /(?:^|\s)(?:sen|kaira)(?=$|\s|[?.!…]).*?(?:nap(?:ıyorsun|ıyosun|iyosun|ıyon|iyon)|ne\s+yap(?:ıyorsun|ıyosun|iyosun|ıyon|iyon))(?=$|\s|[?.!…])/iu;
@@ -80,7 +82,10 @@ const isFirstEncounterRoomScopeQuestion = (
   if (FIRST_ENCOUNTER_SECOND_PERSON_MOMENTARY_ACTIVITY_RE.test(normalized)) {
     return false;
   }
-  if (FIRST_ENCOUNTER_COLLABORATIVE_ROOM_SETUP_RE.test(normalized)) {
+  if (
+    FIRST_ENCOUNTER_COLLABORATIVE_ROOM_SETUP_RE.test(normalized) ||
+    FIRST_ENCOUNTER_ROOM_PROPOSAL_RE.test(normalized)
+  ) {
     return true;
   }
   return (
