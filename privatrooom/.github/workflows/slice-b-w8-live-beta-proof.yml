@@ -1,0 +1,143 @@
+name: Slice B W8 Live Beta Proof
+# Kaira live proof target: d7ec31fc roster-aware graph
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/slice-b-w8-live-beta-proof.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  live-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Wait for deployed W8 observation contract and run live TestRun
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE="https://kelimo-social.onrender.com"
+          OWNER_ID="w8_owner_${GITHUB_RUN_ID}"
+          MEMBER_ID="w8_member_${GITHUB_RUN_ID}"
+          export TEST_RUN_ID="TR_live_beta_slice_b_w8_${GITHUB_RUN_ID}"
+
+          ok=0
+          for deploy_attempt in $(seq 1 36); do
+            ROOM_CODE=$(curl -sS -o /tmp/w8-room.json -w '%{http_code}' \
+              -X POST "$BASE/api/beta/rooms" \
+              -H 'Content-Type: application/json' \
+              --data-binary @- <<JSON
+          {
+            "roomName": "W8 Slice B ${GITHUB_RUN_ID}-${deploy_attempt}",
+            "description": "temporary live proof room",
+            "creatorUid": "$OWNER_ID",
+            "creatorName": "W8 Owner",
+            "isPrivate": true
+          }
+          JSON
+            )
+
+            if [ "$ROOM_CODE" != "201" ]; then
+              sleep 10
+              continue
+            fi
+
+            export ROOM_ID=$(node -e "const p=require('/tmp/w8-room.json'); if(!p?.room?.roomId) process.exit(1); process.stdout.write(p.room.roomId)")
+            echo "W8 candidate room created: $ROOM_ID"
+
+            JOIN_CODE=$(curl -sS -o /tmp/w8-join.json -w '%{http_code}' \
+              -X POST "$BASE/api/beta/rooms/$ROOM_ID/lifecycle" \
+              -H 'Content-Type: application/json' \
+              --data-binary @- <<JSON
+          {
+            "eventType": "participant.joined",
+            "actorUserId": "$MEMBER_ID",
+            "displayName": "W8 Member",
+            "username": "w8_member"
+          }
+          JSON
+            )
+
+            if [ "$JOIN_CODE" != "200" ]; then
+              echo "W8 deploy not ready for participant.joined yet (HTTP $JOIN_CODE); retrying full scenario"
+              cat /tmp/w8-join.json || true
+              sleep 10
+              continue
+            fi
+
+            for chat_attempt in $(seq 1 12); do
+              MESSAGE_ID="w8_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_${deploy_attempt}_${chat_attempt}"
+              HTTP_CODE=$(curl -sS -o /tmp/w8-response.json -w '%{http_code}' \
+                -X POST "$BASE/api/integrations/kaira/beta-room-chat" \
+                -H 'Content-Type: application/json' \
+                -H 'X-Kaira-Test-Mode: test' \
+                -H "X-Kaira-Test-Run-Id: $TEST_RUN_ID" \
+                -H 'X-Kaira-Environment-Id: live-beta' \
+                --data-binary @- <<JSON
+          {
+            "roomId": "$ROOM_ID",
+            "messageId": "$MESSAGE_ID",
+            "text": "w8 slice b observation proof",
+            "userId": "$MEMBER_ID",
+            "userName": "W8 Member",
+            "username": "w8_member"
+          }
+          JSON
+              )
+
+              if [ "$HTTP_CODE" = "200" ]; then
+                if node - <<'NODE'
+          const fs = require('fs');
+          const payload = JSON.parse(fs.readFileSync('/tmp/w8-response.json', 'utf8'));
+          const proof = payload?.conversationGraphObservationProof;
+          if (!payload?.ok || !payload?.testCapture?.persisted || !proof) process.exit(1);
+          if (payload?.testRunId !== process.env.TEST_RUN_ID) process.exit(1);
+          if (proof?.environmentId !== 'live-beta') process.exit(1);
+          if (Number(proof?.participantCount || 0) < 3) process.exit(1);
+          if (Number(proof?.humanParticipantCount || 0) < 2) process.exit(1);
+          if (Number(proof?.droitParticipantCount || 0) < 1) process.exit(1);
+          if (Number(proof?.eventCount || 0) < 2) process.exit(1);
+          if (typeof proof?.snapshotHash !== 'string' || !proof.snapshotHash) process.exit(1);
+          const out = {
+            ok: true,
+            testRunId: payload.testRunId,
+            environmentId: payload.environmentId,
+            eventId: payload.eventId,
+            responseId: payload.responseId,
+            testCapture: payload.testCapture,
+            graphProof: proof
+          };
+          fs.writeFileSync('/tmp/w8-live-proof.json', JSON.stringify(out, null, 2) + '\n');
+          NODE
+                then
+                  ok=1
+                  break 2
+                fi
+              fi
+
+              sleep 10
+            done
+
+            sleep 10
+          done
+
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::W8 live proof did not observe a deployed multi-user Conversation Graph"
+            cat /tmp/w8-room.json || true
+            cat /tmp/w8-join.json || true
+            cat /tmp/w8-response.json || true
+            exit 1
+          fi
+
+          cat /tmp/w8-live-proof.json
+
+      - name: Upload W8 proof artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: slice-b-w8-live-beta-proof
+          path: /tmp/w8-live-proof.json
+          if-no-files-found: error
