@@ -65,6 +65,8 @@ const FIRST_ENCOUNTER_ROOM_ANCHOR_RE =
   /(?:burada|burda|burası|burasi|burayı|burayi|odada|bu\s+oda|oda)/iu;
 const FIRST_ENCOUNTER_ROOM_ACTION_RE =
   /(?:nap\p{L}*|ne\s+yap\p{L}*|nasıl\s+kullan\p{L}*|nasil\s+kullan\p{L}*|ne\s+ol\p{L}*|ne\s+için|ne\s+icin)/iu;
+const FIRST_ENCOUNTER_COLLABORATIVE_ROOM_SETUP_RE =
+  /^(?:(?:peki|ee|e|şimdi)\s+)?(?:(?:ne|neler)\s+yap(?:abiliriz|alım)|nap(?:abiliriz|alım))(?:\s*ki)?[?.!…]*$/iu;
 
 const FIRST_ENCOUNTER_SECOND_PERSON_MOMENTARY_ACTIVITY_RE =
   /(?:^|\s)(?:sen|kaira)(?=$|\s|[?.!…]).*?(?:nap(?:ıyorsun|ıyosun|iyosun|ıyon|iyon)|ne\s+yap(?:ıyorsun|ıyosun|iyosun|ıyon|iyon))(?=$|\s|[?.!…])/iu;
@@ -77,6 +79,9 @@ const isFirstEncounterRoomScopeQuestion = (
   const normalized = message.toLocaleLowerCase("tr-TR").trim();
   if (FIRST_ENCOUNTER_SECOND_PERSON_MOMENTARY_ACTIVITY_RE.test(normalized)) {
     return false;
+  }
+  if (FIRST_ENCOUNTER_COLLABORATIVE_ROOM_SETUP_RE.test(normalized)) {
+    return true;
   }
   return (
     FIRST_ENCOUNTER_ROOM_ANCHOR_RE.test(normalized) &&

@@ -1270,3 +1270,20 @@ Correction:
 - second-person present-activity forms such as `sen/kaira ... ne yapıyorsun/napıyorsun` are excluded from the room-scope fast floor;
 - they remain social `what_doing`, not `room_setup` and not durable `kaira_role`;
 - legacy tests now assert the new authority boundary: explicit durable-role semantics resolve before provider execution.
+
+
+## 63. PrivatRoom live chat quality — collaborative first-encounter room steering (2026-09-20)
+
+Live PrivatRoom testing after the explicit-invite hardening exposed a remaining first-encounter quality failure:
+- short collaborative turns such as `ne yapabiliriz / neler yapabiliriz / peki ne yapalım / napabilirizki` were not recognized as typed room-setup steering;
+- they fell through to the full semantic/provider path, which could answer with unrelated self-state language and added avoidable latency;
+- this was distinct from the persistence/stale-turn bug already fixed on the PrivatRoom side.
+
+Repair:
+- add a bounded structural first-encounter fast floor for collaborative room-steering question forms;
+- map those forms to canonical `platformScopeQuery=room_setup` before provider execution;
+- reuse the existing room-context realizer; no new realization authority is introduced;
+- durable Kaira-role and momentary `what_doing` authority boundaries remain unchanged;
+- regression coverage proves provider bypass only for this narrow collaborative room-setup class.
+
+Closure requires exact-head CI GREEN, merge, Render LIVE, then a fresh live PrivatRoom conversation confirming the reply stays on room/setup context and avoids the unrelated self-state response class.
