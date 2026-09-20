@@ -1,9 +1,9 @@
 name: Build Claude Kaira 3D Intake Bundle
 
 on:
-  push:
+  pull_request:
     branches:
-      - audit/claude-3d-intake-bundle-20260920
+      - main
 
 jobs:
   bundle:
