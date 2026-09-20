@@ -1,0 +1,159 @@
+name: Build Claude Kaira 3D Intake Bundle
+
+on:
+  push:
+    branches:
+      - audit/claude-3d-intake-bundle-20260920
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Kaira
+        uses: actions/checkout@v4
+        with:
+          path: kaira
+          fetch-depth: 0
+
+      - name: Checkout PrivatRoom
+        run: |
+          git clone --depth 1 https://github.com/tolgaarseven46-arch/privatrooom.git privatrooom
+
+      - name: Build intake bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD"
+          OUT="$ROOT/out"
+          PKG="$OUT/kaira-3d-intake"
+          mkdir -p "$PKG/kaira" "$PKG/privatrooom" "$PKG/evidence"
+
+          cp_if_exists() {
+            src="$1"
+            dst="$2"
+            if [ -e "$src" ]; then
+              mkdir -p "$(dirname "$dst")"
+              cp -R "$src" "$dst"
+            fi
+          }
+
+          copy_file_preserve() {
+            repo="$1"
+            rel="$2"
+            destroot="$3"
+            if [ -f "$repo/$rel" ]; then
+              mkdir -p "$destroot/$(dirname "$rel")"
+              cp "$repo/$rel" "$destroot/$rel"
+            fi
+          }
+
+          # Kaira P0/P1: runtime, brain, tests, docs, workflows, config names.
+          for f in server.ts .env.example package.json tsconfig.json AI_CONTEXT.md PROJECT_STATE.md AI_CHANGELOG.md; do
+            copy_file_preserve "$ROOT/kaira" "$f" "$PKG/kaira"
+          done
+
+          for d in src/services src/server src/types src/contracts src/core src/domain src/engine src/runtime docs/adr .github/workflows scripts; do
+            if [ -d "$ROOT/kaira/$d" ]; then
+              mkdir -p "$PKG/kaira/$d"
+              rsync -a                 --exclude 'node_modules'                 --exclude 'dist'                 --exclude 'build'                 --exclude '*.png'                 --exclude '*.jpg'                 --exclude '*.jpeg'                 --exclude '*.webp'                 "$ROOT/kaira/$d/" "$PKG/kaira/$d/"
+            fi
+          done
+
+          # Capture any tests outside the selected brain/runtime directories.
+          while IFS= read -r f; do
+            rel="${f#"$ROOT/kaira/"}"
+            copy_file_preserve "$ROOT/kaira" "$rel" "$PKG/kaira"
+          done < <(find "$ROOT/kaira/src" -type f \( -name '*.test.ts' -o -name '*.spec.ts' -o -name '*.contract.test.ts' \) 2>/dev/null || true)
+
+          # PrivatRoom P0/P1 integration boundary.
+          for f in server.ts .env.example package.json tsconfig.json firestore.rules firebase.json firebase-applet-config.json; do
+            copy_file_preserve "$ROOT/privatrooom" "$f" "$PKG/privatrooom"
+          done
+
+          for d in src/server src/types .github/workflows; do
+            if [ -d "$ROOT/privatrooom/$d" ]; then
+              mkdir -p "$PKG/privatrooom/$d"
+              rsync -a                 --exclude 'node_modules'                 --exclude 'dist'                 --exclude 'build'                 --exclude '*.png'                 --exclude '*.jpg'                 --exclude '*.jpeg'                 --exclude '*.webp'                 "$ROOT/privatrooom/$d/" "$PKG/privatrooom/$d/"
+            fi
+          done
+
+          for f in             src/components/CreateRoomModal.tsx             src/services/roomService.ts             src/firebase.ts             scripts/prove-kaira-explicit-invite-v1.ts             scripts/prove-room-firestore-security.mjs; do
+            copy_file_preserve "$ROOT/privatrooom" "$f" "$PKG/privatrooom"
+          done
+
+          # Include Kaira/room-related files discovered by filename in PrivatRoom.
+          while IFS= read -r f; do
+            rel="${f#"$ROOT/privatrooom/"}"
+            copy_file_preserve "$ROOT/privatrooom" "$rel" "$PKG/privatrooom"
+          done < <(find "$ROOT/privatrooom/src" "$ROOT/privatrooom/scripts" -type f 2>/dev/null |             grep -Ei '(kaira|room|participant|permission|identity|capability|presence|conversation|message)' || true)
+
+          # Exact repository inventories.
+          (cd "$ROOT/kaira" && find . -type f             ! -path './.git/*' ! -path './node_modules/*' ! -path './dist/*' ! -path './build/*' | sort)             > "$PKG/evidence/kaira-all-files.txt"
+          (cd "$ROOT/privatrooom" && find . -type f             ! -path './.git/*' ! -path './node_modules/*' ! -path './dist/*' ! -path './build/*' | sort)             > "$PKG/evidence/privatrooom-all-files.txt"
+
+          # Current SHAs and recent history.
+          {
+            echo "Kaira SHA: $(cd "$ROOT/kaira" && git rev-parse HEAD)"
+            echo "PrivatRoom SHA: $(cd "$ROOT/privatrooom" && git rev-parse HEAD)"
+          } > "$PKG/evidence/source-shas.txt"
+
+          (cd "$ROOT/kaira" && git log -100 --date=iso --pretty=format:'%h | %ad | %s')             > "$PKG/evidence/kaira-recent-commits.txt"
+          (cd "$ROOT/privatrooom" && git log -100 --date=iso --pretty=format:'%h | %ad | %s')             > "$PKG/evidence/privatrooom-recent-commits.txt"
+
+          # Model/config references, without secret values.
+          grep -RInE --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build             '(GEMINI_MODEL|OPENROUTER|providerUsed|local_language|generateText|model[:=])'             "$ROOT/kaira/server.ts" "$ROOT/kaira/src" "$ROOT/kaira/.env.example" 2>/dev/null             > "$PKG/evidence/model-config-code-locations.txt" || true
+
+          # Candidate narrow-path map for Claude to inspect; this is an index, not an analysis.
+          grep -RInE --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build             '(RegExp|_RE\s*=|regex|fast.path|fastPath|realizer|steering|routine|FIRST_ENCOUNTER|platformScopeQuery)'             "$ROOT/kaira/src" 2>/dev/null             > "$PKG/evidence/narrow-path-code-index.txt" || true
+
+          cat > "$PKG/README_FOR_CLAUDE.md" <<'EOF'
+          # Kaira 3D Code Intake Bundle
+
+          This bundle was assembled for a system-level review of whether the implemented runtime can actually produce the intended Kaira character/product.
+
+          ## Included
+          - Kaira runtime entrypoint and environment-name/config examples
+          - Broad Kaira brain/runtime code under src/services plus server/types/contracts/core/domain/engine/runtime when present
+          - Kaira tests located in those areas plus tests discovered elsewhere under src
+          - AI_CONTEXT.md, PROJECT_STATE.md, AI_CHANGELOG.md when present
+          - docs/adr and workflows/scripts relevant to architecture/runtime/proofs
+          - PrivatRoom integration boundary: server, room service, CreateRoomModal, server/types, Firestore rules, Kaira/room-related files and workflows
+          - Exact repository file inventories and source SHAs
+          - Recent commit summaries
+          - Code-location indexes for model/provider config and narrow cue/realizer paths
+
+          ## Intentionally excluded
+          - node_modules, dist, build
+          - images/screenshots and styling-only assets
+          - lockfiles unless incidentally referenced elsewhere
+          - unrelated game/theme/voice UI where not pulled by integration filename filters
+          - secret values
+
+          ## Evidence not fully present in Git repositories
+          The intake manifest also asks for:
+          - one raw 15–20 turn real-user conversation transcript,
+          - a requestId-correlated live log sample,
+          - a KNT report example,
+          - Firestore schema/sample documents if not inferable from code.
+
+          Those should be supplied separately if available. Do not infer their contents from this bundle.
+
+          ## Review instruction
+          Do not reduce the review to individual regexes or recent live bugs.
+          Compare product intent, character identity, authority boundaries, memory/relationship/decision/generation wiring, tests, and actual runtime orchestration as one system.
+          EOF
+
+          # File manifest for exactly what entered the bundle.
+          (cd "$PKG" && find . -type f | sort) > "$PKG/BUNDLE_FILE_MANIFEST.txt"
+
+          cd "$OUT"
+          zip -qr kaira-3d-intake-bundle.zip kaira-3d-intake
+
+      - name: Upload intake bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: kaira-3d-intake-bundle
+          path: out/kaira-3d-intake-bundle.zip
+          if-no-files-found: error
+          retention-days: 7
