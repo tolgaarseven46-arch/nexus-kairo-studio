@@ -107,6 +107,29 @@ describe("platform-scope canonical provider regression", () => {
     expect(result.interpretation.target).toBe("kaira");
   });
 
+  it.each([
+    "ne yapabiliriz",
+    "neler yapabiliriz",
+    "peki ne yapalım",
+    "napabilirizki",
+  ])("routes collaborative first-encounter steering to room_setup without provider latency: %s", async (message) => {
+    const generateText = vi.fn(async () => {
+      throw new Error("semantic provider must not be needed for collaborative room setup steering");
+    });
+
+    const result = await resolveServerLanguageUnderstanding({
+      message,
+      preferredProvider: "openrouter",
+      preferTrivialSocialFastPath: true,
+      firstEncounterContext: { roomName: "deneme", isOwner: true },
+      context: { userName: "Tolga", characterName: "Kaira" },
+      generateText,
+    });
+
+    expect(generateText).not.toHaveBeenCalled();
+    expect(result.interpretation.discourseFacets.platformScopeQuery).toBe("room_setup");
+  });
+
   it("does not turn ambiguous momentary what_doing into durable Kaira-role fast-floor semantics", async () => {
     const message = "sen napıyosun burda";
     const generateText = vi.fn(async () => JSON.stringify(interpretation(message)));
