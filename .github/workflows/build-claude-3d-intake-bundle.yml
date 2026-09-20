@@ -16,10 +16,6 @@ jobs:
           path: kaira
           fetch-depth: 0
 
-      - name: Checkout PrivatRoom
-        run: |
-          git clone --depth 1 https://github.com/tolgaarseven46-arch/privatrooom.git privatrooom
-
       - name: Build intake bundle
         shell: bash
         run: |
@@ -68,38 +64,38 @@ jobs:
 
           # PrivatRoom P0/P1 integration boundary.
           for f in server.ts .env.example package.json tsconfig.json firestore.rules firebase.json firebase-applet-config.json; do
-            copy_file_preserve "$ROOT/privatrooom" "$f" "$PKG/privatrooom"
+            copy_file_preserve "$ROOT/kaira/privatrooom" "$f" "$PKG/privatrooom"
           done
 
           for d in src/server src/types .github/workflows; do
-            if [ -d "$ROOT/privatrooom/$d" ]; then
+            if [ -d "$ROOT/kaira/privatrooom/$d" ]; then
               mkdir -p "$PKG/privatrooom/$d"
-              rsync -a                 --exclude 'node_modules'                 --exclude 'dist'                 --exclude 'build'                 --exclude '*.png'                 --exclude '*.jpg'                 --exclude '*.jpeg'                 --exclude '*.webp'                 "$ROOT/privatrooom/$d/" "$PKG/privatrooom/$d/"
+              rsync -a                 --exclude 'node_modules'                 --exclude 'dist'                 --exclude 'build'                 --exclude '*.png'                 --exclude '*.jpg'                 --exclude '*.jpeg'                 --exclude '*.webp'                 "$ROOT/kaira/privatrooom/$d/" "$PKG/privatrooom/$d/"
             fi
           done
 
           for f in             src/components/CreateRoomModal.tsx             src/services/roomService.ts             src/firebase.ts             scripts/prove-kaira-explicit-invite-v1.ts             scripts/prove-room-firestore-security.mjs; do
-            copy_file_preserve "$ROOT/privatrooom" "$f" "$PKG/privatrooom"
+            copy_file_preserve "$ROOT/kaira/privatrooom" "$f" "$PKG/privatrooom"
           done
 
           # Include Kaira/room-related files discovered by filename in PrivatRoom.
           while IFS= read -r f; do
-            rel="${f#"$ROOT/privatrooom/"}"
-            copy_file_preserve "$ROOT/privatrooom" "$rel" "$PKG/privatrooom"
-          done < <(find "$ROOT/privatrooom/src" "$ROOT/privatrooom/scripts" -type f 2>/dev/null |             grep -Ei '(kaira|room|participant|permission|identity|capability|presence|conversation|message)' || true)
+            rel="${f#"$ROOT/kaira/privatrooom/"}"
+            copy_file_preserve "$ROOT/kaira/privatrooom" "$rel" "$PKG/privatrooom"
+          done < <(find "$ROOT/kaira/privatrooom/src" "$ROOT/kaira/privatrooom/scripts" -type f 2>/dev/null |             grep -Ei '(kaira|room|participant|permission|identity|capability|presence|conversation|message)' || true)
 
           # Exact repository inventories.
           (cd "$ROOT/kaira" && find . -type f             ! -path './.git/*' ! -path './node_modules/*' ! -path './dist/*' ! -path './build/*' | sort)             > "$PKG/evidence/kaira-all-files.txt"
-          (cd "$ROOT/privatrooom" && find . -type f             ! -path './.git/*' ! -path './node_modules/*' ! -path './dist/*' ! -path './build/*' | sort)             > "$PKG/evidence/privatrooom-all-files.txt"
+          (cd "$ROOT/kaira/privatrooom" && find . -type f             ! -path './.git/*' ! -path './node_modules/*' ! -path './dist/*' ! -path './build/*' | sort)             > "$PKG/evidence/privatrooom-all-files.txt"
 
           # Current SHAs and recent history.
           {
             echo "Kaira SHA: $(cd "$ROOT/kaira" && git rev-parse HEAD)"
-            echo "PrivatRoom SHA: $(cd "$ROOT/privatrooom" && git rev-parse HEAD)"
+            echo "PrivatRoom SHA: 468c3674f93dc06d0f64ca11ef167da713d91066 (snapshot copied into audit branch)"
           } > "$PKG/evidence/source-shas.txt"
 
           (cd "$ROOT/kaira" && git log -100 --date=iso --pretty=format:'%h | %ad | %s')             > "$PKG/evidence/kaira-recent-commits.txt"
-          (cd "$ROOT/privatrooom" && git log -100 --date=iso --pretty=format:'%h | %ad | %s')             > "$PKG/evidence/privatrooom-recent-commits.txt"
+          (cd "$ROOT/kaira/privatrooom" && git log -100 --date=iso --pretty=format:'%h | %ad | %s')             > "$PKG/evidence/privatrooom-recent-commits.txt"
 
           # Model/config references, without secret values.
           grep -RInE --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build             '(GEMINI_MODEL|OPENROUTER|providerUsed|local_language|generateText|model[:=])'             "$ROOT/kaira/server.ts" "$ROOT/kaira/src" "$ROOT/kaira/.env.example" 2>/dev/null             > "$PKG/evidence/model-config-code-locations.txt" || true
