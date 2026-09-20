@@ -112,6 +112,11 @@ describe("platform-scope canonical provider regression", () => {
     "neler yapabiliriz",
     "peki ne yapalım",
     "napabilirizki",
+    "ee napıcaz",
+    "napıcaz",
+    "ne yapıcaz",
+    "oda kuralım mı",
+    "kanal açalım mı",
   ])("routes collaborative first-encounter steering to room_setup without provider latency: %s", async (message) => {
     const generateText = vi.fn(async () => {
       throw new Error("semantic provider must not be needed for collaborative room setup steering");
