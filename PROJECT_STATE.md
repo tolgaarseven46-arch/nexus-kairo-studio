@@ -1287,3 +1287,26 @@ Repair:
 - regression coverage proves provider bypass only for this narrow collaborative room-setup class.
 
 Closure requires exact-head CI GREEN, merge, Render LIVE, then a fresh live PrivatRoom conversation confirming the reply stays on room/setup context and avoids the unrelated self-state response class.
+
+
+## 64. Kaira development freeze / social-platform separation (2026-09-20)
+
+Product decision:
+- Kaira development is frozen at current production/code state.
+- No new Kaira behavior feature, conversation-quality fix, refactor, architecture simplification, model-routing experiment, or runtime change will be made while the social-media platform is being completed.
+- The social-media/PrivatRoom project proceeds as a separate product track.
+- Kaira and PrivatRoom may remain connected only through their already-defined integration boundary; this freeze does not authorize new cross-project coupling.
+- Existing Kaira code, tests, ADRs, memory/relationship/KDM/KTM systems, explicit-invite integration, and production evidence are preserved as-is for a later restart.
+- Any future Kaira restart must begin from this frozen checkpoint and an explicit product decision; do not silently resume old open ideas or speculative patches.
+
+Frozen Kaira checkpoint:
+- main: `fae784ab9f8f9c90df789c99c5f53d5766e12462`
+- open Kaira issues: 0
+- open Kaira PRs: 0
+- latest architecture assessment: foundation is usable but should be simplified before further character-quality expansion.
+- no production rollback is implied by this freeze.
+
+Priority after freeze:
+1. Complete PrivatRoom/social-media platform independently.
+2. Do not modify Kaira unless a platform-critical integration defect requires an explicit exception.
+3. Revisit Kaira only after the social-media product is complete enough for a fresh integration phase.
